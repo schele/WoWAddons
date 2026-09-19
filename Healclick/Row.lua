@@ -220,6 +220,13 @@ function Row.Create(unit, parent)
         button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
         button.icon:Hide()
 
+        -- The action bar's own hover highlight, so these buttons light up
+        -- under the cursor the way the ones beside them do. The client draws
+        -- it; there is no OnEnter or OnLeave to write, and nothing to undo
+        -- when the cursor leaves. ADD blends it as a glow over the icon
+        -- rather than laying an opaque square on top of it.
+        button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+
         -- Blizzard's own cooldown widget, so the sweep is the one the action
         -- bars draw and the client animates it for us; all we ever hand it is
         -- a start and a duration.

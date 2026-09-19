@@ -185,6 +185,15 @@ local function makeWidget(kind, parent, template, env)
     function widget:GetTexture() return self.texture end
     function widget:SetTexCoord(...) self.texCoord = { ... } end
 
+    -- Recorded as plain fields rather than behind a getter: the real
+    -- GetHighlightTexture hands back a Texture object, not the path, so a
+    -- stub accessor returning the path would be teaching a test something
+    -- the client does not do.
+    function widget:SetHighlightTexture(value, blend)
+        self.highlightTexture = value
+        self.highlightBlend = blend
+    end
+
     -- The client animates the sweep itself; all an addon ever does is hand
     -- it a start and a duration, so that pair is the whole observable state.
     function widget:SetCooldown(start, duration)
