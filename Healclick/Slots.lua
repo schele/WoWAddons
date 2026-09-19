@@ -100,3 +100,51 @@ function Slots.Seed(class)
         end
     end
 end
+
+-- Declared next to the code that reads them. Settings.lua renders whatever has
+-- been declared, so adding one here needs no edit there.
+--
+-- Every onChange routes through Group.ApplyAll rather than writing attributes
+-- directly, because that is the one place that knows to wait for combat.
+ns.RegisterSetting({
+    store = "bar",
+    key = "slots",
+    type = "slider",
+    name = "Buttons per player",
+    min = 1,
+    max = Slots.MAX,
+    step = 1,
+    onChange = function()
+        if ns.Group then ns.Group.ApplyAll() end
+    end,
+})
+
+ns.RegisterSetting({
+    store = "bar",
+    key = "selfBottom",
+    type = "checkbox",
+    name = "Put my row at the bottom",
+    tooltip = "Whether you sit above the party or below it.",
+    onChange = function()
+        if ns.Group then ns.Group.ApplyAll() end
+    end,
+})
+
+ns.RegisterSetting({
+    store = "bar",
+    key = "spells",
+    type = "spelltable",
+    name = "Spells",
+    rows = Slots.MAX,
+    onChange = function()
+        if ns.Group then ns.Group.ApplyAll() end
+    end,
+})
+
+ns.RegisterSetting({
+    store = "bar",
+    key = "locked",
+    type = "checkbox",
+    name = "Lock the frame",
+    tooltip = "Stops the bar being dragged around by accident.",
+})
