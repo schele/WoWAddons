@@ -915,3 +915,93 @@ describe("hanging a row off Blizzard's unit frame", function()
         assertFalse(ns.Row.Attached())
     end)
 end)
+
+describe("the remaining time under an icon", function()
+    it("writes seconds, minutes and hours the way the game's buff frames do", function()
+        local ns = loggedIn()
+
+        assertEqual("7s", ns.Row.FormatDuration(6.2), "seconds round up, so a live buff never reads 0s")
+        assertEqual("1m", ns.Row.FormatDuration(90), "minutes round down, so 90s is not 2m")
+        assertEqual("38m", ns.Row.FormatDuration(2280))
+        assertEqual("1h", ns.Row.FormatDuration(3700))
+    end)
+
+    it("writes nothing at all when there is nothing to count", function()
+        local ns = loggedIn()
+
+        assertEqual("", ns.Row.FormatDuration(nil))
+        assertEqual("", ns.Row.FormatDuration(0))
+        assertEqual("", ns.Row.FormatDuration(-5))
+    end)
+
+    it("counts down the player's own buff on that row's unit", function()
+        local ns, env = loggedIn()
+        ns.db.bar.slots = 1
+        ns.Slots.Set(1, "Rejuvenation")
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+
+        env.__now = 1000
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1007 } }
+
+        ns.Row.Refresh(row)
+
+        assertEqual("7s", row.buttons[1].timer:GetText())
+    end)
+
+    it("leaves the icon unlabelled when the buff is not on that unit", function()
+        -- Blank is the signal to click: this person does not have it.
+        local ns, env = loggedIn()
+        ns.db.bar.slots = 1
+        ns.Slots.Set(1, "Rejuvenation")
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+
+        env.__auras.party1 = { { name = "Mark of the Wild", expirationTime = 9999 } }
+
+        ns.Row.Refresh(row)
+
+        assertEqual("", row.buttons[1].timer:GetText())
+    end)
+
+    it("clears a number that has run out rather than leaving it frozen", function()
+        local ns, env = loggedIn()
+        ns.db.bar.slots = 1
+        ns.Slots.Set(1, "Rejuvenation")
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+
+        env.__now = 1000
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1007 } }
+        ns.Row.Refresh(row)
+
+        env.__now = 1008
+        ns.Row.Refresh(row)
+
+        assertEqual("", row.buttons[1].timer:GetText())
+    end)
+
+    it("asks the client for a unit's auras once, not once per button", function()
+        -- Eight buttons on each of five rows, five times a second, is
+        -- thousands of calls into the client every second if each button
+        -- asks for itself.
+        local ns, env = loggedIn()
+        ns.db.bar.slots = 3
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.Slots.Set(2, "Regrowth")
+        ns.Slots.Set(3, "Remove Curse")
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+
+        local asked = 0
+        local real = env.C_UnitAuras.GetAuraDataByIndex
+        env.C_UnitAuras.GetAuraDataByIndex = function(...)
+            asked = asked + 1
+            return real(...)
+        end
+
+        ns.Row.RefreshAuras(row)
+
+        assertTrue(asked <= 2, "one walk that stops at the first gap, not one per button")
+    end)
+end)

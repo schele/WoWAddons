@@ -50,6 +50,12 @@ read. Healclick does not guess. Where it cannot tell, it leaves the icon lit,
 because being told a spell is out of reach when it is not costs you a cast you
 had.
 
+Under each icon is how long your own copy of that spell has left on that
+person — 7s of Rejuvenation ticking down on one party member, 38m of Mark of
+the Wild on another. Blank means it is not on them, which is the signal to
+click. It depends on the client being willing to say, on the same terms as
+range above.
+
 Buttons show the cooldown sweep, the same one the action bars draw — including
 the global cooldown, so a click gives you the feedback you expect.
 

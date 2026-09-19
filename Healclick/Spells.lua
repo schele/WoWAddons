@@ -234,3 +234,84 @@ function Spells.Known()
     table.sort(names)
     return names
 end
+
+-- How deep to look through a unit's auras. Forty is past anything a party
+-- member carries, and the walk stops at the first gap anyway; the cap only
+-- matters on a client that answers for every index it is asked about.
+local AURA_LIMIT = 40
+
+-- Helpful auras this player cast, which is the only kind a Healclick button
+-- can be responsible for. Someone else's Rejuvenation on the same target is
+-- not this button's business.
+local AURA_FILTER = "HELPFUL|PLAYER"
+
+--- When each of the player's own helpful auras on `unit` expires, by spell
+-- name. Empty when there are none, or when the client will not say.
+--
+-- Gathered per unit rather than asked per button: with eight buttons on each
+-- of five rows, refreshed five times a second, asking per button would be
+-- thousands of calls into the client every second for the same answers.
+--
+-- Guarded, like every other read here that the client might hand back as a
+-- secret value -- an expiry time is exactly the sort of combat-relevant
+-- number this client family has started withholding.
+function Spells.PlayerAuras(unit)
+    if not unit then
+        return {}
+    end
+
+    return ns.Guarded(function()
+        local expiries = {}
+
+        for index = 1, AURA_LIMIT do
+            local name, expires
+
+            if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+                local data = C_UnitAuras.GetAuraDataByIndex(unit, index, AURA_FILTER)
+                if type(data) ~= "table" then
+                    break
+                end
+                name, expires = data.name, data.expirationTime
+            elseif UnitAura then
+                -- name, icon, count, dispelType, duration, expirationTime
+                local found, _, _, _, _, expirationTime = UnitAura(unit, index, AURA_FILTER)
+                if not found then
+                    break
+                end
+                name, expires = found, expirationTime
+            else
+                break
+            end
+
+            -- First wins: a spell appearing twice is the same spell, and the
+            -- one the client lists first is the one it considers current.
+            if type(name) == "string" and expiries[name] == nil then
+                expiries[name] = expires or 0
+            end
+        end
+
+        return expiries
+    end, {})
+end
+
+--- Seconds left on the player's own `spellName` aura on `unit`, or nil when
+-- it is not there, never expires, or cannot be read.
+--
+-- nil rather than 0 throughout: a slot with nothing on it and a slot whose
+-- buff has just run out both mean "no number to show", and neither is worth
+-- distinguishing under a 22 pixel icon.
+function Spells.AuraRemaining(unit, spellName, auras)
+    if type(spellName) ~= "string" or spellName == "" then
+        return nil
+    end
+
+    auras = auras or Spells.PlayerAuras(unit)
+
+    local expires = auras[spellName]
+    if not expires or expires == 0 then
+        return nil
+    end
+
+    local remaining = expires - (GetTime and GetTime() or 0)
+    return remaining > 0 and remaining or nil
+end

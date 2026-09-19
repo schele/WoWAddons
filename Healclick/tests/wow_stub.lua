@@ -384,6 +384,24 @@ function stub.newEnv()
     --   env.__spellRanges["Rejuvenation:party1"] = false
     env.__spellRanges = {}
 
+    -- The clock the client counts auras against. Fixed rather than real, so
+    -- a test can say "this expires in seven seconds" and mean it.
+    env.__now = 1000
+    function env.GetTime() return env.__now end
+
+    -- Auras the player has put on each unit, in the order the client would
+    -- hand them back: env.__auras.party1 = { { name = "Rejuvenation",
+    -- expirationTime = 1012 } }. An expirationTime of 0 is how the client
+    -- says an aura never runs out.
+    env.__auras = {}
+
+    env.C_UnitAuras = {
+        GetAuraDataByIndex = function(unit, index)
+            local list = env.__auras[unit]
+            return list and list[index] or nil
+        end,
+    }
+
     -- A numeric spellID -> name lookup, standing in for the shape some
     -- clients hand GetCursorInfo back with for a spellbook drag.
     env.__spellIDs = {

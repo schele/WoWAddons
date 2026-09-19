@@ -277,6 +277,11 @@ function Row.Create(unit, parent)
         -- rather than laying an opaque square on top of it.
         button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
 
+        -- Just below the icon rather than across it: at 22 pixels there is
+        -- no room to lay a number over the art and still read either.
+        button.timer = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        button.timer:SetPoint("TOP", button, "BOTTOM", 0, 1)
+
         -- Blizzard's own cooldown widget, so the sweep is the one the action
         -- bars draw and the client animates it for us; all we ever hand it is
         -- a start and a duration.
@@ -569,6 +574,47 @@ function Row.RefreshRange(row)
     end
 end
 
+--- How long is left, written the way the game's own buff frames write it.
+--
+-- One unit, never two: under a 22 pixel icon "38m" is readable and "38m 12s"
+-- is a smear. Seconds round up so a buff still running never reads 0s, and
+-- minutes round down so one that has just over a minute left does not claim
+-- two.
+function Row.FormatDuration(seconds)
+    if not seconds or seconds <= 0 then
+        return ""
+    end
+
+    if seconds < 60 then
+        return string.format("%ds", math.ceil(seconds))
+    end
+
+    if seconds < 3600 then
+        return string.format("%dm", math.max(math.floor(seconds / 60), 1))
+    end
+
+    return string.format("%dh", math.max(math.floor(seconds / 3600), 1))
+end
+
+--- Write the remaining time of each button's own spell on this row's unit.
+--
+-- The unit's auras are gathered once and shared across the row's buttons.
+-- Asked per button instead, eight buttons on each of five rows refreshed
+-- five times a second would be thousands of calls into the client every
+-- second, nearly all of them repeats.
+function Row.RefreshAuras(row)
+    local auras = ns.Spells.PlayerAuras(row.unit)
+
+    for index = 1, ns.Slots.MAX do
+        local button = row.buttons[index]
+        local spell = button:GetAttribute("spell")
+
+        button.timer:SetText(Row.FormatDuration(
+            spell and ns.Spells.AuraRemaining(row.unit, spell, auras) or nil
+        ))
+    end
+end
+
 --- Name, colour, health and the dim state. Touches nothing secure, so this is
 -- safe at any time, including mid-fight when it matters most.
 function Row.Refresh(row)
@@ -609,4 +655,5 @@ function Row.Refresh(row)
     row:SetAlpha(Row.Reachable(unit) and 1 or DIM)
 
     Row.RefreshRange(row)
+    Row.RefreshAuras(row)
 end

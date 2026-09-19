@@ -308,3 +308,74 @@ describe("listing the spells the player knows", function()
         assertEqual(1, #ns.Spells.Known())
     end)
 end)
+
+describe("reading the player's own buffs on a unit", function()
+    it("collects them by name, with when each runs out", function()
+        local ns, env = loggedIn()
+        env.__auras.party1 = {
+            { name = "Rejuvenation", expirationTime = 1012 },
+            { name = "Mark of the Wild", expirationTime = 3280 },
+        }
+
+        local auras = ns.Spells.PlayerAuras("party1")
+
+        assertEqual(1012, auras.Rejuvenation)
+        assertEqual(3280, auras["Mark of the Wild"])
+    end)
+
+    it("is empty rather than broken for a unit with nothing on it", function()
+        local ns = loggedIn()
+        assertEqual(0, #ns.Spells.PlayerAuras("party1"))
+    end)
+
+    it("is empty when the client keeps its auras secret", function()
+        local ns, env = loggedIn()
+        env.C_UnitAuras.GetAuraDataByIndex = function() error("secret value") end
+
+        local ok, auras = pcall(ns.Spells.PlayerAuras, "party1")
+        assertTrue(ok, "a secret aura must not take the row down with it")
+        assertNil(auras.Rejuvenation)
+    end)
+
+    it("counts down from the clock the client keeps", function()
+        local ns, env = loggedIn()
+        env.__now = 1000
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1012 } }
+
+        assertEqual(12, ns.Spells.AuraRemaining("party1", "Rejuvenation"))
+    end)
+
+    it("says nothing for a spell that is not on the unit", function()
+        local ns, env = loggedIn()
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1012 } }
+
+        assertNil(ns.Spells.AuraRemaining("party1", "Mark of the Wild"))
+    end)
+
+    it("says nothing for an aura that never runs out", function()
+        -- The client writes a permanent aura as expiring at zero. Subtracting
+        -- the clock from that would show a large negative countdown.
+        local ns, env = loggedIn()
+        env.__auras.party1 = { { name = "Mark of the Wild", expirationTime = 0 } }
+
+        assertNil(ns.Spells.AuraRemaining("party1", "Mark of the Wild"))
+    end)
+
+    it("says nothing once the aura has run out", function()
+        local ns, env = loggedIn()
+        env.__now = 1020
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1012 } }
+
+        assertNil(ns.Spells.AuraRemaining("party1", "Rejuvenation"))
+    end)
+
+    it("takes an already-gathered list rather than asking again", function()
+        -- What lets a row ask once and answer for all eight of its buttons.
+        local ns, env = loggedIn()
+        env.__now = 1000
+        local gathered = { Rejuvenation = 1009 }
+        env.C_UnitAuras.GetAuraDataByIndex = function() error("must not be asked") end
+
+        assertEqual(9, ns.Spells.AuraRemaining("party1", "Rejuvenation", gathered))
+    end)
+end)
