@@ -150,9 +150,28 @@ describe("labelling a spell button", function()
         assertEqual("MW", ns.Row.Label("Mark of the Wild"))
     end)
 
+    it("keeps a short word that is significant rather than filler", function()
+        -- "Cat", "Ice" and "War" are exactly as short as "the", but dropping
+        -- them the way a length rule would leaves a single letter that
+        -- disambiguates nothing -- the whole reason Row.Label exists. Only a
+        -- fixed stopword list, not word length, can tell these apart from
+        -- "of" or "the".
+        local ns = loggedIn()
+        assertEqual("CF", ns.Row.Label("Cat Form"))
+        assertEqual("IB", ns.Row.Label("Ice Block"))
+        assertEqual("WS", ns.Row.Label("War Stomp"))
+    end)
+
     it("strips punctuation before taking a word's first letter", function()
         local ns = loggedIn()
         assertEqual("PWF", ns.Row.Label("Power Word: Fortitude"))
+    end)
+
+    it("matches the rest of the worked examples", function()
+        local ns = loggedIn()
+        assertEqual("FL", ns.Row.Label("Flash of Light"))
+        assertEqual("BF", ns.Row.Label("Bear Form"))
+        assertEqual("CP", ns.Row.Label("Cure Poison"))
     end)
 
     it("returns an empty string for no spell at all", function()

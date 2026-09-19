@@ -70,17 +70,30 @@ local function withoutPunctuation(word)
     return (word:gsub("%p", ""))
 end
 
---- A word too short to distinguish a spell on its own -- "of", "the" and the
--- like -- skipped when a multi-word label is built.
-local function isMinorWord(word)
-    return #characters(word) <= 3
+-- A fixed list, not a length rule: "Cat", "Ice" and "War" are short but
+-- carry the spell's meaning ("Cat Form", "Ice Block", "War Stomp" all need
+-- their first letter), so word length cannot tell a filler word from a
+-- significant one. Only these specific connectives are ever dropped.
+local STOP_WORDS = {
+    ["of"] = true,
+    ["the"] = true,
+    ["a"] = true,
+    ["an"] = true,
+    ["and"] = true,
+    ["to"] = true,
+}
+
+--- A connective skipped when a multi-word label is built, compared
+-- case-insensitively against the fixed list above.
+local function isStopWord(word)
+    return STOP_WORDS[word:lower()] == true
 end
 
 --- The text a button shows for a spell, since there is no icon.
 -- A single-word name gives its first four characters. A multi-word name
--- gives the first letter of each significant word (short connectives like
--- "of" and "the" are dropped, unless dropping them would leave nothing),
--- which is what keeps "Remove Curse" from reading the same as "Regrowth".
+-- gives the first letter of each significant word (the connectives in
+-- STOP_WORDS are dropped, unless dropping them would leave nothing), which
+-- is what keeps "Remove Curse" from reading the same as "Regrowth".
 function Row.Label(spellName)
     if type(spellName) ~= "string" or spellName == "" then
         return ""
@@ -99,7 +112,7 @@ function Row.Label(spellName)
 
     local significant = {}
     for _, word in ipairs(words) do
-        if not isMinorWord(withoutPunctuation(word)) then
+        if not isStopWord(withoutPunctuation(word)) then
             table.insert(significant, word)
         end
     end
