@@ -11,6 +11,10 @@ local BOX_HEIGHT = 24
 -- Wide enough for a 200px slider or the spell table's boxes (which reach
 -- x=216 from the column's left edge) with room to spare. Two of these is the
 -- whole panel, and comfortably inside the canvas the game gives us.
+-- Big enough to read as a logo beside a GameFontNormalLarge title without
+-- crowding the line the hint sits on just below it.
+local LOGO_SIZE = 24
+
 local COLUMN_WIDTH = 280
 local PANEL_WIDTH = COLUMN_WIDTH * 2
 
@@ -180,8 +184,20 @@ local function ensureBuilt()
     end
     built = true
 
+    -- The addon's own icon, the one the AddOns list shows, built from
+    -- addonName rather than spelled out: the .toc already points at this
+    -- file, and a second copy of the path here would be the thing that goes
+    -- stale when the folder is renamed.
+    local logo = panel:CreateTexture(nil, "ARTWORK")
+    logo:SetSize(LOGO_SIZE, LOGO_SIZE)
+    logo:SetPoint("TOPLEFT", PADDING, -PADDING)
+    logo:SetTexture("Interface\\AddOns\\" .. addonName .. "\\icon")
+    Panel.logo = logo
+
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", PADDING, -PADDING)
+    -- Centred against the icon rather than pinned to the panel, so the two
+    -- read as one heading whatever size the icon is given.
+    title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
     title:SetText("Healclick")
 
     -- From the addon's own metadata, not a constant here, which would drift

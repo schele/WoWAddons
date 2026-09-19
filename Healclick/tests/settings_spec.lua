@@ -283,3 +283,30 @@ describe("the two columns", function()
         assertTrue(headingY > firstY, "the title sits above what it titles")
     end)
 end)
+
+describe("the panel's heading", function()
+    it("shows the addon's own icon", function()
+        local ns = loggedIn()
+        assertEqual(
+            [[Interface\AddOns\Healclick\icon]],
+            ns.SettingsPanel.logo:GetTexture()
+        )
+    end)
+
+    it("builds the icon path from the addon name, not a second copy of it", function()
+        -- The .toc already points at this file. A path spelled out here as
+        -- well is the one that goes stale when the folder is renamed.
+        local ns = loggedIn()
+        assertTrue(
+            ns.SettingsPanel.logo:GetTexture():find("Healclick", 1, true) ~= nil
+        )
+    end)
+
+    it("hangs the title off the icon rather than off the panel", function()
+        local ns = loggedIn()
+        local point, relativeTo = ns.SettingsPanel.logo:GetPoint()
+
+        assertEqual("TOPLEFT", point, "the icon leads the line")
+        assertTrue(ns.SettingsPanel.logo:GetWidth() > 0, "and has a size to draw at")
+    end)
+end)
