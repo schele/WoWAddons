@@ -89,8 +89,10 @@ the shape the other two addons established:
   are in use.
 - `Slots.Count()` - how many slots are configured, 1 to `MAX`.
 - `Slots.Spell(index)` - the spell name in that slot, or nil.
-- `Slots.Set(index, spellName)` - validates and stores. Returns false and a
-  reason for a name the client does not know.
+- `Slots.Set(index, spellName)` - stores, and returns `ok, message`. A name
+  the client does not know is still stored; `message` carries the warning. An
+  empty string clears the slot. Only a slot number outside 1..`MAX` returns
+  false.
 - `Slots.Seed(class)` - fill empty slots with a sensible starting set for that
   class, taken from `UnitClass("player")` at login. See Defaults.
 
@@ -243,10 +245,18 @@ settings - dragged and computed respectively - so they sit outside it.
 pressable and does nothing is the same failure as a slot wired to a spell the
 client does not know.
 
-A spell name is validated against `GetSpellInfo` as it is entered. A name the
-client does not recognise is reported to the player, not stored - a slot that
-silently does nothing is the worst outcome available, and it is exactly what
-`RegisterSetting`'s default assertion exists to prevent elsewhere in this repo.
+A spell name is checked against `GetSpellInfo` as it is entered, and **kept
+either way**, with a warning when the client does not recognise it.
+
+Rejecting an unrecognised name was this document's first answer and it was
+wrong. `GetSpellInfo` only knows spells the character has actually learned, so
+a level 5 Druid would be refused the Remove Curse they get at 24 - and the
+seeded defaults below would be refused wholesale, since a Druid has none of
+them at level 5. Setting up a spell you are levelling towards is sensible, not
+a typo.
+
+So the warning exists to catch the typo without blocking the plan: Healclick
+says "that is not a spell you know yet" once, and keeps what you typed.
 
 ### Defaults, and a risk
 
@@ -295,7 +305,7 @@ family - `UnitExists`, `UnitName`, `UnitClass`, `UnitHealth`, `UnitHealthMax`,
 | File | Covers |
 |---|---|
 | `addon_spec.lua` | Defaults, the command dispatch, the setting registry |
-| `slots_spec.lua` | Count clamping; a spell the client knows; a spell it does not; seeding; a deliberately emptied slot staying empty |
+| `slots_spec.lua` | Count clamping; a spell the client knows; a spell it does not, kept with a warning; seeding; a deliberately emptied slot staying empty |
 | `row_spec.lua` | The three attributes per button, with the right unit; buttons past the count hidden; dim state for dead, offline and out of range |
 | `group_spec.lua` | Five rows; your row first by default and last when `selfBottom` is set, with the party in party order either way; layout arithmetic; `RegisterUnitWatch` called once per row |
 | `combat_spec.lua` | A change during combat is held and not written; it is applied on `PLAYER_REGEN_ENABLED`; nothing secure is touched in the meantime |
