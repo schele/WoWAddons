@@ -119,8 +119,9 @@ where it does not:
 
 **`Group.lua`** - `ns.Group`:
 
-- `Group.UNITS` - `{ "player", "party1", "party2", "party3", "party4" }`, in
-  display order, you at the top.
+- `Group.Units()` - the five units in display order. `party1` through `party4`
+  keep party order; `player` goes first or last according to `bar.selfBottom`.
+  A function rather than a constant, because the order is the player's choice.
 - `Group.Build()` - creates the anchor and one row per unit, once, at login.
 - `Group.Layout()` - stacks the rows and sizes the anchor.
 - `Group.ApplyAll()` - `Row.ApplySpells` for every row, or queues it if in
@@ -140,7 +141,8 @@ registers the category, as in UrlCopy. Adds one control type: a slot table.
   +- row dims when the unit is dead, offline, or out of range
 ```
 
-Five rows, in `Group.UNITS` order, the player at the top.
+Five rows, in `Group.Units()` order - the party in party order, with your own
+row above them or below them as you prefer.
 
 The dimming is not decoration. Clicking a heal on someone dead or out of range
 burns a global cooldown and returns nothing. `UnitIsDeadOrGhost` and
@@ -184,10 +186,15 @@ mid-fight. Ours is the one call; the combat-legal part is Blizzard's.
 ### One rule, everywhere
 
 **No secure change happens in combat.** Writing a spell attribute, changing the
-slot count, showing or hiding a button - all blocked once the player is in
-combat. Healclick holds any pending change and applies it on
+slot count, showing or hiding a button, **and re-ordering the rows** - all of
+it waits. Healclick holds any pending change and applies it on
 `PLAYER_REGEN_ENABLED`, the same shape `ChatKeys.Apply` already uses for
 bindings in ForeverPanel.
+
+Row order is in that list because moving a row moves the secure buttons inside
+it. Whether the client actually refuses a `SetPoint` on a frame that merely
+*contains* protected children, as opposed to on a protected frame itself, is
+something this document assumes rather than knows - see the spike.
 
 This is also why every row builds `Slots.MAX` buttons at load rather than the
 configured number: growing the bar later must never need a frame created at a
@@ -203,9 +210,10 @@ Stored in `HealclickDB`:
 {
     version = 1,
     bar     = {
-        slots  = 4,
-        locked = false,
-        spells = {},           -- index -> spell name
+        slots      = 4,
+        locked     = false,
+        selfBottom = false,    -- your own row: top by default
+        spells     = {},       -- index -> spell name
     },
     anchor  = { point = "CENTER", x = 0, y = -200 },
     seeded  = false,
@@ -217,8 +225,14 @@ The panel, in declaration order:
 | Control | Store | Default | Does |
 |---|---|---|---|
 | Buttons per player | `bar.slots` | 4 | Slider, 1-8. Applies out of combat |
+| Put my row at the bottom | `bar.selfBottom` | off | Whether you sit above the party or below it |
 | Spells | `bar.spells` | seeded | A row per slot; type the spell name |
 | Lock the frame | `bar.locked` | off | Stops the anchor being dragged |
+
+Where your own row sits is a checkbox rather than a dropdown, because a
+two-way choice does not need a new control type and the panel already renders
+checkboxes. Sorting the other four - by class, by name, by role - is out of
+scope: party order is the order you already know from Blizzard's frames.
 
 Every configured value lives under one `bar` store, because
 `ns.RegisterSetting` addresses settings as `store` plus `key` and asserts a
@@ -283,7 +297,7 @@ family - `UnitExists`, `UnitName`, `UnitClass`, `UnitHealth`, `UnitHealthMax`,
 | `addon_spec.lua` | Defaults, the command dispatch, the setting registry |
 | `slots_spec.lua` | Count clamping; a spell the client knows; a spell it does not; seeding; a deliberately emptied slot staying empty |
 | `row_spec.lua` | The three attributes per button, with the right unit; buttons past the count hidden; dim state for dead, offline and out of range |
-| `group_spec.lua` | Five rows in order, player first; layout arithmetic; `RegisterUnitWatch` called once per row |
+| `group_spec.lua` | Five rows; your row first by default and last when `selfBottom` is set, with the party in party order either way; layout arithmetic; `RegisterUnitWatch` called once per row |
 | `combat_spec.lua` | A change during combat is held and not written; it is applied on `PLAYER_REGEN_ENABLED`; nothing secure is touched in the meantime |
 | `settings_spec.lua` | The panel renders one control per registered setting; the slot table writes through |
 
@@ -301,7 +315,11 @@ Before any of the above is built, thirty throwaway lines in the client:
    Click it. Does it cast?
 2. `RegisterUnitWatch` on a frame bound to `party1`. Does it appear and
    disappear with the party member, including in combat?
-3. Does `HealclickDB` survive a logout?
+3. Can a frame holding secure buttons be moved with `SetPoint` while in
+   combat, or does containing them make it as untouchable as they are? This
+   decides whether dragging the anchor and re-ordering rows need the pending
+   queue or can happen freely.
+4. Does `HealclickDB` survive a logout?
 
 If `SecureActionButtonTemplate` behaves differently on Interface 11509/16001
 than this document assumes, every task after it is built on sand. Five minutes
