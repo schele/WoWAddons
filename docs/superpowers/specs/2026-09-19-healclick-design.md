@@ -42,11 +42,36 @@ Three things follow, and they shape everything below:
 ## Scope
 
 **In:** party only - `player` and `party1` through `party4`. One shared bar
-configuration, 1 to 8 slots, any spell you can cast on a friendly unit.
+configuration, 1 to 8 slots, any spell you can cast on a friendly unit. Each
+button shows that spell's real in-game icon, and a spell can be put on a
+button by dragging it from the spellbook or by picking it up and clicking.
 
 **Out, deliberately:** raid; cooldown swipes on buttons; mana or usability
 colouring; HoT and buff duration tracking; debuff indicators on the frame;
-dragging a spell from the spellbook onto a slot; per-unit bar customisation.
+per-unit bar customisation.
+
+### Two things this document was wrong about
+
+Icons and spellbook assignment were both listed here as out of scope, and both
+were added during implementation at the player's request. The reasoning that
+excluded them is worth keeping, because it was wrong in an instructive way.
+
+**Icons** were excluded because the spike found `GetSpellInfo` absent from this
+client, and I inferred that `GetSpellTexture` might be absent too and that an
+icon path could therefore not be tested. That inference was never checked. A
+four-letter abbreviation on a button pressed under pressure is a poor
+substitute for the icon every action bar in the game already uses, and the
+resolution can simply be written defensively - `C_Spell.GetSpellTexture`, then
+the old global, then the text label - which needs no answer about the client at
+all. See `Spells.lua`.
+
+**Dragging** was excluded as machinery not worth v1. But typing a spell's name
+into an options panel is the odd way to configure a spell button; dragging one
+from the spellbook is the native idiom and the thing a player reaches for
+first. It also turned out to be small, because a drop stores a name and calls
+`Group.ApplyAll`, which already knew how to wait for combat to end.
+
+Both are now in, with typing retained as the alternative.
 
 Raid is not a later feature of this design, it is a later piece of work. Forty
 units with a five-slot bar each is 200 buttons, taller than a screen stacked
@@ -60,6 +85,7 @@ be guessing.
 Healclick/
   Healclick.toc
   Healclick.lua   namespace, defaults, database, settings registry, slash commands
+  Spells.lua      everything the client is asked about a spell: icon, known, cursor
   Slots.lua       the spell slots - how many, what is in each. Pure data, no frames
   Row.lua         one unit's row: name, health, and its secure spell buttons
   Group.lua       the five rows, their layout, and the draggable anchor
@@ -96,14 +122,50 @@ the shape the other two addons established:
 - `Slots.Seed(class)` - fill empty slots with a sensible starting set for that
   class, taken from `UnitClass("player")` at login. See Defaults.
 
+**`Spells.lua`** - `ns.Spells`. Everything this addon asks the client about a
+spell, in one place, because this client's spell API is namespaced and the
+older one is absent. Loaded before `Slots.lua`, which needs it.
+
+- `Spells.Texture(name)` - the spell's icon: `C_Spell.GetSpellTexture`, then
+  the old global, then nil.
+- `Spells.IsKnown(name)` - whether this character has learned it, by the same
+  defensive pattern. Used only to warn, never to refuse.
+- `Spells.Cursor()` - the spell name currently held on the cursor, or nil.
+  Returns a name or nil and never anything else, whatever shape
+  `GetCursorInfo` takes on the client it meets.
+
+Splitting this out of `Row.lua` is what stops `Slots.lua` carrying a second,
+incompatible answer to "what spell APIs does this client have" - which it did,
+and which silently disabled its own warning.
+
 **`Row.lua`** - `ns.Row`:
 
 - `Row.Create(unit)` - builds one row's frame, health bar, name and `MAX`
   secure buttons, and returns it. Called once per unit at load.
-- `Row.ApplySpells(row)` - writes the `spell` attribute on each button and
-  shows or hides buttons past the configured count. **Out of combat only.**
+- `Row.ApplySpells(row)` - writes the `spell` attribute on each button, sets
+  each button's icon from `Spells.Texture` (falling back to a short text label
+  when no icon resolves), and shows or hides buttons past the configured
+  count. **Out of combat only.**
 - `Row.Refresh(row)` - health, name, class colour, and the dim state. Safe in
   combat; touches nothing secure.
+
+### Putting a spell on a button
+
+Two paths, both out of combat, both ending in the same place:
+
+- **A drag** from the spellbook, caught by `OnReceiveDrag`.
+- **A click-place** - picking a spell up with a click and clicking the button -
+  caught by `PreClick`/`PostClick`. This one is the reason the click path had
+  to be touched at all: it is how most players assign a spell, and it arrives
+  as a click rather than a drop. `PreClick` clears the button's `type`
+  attribute so the secure handler does not cast on that click, and `PostClick`
+  restores it. Both are secure writes, which is why the whole path is inert in
+  combat - there, a click just casts.
+
+Either way the name goes to `Slots.Set` and then to `Group.ApplyAll`, so a
+spell assigned during a fight is held exactly like one typed into the panel.
+Dropping something that is not a spell does nothing and leaves it on the
+cursor.
 
 ### When a row refreshes
 
