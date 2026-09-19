@@ -121,6 +121,20 @@ describe("seeding", function()
 
         assertNil(ns.Slots.Spell(1))
     end)
+
+    it("does not burn the account-wide flag on a class with no seed, so a later class still gets one", function()
+        -- HealclickDB is account-wide (## SavedVariables): a first login on
+        -- a Warrior must not permanently deny a Druid alt its own seed the
+        -- first time it logs in.
+        local ns = loggedIn()
+        ns.Slots.Seed("WARRIOR")
+        ns.Slots.Seed("DRUID")
+
+        assertEqual("Regrowth", ns.Slots.Spell(1))
+        assertEqual("Rejuvenation", ns.Slots.Spell(2))
+        assertEqual("Remove Curse", ns.Slots.Spell(3))
+        assertEqual("Mark of the Wild", ns.Slots.Spell(4))
+    end)
 end)
 
 describe("slot defaults", function()

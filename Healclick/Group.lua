@@ -25,6 +25,20 @@ ns.AddDefaults({
 local anchor
 local rows = {}
 
+-- Faint enough not to compete with the rows drawn over it, visible enough
+-- that the drag region reads as a thing you can grab rather than empty air.
+local ANCHOR_BACKDROP_ALPHA = 0.12
+
+--- Move the anchor to wherever the database currently says. Shared by the
+-- initial placement, the deferred reset, and the drag-position save, so
+-- there is exactly one place that turns db.anchor into a real SetPoint.
+local function repositionAnchor()
+    if anchor then
+        anchor:ClearAllPoints()
+        anchor:SetPoint(ns.db.anchor.point, ns.db.anchor.x, ns.db.anchor.y)
+    end
+end
+
 -- Nothing secure may be written in combat: not a spell attribute, not showing
 -- or hiding a button, not moving a row, because moving a row moves the secure
 -- buttons inside it. Rather than attempt it and put an error in the player's
@@ -50,6 +64,11 @@ local function runPending()
     end
 
     if pending then
+        -- Covers a deferred /hc reset or drag-stop as well as a deferred
+        -- ApplyAll: repositioning to whatever db.anchor already holds is a
+        -- harmless no-op when nothing moved the anchor, and is exactly the
+        -- move a reset or drag needs when something did.
+        repositionAnchor()
         Group.ApplyAll()
     end
 end
@@ -84,16 +103,35 @@ end
 
 local function createAnchor()
     anchor = CreateFrame("Frame", "HealclickAnchor", UIParent)
-    anchor:SetSize(ns.Row.WIDTH, 1)
-    anchor:SetPoint(ns.db.anchor.point, ns.db.anchor.x, ns.db.anchor.y)
+    -- Real height comes from Group.Layout, which always runs right after
+    -- this (from Build); this starting size only matters for the instant
+    -- before that first Layout call.
+    anchor:SetSize(ns.Row.WIDTH, ns.Row.HEIGHT)
+
+    local background = anchor:CreateTexture(nil, "BACKGROUND")
+    background:SetAllPoints()
+    background:SetColorTexture(1, 1, 1, ANCHOR_BACKDROP_ALPHA)
+    anchor.background = background
+
+    repositionAnchor()
     anchor:SetMovable(true)
     anchor:EnableMouse(true)
     anchor:RegisterForDrag("LeftButton")
 
     anchor:SetScript("OnDragStart", function(self)
-        if not ns.db.bar.locked then
-            self:StartMoving()
+        if ns.db.bar.locked then
+            return
         end
+
+        if InCombatLockdown and InCombatLockdown() then
+            -- StartMoving repositions every row hanging off this frame --
+            -- rows full of secure buttons -- which the client refuses in
+            -- combat the same as any other secure change.
+            ns.Print("Cannot move the frame in combat.")
+            return
+        end
+
+        self:StartMoving()
     end)
 
     anchor:SetScript("OnDragStop", function(self)
@@ -149,22 +187,38 @@ function Group.Build()
     return true
 end
 
---- Stack the rows under the anchor, in the configured order.
+--- Stack the rows under the anchor, in the configured order, and size the
+-- anchor to match.
+--
+-- A unit that is not in the party is skipped here, not just left for
+-- RegisterUnitWatch to hide: hiding a row does not free its slot in the
+-- stack, so with selfBottom on -- where your own row is always last -- a
+-- two-person party used to lay out party1, party2, [hidden], [hidden],
+-- player, leaving your row floating below a gap where the absent party
+-- members would have gone. Skipping them keeps the visible rows contiguous.
 function Group.Layout()
     if not anchor then
         return
     end
 
     local y = 0
+    local placed = 0
 
     for _, unit in ipairs(Group.Units()) do
         local row = rows[unit]
-        if row then
+        if row and UnitExists(unit) then
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, y)
             y = y - (ns.Row.HEIGHT + ROW_GAP)
+            placed = placed + 1
         end
     end
+
+    -- The anchor is the whole draggable region, so it must cover the stack
+    -- it is actually holding -- placed, not #Group.Units() -- or dragging
+    -- would be grabbing a strip sized for rows that are not there.
+    local rowCount = math.max(placed, 1)
+    anchor:SetSize(ns.Row.WIDTH, rowCount * ns.Row.HEIGHT + (rowCount - 1) * ROW_GAP)
 end
 
 function Group.RefreshAll()
@@ -190,12 +244,16 @@ ns.RegisterCommand("reset", "Put the frame back in the middle", function()
     ns.db.anchor.x = DEFAULT_ANCHOR.x
     ns.db.anchor.y = DEFAULT_ANCHOR.y
 
-    if anchor then
-        anchor:ClearAllPoints()
-        anchor:SetPoint(ns.db.anchor.point, ns.db.anchor.x, ns.db.anchor.y)
+    if InCombatLockdown and InCombatLockdown() then
+        -- The database is written either way; only the actual SetPoint --
+        -- which moves every row hanging off the anchor, rows full of secure
+        -- buttons -- waits, through the same pending queue ApplyAll uses.
+        pending = true
+        ns.Print("Frame will move to the middle once combat ends.")
+    else
+        repositionAnchor()
+        ns.Print("Frame back in the middle.")
     end
-
-    ns.Print("Frame back in the middle.")
 end)
 
 local watcher = CreateFrame("Frame")
@@ -210,6 +268,13 @@ watcher:SetScript("OnEvent", function(_, event, unit)
     if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
         -- Names and classes change wholesale, so no single row is enough.
         Group.RefreshAll()
+
+        -- A roster change is also when Layout's contiguous stack can need
+        -- reshuffling (a unit appearing or vanishing). ApplyAll is what
+        -- knows to hold that re-stack, and the spell attributes it also
+        -- reasserts, for combat to end -- RefreshAll alone never re-runs
+        -- Layout at all.
+        Group.ApplyAll()
 
         if event == "PLAYER_ENTERING_WORLD" then
             -- The one other point, besides regen-enabled, where a build or

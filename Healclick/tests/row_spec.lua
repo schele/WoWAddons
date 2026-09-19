@@ -59,6 +59,16 @@ describe("building a row", function()
         assertFalse(row.buttons[1]:IsShown())
     end)
 
+    it("gives the health bar a texture, or it draws nothing at all", function()
+        -- SetStatusBarColor tints whatever texture is set; a StatusBar with
+        -- none set draws nothing, so the row would show a name, an empty
+        -- gap, and the icons.
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        assertEqual("Interface\\TargetingFrame\\UI-StatusBar", row.health:GetStatusBarTexture())
+    end)
+
     it("gives each button its slot index and an icon texture", function()
         local ns, env = loggedIn()
         local row = ns.Row.Create("party1", env.UIParent)

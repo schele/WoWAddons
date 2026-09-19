@@ -105,6 +105,41 @@ describe("layout", function()
 
         assertTrue(playerY < party1Y, "you sit below party1 now")
     end)
+
+    it("sizes the anchor to the rows it actually stacked", function()
+        -- The stub's default party has player, party1 and party2 "in the
+        -- world" (UnitExists true); party3 and party4 are not, so only 3
+        -- rows are placed. 2 is Group.lua's own ROW_GAP, not exported.
+        local ns = loggedIn()
+        ns.Group.Layout()
+
+        local anchor = ns.Group.Anchor()
+        local placedRows = 3
+        local expectedHeight = placedRows * ns.Row.HEIGHT + (placedRows - 1) * 2
+
+        assertEqual(ns.Row.WIDTH, anchor:GetWidth())
+        assertEqual(expectedHeight, anchor:GetHeight())
+    end)
+
+    it("lays your row directly under the last present party member, leaving no hole, when selfBottom is on", function()
+        -- FIX 5: with a fixed slot per unit, a two-person party used to lay
+        -- out party1, [hidden], [hidden], [hidden], player -- your row
+        -- floating below three empty slots. Layout must skip absent units
+        -- so the visible rows stay contiguous.
+        local ns, env = loggedIn(function(_, e)
+            e.units.party2 = nil
+            e.HealclickDB = { bar = { selfBottom = true } }
+        end)
+        ns.Group.Layout()
+
+        local party1 = helpers.rowFor(ns, "party1")
+        local player = helpers.rowFor(ns, "player")
+
+        local _, _, _, _, party1Y = party1:GetPoint(1)
+        local _, _, _, _, playerY = player:GetPoint(1)
+
+        assertEqual(party1Y - (ns.Row.HEIGHT + 2), playerY, "no hole where party2-4 would have gone")
+    end)
 end)
 
 describe("the anchor", function()
@@ -131,6 +166,21 @@ describe("the anchor", function()
         anchor.scripts.OnDragStart(anchor)
 
         assertTrue(anchor.moving)
+    end)
+
+    it("refuses to start moving in combat, and says why", function()
+        -- FIX 3: StartMoving repositions every row hanging off the anchor --
+        -- rows full of secure buttons -- which the client refuses in combat
+        -- the same as any other secure change.
+        local ns, env = loggedIn()
+        ns.db.bar.locked = false
+        env.__setCombat(true)
+
+        local anchor = ns.Group.Anchor()
+        anchor.scripts.OnDragStart(anchor)
+
+        assertFalse(anchor.moving == true, "a frame full of secure buttons must not move mid-fight")
+        assertMatch("combat", helpers.printed(env):lower(), "told the player why")
     end)
 
     it("remembers where it was dropped", function()
@@ -171,6 +221,38 @@ describe("the anchor", function()
 
         assertEqual("CENTER", ns.db.anchor.point)
         assertEqual(0, ns.db.anchor.x)
+    end)
+
+    it("stores the reset position immediately in combat, but leaves the frame alone until combat ends", function()
+        -- FIX 3: /hc reset used to call SetPoint on the anchor unguarded,
+        -- moving every row hanging off it -- rows full of secure buttons --
+        -- mid-fight. The database write is not secure and must not wait;
+        -- only the actual move does, via the same pending queue ApplyAll
+        -- uses.
+        local ns, env = loggedIn()
+        local anchor = ns.Group.Anchor()
+        anchor:ClearAllPoints()
+        anchor:SetPoint("TOPLEFT", 120, -40)
+        ns.db.anchor.point, ns.db.anchor.x, ns.db.anchor.y = "TOPLEFT", 120, -40
+
+        env.__setCombat(true)
+        helpers.command(env, "reset")
+
+        assertEqual("CENTER", ns.db.anchor.point, "the database is written immediately")
+        assertEqual(0, ns.db.anchor.x)
+        assertEqual(-200, ns.db.anchor.y)
+
+        local point, x, y = anchor:GetPoint(1)
+        assertEqual("TOPLEFT", point, "the frame itself has not moved yet")
+        assertEqual(120, x)
+        assertEqual(-40, y)
+
+        env.__setCombat(false)
+
+        point, x, y = anchor:GetPoint(1)
+        assertEqual("CENTER", point, "moved once combat ends")
+        assertEqual(0, x)
+        assertEqual(-200, y)
     end)
 
     it("toggles the lock on /hc lock", function()

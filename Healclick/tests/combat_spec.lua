@@ -126,6 +126,30 @@ describe("re-ordering, which moves secure buttons", function()
     end)
 end)
 
+-- FIX 5: a roster change re-stacks the rows (Group.Layout skips absent
+-- units to stay contiguous), and re-stacking moves secure buttons the same
+-- as any other re-ordering.
+describe("a roster change while re-stacking", function()
+    it("defers the re-stack in combat and catches up once combat ends", function()
+        local ns, env = loggedIn()
+        env.__setCombat(true)
+        env.units.party2 = nil -- party2 leaves mid-fight
+
+        helpers.fire(env, "GROUP_ROSTER_UPDATE")
+        assertTrue(ns.Group.Pending(), "the re-stack is held like any other secure change")
+
+        env.__setCombat(false)
+
+        local player = helpers.rowFor(ns, "player")
+        local party1 = helpers.rowFor(ns, "party1")
+        local _, _, _, _, playerY = player:GetPoint(1)
+        local _, _, _, _, party1Y = party1:GetPoint(1)
+
+        assertEqual(playerY - (ns.Row.HEIGHT + 2), party1Y, "party1 sits directly under you, no hole left where party2 was")
+        assertFalse(ns.Group.Pending())
+    end)
+end)
+
 -- EXTRA REQUIREMENT: Group.Build() itself writes secure attributes
 -- (Row.Create calls SetAttribute), and PLAYER_LOGIN can fire mid-fight -- a
 -- /reload during a pull, or reconnecting after a disconnect mid-fight. If

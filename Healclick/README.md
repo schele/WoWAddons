@@ -59,9 +59,14 @@ There are three ways to put a spell in a slot, and they store the same thing:
   row under Spells. The same out-of-combat/mid-fight split as dragging
   applies here too.
 
-Dropping something that is not a spell — an item, a macro — onto a button, or
-clicking a button while carrying one, does nothing: the button is unchanged
-and whatever you were carrying stays exactly where it was, on your cursor.
+Dropping something that is not a spell — an item, a macro — onto a button
+does nothing: the button is unchanged and whatever you were carrying stays
+exactly where it was, on your cursor.
+
+Clicking a button while carrying one of those is different, not nothing:
+Healclick has no way to tell that click apart from an ordinary one, so the
+button casts normally, on whoever its row is for, while the item or macro is
+left sitting on your cursor, unplaced, for you to deal with afterward.
 
 A spell you have not learned yet is kept, not rejected — setting up the Remove
 Curse you get at level 24 is sensible, not a typo. Healclick says so once and

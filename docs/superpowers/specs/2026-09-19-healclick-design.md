@@ -130,8 +130,8 @@ older one is absent. Loaded before `Slots.lua`, which needs it.
   the old global, then nil.
 - `Spells.IsKnown(name)` - whether this character has learned it, by the same
   defensive pattern. Used only to warn, never to refuse.
-- `Spells.Cursor()` - the spell name currently held on the cursor, or nil.
-  Returns a name or nil and never anything else, whatever shape
+- `Spells.CursorSpell()` - the spell name currently held on the cursor, or
+  nil. Returns a name or nil and never anything else, whatever shape
   `GetCursorInfo` takes on the client it meets.
 
 Splitting this out of `Row.lua` is what stops `Slots.lua` carrying a second,
@@ -307,12 +307,12 @@ settings - dragged and computed respectively - so they sit outside it.
 pressable and does nothing is the same failure as a slot wired to a spell the
 client does not know.
 
-A spell name is checked against `GetSpellInfo` as it is entered, and **kept
+A spell name is checked against `Spells.IsKnown` as it is entered, and **kept
 either way**, with a warning when the client does not recognise it.
 
 Rejecting an unrecognised name was this document's first answer and it was
-wrong. `GetSpellInfo` only knows spells the character has actually learned, so
-a level 5 Druid would be refused the Remove Curse they get at 24 - and the
+wrong. `Spells.IsKnown` only knows spells the character has actually learned,
+so a level 5 Druid would be refused the Remove Curse they get at 24 - and the
 seeded defaults below would be refused wholesale, since a Druid has none of
 them at level 5. Setting up a spell you are levelling towards is sensible, not
 a typo.
@@ -369,8 +369,9 @@ must not disagree about what a bare command does.
 Lua 5.4, outside the game, against a stubbed API, driven by the repo's
 `run-tests.ps1`. `tests/runner.lua` and `tests/helpers.lua` come from UrlCopy;
 `tests/wow_stub.lua` is UrlCopy's extended with `SetAttribute`/`GetAttribute`,
-`RegisterUnitWatch`, `InCombatLockdown`, `GetSpellInfo`, and the `Unit*`
-family - `UnitExists`, `UnitName`, `UnitClass`, `UnitHealth`, `UnitHealthMax`,
+`RegisterUnitWatch`, `InCombatLockdown`, the namespaced `C_Spell`/`C_SpellBook`
+spell lookups, `GetCursorInfo`/`ClearCursor`, and the `Unit*` family -
+`UnitExists`, `UnitName`, `UnitClass`, `UnitHealth`, `UnitHealthMax`,
 `UnitInRange`, `UnitIsDeadOrGhost`, `UnitIsConnected`.
 
 | File | Covers |

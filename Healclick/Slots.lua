@@ -90,12 +90,16 @@ function Slots.Seed(class)
     if ns.db.seeded then
         return
     end
-    ns.db.seeded = true
 
     local seed = SEED[class or ""]
     if not seed then
+        -- Not burnt here: HealclickDB is account-wide, so a first login on a
+        -- class with no seed set (Warrior, Rogue, Mage) must not permanently
+        -- deny every other character on the account -- a Druid main included
+        -- -- its own seed the first time it logs in.
         return
     end
+    ns.db.seeded = true
 
     for index, spell in ipairs(seed) do
         if ns.db.bar.spells[index] == nil then

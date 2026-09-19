@@ -133,6 +133,8 @@ local function makeWidget(kind, parent, template, env)
     function widget:SetValueStep() end
     function widget:SetObeyStepOnDrag() end
     function widget:SetStatusBarColor(r, g, b) self.barColor = { r, g, b } end
+    function widget:SetStatusBarTexture(value) self.statusBarTexture = value end
+    function widget:GetStatusBarTexture() return self.statusBarTexture end
 
     function widget:SetChecked(value) self.checked = value and true or false end
     function widget:GetChecked() return self.checked end

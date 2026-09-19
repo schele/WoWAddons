@@ -176,6 +176,13 @@ function Row.Create(unit, parent)
     row.health = CreateFrame("StatusBar", nil, row)
     row.health:SetPoint("LEFT", NAME_WIDTH + PADDING * 2, 0)
     row.health:SetSize(BAR_WIDTH, Row.HEIGHT - 6)
+    -- A StatusBar with no texture draws nothing at all: Row.Refresh's
+    -- SetStatusBarColor would be tinting a bar nobody can see. ForeverPanel
+    -- paints its own bars from plain textures rather than a StatusBar
+    -- widget, so there is no in-repo StatusBar to copy; this is Blizzard's
+    -- own default health-bar texture, the standard choice absent a reason
+    -- to hand-roll art.
+    row.health:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
     row.health:SetMinMaxValues(0, 1)
     row.health:SetValue(1)
 
