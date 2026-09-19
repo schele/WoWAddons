@@ -72,6 +72,15 @@ foreach ($folder in $folders) {
         $files += "README.md"
     }
 
+    # Art rides along too, and cannot come from the .toc: a .toc lists code for
+    # the client to load, while a texture is only ever referenced by path. So
+    # these are found by looking rather than by being declared, which is the
+    # one thing this script otherwise refuses to do.
+    Get-ChildItem -Path $folder.FullName -File -Include *.tga, *.blp -Recurse |
+        ForEach-Object {
+            $files += $_.FullName.Substring($folder.FullName.Length + 1) -replace "\\", "/"
+        }
+
     $staging = Join-Path ([System.IO.Path]::GetTempPath()) ("$name-pkg-" + [guid]::NewGuid().ToString("N"))
     $addonRoot = Join-Path $staging $name
 
