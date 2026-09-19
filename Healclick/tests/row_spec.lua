@@ -79,6 +79,24 @@ describe("building a row", function()
         end
     end)
 
+    it("gives every button the action bar's own hover highlight", function()
+        -- The same texture and blend Blizzard's action buttons use, so a
+        -- Healclick button lights up under the cursor exactly as the ones
+        -- beside it do. ADD is what makes it a glow rather than an opaque
+        -- square laid over the icon.
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        for index = 1, ns.Slots.MAX do
+            assertEqual(
+                "Interface\\Buttons\\ButtonHilight-Square",
+                row.buttons[index].highlightTexture,
+                "button " .. index .. " highlights on hover"
+            )
+            assertEqual("ADD", row.buttons[index].highlightBlend)
+        end
+    end)
+
     it("never registers a button for drag, only for receiving one", function()
         -- RegisterForDrag is for STARTING a drag; wiring it on a button whose
         -- left-click casts a spell risks the drag swallowing that click.
