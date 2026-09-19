@@ -71,8 +71,8 @@ local function createAnchor()
         self:StopMovingOrSizing()
         local point, _, _, x, y = self:GetPoint(1)
         ns.db.anchor.point = point or DEFAULT_ANCHOR.point
-        ns.db.anchor.x = x or 0
-        ns.db.anchor.y = y or 0
+        ns.db.anchor.x = x or DEFAULT_ANCHOR.x
+        ns.db.anchor.y = y or DEFAULT_ANCHOR.y
     end)
 end
 

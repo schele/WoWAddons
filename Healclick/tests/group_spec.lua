@@ -147,6 +147,22 @@ describe("the anchor", function()
         assertEqual(-40, ns.db.anchor.y)
     end)
 
+    it("falls back to the documented default, not a bare zero, when the drop has no point", function()
+        -- GetPoint(1) returning nothing is the edge the round-trip test above
+        -- cannot reach, since it always hands OnDragStop a full point. x's
+        -- literal 0 fallback used to match DEFAULT_ANCHOR.x by coincidence,
+        -- hiding that y's did not (DEFAULT_ANCHOR.y is -200, not 0).
+        local ns = loggedIn()
+        local anchor = ns.Group.Anchor()
+
+        anchor.points = {}
+        anchor.scripts.OnDragStop(anchor)
+
+        assertEqual("CENTER", ns.db.anchor.point)
+        assertEqual(0, ns.db.anchor.x)
+        assertEqual(-200, ns.db.anchor.y)
+    end)
+
     it("goes back to the middle on /hc reset", function()
         local ns, env = loggedIn()
         ns.db.anchor.point, ns.db.anchor.x, ns.db.anchor.y = "TOPLEFT", 120, -40
