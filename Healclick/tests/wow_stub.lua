@@ -118,6 +118,7 @@ local function makeWidget(kind, parent, template, env)
     -- receives one (see Row.Create's OnReceiveDrag).
     function widget:RegisterForDrag(...) self.dragRegistered = { ... } end
     function widget:EnableMouse() end
+    function widget:EnableMouseWheel() end
     function widget:SetMovable() end
     function widget:StartMoving() self.moving = true end
     function widget:StopMovingOrSizing() self.moving = false end
@@ -430,6 +431,27 @@ function stub.newEnv()
             return env.__spellRanges[tostring(name) .. ":" .. tostring(unit)]
         end,
     }
+
+    -- The bank the player's own spells sit in. A number on modern clients,
+    -- reached through Enum; the string "spell" on older ones.
+    env.Enum = env.Enum or {}
+    env.Enum.SpellBookSpellBank = { Player = 0, Pet = 1 }
+
+    --- Test helper: put spells in the spellbook at consecutive indices, the
+    -- way a character who has learned them would have them. Names repeat
+    -- freely -- that is what ranks look like.
+    function env.__learnSpells(names)
+        for index, name in ipairs(names) do
+            env.__learnSpellAt(index, name)
+        end
+    end
+
+    --- Test helper: one spell at a chosen index, for covering the gaps a
+    -- walk has to stop at.
+    function env.__learnSpellAt(index, name)
+        env.__spellbook[tostring(env.Enum.SpellBookSpellBank.Player) .. ":" .. index] = name
+        env.__spells[name] = true
+    end
 
     env.C_SpellBook = {
         GetSpellBookItemName = function(index, bookType)

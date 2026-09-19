@@ -310,3 +310,131 @@ describe("the panel's heading", function()
         assertTrue(ns.SettingsPanel.logo:GetWidth() > 0, "and has a size to draw at")
     end)
 end)
+
+describe("picking a spell instead of typing one", function()
+    local function withSpellbook()
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+        env.__learnSpells({ "Rejuvenation", "Healing Touch", "Mark of the Wild" })
+        ns.SettingsPanel.EnsureBuilt()
+        return ns, env
+    end
+
+    local function openOn(ns, slot)
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[slot].scripts.OnClick(control.picks[slot])
+        return ns.SettingsPanel.picker
+    end
+
+    it("gives every slot row a Pick button", function()
+        local ns = withSpellbook()
+        local picks = controlFor(ns, "bar", "spells").picks
+
+        assertEqual(ns.Slots.MAX, #picks)
+    end)
+
+    it("lists the spells the player knows, in order", function()
+        local ns = withSpellbook()
+        local picker = openOn(ns, 3)
+
+        assertTrue(picker:IsShown())
+        -- Entry 1 empties the slot; the spellbook starts at 2.
+        assertEqual("Healing Touch", picker.buttons[2].label:GetText())
+        assertEqual("Mark of the Wild", picker.buttons[3].label:GetText())
+        assertEqual("Rejuvenation", picker.buttons[4].label:GetText())
+    end)
+
+    it("shows each spell's own icon beside its name", function()
+        local ns = withSpellbook()
+        local picker = openOn(ns, 1)
+
+        assertTrue(picker.buttons[3].icon:IsShown())
+    end)
+
+    it("stores the spell that is clicked, on the row that opened the list", function()
+        local ns = withSpellbook()
+        local picker = openOn(ns, 3)
+
+        picker.buttons[2].scripts.OnClick(picker.buttons[2])
+
+        assertEqual("Healing Touch", ns.Slots.Spell(3))
+    end)
+
+    it("shows the new spell in the row's box straight away", function()
+        -- Picking has to leave the panel saying what it just did, or the box
+        -- still reads whatever was there and stores it back on next focus.
+        local ns = withSpellbook()
+        local picker = openOn(ns, 3)
+
+        picker.buttons[2].scripts.OnClick(picker.buttons[2])
+
+        assertEqual("Healing Touch", controlFor(ns, "bar", "spells").boxes[3]:GetText())
+    end)
+
+    it("closes once something is chosen", function()
+        local ns = withSpellbook()
+        local picker = openOn(ns, 2)
+
+        picker.buttons[2].scripts.OnClick(picker.buttons[2])
+
+        assertFalse(picker:IsShown())
+    end)
+
+    it("empties the slot from the first entry", function()
+        local ns = withSpellbook()
+        ns.Slots.Set(4, "Regrowth")
+        local picker = openOn(ns, 4)
+
+        picker.buttons[1].scripts.OnClick(picker.buttons[1])
+
+        assertNil(ns.Slots.Spell(4))
+    end)
+
+    it("closes when the same row's button is clicked again", function()
+        local ns = withSpellbook()
+        local picker = openOn(ns, 5)
+        assertTrue(picker:IsShown())
+
+        openOn(ns, 5)
+
+        assertFalse(picker:IsShown(), "a second click on an open list closes it")
+    end)
+
+    it("stays open and re-aims when a different row asks", function()
+        local ns = withSpellbook()
+        openOn(ns, 5)
+        local picker = openOn(ns, 6)
+
+        assertTrue(picker:IsShown())
+        assertEqual(6, picker.slot)
+    end)
+
+    it("scrolls rather than hiding spells past the tenth", function()
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+        local many = {}
+        for index = 1, 30 do
+            many[index] = string.format("Spell %02d", index)
+        end
+        env.__learnSpells(many)
+        ns.SettingsPanel.EnsureBuilt()
+
+        local picker = openOn(ns, 1)
+        local firstBefore = picker.buttons[1].label:GetText()
+
+        picker.scripts.OnMouseWheel(picker, -1)
+
+        assertTrue(picker.buttons[1].label:GetText() ~= firstBefore, "the list moved")
+    end)
+
+    it("does not scroll past the end of the list", function()
+        local ns = withSpellbook()
+        local picker = openOn(ns, 1)
+
+        for _ = 1, 20 do
+            picker.scripts.OnMouseWheel(picker, -1)
+        end
+
+        assertEqual(0, picker.offset, "four entries do not fill ten rows")
+    end)
+end)

@@ -186,3 +186,51 @@ function Spells.InRange(spellName, unit)
         return nil
     end, nil)
 end
+
+-- Where the player's own spells live in the spellbook. Modern clients name
+-- the bank through Enum; older ones used the string "spell". Asked rather
+-- than assumed, like every other client difference in this file.
+local function playerSpellBank()
+    if Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player then
+        return Enum.SpellBookSpellBank.Player
+    end
+
+    return BOOKTYPE_SPELL or "spell"
+end
+
+-- A spellbook has no published length on every client, but it does end: the
+-- name lookup returns nothing past the last entry. Walking until it does
+-- needs no API beyond the one the drag-and-drop path already relies on,
+-- which is the point -- this client has already moved two spell APIs out
+-- from under this addon, and enumerating is not worth a third dependency.
+--
+-- The cap is a guard against a client that answers for every index it is
+-- ever asked about, which would otherwise be an infinite loop in the
+-- settings panel.
+local SPELLBOOK_LIMIT = 1000
+
+--- Every distinct spell the player knows, by name, in alphabetical order.
+--
+-- Distinct matters: Classic gives each rank its own spellbook entry, so a
+-- druid with three ranks of Healing Touch has three entries all named
+-- "Healing Touch". A slot holds a name, and a name casts the best rank the
+-- player has, so the list has no use for the other two.
+function Spells.Known()
+    local names, seen = {}, {}
+    local bank = playerSpellBank()
+
+    for index = 1, SPELLBOOK_LIMIT do
+        local name = nameFromBook(index, bank)
+        if not name or name == "" then
+            break
+        end
+
+        if not seen[name] then
+            seen[name] = true
+            names[#names + 1] = name
+        end
+    end
+
+    table.sort(names)
+    return names
+end

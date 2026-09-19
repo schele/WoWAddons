@@ -244,3 +244,67 @@ describe("asking whether a spell can reach a unit", function()
         assertNil(ns.Spells.InRange("Rejuvenation", nil))
     end)
 end)
+
+describe("listing the spells the player knows", function()
+    it("walks the spellbook until it runs out", function()
+        local ns, env = loggedIn()
+        env.__learnSpells({ "Rejuvenation", "Healing Touch", "Mark of the Wild" })
+
+        local known = ns.Spells.Known()
+
+        assertEqual(3, #known)
+    end)
+
+    it("sorts them, since a spellbook is in no order worth showing", function()
+        local ns, env = loggedIn()
+        env.__learnSpells({ "Rejuvenation", "Healing Touch", "Mark of the Wild" })
+
+        local known = ns.Spells.Known()
+
+        assertEqual("Healing Touch", known[1])
+        assertEqual("Mark of the Wild", known[2])
+        assertEqual("Rejuvenation", known[3])
+    end)
+
+    it("lists a spell once however many ranks of it there are", function()
+        -- Classic gives every rank its own spellbook entry. A slot holds a
+        -- name, and the name casts the best rank, so the others are noise.
+        local ns, env = loggedIn()
+        env.__learnSpells({
+            "Healing Touch", "Healing Touch", "Healing Touch", "Rejuvenation",
+        })
+
+        local known = ns.Spells.Known()
+
+        assertEqual(2, #known)
+        assertEqual("Healing Touch", known[1])
+    end)
+
+    it("stops at the first gap rather than running to the cap", function()
+        local ns, env = loggedIn()
+        env.__learnSpells({ "Rejuvenation" })
+        -- Something far down the book, past where the walk must have stopped.
+        env.__learnSpellAt(500, "Tranquility")
+
+        local known = ns.Spells.Known()
+
+        assertEqual(1, #known)
+    end)
+
+    it("is empty, not broken, for a character with no spellbook", function()
+        local ns = loggedIn()
+        assertEqual(0, #ns.Spells.Known())
+    end)
+
+    it("falls back to the old global when C_SpellBook lacks the lookup", function()
+        local ns, env = loggedIn()
+        env.__learnSpells({ "Rejuvenation" })
+        local book = env.__spellbook
+        env.C_SpellBook.GetSpellBookItemName = nil
+        env.GetSpellBookItemName = function(index, bookType)
+            return book[tostring(bookType) .. ":" .. tostring(index)]
+        end
+
+        assertEqual(1, #ns.Spells.Known())
+    end)
+end)

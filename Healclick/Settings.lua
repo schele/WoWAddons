@@ -89,13 +89,166 @@ local function addSlider(setting, y, x)
     }
 end
 
---- One edit box per slot. Typing a name and pressing Enter stores it.
+-- The spell picker: one shared list, opened against whichever row asked for
+-- it.
+--
+-- A list rather than a drop target on these rows, because the spellbook is a
+-- full-screen panel on this client. It covers the bar and the settings panel
+-- alike, so nothing needing both open at once can work -- which is what put
+-- the player back to typing names in the first place. Dragging a spell onto
+-- a bar button still works for anyone whose spellbook does not cover it.
+local PICKER_ROWS = 10
+local PICKER_WIDTH = 210
+local CLEAR_ENTRY = "(empty this slot)"
+
+local picker
+
+local function pickerEntries()
+    -- Emptying a slot is the one thing the spellbook cannot offer, so it is
+    -- offered here rather than sending the player back to the text box to
+    -- delete what they typed.
+    local entries = { CLEAR_ENTRY }
+
+    for _, name in ipairs(ns.Spells.Known()) do
+        entries[#entries + 1] = name
+    end
+
+    return entries
+end
+
+local function refreshPicker()
+    for index, button in ipairs(picker.buttons) do
+        local entry = picker.entries[index + picker.offset]
+
+        if entry then
+            button.spellName = entry ~= CLEAR_ENTRY and entry or nil
+            button.label:SetText(entry)
+
+            local texture = button.spellName and ns.Spells.Texture(button.spellName)
+            if texture then
+                button.icon:SetTexture(texture)
+                button.icon:Show()
+            else
+                button.icon:Hide()
+            end
+
+            button:Show()
+        else
+            button:Hide()
+        end
+    end
+end
+
+--- Put `name` in `slot` and close the list. nil empties the slot.
+function Panel.Choose(slot, name)
+    local ok, message = ns.Slots.Set(slot, name or "")
+    if not ok then
+        ns.Print(message or "That slot does not exist.")
+    elseif message then
+        ns.Print(message)
+    end
+
+    -- The same two steps the text box's own store does, by way of the
+    -- setting's onChange: write the slot, then put it on the rows.
+    if ns.Group then
+        ns.Group.ApplyAll()
+    end
+
+    if picker then
+        picker:Hide()
+    end
+
+    Panel.Refresh()
+end
+
+local function ensurePicker()
+    if picker then
+        return
+    end
+
+    picker = CreateFrame("Frame", nil, panel)
+    -- Above the rows it drops over, which are ordinary canvas widgets.
+    picker:SetFrameStrata("DIALOG")
+    picker:SetSize(PICKER_WIDTH, PICKER_ROWS * BOX_HEIGHT + 8)
+    -- So a click on the list is not also a click on whatever is under it.
+    picker:EnableMouse(true)
+    picker:EnableMouseWheel(true)
+    picker.buttons = {}
+    picker.entries = {}
+    picker.offset = 0
+
+    local background = picker:CreateTexture(nil, "BACKGROUND")
+    background:SetAllPoints()
+    background:SetColorTexture(0, 0, 0, 0.9)
+
+    for index = 1, PICKER_ROWS do
+        local button = CreateFrame("Button", nil, picker)
+        button:SetSize(PICKER_WIDTH - 8, BOX_HEIGHT - 4)
+        button:SetPoint("TOPLEFT", 4, -4 - (index - 1) * BOX_HEIGHT)
+
+        -- Drawn rather than taken from Blizzard's highlight art: the client
+        -- shows and hides the HIGHLIGHT layer on mouseover by itself, and a
+        -- colour fill cannot silently turn out not to exist on this client.
+        local highlight = button:CreateTexture(nil, "HIGHLIGHT")
+        highlight:SetAllPoints()
+        highlight:SetColorTexture(1, 1, 1, 0.2)
+
+        button.icon = button:CreateTexture(nil, "ARTWORK")
+        button.icon:SetSize(BOX_HEIGHT - 8, BOX_HEIGHT - 8)
+        button.icon:SetPoint("LEFT", 2, 0)
+        button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+        button.label = button:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        button.label:SetPoint("LEFT", button.icon, "RIGHT", 4, 0)
+        button.label:SetJustifyH("LEFT")
+
+        button:SetScript("OnClick", function(self)
+            Panel.Choose(picker.slot, self.spellName)
+        end)
+
+        picker.buttons[index] = button
+    end
+
+    picker:SetScript("OnMouseWheel", function(self, delta)
+        local last = math.max(#self.entries - PICKER_ROWS, 0)
+        self.offset = math.min(math.max(self.offset - delta, 0), last)
+        refreshPicker()
+    end)
+
+    picker:Hide()
+    Panel.picker = picker
+end
+
+local function openPicker(slot, anchorTo)
+    ensurePicker()
+
+    -- A second click on the row that is already open closes it, which is
+    -- what clicking an open dropdown means everywhere else.
+    if picker:IsShown() and picker.slot == slot then
+        picker:Hide()
+        return
+    end
+
+    picker.slot = slot
+    picker.entries = pickerEntries()
+    picker.offset = 0
+    picker:ClearAllPoints()
+    picker:SetPoint("TOPLEFT", anchorTo, "BOTTOMLEFT", 0, -2)
+    refreshPicker()
+    picker:Show()
+end
+
+Panel.OpenPicker = openPicker
+
+--- One edit box per slot, and a Pick button beside each. Typing a name and
+-- pressing Enter stores it; Pick opens the list above instead.
 -- The store is Slots.Set rather than SetSettingValue, because a slot is one
 -- entry inside a table rather than a value of its own, and because Set is
 -- where the "you have not learned that yet" warning comes from.
 local function addSpellTable(setting, y, x)
     local rows = setting.rows or 8
     local boxes = {}
+    local picks = {}
 
     local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     heading:SetPoint("TOPLEFT", x, y)
@@ -156,13 +309,27 @@ local function addSpellTable(setting, y, x)
             reverting = false
         end)
 
+        -- Typing stays, because it is the only way to set up a spell you
+        -- have not learned yet -- the Remove Curse a druid gets at 24 is not
+        -- in the spellbook to be picked. This is for the other case, which
+        -- is every other case.
+        local pick = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+        pick:SetSize(46, BOX_HEIGHT - 4)
+        pick:SetPoint("LEFT", box, "RIGHT", 6, 0)
+        pick:SetText("Pick")
+        pick:SetScript("OnClick", function()
+            openPicker(index, box)
+        end)
+
         boxes[index] = box
+        picks[index] = pick
     end
 
     return {
         setting = setting,
         widget = boxes[1],
         boxes = boxes,
+        picks = picks,
         height = ROW_HEIGHT + rows * BOX_HEIGHT,
         Refresh = function()
             for index = 1, rows do
