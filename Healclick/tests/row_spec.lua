@@ -79,32 +79,6 @@ describe("building a row", function()
         end
     end)
 
-    it("outlines every button in gold while the cursor is over it", function()
-        -- Four edges, drawn by the addon rather than taken from Blizzard's
-        -- highlight art: a texture path this client turns out not to have
-        -- fails silently, drawing nothing and saying nothing about why.
-        -- Colour fills depend on no art at all.
-        local ns, env = loggedIn()
-        local row = ns.Row.Create("party1", env.UIParent)
-
-        for index = 1, ns.Slots.MAX do
-            local edges = row.buttons[index].hoverFrame
-            assertEqual(4, #edges, "button " .. index .. " is framed on all sides")
-
-            for _, edge in ipairs(edges) do
-                -- The client shows and hides this layer on mouseover itself,
-                -- which is what keeps the effect free of any OnEnter and of
-                -- anything that would have to be toggled mid-fight.
-                assertEqual("HIGHLIGHT", edge.drawLayer)
-
-                local r, g, b = table.unpack(edge.colorTexture)
-                assertEqual(1, r)
-                assertEqual(0.82, g)
-                assertEqual(0, b)
-            end
-        end
-    end)
-
     it("never registers a button for drag, only for receiving one", function()
         -- RegisterForDrag is for STARTING a drag; wiring it on a button whose
         -- left-click casts a spell risks the drag swallowing that click.

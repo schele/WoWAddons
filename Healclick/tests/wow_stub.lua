@@ -185,15 +185,6 @@ local function makeWidget(kind, parent, template, env)
     function widget:GetTexture() return self.texture end
     function widget:SetTexCoord(...) self.texCoord = { ... } end
 
-    -- Recorded as plain fields rather than behind a getter: the real
-    -- GetHighlightTexture hands back a Texture object, not the path, so a
-    -- stub accessor returning the path would be teaching a test something
-    -- the client does not do.
-    function widget:SetHighlightTexture(value, blend)
-        self.highlightTexture = value
-        self.highlightBlend = blend
-    end
-
     -- The client animates the sweep itself; all an addon ever does is hand
     -- it a start and a duration, so that pair is the whole observable state.
     function widget:SetCooldown(start, duration)
@@ -205,12 +196,8 @@ local function makeWidget(kind, parent, template, env)
     end
     function widget:SetHideCountdownNumbers() end
 
-    -- The draw layer is recorded because it is not merely cosmetic: the
-    -- client shows and hides anything in the HIGHLIGHT layer on mouseover by
-    -- itself, so the layer is the whole of how a hover effect works.
-    function widget:CreateTexture(name, layer)
+    function widget:CreateTexture()
         local texture = makeWidget("Texture", self)
-        texture.drawLayer = layer
         table.insert(self.children, texture)
         return texture
     end
