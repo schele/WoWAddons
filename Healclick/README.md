@@ -23,8 +23,12 @@ like Regrowth does. So do buffs — Thorns, Mark of the Wild. Every row shows
 the same slots, so slot 3 is the same spell whether it is on your own row or
 party member 2's — only who it is cast on changes.
 
-A row dims when the person is dead, offline, or out of range, because clicking
-a heal on them burns a global cooldown and gives you nothing back.
+A row dims when the person is dead or offline, because clicking a heal on
+them burns a global cooldown and gives you nothing back. It dims for being
+out of range too, but only on a client willing to tell an addon that — some
+will not, and Healclick does not guess: on a client that stays quiet about
+range, it would rather leave a row bright than risk dimming one you could
+actually heal.
 
 ## Icons, and assigning spells
 

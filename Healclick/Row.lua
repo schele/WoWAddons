@@ -358,6 +358,60 @@ function Row.ApplySpells(row)
     end
 end
 
+--- Call `fn` and return what it returns, or `whenUnknown` if it raises.
+--
+-- Some clients hand tainted code (ours) a "secret" value: the API call that
+-- produced it succeeds, but the client refuses to let addon code inspect
+-- the result afterwards -- comparing it, or testing its truthiness, raises
+-- "attempt to perform boolean test on ... a secret ... value". Which
+-- particular return is secret varies by client build and by how the call
+-- was reached, so every place below that branches on one of these values is
+-- routed through here, in one place, rather than guarded ad hoc.
+--
+-- `fn` must both make the call and perform the branch that can raise, not
+-- just fetch a value for the caller to test afterwards -- in the game it is
+-- the branch that raises, the call having already succeeded. Routing both
+-- through the same pcall is also what makes this testable at all: Lua has
+-- no way to construct a value that raises when its truthiness is checked,
+-- so a test instead makes the stubbed API call itself raise. Both failure
+-- shapes land in this same pcall, so the fallback path is exercised even
+-- though the exact in-game trigger (a secret value, not a raising call)
+-- cannot be reproduced.
+local function guarded(fn, whenUnknown)
+    local ok, result = pcall(fn)
+    if ok then
+        return result
+    end
+    return whenUnknown
+end
+
+--- Whether clicking a heal on `unit` could land. False only when we could
+-- affirmatively tell otherwise; anything we could not check at all reads as
+-- reachable -- wrongly dimming a row that could in fact be healed costs a
+-- healer a click they needed, which is worse than never dimming at all.
+function Row.Reachable(unit)
+    -- Dead/offline and range are guarded, and read, independently. If range
+    -- cannot be determined at all, a dead or disconnected unit must still
+    -- dim; one guard wrapping all three would let a raise on any one of
+    -- them swallow a read that would otherwise have succeeded on another.
+    if guarded(function() return not not UnitIsDeadOrGhost(unit) end, false) then
+        return false
+    end
+
+    if not guarded(function() return not not UnitIsConnected(unit) end, true) then
+        return false
+    end
+
+    -- UnitInRange's second return says whether ranging could even be
+    -- checked. It comes back false for "player" while solo, among others --
+    -- that is "unknown", not "out of range", so an unchecked unit counts as
+    -- reachable rather than being dimmed forever.
+    return guarded(function()
+        local inRange, checked = UnitInRange(unit)
+        return inRange or not checked
+    end, true)
+end
+
 --- Name, colour, health and the dim state. Touches nothing secure, so this is
 -- safe at any time, including mid-fight when it matters most.
 function Row.Refresh(row)
@@ -377,23 +431,23 @@ function Row.Refresh(row)
         row.health:SetStatusBarColor(color.r, color.g, color.b)
     end
 
+    -- UnitHealth's secret return is fine to pass straight to SetValue below
+    -- -- handing a secret value onward to a widget is sanctioned, only
+    -- inspecting one is not. healthMax's own comparison just below is the
+    -- inspection, so it is what needs the same guard as Row.Reachable above,
+    -- for the same reason: nothing guarantees a max-health return is exempt
+    -- on every client just because it has been so far.
     local health = UnitHealth(unit) or 0
-    local healthMax = UnitHealthMax(unit) or 0
-    row.health:SetMinMaxValues(0, healthMax > 0 and healthMax or 1)
+    local healthMax = guarded(function()
+        local max = UnitHealthMax(unit) or 0
+        return max > 0 and max or 1
+    end, 1)
+    row.health:SetMinMaxValues(0, healthMax)
     row.health:SetValue(health)
 
     -- Clicking a heal on someone dead, offline or out of range burns a global
     -- cooldown and gives nothing back. Fading the row is the cheapest way to
-    -- stop the hand before it does that.
-    --
-    -- UnitInRange's second return says whether ranging could even be checked.
-    -- It comes back false for "player" while solo, among others -- that is
-    -- "unknown", not "out of range", so an unchecked unit counts as reachable
-    -- rather than being dimmed forever.
-    local inRange, checked = UnitInRange(unit)
-    local reachable = not UnitIsDeadOrGhost(unit)
-        and UnitIsConnected(unit)
-        and (inRange or not checked)
-
-    row:SetAlpha(reachable and 1 or DIM)
+    -- stop the hand before it does that. See Row.Reachable above for why
+    -- each check behind this is guarded rather than tested plainly.
+    row:SetAlpha(Row.Reachable(unit) and 1 or DIM)
 end

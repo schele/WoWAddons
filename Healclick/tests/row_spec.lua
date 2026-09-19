@@ -635,3 +635,60 @@ describe("dimming a row you cannot usefully click", function()
         assertEqual(555, row.health:GetValue())
     end)
 end)
+
+describe("refreshing a row on a client that treats a value as secret", function()
+    -- A client can hand tainted code (ours) a "secret" value: the API call
+    -- that produced it succeeds, but branching on the result -- `if x then`,
+    -- `not x`, `x or y` -- raises. Lua itself has no way to build a value
+    -- that raises when its truthiness is tested, so these tests stand in for
+    -- that by making the stubbed API call itself raise instead. Row.Reachable
+    -- (see Row.lua) routes both shapes of failure through the same pcall, so
+    -- this is exercising the real fallback path even though the trigger
+    -- looks different from the one the game uses.
+
+    it("does not error, and does not dim, when UnitInRange itself raises", function()
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+        env.UnitInRange = function() error("secret boolean value") end
+
+        local ok = pcall(ns.Row.Refresh, row)
+
+        assertTrue(ok, "Refresh must not propagate the raise")
+        assertEqual(1, row:GetAlpha(), "cannot tell must not read as out of range")
+    end)
+
+    it("still dims a dead unit when UnitInRange raises", function()
+        -- Range being unavailable must not cost the dead/offline dimming
+        -- that does not depend on it -- the whole reason dead/offline and
+        -- range are checked independently in Row.Reachable.
+        local ns, env = loggedIn()
+        env.units.party1.dead = true
+        local row = ns.Row.Create("party1", env.UIParent)
+        env.UnitInRange = function() error("secret boolean value") end
+
+        ns.Row.Refresh(row)
+
+        assertTrue(row:GetAlpha() < 1, "a dead unit must still dim")
+    end)
+
+    it("still dims an offline unit when UnitInRange raises", function()
+        local ns, env = loggedIn()
+        env.units.party1.connected = false
+        local row = ns.Row.Create("party1", env.UIParent)
+        env.UnitInRange = function() error("secret boolean value") end
+
+        ns.Row.Refresh(row)
+
+        assertTrue(row:GetAlpha() < 1, "an offline unit must still dim")
+    end)
+
+    it("does not crash when UnitHealthMax raises", function()
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+        env.UnitHealthMax = function() error("secret number value") end
+
+        local ok = pcall(ns.Row.Refresh, row)
+
+        assertTrue(ok, "Refresh must not propagate the raise")
+    end)
+end)
