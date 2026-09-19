@@ -47,6 +47,22 @@ describe("building a row", function()
 
         assertFalse(row.buttons[1]:IsShown())
     end)
+
+    it("reaches at least as far as the last button's right edge", function()
+        -- WIDTH is Group's layout arithmetic; if it falls short here, every
+        -- row Group tiles later has its last button overhanging the next.
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+        local lastButton = row.buttons[ns.Slots.MAX]
+
+        local _, x = lastButton:GetPoint()
+        local rightEdge = x + lastButton:GetWidth()
+
+        assertTrue(
+            ns.Row.WIDTH >= rightEdge,
+            string.format("Row.WIDTH (%d) must reach the last button's right edge (%d)", ns.Row.WIDTH, rightEdge)
+        )
+    end)
 end)
 
 describe("applying spells", function()
@@ -105,6 +121,72 @@ describe("applying spells", function()
         ns.Row.ApplySpells(row)
 
         assertNil(helpers.attrs(row.buttons[1]).spell)
+    end)
+end)
+
+describe("labelling a spell button", function()
+    -- There is no icon, so this label is the only thing telling a healer
+    -- which button is which. Two buttons reading the same thing under
+    -- pressure is the wrong-spell-on-the-right-person failure this addon
+    -- exists to prevent.
+
+    it("takes the first four characters of a single-word name", function()
+        local ns = loggedIn()
+        assertEqual("Regr", ns.Row.Label("Regrowth"))
+    end)
+
+    it("takes the first four characters of another single-word name", function()
+        local ns = loggedIn()
+        assertEqual("Reju", ns.Row.Label("Rejuvenation"))
+    end)
+
+    it("takes the first letter of each significant word", function()
+        local ns = loggedIn()
+        assertEqual("RC", ns.Row.Label("Remove Curse"))
+    end)
+
+    it("drops short connective words like 'of' and 'the'", function()
+        local ns = loggedIn()
+        assertEqual("MW", ns.Row.Label("Mark of the Wild"))
+    end)
+
+    it("strips punctuation before taking a word's first letter", function()
+        local ns = loggedIn()
+        assertEqual("PWF", ns.Row.Label("Power Word: Fortitude"))
+    end)
+
+    it("returns an empty string for no spell at all", function()
+        local ns = loggedIn()
+        assertEqual("", ns.Row.Label(nil))
+        assertEqual("", ns.Row.Label(""))
+    end)
+
+    it("gives the four shipped Druid seeds four distinct labels", function()
+        local ns = loggedIn()
+        local seeds = { "Regrowth", "Rejuvenation", "Remove Curse", "Mark of the Wild" }
+        local seen = {}
+        local uniqueCount = 0
+
+        for _, spell in ipairs(seeds) do
+            local label = ns.Row.Label(spell)
+            if not seen[label] then
+                seen[label] = true
+                uniqueCount = uniqueCount + 1
+            end
+        end
+
+        assertEqual(4, uniqueCount, "all four seeds must read differently on the button")
+    end)
+
+    it("never splits a multi-byte character in half", function()
+        -- Five copies of U+3042 (Hiragana A), three bytes each in UTF-8. A
+        -- byte-based sub(1, 4) would take one whole character plus one
+        -- stray continuation byte of the next -- invalid UTF-8.
+        local ns = loggedIn()
+        local hiragana = "\227\129\130"
+        local name = hiragana:rep(5)
+
+        assertEqual(hiragana:rep(4), ns.Row.Label(name))
     end)
 end)
 
@@ -190,11 +272,32 @@ describe("dimming a row you cannot usefully click", function()
         assertEqual(1, row:GetAlpha())
     end)
 
+    it("treats a unit that cannot be range-checked as reachable", function()
+        -- UnitInRange returns false, false -- not "false, true" -- for a unit
+        -- the client cannot range-check at all, notably "player" while solo.
+        -- That is "unknown", not "out of range", and must not read as one.
+        local ns, env = loggedIn()
+        env.units.party1.checkedRange = false
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        ns.Row.Refresh(row)
+        assertEqual(1, row:GetAlpha())
+    end)
+
     it("survives a unit that is not there at all", function()
         local ns, env = loggedIn()
         local row = ns.Row.Create("party4", env.UIParent)
+        -- Only the UnitExists guard returning early leaves these alone; any
+        -- code path past it would reset them to (0, 1) and 0.
+        row.health:SetMinMaxValues(0, 999)
+        row.health:SetValue(555)
 
         ns.Row.Refresh(row)
+
         assertEqual("", row.name:GetText())
+        local low, high = row.health:GetMinMaxValues()
+        assertEqual(0, low)
+        assertEqual(999, high, "the guard must return before touching the health bar")
+        assertEqual(555, row.health:GetValue())
     end)
 end)

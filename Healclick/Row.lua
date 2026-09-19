@@ -13,12 +13,110 @@ local BUTTON_SIZE = 22
 local BUTTON_GAP = 2
 local PADDING = 4
 
+-- Where the button strip begins: past the name, the bar, and a PADDING gap
+-- after each. Create and WIDTH both anchor on this so they cannot drift
+-- apart the way they did when WIDTH counted its own, separate offset.
+local BUTTONS_START = NAME_WIDTH + BAR_WIDTH + PADDING * 3
+
 Row.HEIGHT = BUTTON_SIZE + 2
-Row.WIDTH = NAME_WIDTH + BAR_WIDTH + PADDING * 2
-    + (BUTTON_SIZE + BUTTON_GAP) * ns.Slots.MAX
+
+-- The last button's right edge, not one gap further -- there is no gap after
+-- the final button, only between buttons.
+Row.WIDTH = BUTTONS_START + ns.Slots.MAX * (BUTTON_SIZE + BUTTON_GAP) - BUTTON_GAP
 
 -- How far a row fades when clicking it would achieve nothing.
 local DIM = 0.35
+
+-- A button has no icon, only this label, so it is the one thing standing
+-- between a healer and casting the wrong spell under pressure.
+
+--- Split a string into its UTF-8 characters, without assuming a UTF-8
+-- library exists on the client. A continuation byte (0x80-0xBF) never starts
+-- a character, so any other byte is where the previous character ends and
+-- the next begins.
+local function characters(text)
+    local chars = {}
+    local charStart = 1
+
+    for index = 1, #text do
+        local byte = text:byte(index)
+        local isContinuation = byte >= 0x80 and byte <= 0xBF
+        if not isContinuation and index > charStart then
+            table.insert(chars, text:sub(charStart, index - 1))
+            charStart = index
+        end
+    end
+
+    if charStart <= #text then
+        table.insert(chars, text:sub(charStart, #text))
+    end
+
+    return chars
+end
+
+--- The first `count` characters of `text`, never cutting a multi-byte one.
+local function firstChars(text, count)
+    local chars = characters(text)
+    local pieces = {}
+    for index = 1, math.min(count, #chars) do
+        pieces[index] = chars[index]
+    end
+    return table.concat(pieces)
+end
+
+-- Lua's %p is ASCII punctuation only, so this leaves multi-byte characters
+-- (all of them >= 0x80, none of them %p) untouched.
+local function withoutPunctuation(word)
+    return (word:gsub("%p", ""))
+end
+
+--- A word too short to distinguish a spell on its own -- "of", "the" and the
+-- like -- skipped when a multi-word label is built.
+local function isMinorWord(word)
+    return #characters(word) <= 3
+end
+
+--- The text a button shows for a spell, since there is no icon.
+-- A single-word name gives its first four characters. A multi-word name
+-- gives the first letter of each significant word (short connectives like
+-- "of" and "the" are dropped, unless dropping them would leave nothing),
+-- which is what keeps "Remove Curse" from reading the same as "Regrowth".
+function Row.Label(spellName)
+    if type(spellName) ~= "string" or spellName == "" then
+        return ""
+    end
+
+    local words = {}
+    for word in spellName:gmatch("%S+") do
+        table.insert(words, word)
+    end
+
+    if #words == 0 then
+        return ""
+    elseif #words == 1 then
+        return firstChars(words[1], 4)
+    end
+
+    local significant = {}
+    for _, word in ipairs(words) do
+        if not isMinorWord(withoutPunctuation(word)) then
+            table.insert(significant, word)
+        end
+    end
+    if #significant == 0 then
+        significant = words
+    end
+
+    local letters = {}
+    for index = 1, math.min(4, #significant) do
+        local firstChar = characters(withoutPunctuation(significant[index]))[1]
+        if firstChar then
+            table.insert(letters, firstChar:upper())
+        end
+    end
+
+    return table.concat(letters)
+end
 
 --- Build one unit's row. Called once per unit, at login, out of combat.
 function Row.Create(unit, parent)
@@ -46,14 +144,17 @@ function Row.Create(unit, parent)
     for index = 1, ns.Slots.MAX do
         local button = CreateFrame(
             "Button",
-            "HealclickButton" .. unit .. index,
+            -- The separator matters once slot counts grow past single digits:
+            -- without it, unit "raid1" slot 11 and unit "raid11" slot 1 both
+            -- name themselves HealclickButtonraid111, clobbering a _G entry.
+            string.format("HealclickButton%s_%d", unit, index),
             row,
             "SecureActionButtonTemplate"
         )
         button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
         button:SetPoint(
             "LEFT",
-            NAME_WIDTH + BAR_WIDTH + PADDING * 3 + (index - 1) * (BUTTON_SIZE + BUTTON_GAP),
+            BUTTONS_START + (index - 1) * (BUTTON_SIZE + BUTTON_GAP),
             0
         )
         button:RegisterForClicks("AnyUp")
@@ -86,7 +187,7 @@ function Row.ApplySpells(row)
 
         if spell then
             button:SetAttribute("spell", spell)
-            button.label:SetText(spell:sub(1, 2))
+            button.label:SetText(Row.Label(spell))
             button:Show()
         else
             -- An empty slot is hidden rather than shown and inert. A button
@@ -125,9 +226,15 @@ function Row.Refresh(row)
     -- Clicking a heal on someone dead, offline or out of range burns a global
     -- cooldown and gives nothing back. Fading the row is the cheapest way to
     -- stop the hand before it does that.
+    --
+    -- UnitInRange's second return says whether ranging could even be checked.
+    -- It comes back false for "player" while solo, among others -- that is
+    -- "unknown", not "out of range", so an unchecked unit counts as reachable
+    -- rather than being dimmed forever.
+    local inRange, checked = UnitInRange(unit)
     local reachable = not UnitIsDeadOrGhost(unit)
         and UnitIsConnected(unit)
-        and (UnitInRange(unit))
+        and (inRange or not checked)
 
     row:SetAlpha(reachable and 1 or DIM)
 end

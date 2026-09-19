@@ -175,6 +175,9 @@ function stub.newEnv()
 
     -- Units --------------------------------------------------------------
     -- Tests edit this table directly: env.units.party2.health = 30
+    -- checkedRange defaults to true (a normal party member); set it false to
+    -- model a unit the client cannot range-check at all, such as "player"
+    -- when solo -- a real case UnitInRange signals by returning false, false.
     env.units = {
         player = { name = "Skyler", class = "DRUID", health = 100, healthMax = 100, connected = true, dead = false, inRange = true },
         party1 = { name = "Borgir", class = "WARRIOR", health = 80, healthMax = 100, connected = true, dead = false, inRange = true },
@@ -197,6 +200,9 @@ function stub.newEnv()
     function env.UnitInRange(id)
         local u = unit(id)
         if not u then return false, false end
+        if u.checkedRange == false then
+            return false, false
+        end
         return u.inRange and true or false, true
     end
 
