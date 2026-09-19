@@ -25,10 +25,34 @@ ns.AddDefaults({
 local anchor
 local rows = {}
 
+-- Nothing secure may be written in combat: not a spell attribute, not showing
+-- or hiding a button, not moving a row, because moving a row moves the secure
+-- buttons inside it. Rather than attempt it and put an error in the player's
+-- face, hold the change and do it the moment the fight ends. ForeverPanel's
+-- ChatKeys.Apply holds its bindings the same way.
+local pending = false
+
 -- Set when Build was asked for during combat and could not run. Row.Create
 -- writes secure attributes the same way ApplySpells does, so the whole build
--- -- not just the spells -- has to wait for the fight to end.
+-- -- not just the spells -- has to wait for the fight to end. Declared next
+-- to pending, not further down with the rest of the queue, because Build
+-- (above the queue in this file) has to be able to set both.
 local buildPending = false
+
+--- Run whatever combat is currently holding back. Cheap to call on spec --
+-- Build returns immediately once the anchor exists, and ApplyAll re-checks
+-- combat itself -- so both PLAYER_REGEN_ENABLED and PLAYER_ENTERING_WORLD
+-- (which can arrive after a loading screen that swallowed the regen event)
+-- call this rather than duplicating the build-then-apply order between them.
+local function runPending()
+    if buildPending and Group.Build() then
+        Group.RefreshAll()
+    end
+
+    if pending then
+        Group.ApplyAll()
+    end
+end
 
 --- The five units in display order. A function rather than a constant,
 -- because where your own row sits is the player's choice.
@@ -93,7 +117,13 @@ function Group.Build()
     end
 
     if InCombatLockdown and InCombatLockdown() then
+        -- pending is armed here too, not left for the caller to arm: the
+        -- rows this build will eventually create start with no spell
+        -- attributes at all, so whoever finishes the build later must also
+        -- apply, whether they reached Build through the login handler or
+        -- called it directly.
         buildPending = true
+        pending = true
         return false
     end
 
@@ -180,17 +210,18 @@ watcher:SetScript("OnEvent", function(_, event, unit)
     if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
         -- Names and classes change wholesale, so no single row is enough.
         Group.RefreshAll()
+
+        if event == "PLAYER_ENTERING_WORLD" then
+            -- The one other point, besides regen-enabled, where a build or
+            -- apply held by combat is worth retrying -- entering the world
+            -- always follows combat ending, even on the runs where the
+            -- regen-enabled event itself does not reach us.
+            runPending()
+        end
     elseif unit then
         refreshUnit(unit)
     end
 end)
-
--- Nothing secure may be written in combat: not a spell attribute, not showing
--- or hiding a button, not moving a row, because moving a row moves the secure
--- buttons inside it. Rather than attempt it and put an error in the player's
--- face, hold the change and do it the moment the fight ends. ForeverPanel's
--- ChatKeys.Apply holds its bindings the same way.
-local pending = false
 
 function Group.Pending()
     return pending
@@ -220,33 +251,18 @@ end
 
 local combatWatcher = CreateFrame("Frame")
 combatWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
-combatWatcher:SetScript("OnEvent", function()
-    -- A build owed from login outranks the spells: there is nothing to apply
-    -- them to until the rows it was waiting to create actually exist.
-    if buildPending then
-        Group.Build()
-    end
-
-    if pending then
-        Group.ApplyAll()
-    end
-end)
+combatWatcher:SetScript("OnEvent", runPending)
 
 ns.OnLogin(function()
     local _, class = UnitClass("player")
     ns.Slots.Seed(class)
 
-    -- Build can be held by combat. When it is, Rows() is still empty, so
-    -- applying spells or refreshing would either quietly do nothing (and be
-    -- forgotten -- ApplyAll only remembers to retry once it has already been
-    -- asked while anchor exists) or, for RefreshAll, just no-op on an empty
-    -- table. Queue both behind the build instead, so the regen-enabled
-    -- handler above carries them out once the rows are real.
+    -- Build arms pending itself when combat holds it, so there is nothing
+    -- left to queue here: a deferred build already guarantees the apply and
+    -- the refresh it also needs will follow, once runPending gets to run.
     if Group.Build() then
         Group.ApplyAll()
         Group.RefreshAll()
-    else
-        pending = true
     end
 
     if C_Timer and C_Timer.NewTicker then

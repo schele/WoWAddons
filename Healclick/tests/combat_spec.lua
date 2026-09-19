@@ -161,6 +161,10 @@ describe("logging in during combat", function()
         env.__setCombat(true)
         helpers.login(ns, env)
 
+        -- A build owed reports the same as an apply owed: both are "a
+        -- secure change is waiting", which is what Pending() promises.
+        assertTrue(ns.Group.Pending())
+
         env.__setCombat(false)
 
         assertTrue(helpers.rowFor(ns, "party1") ~= nil, "rows built")
@@ -170,5 +174,66 @@ describe("logging in during combat", function()
             "spells applied (the stub player is a druid)"
         )
         assertFalse(ns.Group.Pending())
+    end)
+
+    it("refreshes the rows immediately once the deferred build completes", function()
+        -- Not "eventually, once the range ticker gets to it": the ticker
+        -- polls for range and only happens to cover names and health too,
+        -- up to RANGE_INTERVAL seconds late. A row that just came into
+        -- being should not sit blank in the meantime.
+        local ns, env = helpers.loadAddon(FILES)
+        env.__setCombat(true)
+        helpers.login(ns, env)
+
+        env.__setCombat(false)
+
+        assertEqual(
+            "Borgir",
+            helpers.rowFor(ns, "party1").name:GetText(),
+            "refreshed without needing the range ticker to fire first"
+        )
+    end)
+
+    it("also catches up on PLAYER_ENTERING_WORLD, in case PLAYER_REGEN_ENABLED is lost across a loading screen", function()
+        local ns, env = helpers.loadAddon(FILES)
+        env.__setCombat(true)
+        helpers.login(ns, env)
+
+        -- Flip combat off directly instead of through __setCombat, which
+        -- fires PLAYER_REGEN_ENABLED itself -- that is exactly the event
+        -- this scenario assumes never arrived.
+        env.__inCombat = false
+        helpers.fire(env, "PLAYER_ENTERING_WORLD")
+
+        assertTrue(helpers.rowFor(ns, "party1") ~= nil, "rows built")
+        assertEqual(
+            "Regrowth",
+            helpers.attrs(helpers.rowFor(ns, "party1").buttons[1]).spell,
+            "spells applied"
+        )
+    end)
+end)
+
+-- FIX 1 (review of this task): Build's only callers today are the login
+-- handler and the regen-enabled handler, but the combat branch that defers
+-- it must protect its own invariant rather than lean on whichever caller
+-- happened to invoke it. Calling Build() on its own, with no login handler
+-- involved, must still guarantee the eventual apply.
+describe("Build asked for directly, without going through login", function()
+    it("still arms the apply for whenever the deferred build completes", function()
+        local ns, env = helpers.loadAddon(FILES)
+        helpers.fire(env, "ADDON_LOADED", "Healclick")
+        ns.Slots.Set(1, "Regrowth")
+
+        env.__setCombat(true)
+        assertFalse(ns.Group.Build(), "held: combat is active")
+
+        env.__setCombat(false)
+
+        assertEqual(
+            "Regrowth",
+            helpers.attrs(helpers.rowFor(ns, "party1").buttons[1]).spell,
+            "the deferred build must arm its own apply, not rely on a caller to"
+        )
     end)
 end)
