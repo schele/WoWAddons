@@ -606,3 +606,35 @@ describe("attaching before Blizzard has built its frames", function()
         assertEqual(0, #env.__timers)
     end)
 end)
+
+describe("the anchor report", function()
+    it("prints a line for every unit without erroring", function()
+        -- A diagnostic that throws is worse than none: it is reached for
+        -- precisely when something is already wrong.
+        local ns, env = loggedIn()
+        ns.db.bar.attached = true
+        ns.Group.ApplyAll()
+
+        local ok = pcall(helpers.command, env, "anchors")
+
+        assertTrue(ok, "/hc anchors must survive whatever it finds")
+        local printed = helpers.printed(env)
+        for _, unit in ipairs(ns.Group.Units()) do
+            assertTrue(printed:find(unit, 1, true) ~= nil, unit .. " is reported")
+        end
+    end)
+
+    it("survives a unit whose frame is missing entirely", function()
+        local ns, env = loggedIn()
+        env.PartyMemberFrame1 = nil
+        env.PartyMemberFrame1HealthBar = nil
+        ns.db.bar.attached = true
+        ns.Group.ApplyAll()
+
+        local ok = pcall(helpers.command, env, "anchors")
+
+        assertTrue(ok)
+        assertTrue(helpers.printed(env):find("NONE", 1, true) ~= nil,
+            "and says which one it could not find")
+    end)
+end)

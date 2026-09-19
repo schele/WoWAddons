@@ -229,8 +229,14 @@ end
 -- gives up. Bounded because a frame that is never coming would otherwise
 -- queue a retry on every pass, for ever. Reset whenever something happens
 -- that could plausibly have created the frames.
-local RELAYOUT_TRIES = 5
-local relayoutsLeft = RELAYOUT_TRIES
+-- Seconds to wait before each successive retry. Backing off rather than
+-- repeating: the first version fired all its tries inside five frames, about
+-- eighty milliseconds, which is no wait at all for a UI that is still
+-- building itself. This covers the first eight seconds after login and then
+-- stops, so a UI that will never have party frames is not left queueing
+-- passes for the rest of the session.
+local RELAYOUT_DELAYS = { 0, 0.1, 0.25, 0.5, 1, 2, 4 }
+local relayoutStep = 0
 local relayoutQueued = false
 
 --- Ask for one more layout pass shortly, because a frame we wanted was not
@@ -241,7 +247,8 @@ local relayoutQueued = false
 -- login ours runs first, finds no PartyMemberFrame1, and has nothing to hang
 -- that row off. A pass on the next frame finds it.
 local function scheduleRelayout()
-    if relayoutQueued or relayoutsLeft <= 0 then
+    local delay = RELAYOUT_DELAYS[relayoutStep + 1]
+    if relayoutQueued or not delay then
         return
     end
     if not (C_Timer and C_Timer.After) then
@@ -249,9 +256,9 @@ local function scheduleRelayout()
     end
 
     relayoutQueued = true
-    relayoutsLeft = relayoutsLeft - 1
+    relayoutStep = relayoutStep + 1
 
-    C_Timer.After(0, function()
+    C_Timer.After(delay, function()
         relayoutQueued = false
         -- Laying out moves rows full of secure buttons, which is refused
         -- mid-fight. The next roster event or regen-enabled will come back
@@ -311,7 +318,7 @@ function Group.Layout()
         else
             -- Everything found its frame, so the next time one goes missing
             -- gets a full set of tries rather than the remains of this one.
-            relayoutsLeft = RELAYOUT_TRIES
+            relayoutStep = 0
         end
         return
     end
@@ -463,7 +470,7 @@ function Group.ApplyAll()
     -- A fresh set of retries: whatever prompted this apply -- a roster
     -- change, entering the world, a settings toggle -- is exactly the kind
     -- of thing that brings Blizzard's party frames into being.
-    relayoutsLeft = RELAYOUT_TRIES
+    relayoutStep = 0
     -- This is the only place `pending` is ever cleared, so the reposition it
     -- was guarding belongs here too -- not just in runPending -- or whichever
     -- of ApplyAll's other callers (GROUP_ROSTER_UPDATE, a Slots.lua onChange,
@@ -548,3 +555,49 @@ ns.RegisterSetting({
         if ns.Group then ns.Group.ApplyAll() end
     end,
 })
+
+--- Report what the attached layout actually found, per unit.
+--
+-- The layout depends entirely on frames this addon does not own and cannot
+-- see from outside the game: whether PartyMemberFrame1 exists yet, whether
+-- it has the health bar we prefer, and where a row ended up as a result.
+-- None of that is visible on screen -- a row that found nothing looks
+-- exactly like one that was never built.
+local function frameLabel(frame)
+    if not frame then
+        return "NONE"
+    end
+
+    local name = frame.GetName and frame:GetName()
+    return name or "unnamed"
+end
+
+ns.RegisterCommand("anchors", "Report which unit frames the icons found", function()
+    ns.Print(string.format(
+        "Attached: %s (setting %s, frames available %s)",
+        tostring(ns.Row.Attached()),
+        tostring(ns.db.bar.attached),
+        tostring(ns.Anchors.Available())
+    ))
+
+    for _, unit in ipairs(Group.Units()) do
+        local row = rows[unit]
+        local point, relativeTo, _, x, y
+
+        if row then
+            point, relativeTo, _, x, y = row:GetPoint(1)
+        end
+
+        ns.Print(string.format(
+            "%s: wants=%s exists=%s | row %s -> %s at %s,%s shown=%s",
+            unit,
+            frameLabel(ns.Anchors.For(unit)),
+            tostring(UnitExists and UnitExists(unit)),
+            tostring(point),
+            frameLabel(relativeTo),
+            tostring(x),
+            tostring(y),
+            row and tostring(row:IsShown()) or "no row"
+        ))
+    end
+end)
