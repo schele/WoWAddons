@@ -85,13 +85,21 @@ local function makeWidget(kind, parent, template, env)
         self.width, self.height = w, h
     end
 
+    -- OnShow and OnHide fire here, as the client fires them, rather than
+    -- being left for a test to call by hand. A frame that cleans up after
+    -- itself in OnHide -- the spell picker's click catcher, for one -- is
+    -- only correct if hiding actually runs it.
     function widget:Show()
         refuseInCombat(self, "Show")
         self.shown = true
+        local handler = self.scripts.OnShow
+        if handler then handler(self) end
     end
     function widget:Hide()
         refuseInCombat(self, "Hide")
         self.shown = false
+        local handler = self.scripts.OnHide
+        if handler then handler(self) end
     end
     function widget:SetShown(value) self.shown = value and true or false end
     function widget:IsShown() return self.shown end
@@ -369,6 +377,9 @@ function stub.newEnv()
         ["Rejuvenation"] = 136081,
         ["Remove Curse"] = 135921,
         ["Mark of the Wild"] = 136078,
+        -- Every real spell has an icon, so a known spell missing one here is
+        -- a hole in the stub rather than a case worth modelling.
+        ["Healing Touch"] = 136041,
     }
 
     -- What is on cooldown right now. Empty by default: a spell absent here
@@ -383,6 +394,12 @@ function stub.newEnv()
     -- answer -- which is the common case and must never dim anything.
     --   env.__spellRanges["Rejuvenation:party1"] = false
     env.__spellRanges = {}
+
+    -- Which spells are cast on a friendly target. Only the exceptions are
+    -- listed; anything absent reads as helpful, the way most of a healer's
+    -- spellbook is.
+    --   env.__spellHelpful["Attack"] = false
+    env.__spellHelpful = {}
 
     -- The clock the client counts auras against. Fixed rather than real, so
     -- a test can say "this expires in seven seconds" and mean it.
@@ -447,6 +464,17 @@ function stub.newEnv()
         -- A boolean, where the old global returned 1, 0 or nil.
         IsSpellInRange = function(name, unit)
             return env.__spellRanges[tostring(name) .. ":" .. tostring(unit)]
+        end,
+        -- The real call answers for every spell it knows, so this defaults
+        -- to true and a test marks the exceptions. Passives, attacks and
+        -- professions are the exceptions -- and they share the spellbook
+        -- with the heals, which is the whole reason the picker filters.
+        IsSpellHelpful = function(name)
+            local known = env.__spellHelpful[name]
+            if known ~= nil then
+                return known
+            end
+            return true
         end,
     }
 

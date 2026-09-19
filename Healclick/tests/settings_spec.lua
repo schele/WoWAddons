@@ -113,116 +113,63 @@ describe("the slot count slider", function()
 end)
 
 describe("the spell table", function()
+    local function slotRows(ns)
+        return controlFor(ns, "bar", "spells").slotRows
+    end
+
     it("has a row for every slot the maximum allows", function()
         local ns = loggedIn()
-        assertEqual(ns.Slots.MAX, #controlFor(ns, "bar", "spells").boxes)
+        assertEqual(ns.Slots.MAX, #slotRows(ns))
     end)
 
-    -- An EditBox grabs focus as it comes into existence, so SetAutoFocus(false)
-    -- is a line too late to prevent it. Left alone, the last row built stays
-    -- focused, and the player's next click anywhere silently re-stores its
-    -- text and re-applies -- exactly the bug ForeverPanel's key table already
-    -- guards against for the same reason.
-    it("drops keyboard focus from every row as it is built", function()
-        local ns = loggedIn()
-        local boxes = controlFor(ns, "bar", "spells").boxes
-
-        for index, box in ipairs(boxes) do
-            assertFalse(box.focused, "row " .. index .. " does not hold focus")
-        end
-    end)
-
-    it("stores what is typed into a row", function()
-        local ns = loggedIn()
-        local boxes = controlFor(ns, "bar", "spells").boxes
-
-        -- A different spell than the seed already sitting in slot 2, so a
-        -- store that never actually ran (e.g. because the box never regained
-        -- focus, as EnsureBuilt now leaves it) cannot pass by coincidence.
-        boxes[2]:SetFocus()
-        boxes[2]:SetText("Healing Touch")
-        boxes[2].scripts.OnEnterPressed(boxes[2])
-
-        assertEqual("Healing Touch", ns.Slots.Spell(2))
-    end)
-
-    it("keeps a spell the character has not learned, and says so", function()
-        local ns, env = loggedIn()
-        local boxes = controlFor(ns, "bar", "spells").boxes
-
-        boxes[3]:SetFocus()
-        boxes[3]:SetText("Tranquility")
-        boxes[3].scripts.OnEnterPressed(boxes[3])
-
-        assertEqual("Tranquility", ns.Slots.Spell(3))
-        assertMatch("Tranquility", helpers.printed(env))
-    end)
-
-    it("shows what is already configured when it refreshes", function()
+    it("shows the spell a slot holds by name", function()
         local ns = loggedIn()
         ns.Slots.Set(4, "Regrowth")
 
         ns.SettingsPanel.Refresh()
-        assertEqual("Regrowth", controlFor(ns, "bar", "spells").boxes[4]:GetText())
+        assertEqual("Regrowth", slotRows(ns)[4].label:GetText())
     end)
 
-    -- OnEnterPressed and OnEditFocusLost used to both be bound to the same
-    -- store function, and store ended by clearing its own focus -- which the
-    -- client turns straight back into an OnEditFocusLost. One Enter press ran
-    -- the store logic twice.
-    it("stores exactly once when Enter is pressed", function()
-        local ns, env = loggedIn()
-        local box = controlFor(ns, "bar", "spells").boxes[5]
+    it("shows that spell's own icon beside the name", function()
+        -- Which spell a slot holds reads faster from its icon than from its
+        -- name, the same reason the buttons themselves show icons.
+        local ns = loggedIn()
+        ns.Slots.Set(4, "Regrowth")
 
-        box:SetFocus()
-        box:SetText("Tranquility")
-        box.scripts.OnEnterPressed(box)
-
-        local _, count = helpers.printed(env):gsub("Tranquility", "Tranquility")
-        assertEqual(1, count, "the unlearned-spell warning printed exactly once")
-    end)
-
-    -- Escape's own revert-then-ClearFocus used to trigger the very store
-    -- logic it was trying to avoid, so opening a row that already holds an
-    -- unlearned spell and pressing Escape without changing anything spammed
-    -- the warning and reapplied for no reason.
-    it("discards an edit and prints nothing when Escape is pressed", function()
-        local ns, env = loggedIn()
-        ns.Slots.Set(6, "Tranquility")
-
-        local box = controlFor(ns, "bar", "spells").boxes[6]
         ns.SettingsPanel.Refresh()
-        -- Boxes start unfocused since Fix 4 (Settings.lua's ClearFocus at
-        -- build time); without simulating the player having clicked into
-        -- this one first, OnEscapePressed's own ClearFocus() is a no-op and
-        -- the reverting guard below is never actually exercised.
-        box:SetFocus()
-
-        box:SetText("Regrowth")
-        local before = helpers.printed(env)
-
-        box.scripts.OnEscapePressed(box)
-
-        assertEqual("Tranquility", box:GetText(), "reverted to what was stored")
-        assertEqual("Tranquility", ns.Slots.Spell(6), "the typed edit was discarded")
-        assertEqual(before, helpers.printed(env), "no warning printed for the discarded edit")
+        assertEqual(136085, slotRows(ns)[4].icon:GetTexture())
+        assertTrue(slotRows(ns)[4].icon:IsShown())
     end)
 
-    -- Without this, the box for the slot a drop just landed in still shows
-    -- whatever was there before -- and losing focus afterward is exactly
-    -- what stores that stale text back over the drop.
-    it("refreshes so a stale box does not overwrite a drop that just landed", function()
+    it("leaves an empty slot blank, with no icon", function()
+        local ns = loggedIn()
+        ns.Slots.Set(4, "")
+
+        ns.SettingsPanel.Refresh()
+        assertEqual("", slotRows(ns)[4].label:GetText())
+        assertFalse(slotRows(ns)[4].icon:IsShown())
+    end)
+
+    it("keeps showing a spell the character has not learned", function()
+        -- Seeded slots can hold one, and a drop can put one there. The
+        -- picker will not offer it, but the panel must still say it is what
+        -- the slot holds rather than showing the row as empty.
+        local ns = loggedIn()
+        ns.Slots.Set(4, "Tranquility")
+
+        ns.SettingsPanel.Refresh()
+        assertEqual("Tranquility", slotRows(ns)[4].label:GetText())
+    end)
+
+    it("catches up with a spell dropped onto a button while it was open", function()
         local ns, env = loggedIn()
-        local box = controlFor(ns, "bar", "spells").boxes[2]
 
         local row = helpers.rowFor(ns, "party1")
         env.__cursor = { "spell", 5, "spell" }
         row.buttons[2].scripts.OnReceiveDrag(row.buttons[2])
 
-        assertEqual("Regrowth", box:GetText(), "the box reflects the drop immediately")
-
-        box.scripts.OnEditFocusLost(box)
-        assertEqual("Regrowth", ns.Slots.Spell(2), "the drop survives the box losing focus afterward")
+        assertEqual("Regrowth", slotRows(ns)[2].label:GetText(),
+            "the row reflects the drop immediately")
     end)
 end)
 
@@ -316,6 +263,12 @@ describe("picking a spell instead of typing one", function()
         local ns, env = helpers.loadAddon()
         helpers.login(ns, env)
         env.__learnSpells({ "Rejuvenation", "Healing Touch", "Mark of the Wild" })
+        -- Emptied, because the seed fills the first four slots and a slot's
+        -- spell is no longer offered to the others. The uniqueness tests
+        -- below put spells back deliberately.
+        for index = 1, ns.Slots.MAX do
+            ns.Slots.Set(index, "")
+        end
         ns.SettingsPanel.EnsureBuilt()
         return ns, env
     end
@@ -360,15 +313,17 @@ describe("picking a spell instead of typing one", function()
         assertEqual("Healing Touch", ns.Slots.Spell(3))
     end)
 
-    it("shows the new spell in the row's box straight away", function()
-        -- Picking has to leave the panel saying what it just did, or the box
-        -- still reads whatever was there and stores it back on next focus.
+    it("shows the new spell on the row straight away", function()
+        -- Picking has to leave the panel saying what it just did; the row is
+        -- the only thing that tells the player the slot took it.
         local ns = withSpellbook()
         local picker = openOn(ns, 3)
 
         picker.buttons[2].scripts.OnClick(picker.buttons[2])
 
-        assertEqual("Healing Touch", controlFor(ns, "bar", "spells").boxes[3]:GetText())
+        local row = controlFor(ns, "bar", "spells").slotRows[3]
+        assertEqual("Healing Touch", row.label:GetText())
+        assertTrue(row.icon:IsShown(), "and its icon")
     end)
 
     it("closes once something is chosen", function()
@@ -436,5 +391,138 @@ describe("picking a spell instead of typing one", function()
         end
 
         assertEqual(0, picker.offset, "four entries do not fill ten rows")
+    end)
+end)
+
+describe("what the picker will and will not offer", function()
+    local function pickerFor(ns, slot)
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[slot].scripts.OnClick(control.picks[slot])
+        return ns.SettingsPanel.picker
+    end
+
+    local function labels(picker)
+        local seen = {}
+        for _, button in ipairs(picker.buttons) do
+            if button:IsShown() then
+                seen[button.label:GetText()] = true
+            end
+        end
+        return seen
+    end
+
+    local function ready(env, ns)
+        for index = 1, ns.Slots.MAX do
+            ns.Slots.Set(index, "")
+        end
+        ns.SettingsPanel.EnsureBuilt()
+    end
+
+    it("leaves out everything that is not cast on a friendly target", function()
+        -- A spellbook is not a list of heals. Attack, Dodge, Armor
+        -- Proficiency, Mining and every profession share it with them.
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+        env.__learnSpells({ "Healing Touch", "Attack", "Mining", "Dodge" })
+        env.__spellHelpful["Attack"] = false
+        env.__spellHelpful["Mining"] = false
+        env.__spellHelpful["Dodge"] = false
+        ready(env, ns)
+
+        local shown = labels(pickerFor(ns, 1))
+
+        assertTrue(shown["Healing Touch"], "the heal stays")
+        assertNil(shown["Attack"])
+        assertNil(shown["Mining"])
+        assertNil(shown["Dodge"])
+    end)
+
+    it("shows everything when the client will not classify spells at all", function()
+        -- A filter that silently empties the picker is worse than one that
+        -- lets a few passives through.
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+        env.__learnSpells({ "Healing Touch", "Attack" })
+        env.C_Spell.IsSpellHelpful = nil
+        ready(env, ns)
+
+        local shown = labels(pickerFor(ns, 1))
+
+        assertTrue(shown["Healing Touch"])
+        assertTrue(shown["Attack"], "unclassified is kept, not dropped")
+    end)
+
+    it("does not offer a spell another slot already holds", function()
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+        env.__learnSpells({ "Healing Touch", "Rejuvenation" })
+        ready(env, ns)
+        ns.Slots.Set(1, "Healing Touch")
+
+        local shown = labels(pickerFor(ns, 2))
+
+        assertNil(shown["Healing Touch"], "already on slot 1")
+        assertTrue(shown["Rejuvenation"])
+    end)
+
+    it("still offers the slot its own spell, so it reads as what it holds", function()
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+        env.__learnSpells({ "Healing Touch", "Rejuvenation" })
+        ready(env, ns)
+        ns.Slots.Set(2, "Healing Touch")
+
+        local shown = labels(pickerFor(ns, 2))
+
+        assertTrue(shown["Healing Touch"])
+    end)
+
+    it("offers a spell again once the slot holding it is emptied", function()
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+        env.__learnSpells({ "Healing Touch", "Rejuvenation" })
+        ready(env, ns)
+        ns.Slots.Set(1, "Healing Touch")
+
+        ns.Slots.Set(1, "")
+
+        assertTrue(labels(pickerFor(ns, 2))["Healing Touch"])
+    end)
+end)
+
+describe("closing the picker by clicking away", function()
+    local function opened(ns)
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[1].scripts.OnClick(control.picks[1])
+        return ns.SettingsPanel.picker
+    end
+
+    it("closes when a click lands anywhere else", function()
+        local ns = loggedIn()
+        local picker = opened(ns)
+        assertTrue(picker:IsShown())
+
+        picker.catcher.scripts.OnMouseDown(picker.catcher)
+
+        assertFalse(picker:IsShown())
+    end)
+
+    it("covers the screen while the list is open", function()
+        local ns = loggedIn()
+        local picker = opened(ns)
+
+        assertTrue(picker.catcher:IsShown())
+    end)
+
+    it("stops covering it the moment the list closes, however it closed", function()
+        -- A catcher left showing would eat every click on the panel behind
+        -- it -- a worse bug than the one it exists to fix.
+        local ns = loggedIn()
+        local picker = opened(ns)
+
+        ns.SettingsPanel.Choose(1, nil)
+
+        assertFalse(picker:IsShown())
+        assertFalse(picker.catcher:IsShown(), "and lets clicks through again")
     end)
 end)

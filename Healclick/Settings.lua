@@ -103,14 +103,30 @@ local CLEAR_ENTRY = "(empty this slot)"
 
 local picker
 
-local function pickerEntries()
+local function pickerEntries(slot)
     -- Emptying a slot is the one thing the spellbook cannot offer, so it is
-    -- offered here rather than sending the player back to the text box to
-    -- delete what they typed.
+    -- offered here -- and with the text boxes gone it is the only way to
+    -- clear a slot at all.
     local entries = { CLEAR_ENTRY }
 
-    for _, name in ipairs(ns.Spells.Known()) do
-        entries[#entries + 1] = name
+    -- A spell already sitting in another slot is not offered again: two
+    -- buttons casting the same thing is one button wasted, and side by side
+    -- there is nothing to tell them apart. The slot being picked for is
+    -- exempt, so its own spell still appears as what it currently holds.
+    local taken = {}
+    for index = 1, ns.Slots.MAX do
+        if index ~= slot then
+            local spell = ns.Slots.Spell(index)
+            if spell then
+                taken[spell] = true
+            end
+        end
+    end
+
+    for _, name in ipairs(ns.Spells.Pickable()) do
+        if not taken[name] then
+            entries[#entries + 1] = name
+        end
     end
 
     return entries
@@ -167,8 +183,9 @@ local function ensurePicker()
     end
 
     picker = CreateFrame("Frame", nil, panel)
-    -- Above the rows it drops over, which are ordinary canvas widgets.
-    picker:SetFrameStrata("DIALOG")
+    -- Above the rows it drops over, and above the settings frame around
+    -- them, which is itself a dialog.
+    picker:SetFrameStrata("FULLSCREEN_DIALOG")
     picker:SetSize(PICKER_WIDTH, PICKER_ROWS * BOX_HEIGHT + 8)
     -- So a click on the list is not also a click on whatever is under it.
     picker:EnableMouse(true)
@@ -215,6 +232,26 @@ local function ensurePicker()
         refreshPicker()
     end)
 
+    -- A screen-wide frame behind the list, so a click anywhere but on the
+    -- list closes it -- the way every menu behaves. One strata below the
+    -- list, so a click on the list itself reaches the list and not this.
+    local catcher = CreateFrame("Frame", nil, UIParent)
+    catcher:SetAllPoints(UIParent)
+    catcher:SetFrameStrata("FULLSCREEN")
+    catcher:EnableMouse(true)
+    catcher:SetScript("OnMouseDown", function()
+        picker:Hide()
+    end)
+    catcher:Hide()
+
+    -- Tied to the list rather than hidden alongside it at each call site:
+    -- the list closes from four places, and a catcher left showing would
+    -- swallow every click on the panel behind it.
+    picker:SetScript("OnHide", function()
+        catcher:Hide()
+    end)
+
+    picker.catcher = catcher
     picker:Hide()
     Panel.picker = picker
 end
@@ -230,24 +267,27 @@ local function openPicker(slot, anchorTo)
     end
 
     picker.slot = slot
-    picker.entries = pickerEntries()
+    picker.entries = pickerEntries(slot)
     picker.offset = 0
     picker:ClearAllPoints()
     picker:SetPoint("TOPLEFT", anchorTo, "BOTTOMLEFT", 0, -2)
     refreshPicker()
+    picker.catcher:Show()
     picker:Show()
 end
 
 Panel.OpenPicker = openPicker
 
---- One edit box per slot, and a Pick button beside each. Typing a name and
--- pressing Enter stores it; Pick opens the list above instead.
--- The store is Slots.Set rather than SetSettingValue, because a slot is one
--- entry inside a table rather than a value of its own, and because Set is
--- where the "you have not learned that yet" warning comes from.
+--- One row per slot: the spell's icon, its name, and a Pick button that
+-- opens the list above.
+--
+-- Nothing here is typed into any more. That costs the one thing typing could
+-- do that picking cannot -- setting up a spell not yet learned, the Remove
+-- Curse a druid gets at 24 -- and buys a panel where a slot cannot be
+-- spelled wrong.
 local function addSpellTable(setting, y, x)
     local rows = setting.rows or 8
-    local boxes = {}
+    local slotRows = {}
     local picks = {}
 
     local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -261,79 +301,56 @@ local function addSpellTable(setting, y, x)
         number:SetPoint("TOPLEFT", x, top - 4)
         number:SetText(tostring(index))
 
-        local box = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
-        box:SetPoint("TOPLEFT", x + 20, top)
-        box:SetSize(180, BOX_HEIGHT - 4)
-        -- Both, and in this order. An EditBox grabs focus as it comes into
-        -- existence, so SetAutoFocus(false) is a line too late to prevent it
-        -- and the box has to be told to let go of what it already took --
-        -- otherwise the last row built stays focused, and the player's next
-        -- click anywhere silently re-stores its text and re-applies.
-        box:SetAutoFocus(false)
-        box:ClearFocus()
+        -- The spell's own icon and name, not an edit box. Picking is the
+        -- only way into a slot now, so there is nothing left to type into --
+        -- and an icon says which spell a slot holds faster than its name
+        -- does, which is the same reason the buttons themselves show icons.
+        local slotRow = CreateFrame("Frame", nil, panel)
+        slotRow:SetPoint("TOPLEFT", x + 20, top)
+        slotRow:SetSize(180, BOX_HEIGHT - 4)
 
-        -- Set while Escape reverts the text and lets go of focus, so the
-        -- OnEditFocusLost that ClearFocus() triggers as a side effect does
-        -- not re-store the value Escape just discarded.
-        local reverting = false
+        slotRow.icon = slotRow:CreateTexture(nil, "ARTWORK")
+        slotRow.icon:SetSize(BOX_HEIGHT - 6, BOX_HEIGHT - 6)
+        slotRow.icon:SetPoint("LEFT")
+        -- The same border crop the buttons use, so the two show the same art.
+        slotRow.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
-        local function store()
-            if reverting then
-                return
-            end
+        slotRow.label = slotRow:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        slotRow.label:SetPoint("LEFT", slotRow.icon, "RIGHT", 6, 0)
+        slotRow.label:SetJustifyH("LEFT")
 
-            local ok, message = ns.Slots.Set(index, box:GetText())
-            if not ok then
-                ns.Print(message or "That slot does not exist.")
-            elseif message then
-                ns.Print(message)
-            end
-
-            if setting.onChange then
-                setting.onChange()
-            end
-        end
-
-        -- ClearFocus() itself fires OnEditFocusLost, which is where storing
-        -- happens. Binding store to OnEnterPressed too would run it twice for
-        -- one Enter press; ForeverPanel's key table splits the two for the
-        -- same reason.
-        box:SetScript("OnEnterPressed", function(self)
-            self:ClearFocus()
-        end)
-        box:SetScript("OnEditFocusLost", store)
-        box:SetScript("OnEscapePressed", function(self)
-            reverting = true
-            self:SetText(ns.Slots.Spell(index) or "")
-            self:ClearFocus()
-            reverting = false
-        end)
-
-        -- Typing stays, because it is the only way to set up a spell you
-        -- have not learned yet -- the Remove Curse a druid gets at 24 is not
-        -- in the spellbook to be picked. This is for the other case, which
-        -- is every other case.
         local pick = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
         pick:SetSize(46, BOX_HEIGHT - 4)
-        pick:SetPoint("LEFT", box, "RIGHT", 6, 0)
+        pick:SetPoint("LEFT", slotRow, "RIGHT", 6, 0)
         pick:SetText("Pick")
         pick:SetScript("OnClick", function()
-            openPicker(index, box)
+            openPicker(index, slotRow)
         end)
 
-        boxes[index] = box
+        slotRows[index] = slotRow
         picks[index] = pick
     end
 
     return {
         setting = setting,
-        widget = boxes[1],
-        boxes = boxes,
+        widget = slotRows[1],
+        slotRows = slotRows,
         picks = picks,
         height = ROW_HEIGHT + rows * BOX_HEIGHT,
         Refresh = function()
             for index = 1, rows do
-                boxes[index]:SetText(ns.Slots.Spell(index) or "")
+                local spell = ns.Slots.Spell(index)
+                local slotRow = slotRows[index]
+
+                slotRow.label:SetText(spell or "")
+
+                local texture = spell and ns.Spells.Texture(spell)
+                if texture then
+                    slotRow.icon:SetTexture(texture)
+                    slotRow.icon:Show()
+                else
+                    slotRow.icon:Hide()
+                end
             end
         end,
     }

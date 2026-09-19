@@ -280,7 +280,7 @@ function Row.Create(unit, parent)
         -- Just below the icon rather than across it: at 22 pixels there is
         -- no room to lay a number over the art and still read either.
         button.timer = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        button.timer:SetPoint("TOP", button, "BOTTOM", 0, 1)
+        button.timer:SetPoint("TOP", button, "BOTTOM", 0, -3)
 
         -- Blizzard's own cooldown widget, so the sweep is the one the action
         -- bars draw and the client animates it for us; all we ever hand it is

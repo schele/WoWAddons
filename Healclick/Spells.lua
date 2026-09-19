@@ -209,13 +209,47 @@ end
 -- settings panel.
 local SPELLBOOK_LIMIT = 1000
 
---- Every distinct spell the player knows, by name, in alphabetical order.
+--- Whether a spell is one you cast on a friendly target: true, false, or nil
+-- when this client will not say.
+--
+-- This is the rule that keeps a spellbook walk from offering Attack, Dodge,
+-- Armor Proficiency, Mining and every other passive and profession sitting
+-- in the same book. It is asked as a general question rather than matched
+-- against a list of a class's heals, because a list would have to be right
+-- for every class the seed already covers and wrong the day anyone respecs.
+--
+-- Note which way the unknown case falls, below: a client that cannot answer
+-- shows everything rather than nothing. A filter that silently empties the
+-- picker is worse than one that lets a few passives through.
+function Spells.IsHelpful(spellName)
+    if type(spellName) ~= "string" or spellName == "" then
+        return nil
+    end
+
+    return ns.Guarded(function()
+        if C_Spell and C_Spell.IsSpellHelpful then
+            local helpful = C_Spell.IsSpellHelpful(spellName)
+            if helpful ~= nil then
+                return helpful and true or false
+            end
+        end
+
+        if IsHelpfulSpell then
+            return IsHelpfulSpell(spellName) and true or false
+        end
+
+        return nil
+    end, nil)
+end
+
+--- Every distinct spell the player can cast on a friendly target, by name,
+-- in alphabetical order.
 --
 -- Distinct matters: Classic gives each rank its own spellbook entry, so a
 -- druid with three ranks of Healing Touch has three entries all named
 -- "Healing Touch". A slot holds a name, and a name casts the best rank the
 -- player has, so the list has no use for the other two.
-function Spells.Known()
+function Spells.Pickable()
     local names, seen = {}, {}
     local bank = playerSpellBank()
 
@@ -225,7 +259,9 @@ function Spells.Known()
             break
         end
 
-        if not seen[name] then
+        -- Only false excludes. A spell this client will not classify is kept,
+        -- so a missing API costs a tidy list rather than the whole picker.
+        if not seen[name] and Spells.IsHelpful(name) ~= false then
             seen[name] = true
             names[#names + 1] = name
         end

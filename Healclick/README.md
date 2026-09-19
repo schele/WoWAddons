@@ -89,9 +89,18 @@ There are three ways to put a spell in a slot, and they store the same thing:
   instead — the button casts whatever spell it already had, on that party
   member, and the spell you picked up is left sitting on your cursor for
   you to place once the fight is over.
-- **Type it.** Open `/hc settings` and type the spell's name into that slot's
-  row under Spells. The same out-of-combat/mid-fight split as dragging
-  applies here too.
+- **Pick it.** Open `/hc settings` and press **Pick** beside a slot. The list
+  offers every spell you know that can be cast on a friendly target, so
+  passives, attacks and professions stay out of it — as does any spell
+  another slot already holds, since two buttons casting the same thing is one
+  button wasted. Its first entry empties the slot. Click anywhere else to
+  close the list without choosing. The same out-of-combat/mid-fight split as
+  dragging applies here too.
+
+  There is no longer anywhere to type a spell's name, which costs the one
+  thing typing could do that picking cannot: setting up a spell you have not
+  learned yet. A seeded slot can still hold one, and the panel goes on
+  showing it — the picker simply will not offer it until you learn it.
 
 Dropping something that is not a spell — an item, a macro — onto a button
 does nothing: the button is unchanged and whatever you were carrying stays

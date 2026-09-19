@@ -245,12 +245,12 @@ describe("asking whether a spell can reach a unit", function()
     end)
 end)
 
-describe("listing the spells the player knows", function()
+describe("listing the spells a slot can be given", function()
     it("walks the spellbook until it runs out", function()
         local ns, env = loggedIn()
         env.__learnSpells({ "Rejuvenation", "Healing Touch", "Mark of the Wild" })
 
-        local known = ns.Spells.Known()
+        local known = ns.Spells.Pickable()
 
         assertEqual(3, #known)
     end)
@@ -259,7 +259,7 @@ describe("listing the spells the player knows", function()
         local ns, env = loggedIn()
         env.__learnSpells({ "Rejuvenation", "Healing Touch", "Mark of the Wild" })
 
-        local known = ns.Spells.Known()
+        local known = ns.Spells.Pickable()
 
         assertEqual("Healing Touch", known[1])
         assertEqual("Mark of the Wild", known[2])
@@ -274,7 +274,7 @@ describe("listing the spells the player knows", function()
             "Healing Touch", "Healing Touch", "Healing Touch", "Rejuvenation",
         })
 
-        local known = ns.Spells.Known()
+        local known = ns.Spells.Pickable()
 
         assertEqual(2, #known)
         assertEqual("Healing Touch", known[1])
@@ -286,14 +286,14 @@ describe("listing the spells the player knows", function()
         -- Something far down the book, past where the walk must have stopped.
         env.__learnSpellAt(500, "Tranquility")
 
-        local known = ns.Spells.Known()
+        local known = ns.Spells.Pickable()
 
         assertEqual(1, #known)
     end)
 
     it("is empty, not broken, for a character with no spellbook", function()
         local ns = loggedIn()
-        assertEqual(0, #ns.Spells.Known())
+        assertEqual(0, #ns.Spells.Pickable())
     end)
 
     it("falls back to the old global when C_SpellBook lacks the lookup", function()
@@ -305,7 +305,7 @@ describe("listing the spells the player knows", function()
             return book[tostring(bookType) .. ":" .. tostring(index)]
         end
 
-        assertEqual(1, #ns.Spells.Known())
+        assertEqual(1, #ns.Spells.Pickable())
     end)
 end)
 
