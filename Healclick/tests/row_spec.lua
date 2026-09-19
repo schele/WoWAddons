@@ -1,7 +1,7 @@
 local helpers = require("helpers")
 
-local FILES = { "Healclick.lua", "Slots.lua", "Row.lua" }
-local FILES_WITH_GROUP = { "Healclick.lua", "Slots.lua", "Row.lua", "Group.lua" }
+local FILES = { "Healclick.lua", "Spells.lua", "Slots.lua", "Row.lua" }
+local FILES_WITH_GROUP = { "Healclick.lua", "Spells.lua", "Slots.lua", "Row.lua", "Group.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)
@@ -169,7 +169,6 @@ describe("applying spells", function()
     it("falls back to the label when no texture can be found", function()
         local ns, env = loggedIn()
         env.C_Spell.GetSpellTexture = nil
-        env.GetSpellTexture = nil
         ns.Slots.Set(1, "Regrowth")
         local row = ns.Row.Create("party1", env.UIParent)
 
@@ -199,87 +198,6 @@ describe("applying spells", function()
             "0.07, 0.93, 0.07, 0.93",
             table.concat(row.buttons[1].icon.texCoord, ", ")
         )
-    end)
-end)
-
-describe("resolving a spell's icon", function()
-    it("uses C_Spell.GetSpellTexture when it exists", function()
-        local ns = loggedIn()
-        assertEqual(136085, ns.Row.SpellTexture("Regrowth"))
-    end)
-
-    it("falls back to the old global GetSpellTexture when C_Spell lacks it", function()
-        local ns, env = loggedIn()
-        env.C_Spell.GetSpellTexture = nil
-
-        assertEqual(136085, ns.Row.SpellTexture("Regrowth"))
-    end)
-
-    it("returns nil when neither API exists", function()
-        local ns, env = loggedIn()
-        env.C_Spell.GetSpellTexture = nil
-        env.GetSpellTexture = nil
-
-        assertNil(ns.Row.SpellTexture("Regrowth"))
-    end)
-
-    it("returns nil for no spell at all", function()
-        local ns = loggedIn()
-        assertNil(ns.Row.SpellTexture(nil))
-        assertNil(ns.Row.SpellTexture(""))
-    end)
-end)
-
-describe("resolving what is on the cursor", function()
-    it("returns nil when nothing is on the cursor", function()
-        local ns, env = loggedIn()
-        env.__cursor = nil
-
-        assertNil(ns.Row.CursorSpell())
-    end)
-
-    it("returns nil for a non-spell, such as an item, and never touches it", function()
-        local ns, env = loggedIn()
-        env.__cursor = { "item", 6948 }
-
-        assertNil(ns.Row.CursorSpell())
-    end)
-
-    it("resolves a spellID through C_Spell.GetSpellInfo", function()
-        local ns, env = loggedIn()
-        env.__cursor = { "spell", nil, nil, 8936, n = 4 }
-
-        assertEqual("Rejuvenation", ns.Row.CursorSpell())
-    end)
-
-    it("falls back to the old GetSpellInfo when C_Spell lacks GetSpellInfo", function()
-        local ns, env = loggedIn()
-        env.C_Spell.GetSpellInfo = nil
-        env.__cursor = { "spell", nil, nil, 8936, n = 4 }
-
-        assertEqual("Rejuvenation", ns.Row.CursorSpell())
-    end)
-
-    it("resolves a spellbook index through C_SpellBook.GetSpellBookItemName", function()
-        local ns, env = loggedIn()
-        env.__cursor = { "spell", 5, "spell" }
-
-        assertEqual("Regrowth", ns.Row.CursorSpell())
-    end)
-
-    it("falls back to the old GetSpellBookItemName when C_SpellBook lacks it", function()
-        local ns, env = loggedIn()
-        env.C_SpellBook.GetSpellBookItemName = nil
-        env.__cursor = { "spell", 5, "spell" }
-
-        assertEqual("Regrowth", ns.Row.CursorSpell())
-    end)
-
-    it("returns nil, never a number or a table, when nothing resolves a name", function()
-        local ns, env = loggedIn()
-        env.__cursor = { "spell", 999, "spell" }
-
-        assertNil(ns.Row.CursorSpell())
     end)
 end)
 
@@ -340,6 +258,91 @@ describe("dropping a spell onto a button", function()
             helpers.attrs(row.buttons[2]).spell,
             "applied the moment combat ends"
         )
+    end)
+end)
+
+describe("clicking a spell onto a button", function()
+    -- Most players assign a spell by clicking it in the spellbook, then
+    -- clicking the button, not by dragging it. That is an ordinary click,
+    -- which PreClick/PostClick intercept: nil the secure `type` attribute
+    -- out for this one click, then restore it once the click has passed.
+
+    it("assigns the spell and suppresses the cast when the cursor holds one", function()
+        local ns, env = loggedInWithGroup()
+        local row = helpers.rowFor(ns, "party1")
+        local button = row.buttons[2]
+        env.__cursor = { "spell", 5, "spell" }
+
+        button.scripts.PreClick(button)
+        assertNil(button:GetAttribute("type"), "the secure handler must not cast on this click")
+
+        button.scripts.PostClick(button)
+
+        assertEqual("spell", button:GetAttribute("type"), "restored for the next real click")
+        assertEqual("Regrowth", ns.Slots.Spell(2))
+        assertEqual("Regrowth", helpers.attrs(button).spell)
+    end)
+
+    it("casts normally and assigns nothing when the cursor is empty", function()
+        local ns, env = loggedInWithGroup()
+        local row = helpers.rowFor(ns, "party1")
+        local button = row.buttons[2]
+        env.__cursor = nil
+
+        button.scripts.PreClick(button)
+        assertEqual("spell", button:GetAttribute("type"), "an ordinary click must still be able to cast")
+
+        button.scripts.PostClick(button)
+
+        assertEqual("spell", button:GetAttribute("type"))
+        assertEqual("Rejuvenation", ns.Slots.Spell(2), "the seeded spell is untouched")
+    end)
+
+    it("casts normally and assigns nothing when the click lands during combat", function()
+        local ns, env = loggedInWithGroup()
+        local row = helpers.rowFor(ns, "party1")
+        local button = row.buttons[2]
+
+        env.__setCombat(true)
+        env.__cursor = { "spell", 5, "spell" }
+
+        button.scripts.PreClick(button)
+        assertEqual(
+            "spell",
+            button:GetAttribute("type"),
+            "attributes cannot be written in combat, so the click must cast normally"
+        )
+
+        button.scripts.PostClick(button)
+
+        assertEqual("spell", button:GetAttribute("type"))
+        assertEqual("Rejuvenation", ns.Slots.Spell(2), "nothing was assigned")
+    end)
+
+    it("clears the stash so a later ordinary click cannot replay the assignment", function()
+        local ns, env = loggedInWithGroup()
+        local row = helpers.rowFor(ns, "party1")
+        local button = row.buttons[3]
+        -- Slot 7 is "Tranquility", unlearned, so a successful assignment
+        -- prints a warning -- which is what makes a replay observable: the
+        -- stored value would be identical either way, but a second print
+        -- would not be.
+        env.__cursor = { "spell", 7, "spell" }
+
+        button.scripts.PreClick(button)
+        button.scripts.PostClick(button)
+        local _, firstCount = helpers.printed(env):gsub("Tranquility", "Tranquility")
+
+        -- A second, ordinary click: nothing on the cursor this time. If the
+        -- stash from the first click were still set, PostClick would find it
+        -- and replay the assignment -- and its warning -- a second time.
+        env.__cursor = nil
+        button.scripts.PreClick(button)
+        button.scripts.PostClick(button)
+        local _, secondCount = helpers.printed(env):gsub("Tranquility", "Tranquility")
+
+        assertEqual(firstCount, secondCount, "the warning must not print a second time")
+        assertEqual("spell", button:GetAttribute("type"))
     end)
 end)
 

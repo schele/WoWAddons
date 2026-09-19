@@ -133,87 +133,29 @@ function Row.Label(spellName)
     return table.concat(letters)
 end
 
---- The spell's own icon, defensively: the namespaced call if this client has
--- it, the old global if it does not, nil if neither does. A spike against
--- this addon's 1.60 Classic beta target found GetSpellInfo and
--- GetSpellBookItemName gone, moved into C_Spell and C_SpellBook, while
--- C_SpellBook's namespaced call still worked -- so the namespaced route is
--- the likely one, but trying both means we do not have to be right about it.
-function Row.SpellTexture(spellName)
-    if type(spellName) ~= "string" or spellName == "" then
-        return nil
+--- Store a spell in a slot and apply it -- the body shared by a drag-and-drop
+-- and a click-to-place assignment (see Row.Create), so the two paths cannot
+-- drift apart.
+local function assignSpellToSlot(slot, name)
+    local _, message = ns.Slots.Set(slot, name)
+    ClearCursor()
+
+    if ns.Group then
+        ns.Group.ApplyAll()
     end
 
-    if C_Spell and C_Spell.GetSpellTexture then
-        return C_Spell.GetSpellTexture(spellName)
+    -- The settings panel's own box for this slot still shows whatever was
+    -- there before this assignment; left alone, it stores that stale text
+    -- back over the drop or click the next time it loses focus. The `spells`
+    -- setting in Slots.lua applies the mirror image of this on its own
+    -- change, for the same reason.
+    if ns.SettingsPanel then
+        ns.SettingsPanel.Refresh()
     end
 
-    if GetSpellTexture then
-        return GetSpellTexture(spellName)
+    if message then
+        ns.Print(message)
     end
-
-    return nil
-end
-
---- A spell name from a spellID, tried through whichever API this client has.
-local function spellNameFromID(spellID)
-    if not spellID then
-        return nil
-    end
-
-    if C_Spell and C_Spell.GetSpellInfo then
-        local info = C_Spell.GetSpellInfo(spellID)
-        if type(info) == "table" and type(info.name) == "string" then
-            return info.name
-        end
-    end
-
-    if GetSpellInfo then
-        local name = GetSpellInfo(spellID)
-        if type(name) == "string" then
-            return name
-        end
-    end
-
-    return nil
-end
-
---- A spell name from a spellbook (index, bookType) pair, tried the same way.
-local function spellNameFromBook(index, bookType)
-    if not index then
-        return nil
-    end
-
-    if C_SpellBook and C_SpellBook.GetSpellBookItemName then
-        local name = C_SpellBook.GetSpellBookItemName(index, bookType)
-        if type(name) == "string" then
-            return name
-        end
-    end
-
-    if GetSpellBookItemName then
-        local name = GetSpellBookItemName(index, bookType)
-        if type(name) == "string" then
-            return name
-        end
-    end
-
-    return nil
-end
-
---- What spell, if any, is on the cursor -- nil for anything else (an item, a
--- macro, an empty cursor), so a player dropping one of those can carry on
--- carrying it. GetCursorInfo's extra returns for a spell differ by client:
--- some hand back a spellID, others only a spellbook index and which book it
--- came from, so the ID route is tried first and the book route second,
--- rather than assuming which this client gives.
-function Row.CursorSpell()
-    local cursorType, index, bookType, spellID = GetCursorInfo()
-    if cursorType ~= "spell" then
-        return nil
-    end
-
-    return spellNameFromID(spellID) or spellNameFromBook(index, bookType)
 end
 
 --- Build one unit's row. Called once per unit, at login, out of combat.
@@ -281,26 +223,61 @@ function Row.Create(unit, parent)
         -- already casts a spell, and registering it for drag risks a drag
         -- swallowing that click. OnReceiveDrag alone, which fires whenever
         -- something lands here regardless of who can start a drag, is all a
-        -- drop needs.
+        -- real drag needs.
         button:SetScript("OnReceiveDrag", function(self)
-            local name = Row.CursorSpell()
+            local name = ns.Spells.CursorSpell()
             if not name then
                 -- Not a spell: an item, a macro, whatever else can ride a
                 -- cursor. Leave it exactly where it was.
                 return
             end
 
-            -- Never write the attribute here -- only Group.ApplyAll knows to
-            -- wait out combat. ClearCursor only after the name is safely
-            -- stored, so a failure above would have left the drag intact.
-            local _, message = ns.Slots.Set(self.slot, name)
-            ClearCursor()
-            if ns.Group then
-                ns.Group.ApplyAll()
+            assignSpellToSlot(self.slot, name)
+        end)
+
+        -- Most players assign a spell by clicking it in the spellbook, then
+        -- clicking the button -- an ordinary click, which the secure handler
+        -- below would otherwise read as "cast this button's spell" and fire
+        -- it on whoever this row is for. PreClick/PostClick wrap around
+        -- every click regardless of what handles it, which is the documented
+        -- way to suppress one click's cast without touching how any other
+        -- click on this button is handled.
+        --
+        -- Not set past the click that fills it: PostClick clears it
+        -- unconditionally once used, so a later ordinary click never finds a
+        -- stash left over from this one.
+        button.pendingAssign = nil
+
+        button:SetScript("PreClick", function(self)
+            if InCombatLockdown and InCombatLockdown() then
+                -- SetAttribute is refused outright in combat, even to nil
+                -- `type` out for a single click, so a click mid-fight is left
+                -- to cast normally, exactly as if nothing were picked up.
+                return
             end
-            if message then
-                ns.Print(message)
+
+            local name = ns.Spells.CursorSpell()
+            if not name then
+                return
             end
+
+            -- Suppress the cast this click would otherwise trigger: the
+            -- secure handler reads `type` at click time, so nil-ing it here
+            -- is what stops this click casting while it is placing a spell
+            -- instead.
+            self.pendingAssign = name
+            self:SetAttribute("type", nil)
+        end)
+
+        button:SetScript("PostClick", function(self)
+            if not self.pendingAssign then
+                return
+            end
+
+            local name = self.pendingAssign
+            self:SetAttribute("type", "spell")
+            assignSpellToSlot(self.slot, name)
+            self.pendingAssign = nil
         end)
 
         button:Hide()
@@ -323,7 +300,7 @@ function Row.ApplySpells(row)
         if spell then
             button:SetAttribute("spell", spell)
 
-            local texture = Row.SpellTexture(spell)
+            local texture = ns.Spells.Texture(spell)
             if texture then
                 button.icon:SetTexture(texture)
                 button.icon:Show()

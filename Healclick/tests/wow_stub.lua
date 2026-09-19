@@ -248,18 +248,6 @@ function stub.newEnv()
         ["Healing Touch"] = true,
     }
 
-    -- Old GetSpellInfo(name) answers whether a name is known (used above by
-    -- Slots.Set). It also accepts a numeric spellID, on both this global and
-    -- the namespaced C_Spell.GetSpellInfo below -- the route Row.CursorSpell
-    -- tries first when a spellbook drag hands back an ID rather than an index.
-    function env.GetSpellInfo(nameOrID)
-        if type(nameOrID) == "number" then
-            return env.__spellIDs[nameOrID]
-        end
-        if env.__spells[nameOrID] then return nameOrID end
-        return nil
-    end
-
     -- Arbitrary stand-ins for the icon file IDs a real client would return.
     env.__spellTextures = {
         ["Regrowth"] = 136085,
@@ -283,33 +271,35 @@ function stub.newEnv()
         ["spell:7"] = "Tranquility",
     }
 
-    -- C_Spell.GetSpellTexture and the old global below are each removable on
-    -- their own (env.C_Spell.GetSpellTexture = nil, or env.GetSpellTexture =
-    -- nil), the way a real client only ever has one of them -- Row.SpellTexture
-    -- tries the namespaced call first, and the fallback chain needs both ends
-    -- testable independently.
+    -- This env models the target client the spike found: namespaced APIs
+    -- only, with GetSpellInfo, GetSpellTexture and GetSpellBookItemName gone
+    -- entirely (not merely shadowed by the same data, which could never tell
+    -- a test "the namespaced branch ran" from "the legacy one did, and
+    -- happened to agree"). A fallback test removes the namespaced piece it
+    -- means to test and adds the legacy global back itself, from the same
+    -- __spellTextures/__spellIDs/__spellbook tables above, e.g.:
+    --   env.C_Spell.GetSpellTexture = nil
+    --   env.GetSpellTexture = function(name) return env.__spellTextures[name] end
     env.C_Spell = {
         GetSpellTexture = function(name) return env.__spellTextures[name] end,
-        GetSpellInfo = function(spellID)
-            local name = env.__spellIDs[spellID]
+        -- The real call accepts a spellID or a name; both __spellIDs and
+        -- __spells are checked so this one stub serves CursorSpell's ID
+        -- route and Spells.IsKnown's by-name check alike.
+        GetSpellInfo = function(identifier)
+            local name = env.__spellIDs[identifier]
+            if not name and env.__spells[identifier] then
+                name = identifier
+            end
             if not name then return nil end
-            return { name = name, spellID = spellID }
+            return { name = name, spellID = identifier }
         end,
     }
-
-    function env.GetSpellTexture(name)
-        return env.__spellTextures[name]
-    end
 
     env.C_SpellBook = {
         GetSpellBookItemName = function(index, bookType)
             return env.__spellbook[tostring(bookType) .. ":" .. tostring(index)]
         end,
     }
-
-    function env.GetSpellBookItemName(index, bookType)
-        return env.__spellbook[tostring(bookType) .. ":" .. tostring(index)]
-    end
 
     -- Cursor ----------------------------------------------------------------
     -- Tests drive this directly: env.__cursor = { "spell", 5, "spell" } for a

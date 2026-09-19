@@ -54,9 +54,12 @@ end
 --- Put a spell in a slot. Returns ok, and a warning when the client does not
 -- recognise the name.
 --
--- The name is stored either way. GetSpellInfo only knows spells this character
--- has learned, so refusing an unknown one would reject a level 5 Druid setting
--- up the Remove Curse they get at 24 -- and would reject our own seeds.
+-- The name is stored either way. ns.Spells.IsKnown only knows spells this
+-- character has learned, so refusing an unknown one would reject a level 5
+-- Druid setting up the Remove Curse they get at 24 -- and would reject our
+-- own seeds. Asking Spells rather than a global here directly means there is
+-- one answer to "what spell APIs does this client have", not a second guess
+-- that can disagree with the one Row.lua uses for icons and drag-and-drop.
 function Slots.Set(index, spellName)
     if type(index) ~= "number" or index < 1 or index > Slots.MAX then
         return false, "no such slot"
@@ -71,7 +74,7 @@ function Slots.Set(index, spellName)
 
     ns.db.bar.spells[index] = spellName
 
-    if GetSpellInfo and not GetSpellInfo(spellName) then
+    if not ns.Spells.IsKnown(spellName) then
         return true, string.format(
             "%s is not a spell you know yet. Kept anyway.", spellName
         )

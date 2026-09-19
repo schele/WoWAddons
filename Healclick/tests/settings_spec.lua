@@ -105,20 +105,39 @@ describe("the spell table", function()
         assertEqual(ns.Slots.MAX, #controlFor(ns, "bar", "spells").boxes)
     end)
 
+    -- An EditBox grabs focus as it comes into existence, so SetAutoFocus(false)
+    -- is a line too late to prevent it. Left alone, the last row built stays
+    -- focused, and the player's next click anywhere silently re-stores its
+    -- text and re-applies -- exactly the bug ForeverPanel's key table already
+    -- guards against for the same reason.
+    it("drops keyboard focus from every row as it is built", function()
+        local ns = loggedIn()
+        local boxes = controlFor(ns, "bar", "spells").boxes
+
+        for index, box in ipairs(boxes) do
+            assertFalse(box.focused, "row " .. index .. " does not hold focus")
+        end
+    end)
+
     it("stores what is typed into a row", function()
         local ns = loggedIn()
         local boxes = controlFor(ns, "bar", "spells").boxes
 
-        boxes[2]:SetText("Rejuvenation")
+        -- A different spell than the seed already sitting in slot 2, so a
+        -- store that never actually ran (e.g. because the box never regained
+        -- focus, as EnsureBuilt now leaves it) cannot pass by coincidence.
+        boxes[2]:SetFocus()
+        boxes[2]:SetText("Healing Touch")
         boxes[2].scripts.OnEnterPressed(boxes[2])
 
-        assertEqual("Rejuvenation", ns.Slots.Spell(2))
+        assertEqual("Healing Touch", ns.Slots.Spell(2))
     end)
 
     it("keeps a spell the character has not learned, and says so", function()
         local ns, env = loggedIn()
         local boxes = controlFor(ns, "bar", "spells").boxes
 
+        boxes[3]:SetFocus()
         boxes[3]:SetText("Tranquility")
         boxes[3].scripts.OnEnterPressed(boxes[3])
 
@@ -142,6 +161,7 @@ describe("the spell table", function()
         local ns, env = loggedIn()
         local box = controlFor(ns, "bar", "spells").boxes[5]
 
+        box:SetFocus()
         box:SetText("Tranquility")
         box.scripts.OnEnterPressed(box)
 
@@ -168,5 +188,22 @@ describe("the spell table", function()
         assertEqual("Tranquility", box:GetText(), "reverted to what was stored")
         assertEqual("Tranquility", ns.Slots.Spell(6), "the typed edit was discarded")
         assertEqual(before, helpers.printed(env), "no warning printed for the discarded edit")
+    end)
+
+    -- Without this, the box for the slot a drop just landed in still shows
+    -- whatever was there before -- and losing focus afterward is exactly
+    -- what stores that stale text back over the drop.
+    it("refreshes so a stale box does not overwrite a drop that just landed", function()
+        local ns, env = loggedIn()
+        local box = controlFor(ns, "bar", "spells").boxes[2]
+
+        local row = helpers.rowFor(ns, "party1")
+        env.__cursor = { "spell", 5, "spell" }
+        row.buttons[2].scripts.OnReceiveDrag(row.buttons[2])
+
+        assertEqual("Regrowth", box:GetText(), "the box reflects the drop immediately")
+
+        box.scripts.OnEditFocusLost(box)
+        assertEqual("Regrowth", ns.Slots.Spell(2), "the drop survives the box losing focus afterward")
     end)
 end)

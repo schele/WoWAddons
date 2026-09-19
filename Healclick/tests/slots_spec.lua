@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local FILES = { "Healclick.lua", "Slots.lua" }
+local FILES = { "Healclick.lua", "Spells.lua", "Slots.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)
@@ -43,9 +43,10 @@ describe("setting a spell", function()
     end)
 
     it("stores a spell the client does not know, and warns", function()
-        -- GetSpellInfo only knows spells this character has learned. A level 5
-        -- Druid setting up Remove Curse for level 24 is being sensible, not
-        -- making a typo, and refusing them would reject our own seeds.
+        -- ns.Spells.IsKnown only knows spells this character has learned. A
+        -- level 5 Druid setting up Remove Curse for level 24 is being
+        -- sensible, not making a typo, and refusing them would reject our own
+        -- seeds.
         local ns = loggedIn()
         local ok, message = ns.Slots.Set(1, "Tranquility")
 

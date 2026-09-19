@@ -102,7 +102,13 @@ local function addSpellTable(setting, y)
         local box = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
         box:SetPoint("TOPLEFT", PADDING + 20, top)
         box:SetSize(180, BOX_HEIGHT - 4)
+        -- Both, and in this order. An EditBox grabs focus as it comes into
+        -- existence, so SetAutoFocus(false) is a line too late to prevent it
+        -- and the box has to be told to let go of what it already took --
+        -- otherwise the last row built stays focused, and the player's next
+        -- click anywhere silently re-stores its text and re-applies.
         box:SetAutoFocus(false)
+        box:ClearFocus()
 
         -- Set while Escape reverts the text and lets go of focus, so the
         -- OnEditFocusLost that ClearFocus() triggers as a side effect does
