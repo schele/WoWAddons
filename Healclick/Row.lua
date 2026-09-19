@@ -27,8 +27,10 @@ Row.WIDTH = BUTTONS_START + ns.Slots.MAX * (BUTTON_SIZE + BUTTON_GAP) - BUTTON_G
 -- How far a row fades when clicking it would achieve nothing.
 local DIM = 0.35
 
--- A button has no icon, only this label, so it is the one thing standing
--- between a healer and casting the wrong spell under pressure.
+-- A button shows the spell's own icon when one can be found. Row.Label below
+-- is what it falls back to when it cannot -- the one thing standing between
+-- a healer and casting the wrong spell under pressure, on a client that will
+-- not tell us what the icon is.
 
 --- Split a string into its UTF-8 characters, without assuming a UTF-8
 -- library exists on the client. A continuation byte (0x80-0xBF) never starts
@@ -131,6 +133,89 @@ function Row.Label(spellName)
     return table.concat(letters)
 end
 
+--- The spell's own icon, defensively: the namespaced call if this client has
+-- it, the old global if it does not, nil if neither does. A spike against
+-- this addon's 1.60 Classic beta target found GetSpellInfo and
+-- GetSpellBookItemName gone, moved into C_Spell and C_SpellBook, while
+-- C_SpellBook's namespaced call still worked -- so the namespaced route is
+-- the likely one, but trying both means we do not have to be right about it.
+function Row.SpellTexture(spellName)
+    if type(spellName) ~= "string" or spellName == "" then
+        return nil
+    end
+
+    if C_Spell and C_Spell.GetSpellTexture then
+        return C_Spell.GetSpellTexture(spellName)
+    end
+
+    if GetSpellTexture then
+        return GetSpellTexture(spellName)
+    end
+
+    return nil
+end
+
+--- A spell name from a spellID, tried through whichever API this client has.
+local function spellNameFromID(spellID)
+    if not spellID then
+        return nil
+    end
+
+    if C_Spell and C_Spell.GetSpellInfo then
+        local info = C_Spell.GetSpellInfo(spellID)
+        if type(info) == "table" and type(info.name) == "string" then
+            return info.name
+        end
+    end
+
+    if GetSpellInfo then
+        local name = GetSpellInfo(spellID)
+        if type(name) == "string" then
+            return name
+        end
+    end
+
+    return nil
+end
+
+--- A spell name from a spellbook (index, bookType) pair, tried the same way.
+local function spellNameFromBook(index, bookType)
+    if not index then
+        return nil
+    end
+
+    if C_SpellBook and C_SpellBook.GetSpellBookItemName then
+        local name = C_SpellBook.GetSpellBookItemName(index, bookType)
+        if type(name) == "string" then
+            return name
+        end
+    end
+
+    if GetSpellBookItemName then
+        local name = GetSpellBookItemName(index, bookType)
+        if type(name) == "string" then
+            return name
+        end
+    end
+
+    return nil
+end
+
+--- What spell, if any, is on the cursor -- nil for anything else (an item, a
+-- macro, an empty cursor), so a player dropping one of those can carry on
+-- carrying it. GetCursorInfo's extra returns for a spell differ by client:
+-- some hand back a spellID, others only a spellbook index and which book it
+-- came from, so the ID route is tried first and the book route second,
+-- rather than assuming which this client gives.
+function Row.CursorSpell()
+    local cursorType, index, bookType, spellID = GetCursorInfo()
+    if cursorType ~= "spell" then
+        return nil
+    end
+
+    return spellNameFromID(spellID) or spellNameFromBook(index, bookType)
+end
+
 --- Build one unit's row. Called once per unit, at login, out of combat.
 function Row.Create(unit, parent)
     local row = CreateFrame("Frame", "HealclickRow" .. unit, parent)
@@ -178,8 +263,45 @@ function Row.Create(unit, parent)
         button:SetAttribute("type", "spell")
         button:SetAttribute("unit", unit)
 
+        -- Which slot a drop onto this button should land in.
+        button.slot = index
+
+        button.icon = button:CreateTexture(nil, "ARTWORK")
+        button.icon:SetAllPoints(button)
+        -- The standard action-bar crop: default spell icons carry their own
+        -- border baked in, and without trimming it every button looks wrong
+        -- next to this one's.
+        button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+        button.icon:Hide()
+
         button.label = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         button.label:SetPoint("CENTER")
+
+        -- RegisterForDrag is for STARTING a drag; this button's left-click
+        -- already casts a spell, and registering it for drag risks a drag
+        -- swallowing that click. OnReceiveDrag alone, which fires whenever
+        -- something lands here regardless of who can start a drag, is all a
+        -- drop needs.
+        button:SetScript("OnReceiveDrag", function(self)
+            local name = Row.CursorSpell()
+            if not name then
+                -- Not a spell: an item, a macro, whatever else can ride a
+                -- cursor. Leave it exactly where it was.
+                return
+            end
+
+            -- Never write the attribute here -- only Group.ApplyAll knows to
+            -- wait out combat. ClearCursor only after the name is safely
+            -- stored, so a failure above would have left the drag intact.
+            local _, message = ns.Slots.Set(self.slot, name)
+            ClearCursor()
+            if ns.Group then
+                ns.Group.ApplyAll()
+            end
+            if message then
+                ns.Print(message)
+            end
+        end)
 
         button:Hide()
         row.buttons[index] = button
@@ -200,12 +322,23 @@ function Row.ApplySpells(row)
 
         if spell then
             button:SetAttribute("spell", spell)
-            button.label:SetText(Row.Label(spell))
+
+            local texture = Row.SpellTexture(spell)
+            if texture then
+                button.icon:SetTexture(texture)
+                button.icon:Show()
+                button.label:SetText("")
+            else
+                button.icon:Hide()
+                button.label:SetText(Row.Label(spell))
+            end
+
             button:Show()
         else
             -- An empty slot is hidden rather than shown and inert. A button
             -- that looks pressable and does nothing is the worse failure.
             button:SetAttribute("spell", nil)
+            button.icon:Hide()
             button.label:SetText("")
             button:Hide()
         end

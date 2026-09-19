@@ -62,7 +62,10 @@ local function makeWidget(kind, parent, template)
     function widget:RegisterEvent(event) self.registeredEvents[event] = true end
     function widget:UnregisterEvent(event) self.registeredEvents[event] = nil end
     function widget:RegisterForClicks() end
-    function widget:RegisterForDrag() end
+    -- Recorded, not ignored: row_spec asserts a button never calls this,
+    -- since RegisterForDrag is for STARTING a drag and this addon only ever
+    -- receives one (see Row.Create's OnReceiveDrag).
+    function widget:RegisterForDrag(...) self.dragRegistered = { ... } end
     function widget:EnableMouse() end
     function widget:SetMovable() end
     function widget:StartMoving() self.moving = true end
@@ -121,6 +124,9 @@ local function makeWidget(kind, parent, template)
     function widget:GetName() return self.frameName end
     function widget:SetTextColor(r, g, b) self.textColor = { r, g, b } end
     function widget:SetColorTexture(r, g, b, a) self.colorTexture = { r, g, b, a } end
+    function widget:SetTexture(value) self.texture = value end
+    function widget:GetTexture() return self.texture end
+    function widget:SetTexCoord(...) self.texCoord = { ... } end
 
     function widget:CreateTexture()
         local texture = makeWidget("Texture", self)
@@ -242,9 +248,87 @@ function stub.newEnv()
         ["Healing Touch"] = true,
     }
 
-    function env.GetSpellInfo(name)
-        if env.__spells[name] then return name end
+    -- Old GetSpellInfo(name) answers whether a name is known (used above by
+    -- Slots.Set). It also accepts a numeric spellID, on both this global and
+    -- the namespaced C_Spell.GetSpellInfo below -- the route Row.CursorSpell
+    -- tries first when a spellbook drag hands back an ID rather than an index.
+    function env.GetSpellInfo(nameOrID)
+        if type(nameOrID) == "number" then
+            return env.__spellIDs[nameOrID]
+        end
+        if env.__spells[nameOrID] then return nameOrID end
         return nil
+    end
+
+    -- Arbitrary stand-ins for the icon file IDs a real client would return.
+    env.__spellTextures = {
+        ["Regrowth"] = 136085,
+        ["Rejuvenation"] = 136081,
+        ["Remove Curse"] = 135921,
+        ["Mark of the Wild"] = 136078,
+    }
+
+    -- A numeric spellID -> name lookup, standing in for the shape some
+    -- clients hand GetCursorInfo back with for a spellbook drag.
+    env.__spellIDs = {
+        [8936] = "Rejuvenation",
+    }
+
+    -- A spellbook (index, bookType) -> name lookup, standing in for the shape
+    -- other clients hand GetCursorInfo back with instead.
+    env.__spellbook = {
+        ["spell:5"] = "Regrowth",
+        -- Known by ID/index but not by name, the way a spell a player has
+        -- learned but never typed into the settings panel would look.
+        ["spell:7"] = "Tranquility",
+    }
+
+    -- C_Spell.GetSpellTexture and the old global below are each removable on
+    -- their own (env.C_Spell.GetSpellTexture = nil, or env.GetSpellTexture =
+    -- nil), the way a real client only ever has one of them -- Row.SpellTexture
+    -- tries the namespaced call first, and the fallback chain needs both ends
+    -- testable independently.
+    env.C_Spell = {
+        GetSpellTexture = function(name) return env.__spellTextures[name] end,
+        GetSpellInfo = function(spellID)
+            local name = env.__spellIDs[spellID]
+            if not name then return nil end
+            return { name = name, spellID = spellID }
+        end,
+    }
+
+    function env.GetSpellTexture(name)
+        return env.__spellTextures[name]
+    end
+
+    env.C_SpellBook = {
+        GetSpellBookItemName = function(index, bookType)
+            return env.__spellbook[tostring(bookType) .. ":" .. tostring(index)]
+        end,
+    }
+
+    function env.GetSpellBookItemName(index, bookType)
+        return env.__spellbook[tostring(bookType) .. ":" .. tostring(index)]
+    end
+
+    -- Cursor ----------------------------------------------------------------
+    -- Tests drive this directly: env.__cursor = { "spell", 5, "spell" } for a
+    -- spellbook-index drag, or { "spell", nil, nil, 8936, n = 4 } for one that
+    -- carries a spellID instead (the explicit n covers the hole a plain #
+    -- would trip over). GetCursorInfo reports it positionally, the way the
+    -- real API does; ClearCursor empties it the way a completed drop does.
+    env.__cursor = nil
+
+    function env.GetCursorInfo()
+        if not env.__cursor then
+            return nil
+        end
+        local cursor = env.__cursor
+        return table.unpack(cursor, 1, cursor.n or #cursor)
+    end
+
+    function env.ClearCursor()
+        env.__cursor = nil
     end
 
     -- Secure visibility ----------------------------------------------------

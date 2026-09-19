@@ -1,9 +1,20 @@
 local helpers = require("helpers")
 
 local FILES = { "Healclick.lua", "Slots.lua", "Row.lua" }
+local FILES_WITH_GROUP = { "Healclick.lua", "Slots.lua", "Row.lua", "Group.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)
+    helpers.login(ns, env)
+    return ns, env
+end
+
+--- Group.lua is what turns a drop's Slots.Set into a written attribute (it is
+-- the only thing that knows to wait for combat to end), so the drag-and-drop
+-- tests need it loaded alongside Row -- unlike the rest of this file, which
+-- tests Row in isolation.
+local function loggedInWithGroup()
+    local ns, env = helpers.loadAddon(FILES_WITH_GROUP)
     helpers.login(ns, env)
     return ns, env
 end
@@ -46,6 +57,26 @@ describe("building a row", function()
         local row = ns.Row.Create("party1", env.UIParent)
 
         assertFalse(row.buttons[1]:IsShown())
+    end)
+
+    it("gives each button its slot index and an icon texture", function()
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        for index = 1, ns.Slots.MAX do
+            assertEqual(index, row.buttons[index].slot)
+            assertTrue(row.buttons[index].icon ~= nil, "button " .. index .. " has an icon")
+        end
+    end)
+
+    it("never registers a button for drag, only for receiving one", function()
+        -- RegisterForDrag is for STARTING a drag; wiring it on a button whose
+        -- left-click casts a spell risks the drag swallowing that click.
+        -- OnReceiveDrag alone is what a drop needs.
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        assertNil(row.buttons[1].dragRegistered)
     end)
 
     it("reaches at least as far as the last button's right edge", function()
@@ -121,6 +152,194 @@ describe("applying spells", function()
         ns.Row.ApplySpells(row)
 
         assertNil(helpers.attrs(row.buttons[1]).spell)
+    end)
+
+    it("shows the icon and clears the label when a texture is found", function()
+        local ns, env = loggedIn()
+        ns.Slots.Set(1, "Regrowth")
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        ns.Row.ApplySpells(row)
+
+        assertEqual(136085, row.buttons[1].icon:GetTexture())
+        assertTrue(row.buttons[1].icon:IsShown())
+        assertEqual("", row.buttons[1].label:GetText())
+    end)
+
+    it("falls back to the label when no texture can be found", function()
+        local ns, env = loggedIn()
+        env.C_Spell.GetSpellTexture = nil
+        env.GetSpellTexture = nil
+        ns.Slots.Set(1, "Regrowth")
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        ns.Row.ApplySpells(row)
+
+        assertFalse(row.buttons[1].icon:IsShown())
+        assertEqual("Regr", row.buttons[1].label:GetText())
+    end)
+
+    it("hides the icon along with the label for an empty slot", function()
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        ns.Row.ApplySpells(row)
+
+        assertFalse(row.buttons[1].icon:IsShown())
+        assertEqual("", row.buttons[1].label:GetText())
+    end)
+
+    it("applies the standard border crop to every button's icon", function()
+        -- The idiom every action bar uses: without it, a default spell icon's
+        -- own border shows up doubled, next to this button's.
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        assertEqual(
+            "0.07, 0.93, 0.07, 0.93",
+            table.concat(row.buttons[1].icon.texCoord, ", ")
+        )
+    end)
+end)
+
+describe("resolving a spell's icon", function()
+    it("uses C_Spell.GetSpellTexture when it exists", function()
+        local ns = loggedIn()
+        assertEqual(136085, ns.Row.SpellTexture("Regrowth"))
+    end)
+
+    it("falls back to the old global GetSpellTexture when C_Spell lacks it", function()
+        local ns, env = loggedIn()
+        env.C_Spell.GetSpellTexture = nil
+
+        assertEqual(136085, ns.Row.SpellTexture("Regrowth"))
+    end)
+
+    it("returns nil when neither API exists", function()
+        local ns, env = loggedIn()
+        env.C_Spell.GetSpellTexture = nil
+        env.GetSpellTexture = nil
+
+        assertNil(ns.Row.SpellTexture("Regrowth"))
+    end)
+
+    it("returns nil for no spell at all", function()
+        local ns = loggedIn()
+        assertNil(ns.Row.SpellTexture(nil))
+        assertNil(ns.Row.SpellTexture(""))
+    end)
+end)
+
+describe("resolving what is on the cursor", function()
+    it("returns nil when nothing is on the cursor", function()
+        local ns, env = loggedIn()
+        env.__cursor = nil
+
+        assertNil(ns.Row.CursorSpell())
+    end)
+
+    it("returns nil for a non-spell, such as an item, and never touches it", function()
+        local ns, env = loggedIn()
+        env.__cursor = { "item", 6948 }
+
+        assertNil(ns.Row.CursorSpell())
+    end)
+
+    it("resolves a spellID through C_Spell.GetSpellInfo", function()
+        local ns, env = loggedIn()
+        env.__cursor = { "spell", nil, nil, 8936, n = 4 }
+
+        assertEqual("Rejuvenation", ns.Row.CursorSpell())
+    end)
+
+    it("falls back to the old GetSpellInfo when C_Spell lacks GetSpellInfo", function()
+        local ns, env = loggedIn()
+        env.C_Spell.GetSpellInfo = nil
+        env.__cursor = { "spell", nil, nil, 8936, n = 4 }
+
+        assertEqual("Rejuvenation", ns.Row.CursorSpell())
+    end)
+
+    it("resolves a spellbook index through C_SpellBook.GetSpellBookItemName", function()
+        local ns, env = loggedIn()
+        env.__cursor = { "spell", 5, "spell" }
+
+        assertEqual("Regrowth", ns.Row.CursorSpell())
+    end)
+
+    it("falls back to the old GetSpellBookItemName when C_SpellBook lacks it", function()
+        local ns, env = loggedIn()
+        env.C_SpellBook.GetSpellBookItemName = nil
+        env.__cursor = { "spell", 5, "spell" }
+
+        assertEqual("Regrowth", ns.Row.CursorSpell())
+    end)
+
+    it("returns nil, never a number or a table, when nothing resolves a name", function()
+        local ns, env = loggedIn()
+        env.__cursor = { "spell", 999, "spell" }
+
+        assertNil(ns.Row.CursorSpell())
+    end)
+end)
+
+describe("dropping a spell onto a button", function()
+    it("stores the dropped spell in the button's slot, applies it, and clears the cursor", function()
+        local ns, env = loggedInWithGroup()
+        local row = helpers.rowFor(ns, "party1")
+        env.__cursor = { "spell", 5, "spell" }
+
+        row.buttons[2].scripts.OnReceiveDrag(row.buttons[2])
+
+        assertEqual("Regrowth", ns.Slots.Spell(2))
+        assertEqual("Regrowth", helpers.attrs(row.buttons[2]).spell)
+        assertNil(env.__cursor)
+    end)
+
+    it("does nothing at all, and leaves the cursor alone, for a non-spell drop", function()
+        local ns, env = loggedInWithGroup()
+        local row = helpers.rowFor(ns, "party1")
+        env.__cursor = { "item", 6948 }
+
+        row.buttons[2].scripts.OnReceiveDrag(row.buttons[2])
+
+        assertEqual("Rejuvenation", ns.Slots.Spell(2), "the seeded spell is untouched")
+        assertTrue(env.__cursor ~= nil, "the item is still on the cursor")
+    end)
+
+    it("prints the unlearned-spell warning that Slots.Set returns", function()
+        local ns, env = loggedInWithGroup()
+        local row = helpers.rowFor(ns, "party1")
+        env.__cursor = { "spell", 7, "spell" }
+
+        row.buttons[3].scripts.OnReceiveDrag(row.buttons[3])
+
+        assertEqual("Tranquility", ns.Slots.Spell(3))
+        assertMatch("Tranquility", helpers.printed(env))
+    end)
+
+    it("stores the spell during combat but leaves the attribute unwritten until combat ends", function()
+        local ns, env = loggedInWithGroup()
+        local row = helpers.rowFor(ns, "party1")
+
+        env.__setCombat(true)
+        env.__cursor = { "spell", 5, "spell" }
+        row.buttons[2].scripts.OnReceiveDrag(row.buttons[2])
+
+        assertEqual("Regrowth", ns.Slots.Spell(2), "stored despite combat")
+        assertEqual(
+            "Rejuvenation",
+            helpers.attrs(row.buttons[2]).spell,
+            "not written yet -- the seeded spell is still there while combat is active"
+        )
+
+        env.__setCombat(false)
+
+        assertEqual(
+            "Regrowth",
+            helpers.attrs(row.buttons[2]).spell,
+            "applied the moment combat ends"
+        )
     end)
 end)
 
