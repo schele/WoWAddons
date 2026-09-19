@@ -176,6 +176,17 @@ local function makeWidget(kind, parent, template, env)
     function widget:GetTexture() return self.texture end
     function widget:SetTexCoord(...) self.texCoord = { ... } end
 
+    -- The client animates the sweep itself; all an addon ever does is hand
+    -- it a start and a duration, so that pair is the whole observable state.
+    function widget:SetCooldown(start, duration)
+        self.cooldownStart = start
+        self.cooldownDuration = duration
+    end
+    function widget:GetCooldownTimes()
+        return self.cooldownStart, self.cooldownDuration
+    end
+    function widget:SetHideCountdownNumbers() end
+
     function widget:CreateTexture()
         local texture = makeWidget("Texture", self)
         table.insert(self.children, texture)
@@ -222,7 +233,18 @@ function stub.newEnv()
         table.insert(env.__printed, table.concat(pieces, " "))
     end
 
+    --- Test helper: templates this client does not have. The real client
+    -- raises on an unknown template rather than returning nil, and this
+    -- client family has already dropped GetSpellInfo and GetSpellBookItemName
+    -- out from under the addon, so a template going missing is a case the
+    -- addon has to survive -- which means the stub has to be able to stage it.
+    env.__missingTemplates = {}
+
     function env.CreateFrame(kind, name, parent, template)
+        if template and env.__missingTemplates[template] then
+            error(string.format("Couldn't find inherited node '%s'", template), 2)
+        end
+
         local frame = makeWidget(kind or "Frame", parent, template, env)
         frame.frameName = name
         table.insert(env.__frames, frame)
@@ -304,6 +326,13 @@ function stub.newEnv()
         ["Mark of the Wild"] = 136078,
     }
 
+    -- What is on cooldown right now. Empty by default: a spell absent here
+    -- is simply off cooldown, which is the state nearly every test wants.
+    -- A test stages one with
+    --   env.__spellCooldowns["Rejuvenation"] =
+    --       { startTime = 100, duration = 1.5, isEnabled = true }
+    env.__spellCooldowns = {}
+
     -- A numeric spellID -> name lookup, standing in for the shape some
     -- clients hand GetCursorInfo back with for a spellbook drag.
     env.__spellIDs = {
@@ -340,6 +369,11 @@ function stub.newEnv()
             end
             if not name then return nil end
             return { name = name, spellID = identifier }
+        end,
+        -- A table, where the old global returned four loose values. That
+        -- difference is the whole reason Spells.Cooldown exists.
+        GetSpellCooldown = function(name)
+            return env.__spellCooldowns[name]
         end,
     }
 

@@ -284,6 +284,24 @@ function Row.Create(unit, parent)
         button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
         button.icon:Hide()
 
+        -- Blizzard's own cooldown widget, so the sweep is the one the action
+        -- bars draw and the client animates it for us; all we ever hand it is
+        -- a start and a duration.
+        --
+        -- Through pcall because a template is not something this client
+        -- family can be trusted to have -- it has already dropped
+        -- GetSpellInfo and GetSpellBookItemName out from under the addon --
+        -- and an unknown template raises rather than returning nil. The sweep
+        -- is decoration; casting is the point, so losing the template costs
+        -- the sweep and nothing else.
+        local created, cooldown = pcall(
+            CreateFrame, "Cooldown", nil, button, "CooldownFrameTemplate"
+        )
+        if created and cooldown then
+            cooldown:SetAllPoints(button)
+            button.cooldown = cooldown
+        end
+
         button.label = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         button.label:SetPoint("CENTER")
 
@@ -493,6 +511,32 @@ function Row.Reachable(unit)
         local inRange, checked = UnitInRange(unit)
         return inRange or not checked
     end, true)
+end
+
+--- Draw each button's cooldown sweep.
+--
+-- Reads the spell off the button's own attribute rather than out of Slots,
+-- so the sweep can only ever show the cooldown of the spell this button will
+-- actually cast. Touches nothing secure -- reading an attribute we set
+-- ourselves is not a secure write -- so like Row.Refresh this is safe
+-- mid-fight, which is the only time it matters.
+function Row.RefreshCooldowns(row)
+    for index = 1, ns.Slots.MAX do
+        local cooldown = row.buttons[index].cooldown
+        if cooldown then
+            local start, duration, enabled =
+                ns.Spells.Cooldown(row.buttons[index]:GetAttribute("spell"))
+
+            if start and duration and duration > 0 and enabled then
+                cooldown:SetCooldown(start, duration)
+            else
+                -- A zero-length cooldown is how the widget is told to draw
+                -- nothing. Without this an expired sweep would sit there
+                -- for good, since nothing else ever clears one.
+                cooldown:SetCooldown(0, 0)
+            end
+        end
+    end
 end
 
 --- Name, colour, health and the dim state. Touches nothing secure, so this is

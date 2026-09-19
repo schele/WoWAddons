@@ -113,3 +113,36 @@ function Spells.CursorSpell()
 
     return nameFromSpellInfo(spellID) or nameFromBook(index, bookType)
 end
+
+--- When a spell's cooldown started and how long it runs: start, duration and
+-- whether the client wants a sweep drawn at all. Nil when this client has
+-- nothing to say about the spell, which a caller reads as "draw nothing"
+-- rather than "ready".
+--
+-- The two APIs disagree about shape, not just about name: C_Spell hands back
+-- a table, while the old global returned four loose values with `enabled` as
+-- 1 or 0. Normalising here is the point of the function -- 0 is truthy in
+-- Lua, so a caller testing the raw return would draw a sweep over exactly
+-- the spell the client asked it not to.
+function Spells.Cooldown(spellName)
+    if type(spellName) ~= "string" or spellName == "" then
+        return nil
+    end
+
+    if C_Spell and C_Spell.GetSpellCooldown then
+        local info = C_Spell.GetSpellCooldown(spellName)
+        if type(info) ~= "table" then
+            return nil
+        end
+        return info.startTime, info.duration, info.isEnabled ~= false
+    end
+
+    if GetSpellCooldown then
+        local start, duration, enabled = GetSpellCooldown(spellName)
+        if start then
+            return start, duration, enabled ~= 0 and enabled ~= false
+        end
+    end
+
+    return nil
+end

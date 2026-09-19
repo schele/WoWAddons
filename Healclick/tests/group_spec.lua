@@ -358,6 +358,44 @@ describe("keeping the rows current", function()
         assertEqual(12, helpers.rowFor(ns, "party1").health:GetValue())
     end)
 
+    it("sweeps every row's copy of a spell when the client reports a cooldown", function()
+        -- A cooldown belongs to the player, not to a unit, so one cast puts
+        -- the same spell on cooldown on every row at once. Refreshing only
+        -- the row that was clicked would leave four rows showing a spell as
+        -- ready that is not.
+        local ns, env = loggedIn()
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.Group.ApplyAll()
+        env.__spellCooldowns["Rejuvenation"] =
+            { startTime = 100, duration = 1.5, isEnabled = true }
+
+        helpers.fire(env, "SPELL_UPDATE_COOLDOWN")
+
+        for _, unit in ipairs({ "player", "party1", "party2" }) do
+            local _, duration =
+                helpers.rowFor(ns, unit).buttons[1].cooldown:GetCooldownTimes()
+            assertEqual(1.5, duration, unit .. " must sweep too")
+        end
+    end)
+
+    it("sweeps a spell that was already on cooldown when it was assigned", function()
+        -- Nothing fires SPELL_UPDATE_COOLDOWN just because a button changed
+        -- hands, so without a redraw here the new spell would look ready
+        -- until some unrelated cooldown happened to start.
+        local ns, env = loggedIn()
+        env.__spellCooldowns["Healing Touch"] =
+            { startTime = 100, duration = 8, isEnabled = true }
+
+        -- Slots.Set only writes the slot; ApplyAll is what puts it on the
+        -- buttons, and is what every real assignment path calls next.
+        ns.Slots.Set(1, "Healing Touch")
+        ns.Group.ApplyAll()
+
+        local _, duration =
+            helpers.rowFor(ns, "player").buttons[1].cooldown:GetCooldownTimes()
+        assertEqual(8, duration)
+    end)
+
     it("polls for range, because the game fires no event for it", function()
         local ns, env = loggedIn()
         env.units.party1.inRange = false

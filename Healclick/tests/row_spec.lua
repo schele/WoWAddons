@@ -732,3 +732,70 @@ describe("which clicks a spell button asks for", function()
         assertTrue(registered.AnyUp, "and keep the release, for clients that act on it")
     end)
 end)
+
+describe("the cooldown sweep on a button", function()
+    local function armed(env, ns, slot, spell)
+        ns.Slots.Set(slot, spell)
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+        return row
+    end
+
+    it("draws the sweep the client reports for the button's own spell", function()
+        local ns, env = loggedIn()
+        local row = armed(env, ns, 1, "Rejuvenation")
+        env.__spellCooldowns["Rejuvenation"] =
+            { startTime = 100, duration = 1.5, isEnabled = true }
+
+        ns.Row.RefreshCooldowns(row)
+
+        local start, duration = row.buttons[1].cooldown:GetCooldownTimes()
+        assertEqual(100, start)
+        assertEqual(1.5, duration)
+    end)
+
+    it("clears the sweep once the spell is off cooldown", function()
+        local ns, env = loggedIn()
+        local row = armed(env, ns, 1, "Rejuvenation")
+        env.__spellCooldowns["Rejuvenation"] =
+            { startTime = 100, duration = 1.5, isEnabled = true }
+        ns.Row.RefreshCooldowns(row)
+
+        env.__spellCooldowns["Rejuvenation"] = nil
+        ns.Row.RefreshCooldowns(row)
+
+        local start, duration = row.buttons[1].cooldown:GetCooldownTimes()
+        assertEqual(0, start, "a stale sweep would sit there for good")
+        assertEqual(0, duration)
+    end)
+
+    it("draws no sweep for a cooldown the client says is not enabled", function()
+        local ns, env = loggedIn()
+        local row = armed(env, ns, 1, "Rejuvenation")
+        env.__spellCooldowns["Rejuvenation"] =
+            { startTime = 100, duration = 1.5, isEnabled = false }
+
+        ns.Row.RefreshCooldowns(row)
+
+        local _, duration = row.buttons[1].cooldown:GetCooldownTimes()
+        assertEqual(0, duration)
+    end)
+
+    it("still builds a working button when the client has no cooldown template", function()
+        -- The sweep is decoration; casting is the point. This client family
+        -- has already dropped APIs the addon expected, and an unknown
+        -- template raises rather than returning nil, so losing the template
+        -- must cost the sweep and nothing else.
+        local ns, env = loggedIn()
+        env.__missingTemplates["CooldownFrameTemplate"] = true
+
+        local row = armed(env, ns, 1, "Rejuvenation")
+
+        assertEqual("Rejuvenation", row.buttons[1]:GetAttribute("spell"))
+        assertEqual("spell", row.buttons[1]:GetAttribute("type"))
+        assertNil(row.buttons[1].cooldown, "no template means no sweep frame")
+
+        local ok = pcall(ns.Row.RefreshCooldowns, row)
+        assertTrue(ok, "and refreshing must not trip over its absence")
+    end)
+end)

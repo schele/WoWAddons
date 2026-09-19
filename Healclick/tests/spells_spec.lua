@@ -134,3 +134,59 @@ describe("knowing whether a spell is learned", function()
         assertFalse(ns.Spells.IsKnown(nil))
     end)
 end)
+
+describe("reading a spell's cooldown", function()
+    it("normalises C_Spell.GetSpellCooldown's table to loose values", function()
+        local ns, env = loggedIn()
+        env.__spellCooldowns["Rejuvenation"] =
+            { startTime = 100, duration = 1.5, isEnabled = true }
+
+        local start, duration, enabled = ns.Spells.Cooldown("Rejuvenation")
+
+        assertEqual(100, start)
+        assertEqual(1.5, duration)
+        assertTrue(enabled)
+    end)
+
+    it("falls back to the old global, whose returns were never a table", function()
+        local ns, env = loggedIn()
+        env.C_Spell.GetSpellCooldown = nil
+        env.GetSpellCooldown = function() return 100, 1.5, 1 end
+
+        local start, duration, enabled = ns.Spells.Cooldown("Rejuvenation")
+
+        assertEqual(100, start)
+        assertEqual(1.5, duration)
+        assertTrue(enabled, "the old API's 1 means enabled, and 1 is not a boolean")
+    end)
+
+    it("reports the old global's 0 as not enabled, rather than as truthy", function()
+        -- 0 is truthy in Lua, so passing it through unconverted would draw a
+        -- sweep over a spell the client is saying not to draw one for.
+        local ns, env = loggedIn()
+        env.C_Spell.GetSpellCooldown = nil
+        env.GetSpellCooldown = function() return 100, 1.5, 0 end
+
+        local _, _, enabled = ns.Spells.Cooldown("Rejuvenation")
+
+        assertFalse(enabled)
+    end)
+
+    it("returns nil for a spell this client has nothing to say about", function()
+        local ns = loggedIn()
+        assertNil(ns.Spells.Cooldown("Rejuvenation"))
+    end)
+
+    it("returns nil when neither API exists", function()
+        local ns, env = loggedIn()
+        env.C_Spell.GetSpellCooldown = nil
+
+        assertNil(ns.Spells.Cooldown("Rejuvenation"))
+    end)
+
+    it("returns nil for no spell at all", function()
+        local ns = loggedIn()
+        assertNil(ns.Spells.Cooldown(""))
+        assertNil(ns.Spells.Cooldown(nil))
+    end)
+end)

@@ -234,6 +234,18 @@ function Group.RefreshAll()
     end
 end
 
+--- Redraw every row's cooldown sweeps.
+--
+-- Every row, not the row that was clicked: a cooldown belongs to the player,
+-- so one cast puts that spell on cooldown on all five rows at once. Updating
+-- only the row that was clicked would leave the other four showing a spell
+-- as ready that is not.
+function Group.RefreshCooldowns()
+    for _, row in pairs(rows) do
+        ns.Row.RefreshCooldowns(row)
+    end
+end
+
 local function refreshUnit(unit)
     local row = rows[unit]
     if row then
@@ -270,8 +282,16 @@ watcher:RegisterEvent("UNIT_CONNECTION")
 watcher:RegisterEvent("PLAYER_FLAGS_CHANGED")
 watcher:RegisterEvent("GROUP_ROSTER_UPDATE")
 watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+watcher:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 
 watcher:SetScript("OnEvent", function(_, event, unit)
+    if event == "SPELL_UPDATE_COOLDOWN" then
+        -- Carries no unit, and wants none: this is the one event here that
+        -- is about the player's spells rather than about somebody's health.
+        Group.RefreshCooldowns()
+        return
+    end
+
     if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
         -- Names and classes change wholesale, so no single row is enough.
         Group.RefreshAll()
@@ -323,6 +343,12 @@ function Group.ApplyAll()
     for _, row in pairs(rows) do
         ns.Row.ApplySpells(row)
     end
+
+    -- A button whose spell just changed is showing the sweep of the spell it
+    -- used to hold, and nothing else will correct that until the next time
+    -- some cooldown happens to start. Drawing them here means a spell
+    -- assigned mid-cooldown looks right the instant it lands.
+    Group.RefreshCooldowns()
 
     return true
 end
