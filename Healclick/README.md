@@ -173,8 +173,8 @@ the two offsets in Settings nudge them from there.
 
 | Setting | Does |
 |---|---|
-| Buttons per player | How many slots each row shows, 1 to 8 |
-| Icon size | How big each spell icon is, 12 to 48. Blizzard's own action buttons are 36; these default to 22 because five rows of them sit beside five unit frames |
+| Buttons per player | How many slots each row shows, 1 to 8, six by default |
+| Icon size | How big each spell icon is, 12 to 48. Blizzard's own action buttons are 36; these default to 24 because five rows of them sit beside five unit frames |
 | Sit beside the party frames | On by default. Hangs the icons off Blizzard's unit frames. Turn it off for the addon's own draggable bar. Falls back to the bar by itself if your UI has no party frames |
 | Distance from the frame | How far right of the unit frame the icons sit. Negative puts them on the left |
 | Height against the frame | How far above the middle of the unit frame the icons sit. Negative puts them below |

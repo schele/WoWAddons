@@ -210,11 +210,19 @@ local function ensurePicker()
         local button = CreateFrame("Button", nil, picker)
         button:SetSize(PICKER_WIDTH - 8, BOX_HEIGHT - 4)
         button:SetPoint("TOPLEFT", 4, -4 - (index - 1) * BOX_HEIGHT)
+        -- Said out loud, because a Button made without a template does not
+        -- arrive with it. Without this the row takes no mouse at all: no
+        -- click, and no mouseover either -- which is why the highlight
+        -- below never appeared, and the missing highlight is what gave the
+        -- cause away. The Pick buttons work only because their template
+        -- does this for them.
+        button:EnableMouse(true)
 
         -- Drawn rather than taken from Blizzard's highlight art: the client
         -- shows and hides the HIGHLIGHT layer on mouseover by itself, and a
         -- colour fill cannot silently turn out not to exist on this client.
-        local highlight = button:CreateTexture(nil, "HIGHLIGHT")
+        button.highlight = button:CreateTexture(nil, "HIGHLIGHT")
+        local highlight = button.highlight
         highlight:SetAllPoints()
         highlight:SetColorTexture(1, 1, 1, 0.2)
 

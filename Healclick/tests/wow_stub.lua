@@ -125,7 +125,9 @@ local function makeWidget(kind, parent, template, env)
     -- since RegisterForDrag is for STARTING a drag and this addon only ever
     -- receives one (see Row.Create's OnReceiveDrag).
     function widget:RegisterForDrag(...) self.dragRegistered = { ... } end
-    function widget:EnableMouse() end
+    -- Recorded, not ignored: a frame that takes no mouse takes no click and
+    -- shows no mouseover highlight, and nothing else about it looks wrong.
+    function widget:EnableMouse(value) self.mouseEnabled = value ~= false end
     function widget:EnableMouseWheel() end
     -- Driven by a test: env.__mouseOver = someFrame. The real answer depends
     -- on where the cursor is, which a test has no way to arrange.
@@ -221,8 +223,12 @@ local function makeWidget(kind, parent, template, env)
     end
     function widget:SetHideCountdownNumbers() end
 
-    function widget:CreateTexture()
+    -- The draw layer is recorded because it is not merely cosmetic: the
+    -- client shows and hides anything in the HIGHLIGHT layer on mouseover by
+    -- itself, so the layer is the whole of how a hover effect works.
+    function widget:CreateTexture(name, layer)
         local texture = makeWidget("Texture", self)
+        texture.drawLayer = layer
         table.insert(self.children, texture)
         return texture
     end

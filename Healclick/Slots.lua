@@ -11,6 +11,11 @@ ns.Slots = Slots
 -- later must never need a frame created at a moment the client forbids one.
 Slots.MAX = 8
 
+-- How many buttons a row shows before anyone changes it. Named rather than
+-- written in twice, because the default and the fallback Count uses when the
+-- database has not loaded have to be the same number.
+Slots.DEFAULT_COUNT = 6
+
 -- A starting set per class, so a configuration that was never saved is still
 -- usable. ForeverPanel seeds its chat keys for the same reason.
 local SEED = {
@@ -22,7 +27,7 @@ local SEED = {
 
 ns.AddDefaults({
     bar = {
-        slots = 4,
+        slots = Slots.DEFAULT_COUNT,
         locked = false,
         -- Your own row: top by default, bottom if you prefer it there.
         selfBottom = false,
@@ -32,7 +37,7 @@ ns.AddDefaults({
 })
 
 function Slots.Count()
-    local count = tonumber(ns.db and ns.db.bar.slots) or 4
+    local count = tonumber(ns.db and ns.db.bar.slots) or Slots.DEFAULT_COUNT
     count = math.floor(count)
 
     if count < 1 then

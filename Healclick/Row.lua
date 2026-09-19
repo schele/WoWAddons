@@ -13,7 +13,7 @@ local BAR_WIDTH = 120
 -- these stack beside five unit frames rather than sitting alone at the foot
 -- of the screen. The bounds are what a spell icon still reads at, and what
 -- fits beside a unit frame without swamping it.
-Row.DEFAULT_BUTTON_SIZE = 22
+Row.DEFAULT_BUTTON_SIZE = 24
 Row.MIN_BUTTON_SIZE = 12
 Row.MAX_BUTTON_SIZE = 48
 

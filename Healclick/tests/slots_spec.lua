@@ -9,9 +9,17 @@ local function loggedIn()
 end
 
 describe("the slot count", function()
-    it("defaults to four", function()
+    it("defaults to the shipped count", function()
         local ns = loggedIn()
-        assertEqual(4, ns.Slots.Count())
+        assertEqual(ns.Slots.DEFAULT_COUNT, ns.Slots.Count())
+    end)
+
+    it("ships as six", function()
+        -- Named separately from the test above so that changing the number
+        -- is a deliberate edit here rather than something that quietly
+        -- follows a constant.
+        local ns = loggedIn()
+        assertEqual(6, ns.Slots.DEFAULT_COUNT)
     end)
 
     it("clamps above the maximum", function()

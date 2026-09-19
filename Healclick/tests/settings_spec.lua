@@ -104,12 +104,15 @@ describe("the slot count slider", function()
     end)
 
     it("applies the change to the rows", function()
+        -- Moved to a count the bar is not already on, so the change is a
+        -- real one: setting a slider to the value it already holds is not
+        -- a change, and nothing downstream runs.
         local ns = loggedIn()
-        ns.Slots.Set(6, "Regrowth")
+        ns.Slots.Set(8, "Regrowth")
 
-        controlFor(ns, "bar", "slots").widget:SetValue(6)
+        controlFor(ns, "bar", "slots").widget:SetValue(8)
 
-        assertTrue(helpers.rowFor(ns, "party1").buttons[6]:IsShown())
+        assertTrue(helpers.rowFor(ns, "party1").buttons[8]:IsShown())
     end)
 end)
 
@@ -667,5 +670,35 @@ describe("a click aimed at the list reaching the list", function()
         local picker = ns.SettingsPanel.picker
 
         assertTrue(picker:GetFrameLevel() > picker.catcher:GetFrameLevel())
+    end)
+end)
+
+describe("the picker rows taking the mouse", function()
+    -- A Button made without a template does not arrive mouse-enabled. It
+    -- looks entirely correct -- right size, right place, right text -- and
+    -- takes no click and shows no mouseover. Both symptoms at once, and
+    -- nothing in the frame to say why.
+    it("enables the mouse on every row of the list", function()
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+        env.__learnSpells({ "Healing Touch" })
+        ns.SettingsPanel.EnsureBuilt()
+
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[1].scripts.OnClick(control.picks[1])
+
+        for index, button in ipairs(ns.SettingsPanel.picker.buttons) do
+            assertTrue(button.mouseEnabled, "row " .. index .. " takes the mouse")
+        end
+    end)
+
+    it("gives every row a highlight to show while the cursor is on it", function()
+        local ns = loggedIn()
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[1].scripts.OnClick(control.picks[1])
+
+        for _, button in ipairs(ns.SettingsPanel.picker.buttons) do
+            assertEqual("HIGHLIGHT", button.highlight.drawLayer)
+        end
     end)
 end)
