@@ -23,6 +23,18 @@ describe("the declared settings", function()
         assertTrue(controlFor(ns, "bar", "selfBottom") ~= nil, "where your row sits")
         assertTrue(controlFor(ns, "bar", "spells") ~= nil, "the spells")
         assertTrue(controlFor(ns, "bar", "locked") ~= nil, "the lock")
+        assertTrue(controlFor(ns, "bar", "attached") ~= nil, "where the icons live")
+        assertTrue(controlFor(ns, "bar", "attachX") ~= nil, "how far across")
+        assertTrue(controlFor(ns, "bar", "attachY") ~= nil, "how far up")
+    end)
+
+    it("lets the attach offsets go negative, so the icons can sit left of the frame", function()
+        -- A slider that bottoms out at zero would only ever put the icons on
+        -- one side of the unit frame.
+        local ns = loggedIn()
+
+        assertTrue(controlFor(ns, "bar", "attachX").setting.min < 0)
+        assertTrue(controlFor(ns, "bar", "attachY").setting.min < 0)
     end)
 end)
 

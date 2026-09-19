@@ -25,14 +25,39 @@ local BUTTONS_START = NAME_WIDTH + BAR_WIDTH + PADDING * 3
 
 Row.HEIGHT = BUTTON_SIZE + 2
 
+--- Whether rows hang off Blizzard's own unit frames rather than off a bar of
+-- ours.
+--
+-- Both halves have to hold: the player asked for it, and this UI actually
+-- has the frames to hang from. Asking for the attached layout cannot conjure
+-- frames that raid-style party frames or a unit-frame addon have taken away,
+-- so the answer is no whenever they are gone, and everything downstream --
+-- widths, button offsets, Group's layout -- follows from this one question.
+function Row.Attached()
+    if not (ns.db and ns.db.bar and ns.db.bar.attached) then
+        return false
+    end
+    return ns.Anchors.Available()
+end
+
+-- Where the button strip begins inside a row. Attached, Blizzard's frame is
+-- already showing the name and health, so ours are hidden and there is
+-- nothing for the buttons to start after.
+local function buttonsStart()
+    return Row.Attached() and 0 or BUTTONS_START
+end
+
 --- How wide a row must be to carry `count` buttons: everything up to the
 -- button strip, then the strip. It reaches the last button's right edge and
 -- no further -- there is no gap after the final button, only between two.
 local function widthFor(count)
+    local start = buttonsStart()
     if count < 1 then
-        return BUTTONS_START
+        -- Never zero: a row with no buttons is hidden anyway, and a frame
+        -- sized zero is a thing the client has opinions about.
+        return math.max(start, 1)
     end
-    return BUTTONS_START + count * (BUTTON_SIZE + BUTTON_GAP) - BUTTON_GAP
+    return start + count * (BUTTON_SIZE + BUTTON_GAP) - BUTTON_GAP
 end
 
 -- The widest a row can ever be, which is what Group's layout arithmetic is
@@ -184,7 +209,7 @@ function Row.Create(unit, parent)
         button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
         button:SetPoint(
             "LEFT",
-            BUTTONS_START + (index - 1) * (BUTTON_SIZE + BUTTON_GAP),
+            buttonsStart() + (index - 1) * (BUTTON_SIZE + BUTTON_GAP),
             0
         )
         -- Both edges, and the press is the one that matters. Registered for
@@ -354,6 +379,18 @@ function Row.ApplySpells(row)
     local count = ns.Slots.Count()
     local shown = 0
 
+    -- Attached, Blizzard's frame is already showing this unit's name and
+    -- health, so drawing ours would put a second copy of each right beside
+    -- the first. Done here rather than at creation so the layout can change
+    -- without rebuilding the rows -- which would be impossible in combat.
+    if Row.Attached() then
+        row.name:Hide()
+        row.health:Hide()
+    else
+        row.name:Show()
+        row.health:Show()
+    end
+
     for index = 1, ns.Slots.MAX do
         local button = row.buttons[index]
         local spell = index <= count and ns.Slots.Spell(index) or nil
@@ -390,7 +427,7 @@ function Row.ApplySpells(row)
             button:ClearAllPoints()
             button:SetPoint(
                 "LEFT",
-                BUTTONS_START + shown * (BUTTON_SIZE + BUTTON_GAP),
+                buttonsStart() + shown * (BUTTON_SIZE + BUTTON_GAP),
                 0
             )
             shown = shown + 1

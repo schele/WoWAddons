@@ -1,7 +1,7 @@
 local helpers = require("helpers")
 
-local FILES = { "Healclick.lua", "Spells.lua", "Slots.lua", "Row.lua" }
-local FILES_WITH_GROUP = { "Healclick.lua", "Spells.lua", "Slots.lua", "Row.lua", "Group.lua" }
+local FILES = { "Healclick.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "Row.lua" }
+local FILES_WITH_GROUP = { "Healclick.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "Row.lua", "Group.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)
@@ -853,5 +853,65 @@ describe("dimming an icon its spell cannot reach", function()
 
         assertEqual(1, row.buttons[1].icon.vertexColor[1])
         assertTrue(row.buttons[2].icon.vertexColor[1] < 1)
+    end)
+end)
+
+describe("hanging a row off Blizzard's unit frame", function()
+    local function applied(ns, env, attached, spells)
+        ns.db.bar.attached = attached
+        ns.db.bar.slots = #spells
+        for index, spell in ipairs(spells) do
+            ns.Slots.Set(index, spell)
+        end
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+        return row
+    end
+
+    it("hides the row's own name and health bar", function()
+        -- Blizzard's frame is already showing both. Ours would be a second
+        -- copy of each, sitting right next to the first.
+        local ns, env = loggedIn()
+        local row = applied(ns, env, true, { "Rejuvenation" })
+
+        assertFalse(row.name:IsShown())
+        assertFalse(row.health:IsShown())
+    end)
+
+    it("shows them again on the standalone bar, which has neither", function()
+        local ns, env = loggedIn()
+        local row = applied(ns, env, false, { "Rejuvenation" })
+
+        assertTrue(row.name:IsShown())
+        assertTrue(row.health:IsShown())
+    end)
+
+    it("starts the buttons at the row's own left edge", function()
+        local ns, env = loggedIn()
+        local row = applied(ns, env, true, { "Rejuvenation" })
+
+        local _, x = row.buttons[1]:GetPoint()
+        assertEqual(0, x, "nothing sits to the left of the buttons any more")
+    end)
+
+    it("narrows the row to just its buttons", function()
+        local ns, env = loggedIn()
+        local row = applied(ns, env, true, { "Rejuvenation", "Regrowth" })
+
+        assertEqual(
+            2 * row.buttons[1]:GetWidth() + ns.Row.BUTTON_GAP,
+            row:GetWidth(),
+            "no room reserved for a name and bar that are not drawn"
+        )
+    end)
+
+    it("stays on the bar when this UI has no unit frames to hang from", function()
+        -- Raid-style party frames, or a unit-frame addon. Asking for the
+        -- attached layout cannot conjure frames that are not there.
+        local ns, env = loggedIn()
+        ns.db.bar.attached = true
+        env.PlayerFrame = nil
+
+        assertFalse(ns.Row.Attached())
     end)
 end)

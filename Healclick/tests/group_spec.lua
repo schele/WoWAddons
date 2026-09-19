@@ -1,10 +1,23 @@
 local helpers = require("helpers")
 
-local FILES = { "Healclick.lua", "Spells.lua", "Slots.lua", "Row.lua", "Group.lua" }
+local FILES = { "Healclick.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "Row.lua", "Group.lua" }
 
 local function loggedIn(before)
     local ns, env = helpers.loadAddon(FILES)
     if before then before(ns, env) end
+
+    -- Most of this file is about the addon's own bar -- the stacking, the
+    -- backdrop, the dragging -- none of which the attached layout has, and
+    -- the attached layout is what ships by default. Set in the saved
+    -- variables rather than on ns.db after login, because rows are built
+    -- during login and take their width from the layout in force at the
+    -- time. Set after `before` so a test seeding its own HealclickDB does
+    -- not lose it. The attached describe at the foot of the file turns it
+    -- back on and re-applies, which is what a real settings change does.
+    env.HealclickDB = env.HealclickDB or {}
+    env.HealclickDB.bar = env.HealclickDB.bar or {}
+    env.HealclickDB.bar.attached = false
+
     helpers.login(ns, env)
     return ns, env
 end
@@ -460,5 +473,78 @@ describe("keeping the rows current", function()
 
         helpers.fire(env, "UNIT_HEALTH", "party2")
         assertEqual(7, helpers.rowFor(ns, "party2").health:GetValue())
+    end)
+end)
+
+describe("hanging the rows off Blizzard's unit frames", function()
+    local function attached(ns)
+        ns.db.bar.attached = true
+        ns.Group.ApplyAll()
+    end
+
+    it("points each party row at that party member's own frame", function()
+        local ns, env = loggedIn()
+        attached(ns)
+
+        local _, relativeTo = helpers.rowFor(ns, "party1"):GetPoint(1)
+        assertEqual(env.PartyMemberFrame1, relativeTo)
+    end)
+
+    it("points your own row at the player frame", function()
+        local ns, env = loggedIn()
+        attached(ns)
+
+        local _, relativeTo = helpers.rowFor(ns, "player"):GetPoint(1)
+        assertEqual(env.PlayerFrame, relativeTo)
+    end)
+
+    it("hides the backdrop, which now has nothing to sit behind", function()
+        local ns = loggedIn()
+        attached(ns)
+
+        assertFalse(ns.Group.Anchor().background:IsShown())
+    end)
+
+    it("leaves the anchor itself shown, since the rows are its children", function()
+        -- Hiding a frame hides everything under it, so hiding the anchor
+        -- would take every row with it -- icons included.
+        local ns = loggedIn()
+        attached(ns)
+
+        assertTrue(ns.Group.Anchor():IsShown())
+    end)
+
+    it("falls back to the bar when the unit frames are not there", function()
+        local ns, env = loggedIn()
+        env.PlayerFrame = nil
+        attached(ns)
+
+        local _, relativeTo = helpers.rowFor(ns, "party1"):GetPoint(1)
+        assertEqual(ns.Group.Anchor(), relativeTo, "back on our own bar")
+        assertTrue(ns.Group.Anchor().background:IsShown())
+    end)
+
+    it("puts the backdrop back when the setting is turned off again", function()
+        local ns = loggedIn()
+        attached(ns)
+
+        ns.db.bar.attached = false
+        ns.Group.ApplyAll()
+
+        assertTrue(ns.Group.Anchor().background:IsShown())
+        local _, relativeTo = helpers.rowFor(ns, "party1"):GetPoint(1)
+        assertEqual(ns.Group.Anchor(), relativeTo)
+    end)
+end)
+
+describe("which layout ships by default", function()
+    it("attaches to the unit frames without being asked", function()
+        -- Note this file's loggedIn turns it off for every other test here,
+        -- so nothing else in group_spec would catch this changing.
+        local ns, env = helpers.loadAddon(FILES)
+        helpers.login(ns, env)
+
+        assertTrue(ns.db.bar.attached)
+        assertTrue(ns.Row.Attached())
     end)
 end)

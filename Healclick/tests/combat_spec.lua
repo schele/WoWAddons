@@ -1,9 +1,13 @@
 local helpers = require("helpers")
 
-local FILES = { "Healclick.lua", "Spells.lua", "Slots.lua", "Row.lua", "Group.lua" }
+local FILES = { "Healclick.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "Row.lua", "Group.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)
+    -- These are about re-stacking rows on the addon's own bar, which is the
+    -- layout that does any stacking. Set before login, not after: rows are
+    -- built during it and take their width from the layout in force then.
+    env.HealclickDB = { bar = { attached = false } }
     helpers.login(ns, env)
     return ns, env
 end

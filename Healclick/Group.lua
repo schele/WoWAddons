@@ -20,6 +20,17 @@ ns.AddDefaults({
         x = DEFAULT_ANCHOR.x,
         y = DEFAULT_ANCHOR.y,
     },
+    bar = {
+        -- On by default: icons beside the party frames is what people
+        -- picture when they ask for this, and Row.Attached drops back to the
+        -- standalone bar by itself on a UI with no frames to hang from.
+        attached = true,
+        -- Clear of the frame rather than flush against it. The space to the
+        -- right of a party frame is also where its buffs and debuffs draw,
+        -- so these are settings rather than constants.
+        attachX = 8,
+        attachY = 0,
+    },
 })
 
 local anchor
@@ -203,10 +214,48 @@ end
 -- two-person party used to lay out party1, party2, [hidden], [hidden],
 -- player, leaving your row floating below a gap where the absent party
 -- members would have gone. Skipping them keeps the visible rows contiguous.
+--- Hang each row off its unit's own Blizzard frame.
+--
+-- The anchor stays shown even though nothing of it is drawn: the rows are
+-- its children, and hiding a frame hides everything under it, so hiding the
+-- anchor here would take every row -- icons included -- with it. Its
+-- backdrop is hidden instead, and its mouse turned off so an invisible
+-- rectangle cannot be dragged around by accident.
+--
+-- A unit whose frame is missing keeps whatever position it had. That is the
+-- ordinary case for party2-4 in a small group, not a failure: those rows are
+-- hidden by RegisterUnitWatch anyway, so where they sit does not matter.
+local function layoutAttached()
+    anchor.background:Hide()
+    anchor:EnableMouse(false)
+
+    for _, unit in ipairs(Group.Units()) do
+        local row = rows[unit]
+        local frame = ns.Anchors.For(unit)
+
+        if row and frame then
+            row:ClearAllPoints()
+            row:SetPoint(
+                "LEFT", frame, "RIGHT", ns.db.bar.attachX, ns.db.bar.attachY
+            )
+        end
+    end
+end
+
 function Group.Layout()
     if not anchor then
         return
     end
+
+    if ns.Row.Attached() then
+        layoutAttached()
+        return
+    end
+
+    -- The backdrop and the drag handle only mean anything on our own bar, and
+    -- the attached layout may have just put them away.
+    anchor.background:Show()
+    anchor:EnableMouse(true)
 
     local y = 0
     local placed = 0
@@ -388,3 +437,46 @@ ns.OnLogin(function()
         C_Timer.NewTicker(RANGE_INTERVAL, Group.RefreshAll)
     end
 end)
+
+-- Layout settings live here rather than with the rest in Slots.lua because
+-- this is the file that acts on them.
+ns.RegisterSetting({
+    store = "bar",
+    key = "attached",
+    type = "checkbox",
+    name = "Sit beside the party frames",
+    tooltip = "Hang the icons off Blizzard's own unit frames instead of putting them on a bar of their own. Falls back to the bar if your UI has no party frames -- raid-style party frames replace them, and so do most unit-frame addons.",
+    onChange = function()
+        if ns.Group then ns.Group.ApplyAll() end
+    end,
+})
+
+ns.RegisterSetting({
+    store = "bar",
+    key = "attachX",
+    type = "slider",
+    name = "Distance from the frame",
+    tooltip = "How far right of the unit frame the icons sit. Negative puts them on the left instead.",
+    -- Wide enough to clear a party frame's buffs, and negative because the
+    -- left of the frame is a perfectly good place to want them.
+    min = -300,
+    max = 300,
+    step = 1,
+    onChange = function()
+        if ns.Group then ns.Group.ApplyAll() end
+    end,
+})
+
+ns.RegisterSetting({
+    store = "bar",
+    key = "attachY",
+    type = "slider",
+    name = "Height against the frame",
+    tooltip = "How far above the middle of the unit frame the icons sit. Negative puts them below it.",
+    min = -100,
+    max = 100,
+    step = 1,
+    onChange = function()
+        if ns.Group then ns.Group.ApplyAll() end
+    end,
+})

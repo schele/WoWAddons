@@ -4,6 +4,7 @@ local M = {}
 
 M.FILES = {
     "Healclick.lua",
+    "Anchors.lua",
     "Spells.lua",
     "Slots.lua",
     "Row.lua",

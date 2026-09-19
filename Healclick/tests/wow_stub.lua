@@ -179,6 +179,7 @@ local function makeWidget(kind, parent, template, env)
     end
     function widget:GetText() return self.text end
     function widget:GetName() return self.frameName end
+    function widget:GetObjectType() return self.kind end
     function widget:SetTextColor(r, g, b) self.textColor = { r, g, b } end
     function widget:SetColorTexture(r, g, b, a) self.colorTexture = { r, g, b, a } end
     function widget:SetTexture(value) self.texture = value end
@@ -241,6 +242,16 @@ function stub.newEnv()
     env._G = env
 
     env.UIParent = makeWidget("Frame", nil, nil, env)
+
+    -- Blizzard's own unit frames, which the attached layout hangs rows off.
+    -- A test staging a UI without them -- raid-style party frames are on, or
+    -- a unit-frame addon has replaced them -- clears the ones it cares about:
+    --   env.PlayerFrame = nil
+    env.PlayerFrame = makeWidget("Frame", env.UIParent, nil, env)
+    for index = 1, 4 do
+        env["PartyMemberFrame" .. index] = makeWidget("Frame", env.UIParent, nil, env)
+    end
+
     env.SlashCmdList = {}
     env.OKAY = "Okay"
 
