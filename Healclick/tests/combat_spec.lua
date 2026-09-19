@@ -7,7 +7,7 @@ local function loggedIn()
     -- These are about re-stacking rows on the addon's own bar, which is the
     -- layout that does any stacking. Set before login, not after: rows are
     -- built during it and take their width from the layout in force then.
-    env.HealclickDB = { bar = { attached = false } }
+    env.HealclickDB = { bar = { attached = false, showSelf = true } }
     helpers.login(ns, env)
     return ns, env
 end

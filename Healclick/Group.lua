@@ -28,11 +28,15 @@ ns.AddDefaults({
         -- Clear of the frame rather than flush against it. The space to the
         -- right of a party frame is also where its buffs and debuffs draw,
         -- so these are settings rather than constants.
-        attachX = 8,
+        attachX = 30,
         attachY = 0,
-        -- Your own icons, on by default because most healers do heal
-        -- themselves.
-        showSelf = true,
+        -- Off, though most healers do heal themselves. These two defaults
+        -- are what this player asked for while saved variables do not
+        -- persist on their client: with nothing remembered between sessions,
+        -- the default is the setting. Once saving works, anything they
+        -- choose overrides these and they can go back to being whatever
+        -- suits a new install.
+        showSelf = false,
     },
 })
 

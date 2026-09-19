@@ -17,6 +17,10 @@ local function loggedIn(before)
     env.HealclickDB = env.HealclickDB or {}
     env.HealclickDB.bar = env.HealclickDB.bar or {}
     env.HealclickDB.bar.attached = false
+    -- Likewise: the player's row ships switched off, and most of this file
+    -- is about a stack that includes it. The describe that covers switching
+    -- it off turns it off itself.
+    env.HealclickDB.bar.showSelf = true
 
     helpers.login(ns, env)
     return ns, env
@@ -680,8 +684,12 @@ describe("turning your own icons off", function()
         assertTrue(helpers.rowFor(ns, "player").buttons[1]:IsShown())
     end)
 
-    it("is on by default", function()
-        local ns = loggedIn()
-        assertTrue(ns.db.bar.showSelf)
+    it("is off by default, which this file's loggedIn overrides", function()
+        -- Loaded raw, because loggedIn turns it back on for everything else
+        -- here and so would hide this changing.
+        local ns, env = helpers.loadAddon(FILES)
+        helpers.login(ns, env)
+
+        assertFalse(ns.db.bar.showSelf)
     end)
 end)

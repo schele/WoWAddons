@@ -162,7 +162,7 @@ the two offsets in Settings nudge them from there.
 | Sit beside the party frames | On by default. Hangs the icons off Blizzard's unit frames. Turn it off for the addon's own draggable bar. Falls back to the bar by itself if your UI has no party frames |
 | Distance from the frame | How far right of the unit frame the icons sit. Negative puts them on the left |
 | Height against the frame | How far above the middle of the unit frame the icons sit. Negative puts them below |
-| Show my own icons | On by default. Turn it off to keep the party's icons and drop your own, if the row beside your own frame is one you never click |
+| Show my own icons | Off by default. Turn it on to get a row beside your own frame as well as the party's |
 | Put my row at the bottom | Whether you sit above the party or below it. Only affects the bar — attached, the unit frames decide the order |
 | Spells | One row per slot. Type a spell's name, or assign it from a row's button instead — drag a spell onto one, or click it up in the spellbook and click the button (see "Icons, and assigning spells" above) |
 | Lock the frame | Stops the bar being dragged by accident. Only affects the bar |
