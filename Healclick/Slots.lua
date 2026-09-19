@@ -113,6 +113,8 @@ end
 --
 -- Every onChange routes through Group.ApplyAll rather than writing attributes
 -- directly, because that is the one place that knows to wait for combat.
+ns.RegisterColumn("right", "Raid settings")
+
 ns.RegisterSetting({
     store = "bar",
     key = "slots",
@@ -130,6 +132,7 @@ ns.RegisterSetting({
     store = "bar",
     key = "selfBottom",
     type = "checkbox",
+    column = "right",
     name = "Put my row at the bottom",
     tooltip = "Whether you sit above the party or below it.",
     onChange = function()
@@ -152,6 +155,7 @@ ns.RegisterSetting({
     store = "bar",
     key = "locked",
     type = "checkbox",
+    column = "right",
     name = "Lock the frame",
     tooltip = "Stops the bar being dragged around by accident.",
 })

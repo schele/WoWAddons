@@ -133,6 +133,16 @@ function ns.RegisterCommand(name, help, handler)
     commands[name] = { help = help, handler = handler }
 end
 
+-- Headings for the settings panel's columns, by the key a setting names in
+-- its `column` field. A column nobody titles simply has no heading, and a
+-- setting that names no column goes in the left one.
+local columns = {}
+ns.columns = columns
+
+function ns.RegisterColumn(key, title)
+    columns[key] = title
+end
+
 function ns.RegisterHelpLine(line)
     table.insert(helpLines, line)
 end

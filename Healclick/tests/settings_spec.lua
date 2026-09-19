@@ -225,3 +225,61 @@ describe("the spell table", function()
         assertEqual("Regrowth", ns.Slots.Spell(2), "the drop survives the box losing focus afterward")
     end)
 end)
+
+describe("the two columns", function()
+    local function xOf(control)
+        local _, x = control.widget:GetPoint()
+        return x
+    end
+
+    it("heads the right column with its registered title", function()
+        local ns = loggedIn()
+        assertEqual("Raid settings", ns.SettingsPanel.headings.right:GetText())
+    end)
+
+    it("puts the settings that asked for it in the right column", function()
+        local ns = loggedIn()
+        local left = xOf(controlFor(ns, "bar", "slots"))
+
+        assertTrue(xOf(controlFor(ns, "bar", "selfBottom")) > left,
+            "where your row sits moved right")
+        assertTrue(xOf(controlFor(ns, "bar", "locked")) > left,
+            "the lock moved right")
+    end)
+
+    it("leaves everything else in the left column, in one line", function()
+        -- A setting declaring no column must not drift: every one of these
+        -- was written before columns existed.
+        local ns = loggedIn()
+        local left = xOf(controlFor(ns, "bar", "slots"))
+
+        for _, key in ipairs({ "attached", "attachX", "showSelf" }) do
+            assertEqual(left, xOf(controlFor(ns, "bar", key)), key)
+        end
+
+        -- The spell table's widget is its first box, which sits past the
+        -- gutter the row numbers are written in rather than at the column's
+        -- own edge. Still the left column, just indented within it.
+        assertTrue(xOf(controlFor(ns, "bar", "spells")) < left + 100, "spells")
+    end)
+
+    it("starts each column at the top rather than continuing the other", function()
+        -- The whole point of a column: the right one begins beside the left
+        -- one, not below everything already stacked there.
+        local ns = loggedIn()
+        local _, _, slotsY = nil, nil, nil
+        local _, _, y = controlFor(ns, "bar", "slots").widget:GetPoint()
+        local _, _, rightY = controlFor(ns, "bar", "selfBottom").widget:GetPoint()
+
+        assertTrue(rightY > y - 100,
+            "the right column is near the top, not far below the spell table")
+    end)
+
+    it("heads the column above the first control in it", function()
+        local ns = loggedIn()
+        local _, _, headingY = ns.SettingsPanel.headings.right:GetPoint()
+        local _, _, firstY = controlFor(ns, "bar", "selfBottom").widget:GetPoint()
+
+        assertTrue(headingY > firstY, "the title sits above what it titles")
+    end)
+end)

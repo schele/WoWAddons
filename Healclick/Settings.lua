@@ -8,17 +8,22 @@ local PADDING = 16
 local ROW_HEIGHT = 30
 local SLIDER_EXTRA = 24
 local BOX_HEIGHT = 24
-local PANEL_WIDTH = 400
+-- Wide enough for a 200px slider or the spell table's boxes (which reach
+-- x=216 from the column's left edge) with room to spare. Two of these is the
+-- whole panel, and comfortably inside the canvas the game gives us.
+local COLUMN_WIDTH = 280
+local PANEL_WIDTH = COLUMN_WIDTH * 2
 
 local Panel = {}
 ns.SettingsPanel = Panel
 Panel.controls = {}
+Panel.headings = {}
 
 local panel, category, built
 
-local function addCheckbox(setting, y)
+local function addCheckbox(setting, y, x)
     local button = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-    button:SetPoint("TOPLEFT", PADDING, y)
+    button:SetPoint("TOPLEFT", x, y)
 
     -- The label belongs to the template on some clients and not others, so
     -- write our own rather than reaching for button.Text and finding nil.
@@ -39,9 +44,9 @@ local function addCheckbox(setting, y)
     }
 end
 
-local function addSlider(setting, y)
+local function addSlider(setting, y, x)
     local slider = CreateFrame("Slider", nil, panel, "OptionsSliderTemplate")
-    slider:SetPoint("TOPLEFT", PADDING, y - SLIDER_EXTRA)
+    slider:SetPoint("TOPLEFT", x, y - SLIDER_EXTRA)
     slider:SetMinMaxValues(setting.min, setting.max)
     slider:SetValueStep(setting.step or 1)
     slider:SetObeyStepOnDrag(true)
@@ -84,23 +89,23 @@ end
 -- The store is Slots.Set rather than SetSettingValue, because a slot is one
 -- entry inside a table rather than a value of its own, and because Set is
 -- where the "you have not learned that yet" warning comes from.
-local function addSpellTable(setting, y)
+local function addSpellTable(setting, y, x)
     local rows = setting.rows or 8
     local boxes = {}
 
     local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    heading:SetPoint("TOPLEFT", PADDING, y)
+    heading:SetPoint("TOPLEFT", x, y)
     heading:SetText(setting.name)
 
     for index = 1, rows do
         local top = y - ROW_HEIGHT - (index - 1) * BOX_HEIGHT
 
         local number = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-        number:SetPoint("TOPLEFT", PADDING, top - 4)
+        number:SetPoint("TOPLEFT", x, top - 4)
         number:SetText(tostring(index))
 
         local box = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
-        box:SetPoint("TOPLEFT", PADDING + 20, top)
+        box:SetPoint("TOPLEFT", x + 20, top)
         box:SetSize(180, BOX_HEIGHT - 4)
         -- Both, and in this order. An EditBox grabs focus as it comes into
         -- existence, so SetAutoFocus(false) is a line too late to prevent it
@@ -196,19 +201,38 @@ local function ensureBuilt()
         .. "re-point a spell button while you are fighting."
     )
 
-    local y = -PADDING - ROW_HEIGHT * 2
+    -- Two columns, each falling down its own side independently. A setting
+    -- names the column it belongs to; anything that names none goes left,
+    -- which is every setting declared before columns existed.
+    local top = -PADDING - ROW_HEIGHT * 2
+    local columnX = { left = PADDING, right = PADDING + COLUMN_WIDTH }
+    local y = { left = top, right = top }
 
     for _, setting in ipairs(ns.settings) do
+        local column = columnX[setting.column] and setting.column or "left"
+        local x = columnX[column]
+
+        -- The heading goes in above the first control that claims the
+        -- column, so an untitled column costs nothing and a column nobody
+        -- puts a setting in never appears at all.
+        if ns.columns[column] and not Panel.headings[column] then
+            local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+            heading:SetPoint("TOPLEFT", x, y[column])
+            heading:SetText(ns.columns[column])
+            Panel.headings[column] = heading
+            y[column] = y[column] - ROW_HEIGHT
+        end
+
         local control
         if setting.type == "slider" then
-            control = addSlider(setting, y)
-            y = y - ROW_HEIGHT - SLIDER_EXTRA
+            control = addSlider(setting, y[column], x)
+            y[column] = y[column] - ROW_HEIGHT - SLIDER_EXTRA
         elseif setting.type == "spelltable" then
-            control = addSpellTable(setting, y)
-            y = y - control.height
+            control = addSpellTable(setting, y[column], x)
+            y[column] = y[column] - control.height
         else
-            control = addCheckbox(setting, y)
-            y = y - ROW_HEIGHT
+            control = addCheckbox(setting, y[column], x)
+            y[column] = y[column] - ROW_HEIGHT
         end
 
         table.insert(Panel.controls, control)
