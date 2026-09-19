@@ -30,6 +30,9 @@ ns.AddDefaults({
         -- so these are settings rather than constants.
         attachX = 8,
         attachY = 0,
+        -- Your own icons, on by default because most healers do heal
+        -- themselves.
+        showSelf = true,
     },
 })
 
@@ -333,7 +336,9 @@ function Group.Layout()
 
     for _, unit in ipairs(Group.Units()) do
         local row = rows[unit]
-        if row and ns.Row.Exists(unit) then
+        -- A suppressed row has no buttons left to show, so giving it a slot
+        -- in the stack would leave a gap the height of a row.
+        if row and ns.Row.Exists(unit) and not ns.Row.Suppressed(unit) then
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, y)
             y = y - (ns.Row.HEIGHT + ROW_GAP)
@@ -592,12 +597,13 @@ ns.RegisterCommand("anchors", "Report which unit frames the icons found", functi
         -- the thing worth knowing when nothing does, since Blizzard has
         -- moved these frames between client versions.
         local _, path = ns.Anchors.Frame(unit)
+        local _, anchorPath = ns.Anchors.For(unit)
 
         ns.Print(string.format(
             "%s: frame=%s anchor=%s exists=%s | row %s -> %s at %s,%s shown=%s",
             unit,
             path or "NONE",
-            frameLabel(ns.Anchors.For(unit)),
+            anchorPath or "NONE",
             tostring(UnitExists and UnitExists(unit)),
             tostring(point),
             frameLabel(relativeTo),
@@ -607,3 +613,14 @@ ns.RegisterCommand("anchors", "Report which unit frames the icons found", functi
         ))
     end
 end)
+
+ns.RegisterSetting({
+    store = "bar",
+    key = "showSelf",
+    type = "checkbox",
+    name = "Show my own icons",
+    tooltip = "Turn this off to keep the party's icons but drop your own -- useful if the row beside your own frame is one you never click.",
+    onChange = function()
+        if ns.Group then ns.Group.ApplyAll() end
+    end,
+})

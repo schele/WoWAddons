@@ -160,3 +160,55 @@ describe("whether attaching is possible at all", function()
         assertTrue(ns.Anchors.Available())
     end)
 end)
+
+describe("hunting down a health bar", function()
+    -- Blizzard has kept it in a different place in almost every client, and
+    -- a frame whose bar is not found anchors the icons to the frame's own
+    -- rect -- which runs past the art. Finding it for the party frames but
+    -- not the player frame is what left the player's icons further out than
+    -- everyone else's.
+
+    local function noBarAt(env, frame)
+        frame.healthBar = nil
+        frame.healthbar = nil
+        frame.HealthBar = nil
+    end
+
+    it("finds it under a lowercase field name", function()
+        local ns, env = loggedIn()
+        local frame = env.PartyFrame.MemberFrame1
+        noBarAt(env, frame)
+        frame.healthbar = env.CreateFrame("StatusBar")
+
+        assertEqual(frame.healthbar, (ns.Anchors.For("party1")))
+    end)
+
+    it("finds it buried in the rebuilt player frame's containers", function()
+        local ns, env = loggedIn()
+        noBarAt(env, env.PlayerFrame)
+        local bar = env.CreateFrame("StatusBar")
+        env.PlayerFrame.PlayerFrameContent = {
+            PlayerFrameContentMain = {
+                HealthBarsContainer = { HealthBar = bar },
+            },
+        }
+
+        assertEqual(bar, (ns.Anchors.For("player")))
+    end)
+
+    it("says which path answered, so the report can name it", function()
+        local ns = loggedIn()
+        local _, path = ns.Anchors.For("party1")
+
+        assertEqual("PartyFrame.MemberFrame1.healthBar", path)
+    end)
+
+    it("names the frame itself when no bar is found anywhere", function()
+        local ns, env = loggedIn()
+        noBarAt(env, env.PlayerFrame)
+
+        local widget, path = ns.Anchors.For("player")
+        assertEqual(env.PlayerFrame, widget)
+        assertEqual("PlayerFrame", path)
+    end)
+end)

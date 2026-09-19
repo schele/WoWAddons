@@ -636,3 +636,52 @@ describe("the anchor report", function()
             "and says which one it could not find")
     end)
 end)
+
+describe("turning your own icons off", function()
+    it("empties your row and leaves the party's alone", function()
+        local ns, env = loggedIn()
+        ns.db.bar.showSelf = false
+        ns.Group.ApplyAll()
+
+        assertFalse(helpers.rowFor(ns, "player").buttons[1]:IsShown())
+        assertTrue(helpers.rowFor(ns, "party1").buttons[1]:IsShown(),
+            "the party is why the addon is on screen at all")
+    end)
+
+    it("clears the spell, so an empty row cannot cast", function()
+        -- A hidden button that still carries a spell is one keybind or one
+        -- stray click away from casting.
+        local ns, env = loggedIn()
+        ns.db.bar.showSelf = false
+        ns.Group.ApplyAll()
+
+        assertNil(helpers.attrs(helpers.rowFor(ns, "player").buttons[1]).spell)
+    end)
+
+    it("leaves no gap in the stack where your row was", function()
+        local ns, env = loggedIn()
+        ns.db.bar.showSelf = false
+        ns.Group.ApplyAll()
+
+        -- party1 and party2 are the stub's other present units, so with the
+        -- player's row gone they are the whole stack.
+        local _, _, _, _, firstY = helpers.rowFor(ns, "party1"):GetPoint(1)
+        assertEqual(0, firstY, "party1 takes the top slot")
+    end)
+
+    it("comes back when it is turned on again", function()
+        local ns, env = loggedIn()
+        ns.db.bar.showSelf = false
+        ns.Group.ApplyAll()
+
+        ns.db.bar.showSelf = true
+        ns.Group.ApplyAll()
+
+        assertTrue(helpers.rowFor(ns, "player").buttons[1]:IsShown())
+    end)
+
+    it("is on by default", function()
+        local ns = loggedIn()
+        assertTrue(ns.db.bar.showSelf)
+    end)
+end)

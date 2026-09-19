@@ -43,15 +43,9 @@ local function isWidget(value)
     return type(value) == "table" and type(value.GetObjectType) == "function"
 end
 
---- The widget at a global path, or nil if there is nothing usable there.
---
--- Dotted, because the modern frames live inside a container rather than at a
--- global of their own -- "PartyFrame.MemberFrame1" is one lookup then one
--- field. A path holding something which is not a widget, such as a table
--- another addon has parked there, reads as absent rather than being anchored
--- to; GetObjectType is the cheapest thing only a real widget has.
-local function widgetAt(path)
-    local value = _G
+--- Follow a dotted path from `root`, or nil if it does not end at a widget.
+local function walk(root, path)
+    local value = root
     for part in path:gmatch("[^.]+") do
         if type(value) ~= "table" then
             return nil
@@ -60,6 +54,35 @@ local function widgetAt(path)
     end
 
     return isWidget(value) and value or nil
+end
+
+-- Where a unit frame's health bar hides, in the order worth trying. Blizzard
+-- has kept it in every one of these places across client versions: a field
+-- with three different spellings, a nest of containers on the rebuilt player
+-- frame, and -- before 10.x -- a global named after the frame, tried last
+-- and separately since it hangs off _G rather than off the frame.
+--
+-- Worth the breadth: with no health bar the icons anchor to the frame, whose
+-- rect runs past the art it draws. The player frame and the party frames do
+-- not overhang by the same amount, so finding one and not the other is what
+-- left the player's icons sitting further out than everybody else's.
+local HEALTH_BAR_PATHS = {
+    "healthBar",
+    "healthbar",
+    "HealthBar",
+    "HealthBarsContainer.HealthBar",
+    "PlayerFrameContent.PlayerFrameContentMain.HealthBarsContainer.HealthBar",
+}
+
+--- The widget at a global path, or nil if there is nothing usable there.
+--
+-- Dotted, because the modern frames live inside a container rather than at a
+-- global of their own -- "PartyFrame.MemberFrame1" is one lookup then one
+-- field. A path holding something which is not a widget, such as a table
+-- another addon has parked there, reads as absent rather than being anchored
+-- to; GetObjectType is the cheapest thing only a real widget has.
+local function widgetAt(path)
+    return walk(_G, path)
 end
 
 --- What `unit`'s buttons should hang off, or nil if this UI has nothing.
@@ -100,16 +123,21 @@ function Anchors.For(unit)
         return nil
     end
 
-    -- Modern frames keep the health bar as a field; the pre-10.x ones
-    -- published it as a global named after the frame. Try both, and settle
-    -- for the frame itself, which is a perfectly good anchor -- on this
-    -- client it is what the player frame falls back to, and the icons sit
-    -- correctly against it.
-    if isWidget(frame.healthBar) then
-        return frame.healthBar
+    for _, field in ipairs(HEALTH_BAR_PATHS) do
+        local bar = walk(frame, field)
+        if bar then
+            return bar, path .. "." .. field
+        end
     end
 
-    return widgetAt(path .. "HealthBar") or frame
+    local global = widgetAt(path .. "HealthBar")
+    if global then
+        return global, path .. "HealthBar"
+    end
+
+    -- The frame itself still works; the icons simply sit as far out as its
+    -- rect reaches rather than where its art ends.
+    return frame, path
 end
 
 --- Whether attaching is possible at all: the player's own frame has to be

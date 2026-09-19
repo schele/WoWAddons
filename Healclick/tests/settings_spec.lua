@@ -26,6 +26,7 @@ describe("the declared settings", function()
         assertTrue(controlFor(ns, "bar", "attached") ~= nil, "where the icons live")
         assertTrue(controlFor(ns, "bar", "attachX") ~= nil, "how far across")
         assertTrue(controlFor(ns, "bar", "attachY") ~= nil, "how far up")
+        assertTrue(controlFor(ns, "bar", "showSelf") ~= nil, "whether your own icons show")
     end)
 
     it("lets the attach offsets go negative, so the icons can sit left of the frame", function()

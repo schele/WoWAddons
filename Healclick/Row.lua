@@ -40,6 +40,23 @@ function Row.Attached()
     return ns.Anchors.Available()
 end
 
+--- Whether this unit's row is switched off, buttons and all.
+--
+-- Only the player's, and only by choice. A healer watching the party rather
+-- than themselves has a row beside their own frame they never click, sitting
+-- where their eyes go first.
+--
+-- The row is kept and emptied rather than never built: rows can only be
+-- created out of combat, so a row that does not exist is one the setting
+-- could not bring back mid-fight.
+function Row.Suppressed(unit)
+    if unit ~= "player" then
+        return false
+    end
+
+    return (ns.db and ns.db.bar and ns.db.bar.showSelf) == false
+end
+
 -- Where the button strip begins inside a row. Attached, Blizzard's frame is
 -- already showing the name and health, so ours are hidden and there is
 -- nothing for the buttons to start after.
@@ -412,7 +429,7 @@ function Row.ApplySpells(row)
         -- reports one it cannot check as having no icon. Deciding on the
         -- icon would empty the whole bar on a client with no texture API,
         -- which is the one outcome that leaves a healer nothing to click.
-        if hasButton(spell) then
+        if hasButton(spell) and not Row.Suppressed(row.unit) then
             button:SetAttribute("spell", spell)
 
             button.icon:SetTexture(ns.Spells.Texture(spell) or UNKNOWN_ICON)
