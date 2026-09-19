@@ -14,7 +14,7 @@ removes the targeting step.
 ```
 
 (Sketched here as text because this is a text file. In game each box normally
-shows the spell's own icon — see "Icons and assigning spells" below for when
+shows the spell's own icon — see "Icons, and assigning spells" below for when
 it does not.)
 
 A slot holds any spell you can cast on a friendly unit, so a dispel is not a
@@ -37,13 +37,31 @@ the Wild` becomes `MW`, skipping small connecting words like "of" and "the").
 You should rarely see the text version — it exists so a button is never
 blank, not as the normal look of one.
 
-There are two ways to put a spell in a slot, and they store the same thing:
+There are three ways to put a spell in a slot, and they store the same thing:
 
 - **Drag it there.** Pick up a spell from your spellbook and drop it on any
-  button. The slot it lands in takes that spell, on every row, and the
-  button shows the spell's icon right away.
+  button. The slot it lands in takes that spell, on every row. Out of
+  combat the button's icon updates right away. Mid-fight it does not: the
+  spell is saved, but the button — icon, cast target, everything about it —
+  is left exactly as it was until the fight ends (see "What it cannot do,
+  and why" below). A healer who drags a replacement heal onto a button
+  mid-fight will see nothing happen, and that is expected, not a dropped
+  click.
+- **Click it there.** Click a spell in your spellbook to pick it up instead
+  of dragging it, then click a button — no click-and-hold needed. Out of
+  combat this assigns the spell exactly as a drag does. Mid-fight it does
+  not, and not merely by being held: the game will not let Healclick
+  intercept that click at all, so it falls through to an ordinary click
+  instead — the button casts whatever spell it already had, on that party
+  member, and the spell you picked up is left sitting on your cursor for
+  you to place once the fight is over.
 - **Type it.** Open `/hc settings` and type the spell's name into that slot's
-  row under Spells.
+  row under Spells. The same out-of-combat/mid-fight split as dragging
+  applies here too.
+
+Dropping something that is not a spell — an item, a macro — onto a button, or
+clicking a button while carrying one, does nothing: the button is unchanged
+and whatever you were carrying stays exactly where it was, on your cursor.
 
 A spell you have not learned yet is kept, not rejected — setting up the Remove
 Curse you get at level 24 is sensible, not a typo. Healclick says so once and
@@ -62,6 +80,11 @@ Three consequences you will notice:
   dragging — changing the number of buttons, or moving your own row to the
   bottom is held until the fight ends. The game refuses those changes
   mid-fight, so Healclick waits rather than putting an error on your screen.
+  Picking a spell up and clicking a button, rather than dragging it, is the
+  exception: mid-fight the game will not even let Healclick suppress that
+  click, so instead of holding the assignment for later it lets the click
+  through as an ordinary cast and leaves the spell on your cursor — see
+  "Icons, and assigning spells" above.
 - **A button can only ever cast on the person whose row it sits in.** Its unit
   is fixed when the row is built and never changes.
 - **Whether a row is on screen is Blizzard's decision, not ours** — the game's
@@ -98,7 +121,7 @@ Built against Classic Era 1.15.x (`11509`) and the 1.60.x Classic beta
 |---|---|
 | Buttons per player | How many slots each row shows, 1 to 8 |
 | Put my row at the bottom | Whether you sit above the party or below it |
-| Spells | One row per slot. Type a spell's name, or drag a spell from your spellbook onto any button in that slot instead (see "Icons, and assigning spells" above) |
+| Spells | One row per slot. Type a spell's name, or assign it from a row's button instead — drag a spell onto one, or click it up in the spellbook and click the button (see "Icons, and assigning spells" above) |
 | Lock the frame | Stops the bar being dragged by accident |
 
 Slots are seeded with a starting set the first time you log in, for four
