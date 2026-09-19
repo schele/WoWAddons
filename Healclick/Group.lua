@@ -225,21 +225,79 @@ end
 -- A unit whose frame is missing keeps whatever position it had. That is the
 -- ordinary case for party2-4 in a small group, not a failure: those rows are
 -- hidden by RegisterUnitWatch anyway, so where they sit does not matter.
+-- How many deferred passes a single layout is allowed to ask for before it
+-- gives up. Bounded because a frame that is never coming would otherwise
+-- queue a retry on every pass, for ever. Reset whenever something happens
+-- that could plausibly have created the frames.
+local RELAYOUT_TRIES = 5
+local relayoutsLeft = RELAYOUT_TRIES
+local relayoutQueued = false
+
+--- Ask for one more layout pass shortly, because a frame we wanted was not
+-- there yet.
+--
+-- Blizzard builds its party frames in its own handler for GROUP_ROSTER_UPDATE
+-- -- the same event this addon watches -- and nothing orders the two. At
+-- login ours runs first, finds no PartyMemberFrame1, and has nothing to hang
+-- that row off. A pass on the next frame finds it.
+local function scheduleRelayout()
+    if relayoutQueued or relayoutsLeft <= 0 then
+        return
+    end
+    if not (C_Timer and C_Timer.After) then
+        return
+    end
+
+    relayoutQueued = true
+    relayoutsLeft = relayoutsLeft - 1
+
+    C_Timer.After(0, function()
+        relayoutQueued = false
+        -- Laying out moves rows full of secure buttons, which is refused
+        -- mid-fight. The next roster event or regen-enabled will come back
+        -- to it; there is nothing worth queueing here.
+        if not (InCombatLockdown and InCombatLockdown()) then
+            Group.Layout()
+        end
+    end)
+end
+
+--- Hang each row off its unit's own Blizzard frame. Returns true if some
+-- frame was missing and the layout is worth repeating.
 local function layoutAttached()
     anchor.background:Hide()
     anchor:EnableMouse(false)
+
+    local missing = false
+    local y = 0
 
     for _, unit in ipairs(Group.Units()) do
         local row = rows[unit]
         local frame = ns.Anchors.For(unit)
 
-        if row and frame then
+        if row then
             row:ClearAllPoints()
-            row:SetPoint(
-                "LEFT", frame, "RIGHT", ns.db.bar.attachX, ns.db.bar.attachY
-            )
+
+            if frame then
+                row:SetPoint(
+                    "LEFT", frame, "RIGHT", ns.db.bar.attachX, ns.db.bar.attachY
+                )
+            else
+                -- Not skipped. A row is given no point at all when it is
+                -- built -- Layout is what places it -- and a frame with no
+                -- points does not render, so skipping one here made it
+                -- vanish rather than leave it where it was. It goes on the
+                -- bar instead: somewhere visible beats nowhere, and
+                -- RegisterUnitWatch keeps it hidden anyway unless the unit
+                -- is really there.
+                row:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, y)
+                y = y - (ns.Row.HEIGHT + ROW_GAP)
+                missing = true
+            end
         end
     end
+
+    return missing
 end
 
 function Group.Layout()
@@ -248,7 +306,13 @@ function Group.Layout()
     end
 
     if ns.Row.Attached() then
-        layoutAttached()
+        if layoutAttached() then
+            scheduleRelayout()
+        else
+            -- Everything found its frame, so the next time one goes missing
+            -- gets a full set of tries rather than the remains of this one.
+            relayoutsLeft = RELAYOUT_TRIES
+        end
         return
     end
 
@@ -396,6 +460,10 @@ function Group.ApplyAll()
     end
 
     pending = false
+    -- A fresh set of retries: whatever prompted this apply -- a roster
+    -- change, entering the world, a settings toggle -- is exactly the kind
+    -- of thing that brings Blizzard's party frames into being.
+    relayoutsLeft = RELAYOUT_TRIES
     -- This is the only place `pending` is ever cleared, so the reposition it
     -- was guarding belongs here too -- not just in runPending -- or whichever
     -- of ApplyAll's other callers (GROUP_ROSTER_UPDATE, a Slots.lua onChange,

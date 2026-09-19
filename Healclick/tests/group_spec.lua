@@ -487,7 +487,7 @@ describe("hanging the rows off Blizzard's unit frames", function()
         attached(ns)
 
         local _, relativeTo = helpers.rowFor(ns, "party1"):GetPoint(1)
-        assertEqual(env.PartyMemberFrame1, relativeTo)
+        assertEqual(env.PartyMemberFrame1HealthBar, relativeTo)
     end)
 
     it("points your own row at the player frame", function()
@@ -495,7 +495,7 @@ describe("hanging the rows off Blizzard's unit frames", function()
         attached(ns)
 
         local _, relativeTo = helpers.rowFor(ns, "player"):GetPoint(1)
-        assertEqual(env.PlayerFrame, relativeTo)
+        assertEqual(env.PlayerFrameHealthBar, relativeTo)
     end)
 
     it("hides the backdrop, which now has nothing to sit behind", function()
@@ -546,5 +546,63 @@ describe("which layout ships by default", function()
 
         assertTrue(ns.db.bar.attached)
         assertTrue(ns.Row.Attached())
+    end)
+end)
+
+describe("attaching before Blizzard has built its frames", function()
+    -- Blizzard creates the party frames in its own handler for the roster
+    -- event this addon also watches, and nothing orders the two. At login
+    -- ours ran first and found no PartyMemberFrame1, so this is the ordinary
+    -- state at startup rather than an exotic one.
+    local function attachedWithout(ns, env, unitFrame)
+        env[unitFrame] = nil
+        env[unitFrame .. "HealthBar"] = nil
+        ns.db.bar.attached = true
+        ns.Group.ApplyAll()
+    end
+
+    it("still gives the row a position, since one with none does not render", function()
+        local ns, env = loggedIn()
+        attachedWithout(ns, env, "PartyMemberFrame1")
+
+        local point, relativeTo = helpers.rowFor(ns, "party1"):GetPoint(1)
+        assertTrue(point ~= nil, "a row with no point is invisible, not merely misplaced")
+        assertEqual(ns.Group.Anchor(), relativeTo, "parked on the bar meanwhile")
+    end)
+
+    it("leaves the rows that did find their frames alone", function()
+        local ns, env = loggedIn()
+        attachedWithout(ns, env, "PartyMemberFrame1")
+
+        local _, relativeTo = helpers.rowFor(ns, "player"):GetPoint(1)
+        assertEqual(env.PlayerFrameHealthBar, relativeTo)
+    end)
+
+    it("picks the frame up on a later pass once it exists", function()
+        local ns, env = loggedIn()
+        attachedWithout(ns, env, "PartyMemberFrame1")
+
+        env.PartyMemberFrame1 = env.CreateFrame("Frame")
+        env.__runTimers()
+
+        local _, relativeTo = helpers.rowFor(ns, "party1"):GetPoint(1)
+        assertEqual(env.PartyMemberFrame1, relativeTo)
+    end)
+
+    it("gives up rather than retrying for ever on a frame that never comes", function()
+        -- A UI that simply has no party frames would otherwise queue a
+        -- retry from every pass, which queues another, for the rest of the
+        -- session.
+        local ns, env = loggedIn()
+        attachedWithout(ns, env, "PartyMemberFrame1")
+
+        local passes = 0
+        while #env.__timers > 0 and passes < 50 do
+            passes = passes + 1
+            env.__runTimers()
+        end
+
+        assertTrue(passes < 50, "the retries must stop on their own")
+        assertEqual(0, #env.__timers)
     end)
 end)

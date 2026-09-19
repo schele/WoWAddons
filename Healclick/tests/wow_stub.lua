@@ -247,9 +247,16 @@ function stub.newEnv()
     -- A test staging a UI without them -- raid-style party frames are on, or
     -- a unit-frame addon has replaced them -- clears the ones it cares about:
     --   env.PlayerFrame = nil
+    -- Each with the health bar Healclick prefers to anchor to, since that is
+    -- where a unit frame visibly ends. A test wanting the bare frame clears
+    -- the health bar and leaves the frame.
     env.PlayerFrame = makeWidget("Frame", env.UIParent, nil, env)
+    env.PlayerFrameHealthBar = makeWidget("StatusBar", env.PlayerFrame, nil, env)
     for index = 1, 4 do
-        env["PartyMemberFrame" .. index] = makeWidget("Frame", env.UIParent, nil, env)
+        local frame = makeWidget("Frame", env.UIParent, nil, env)
+        env["PartyMemberFrame" .. index] = frame
+        env["PartyMemberFrame" .. index .. "HealthBar"] =
+            makeWidget("StatusBar", frame, nil, env)
     end
 
     env.SlashCmdList = {}

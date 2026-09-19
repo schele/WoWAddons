@@ -11,14 +11,14 @@ end
 describe("finding Blizzard's frame for a unit", function()
     it("finds the player's own frame", function()
         local ns, env = loggedIn()
-        assertEqual(env.PlayerFrame, ns.Anchors.For("player"))
+        assertEqual(env.PlayerFrameHealthBar, ns.Anchors.For("player"))
     end)
 
     it("finds each party member's frame", function()
         local ns, env = loggedIn()
         for index = 1, 4 do
             assertEqual(
-                env["PartyMemberFrame" .. index],
+                env["PartyMemberFrame" .. index .. "HealthBar"],
                 ns.Anchors.For("party" .. index),
                 "party" .. index
             )
@@ -55,6 +55,9 @@ describe("finding Blizzard's frame for a unit", function()
         local ns, env = loggedIn()
         local replacement = env.CreateFrame("Frame")
         env.PlayerFrame = replacement
+        -- The old frame's health bar goes with it, the way a real
+        -- replacement takes its children along.
+        env.PlayerFrameHealthBar = nil
 
         assertEqual(replacement, ns.Anchors.For("player"))
     end)
@@ -83,5 +86,33 @@ describe("whether attaching is possible at all", function()
         env.PartyMemberFrame4 = nil
 
         assertTrue(ns.Anchors.Available())
+    end)
+end)
+
+describe("what exactly a row hangs off", function()
+    it("prefers the health bar to the frame around it", function()
+        -- A unit frame's rect runs past the art it draws, and the player
+        -- frame and the party frames do not overhang by the same amount.
+        -- Anchored to the frames, one offset put the player's icons snug
+        -- against the portrait and a party member's a frame-width out into
+        -- empty screen.
+        local ns, env = loggedIn()
+        assertEqual(env.PartyMemberFrame1HealthBar, ns.Anchors.For("party1"))
+    end)
+
+    it("falls back to the frame when there is no health bar on it", function()
+        local ns, env = loggedIn()
+        env.PartyMemberFrame1HealthBar = nil
+
+        assertEqual(env.PartyMemberFrame1, ns.Anchors.For("party1"))
+    end)
+
+    it("is absent when the frame is, whatever shares its name prefix", function()
+        -- The frame decides whether the unit has a usable anchor; the health
+        -- bar only refines where on it.
+        local ns, env = loggedIn()
+        env.PartyMemberFrame1 = nil
+
+        assertNil(ns.Anchors.For("party1"))
     end)
 end)
