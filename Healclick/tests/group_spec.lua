@@ -255,6 +255,72 @@ describe("the anchor", function()
         assertEqual(-200, y)
     end)
 
+    it("does not lose a reset deferred across a loading screen that swallows PLAYER_REGEN_ENABLED", function()
+        -- FIX 1: ApplyAll used to clear `pending` without repositioning.
+        -- PLAYER_ENTERING_WORLD's own direct ApplyAll call (in the watcher
+        -- below) was exactly such a clearer, so when it ran first, runPending
+        -- found `pending` already false and skipped the reposition entirely
+        -- -- the database said centred, the frame stayed put, and they
+        -- disagreed until the next reload. PLAYER_ENTERING_WORLD is the
+        -- fallback path for precisely the runs where PLAYER_REGEN_ENABLED
+        -- itself never arrives, so this defeated the deferral exactly when
+        -- it was most needed.
+        local ns, env = loggedIn()
+        local anchor = ns.Group.Anchor()
+        anchor:ClearAllPoints()
+        anchor:SetPoint("TOPLEFT", 120, -40)
+        ns.db.anchor.point, ns.db.anchor.x, ns.db.anchor.y = "TOPLEFT", 120, -40
+
+        env.__setCombat(true)
+        helpers.command(env, "reset")
+        assertTrue(ns.Group.Pending(), "the reposition is deferred")
+
+        -- Leave combat without firing PLAYER_REGEN_ENABLED -- the event this
+        -- fallback exists for losing across a loading screen.
+        env.__inCombat = false
+        helpers.fire(env, "PLAYER_ENTERING_WORLD")
+
+        local point, x, y = anchor:GetPoint(1)
+        assertEqual("CENTER", point, "the frame caught up with the database")
+        assertEqual(0, x)
+        assertEqual(-200, y)
+    end)
+
+    it("does not move the frame when PLAYER_ENTERING_WORLD itself arrives mid-fight", function()
+        -- FIX 2: repositionAnchor() inside runPending used to run unguarded,
+        -- unlike its siblings Group.Build and Group.ApplyAll, which re-check
+        -- InCombatLockdown themselves. PLAYER_ENTERING_WORLD can fire while
+        -- still in combat (a loading screen finishing mid-fight), and
+        -- SetPoint on the anchor moves every row of secure buttons hanging
+        -- off it -- exactly what the drag and reset guards exist to prevent.
+        local ns, env = loggedIn()
+        local anchor = ns.Group.Anchor()
+        anchor:ClearAllPoints()
+        anchor:SetPoint("TOPLEFT", 120, -40)
+        ns.db.anchor.point, ns.db.anchor.x, ns.db.anchor.y = "TOPLEFT", 120, -40
+
+        env.__setCombat(true)
+        helpers.command(env, "reset") -- arms a reposition
+        assertTrue(ns.Group.Pending())
+
+        -- Still in combat when PLAYER_ENTERING_WORLD fires.
+        helpers.fire(env, "PLAYER_ENTERING_WORLD")
+
+        local point, x, y = anchor:GetPoint(1)
+        assertEqual("TOPLEFT", point, "the frame must not move while still in combat")
+        assertEqual(120, x)
+        assertEqual(-40, y)
+        assertTrue(ns.Group.Pending(), "the reposition is still owed")
+
+        env.__setCombat(false)
+
+        point, x, y = anchor:GetPoint(1)
+        assertEqual("CENTER", point, "moved once combat actually ends")
+        assertEqual(0, x)
+        assertEqual(-200, y)
+        assertFalse(ns.Group.Pending())
+    end)
+
     it("toggles the lock on /hc lock", function()
         local ns, env = loggedIn()
         assertFalse(ns.db.bar.locked)

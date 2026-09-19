@@ -67,8 +67,15 @@ local function runPending()
         -- Covers a deferred /hc reset or drag-stop as well as a deferred
         -- ApplyAll: repositioning to whatever db.anchor already holds is a
         -- harmless no-op when nothing moved the anchor, and is exactly the
-        -- move a reset or drag needs when something did.
-        repositionAnchor()
+        -- move a reset or drag needs when something did. Guarded the same
+        -- way Group.Build and Group.ApplyAll guard themselves, unlike those
+        -- two this call had no check of its own: PLAYER_ENTERING_WORLD can
+        -- fire while still in combat (the whole reason it also calls this),
+        -- and SetPoint on the anchor moves every row of secure buttons
+        -- hanging off it.
+        if not (InCombatLockdown and InCombatLockdown()) then
+            repositionAnchor()
+        end
         Group.ApplyAll()
     end
 end
@@ -305,6 +312,12 @@ function Group.ApplyAll()
     end
 
     pending = false
+    -- This is the only place `pending` is ever cleared, so the reposition it
+    -- was guarding belongs here too -- not just in runPending -- or whichever
+    -- of ApplyAll's other callers (GROUP_ROSTER_UPDATE, a Slots.lua onChange,
+    -- a Row.lua assignment) happens to be the one that clears a pending
+    -- /hc reset or drag-stop discards it silently instead of performing it.
+    repositionAnchor()
     Group.Layout()
 
     for _, row in pairs(rows) do

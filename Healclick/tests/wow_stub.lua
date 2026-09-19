@@ -1,16 +1,18 @@
 -- A minimal stand-in for the WoW API, enough to load the addon outside the
 -- game. Widgets record what was done to them so tests can assert on it.
 --
--- The point of interest is SetAttribute. We can never test that Blizzard casts
--- the right spell; we can test that we asked it to.
+-- The point of interest is SetAttribute, SetPoint, SetSize, Show and Hide.
+-- We can never test that Blizzard casts the right spell, or actually moves a
+-- frame on screen; we can test that we asked it to, and that we refused to
+-- ask while a real client would have refused the ask outright.
 
 local stub = {}
 
 -- env is threaded through explicitly at every top-level creation site
 -- (UIParent, CreateFrame, SettingsPanel, GameMenuFrame below); a child
 -- widget (CreateTexture/CreateFontString further down) inherits its
--- parent's rather than needing every call site updated. SetAttribute is
--- the one thing here that needs it, to refuse the way the real client does
+-- parent's rather than needing every call site updated. refuseInCombat below
+-- is the thing here that needs it, to refuse the way the real client does
 -- when __inCombat is true.
 local function makeWidget(kind, parent, template, env)
     env = env or (parent and parent.__env)
@@ -39,7 +41,25 @@ local function makeWidget(kind, parent, template, env)
         focused = (kind == "EditBox"),
     }
 
-    function widget:SetPoint(...) table.insert(self.points, { ... }) end
+    -- Shared by every secure-adjacent write below (SetAttribute already had
+    -- its own copy of this check; SetPoint, SetSize, Show and Hide used to
+    -- have none at all). Raises, rather than silently no-op-ing or recording
+    -- a flag: the real client refuses these outright in combat, loudly
+    -- enough that an addon doing one anyway finds out immediately. A stub
+    -- that instead just accepted the call quietly would let exactly this
+    -- class of bug back in -- a frame move or a show/hide reachable from a
+    -- path the addon believed was combat-safe -- the same way a
+    -- too-permissive stub already has, more than once, on this branch.
+    local function refuseInCombat(self, name)
+        if self.__env and self.__env.__inCombat then
+            error("Interface action failed because of an AddOn (" .. name .. " blocked during combat lockdown)", 3)
+        end
+    end
+
+    function widget:SetPoint(...)
+        refuseInCombat(self, "SetPoint")
+        table.insert(self.points, { ... })
+    end
     function widget:ClearAllPoints() self.points = {} end
     function widget:SetAllPoints() end
     function widget:GetPoint(index)
@@ -51,10 +71,19 @@ local function makeWidget(kind, parent, template, env)
     function widget:GetWidth() return self.width end
     function widget:SetHeight(value) self.height = value end
     function widget:GetHeight() return self.height end
-    function widget:SetSize(w, h) self.width, self.height = w, h end
+    function widget:SetSize(w, h)
+        refuseInCombat(self, "SetSize")
+        self.width, self.height = w, h
+    end
 
-    function widget:Show() self.shown = true end
-    function widget:Hide() self.shown = false end
+    function widget:Show()
+        refuseInCombat(self, "Show")
+        self.shown = true
+    end
+    function widget:Hide()
+        refuseInCombat(self, "Hide")
+        self.shown = false
+    end
     function widget:SetShown(value) self.shown = value and true or false end
     function widget:IsShown() return self.shown end
 
@@ -101,20 +130,11 @@ local function makeWidget(kind, parent, template, env)
     function widget:HighlightText() end
     function widget:SetMaxLetters() end
 
-    -- The whole point. Secure attributes are what the client acts on, so the
-    -- tests assert on these rather than on anything happening.
-    --
-    -- Raises, rather than silently no-op-ing or recording a flag: the real
-    -- client refuses this outright in combat, loudly enough that an addon
-    -- calling it anyway finds out immediately. A stub that instead just
-    -- accepted the write quietly would let exactly this class of bug back
-    -- in -- a secure write reachable from a path the addon believed was
-    -- combat-safe -- the same way a too-permissive stub already has, more
-    -- than once, on this branch.
+    -- Secure attributes are what the client acts on, so the tests assert on
+    -- these rather than on anything happening. See refuseInCombat above for
+    -- why this raises instead of no-op-ing.
     function widget:SetAttribute(name, value)
-        if self.__env and self.__env.__inCombat then
-            error("Interface action failed because of an AddOn (SetAttribute blocked during combat lockdown)", 2)
-        end
+        refuseInCombat(self, "SetAttribute")
         self.attributes[name] = value
     end
     function widget:GetAttribute(name) return self.attributes[name] end
