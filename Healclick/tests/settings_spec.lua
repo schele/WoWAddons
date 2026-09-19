@@ -494,43 +494,6 @@ describe("what the picker will and will not offer", function()
     end)
 end)
 
-describe("closing the picker by clicking away", function()
-    local function opened(ns)
-        local control = controlFor(ns, "bar", "spells")
-        control.picks[1].scripts.OnClick(control.picks[1])
-        return ns.SettingsPanel.picker
-    end
-
-    it("closes when a click lands anywhere else", function()
-        local ns = loggedIn()
-        local picker = opened(ns)
-        assertTrue(picker:IsShown())
-
-        picker.catcher.scripts.OnMouseDown(picker.catcher)
-
-        assertFalse(picker:IsShown())
-    end)
-
-    it("covers the screen while the list is open", function()
-        local ns = loggedIn()
-        local picker = opened(ns)
-
-        assertTrue(picker.catcher:IsShown())
-    end)
-
-    it("stops covering it the moment the list closes, however it closed", function()
-        -- A catcher left showing would eat every click on the panel behind
-        -- it -- a worse bug than the one it exists to fix.
-        local ns = loggedIn()
-        local picker = opened(ns)
-
-        ns.SettingsPanel.Choose(1, nil)
-
-        assertFalse(picker:IsShown())
-        assertFalse(picker.catcher:IsShown(), "and lets clicks through again")
-    end)
-end)
-
 describe("slot rows following the button count", function()
     local function control(ns)
         return controlFor(ns, "bar", "spells")
@@ -628,50 +591,6 @@ describe("marking the spell a slot already holds", function()
     end)
 end)
 
-describe("a click aimed at the list reaching the list", function()
-    it("does not close when the cursor is over the list itself", function()
-        -- The catcher covers the whole screen. If it acts on a click that
-        -- landed on the list, the window closes and nothing is chosen --
-        -- which is exactly what it did.
-        local ns, env = helpers.loadAddon()
-        helpers.login(ns, env)
-        env.__learnSpells({ "Healing Touch" })
-        ns.SettingsPanel.EnsureBuilt()
-
-        local control = controlFor(ns, "bar", "spells")
-        control.picks[1].scripts.OnClick(control.picks[1])
-        local picker = ns.SettingsPanel.picker
-
-        env.__mouseOver = picker
-        picker.catcher.scripts.OnMouseDown(picker.catcher)
-
-        assertTrue(picker:IsShown(), "the click belongs to the list, not the catcher")
-    end)
-
-    it("still closes on a click that landed anywhere else", function()
-        local ns, env = helpers.loadAddon()
-        helpers.login(ns, env)
-        ns.SettingsPanel.EnsureBuilt()
-
-        local control = controlFor(ns, "bar", "spells")
-        control.picks[1].scripts.OnClick(control.picks[1])
-        local picker = ns.SettingsPanel.picker
-
-        env.__mouseOver = nil
-        picker.catcher.scripts.OnMouseDown(picker.catcher)
-
-        assertFalse(picker:IsShown())
-    end)
-
-    it("sits above the catcher by frame level, not strata alone", function()
-        local ns = loggedIn()
-        local control = controlFor(ns, "bar", "spells")
-        control.picks[1].scripts.OnClick(control.picks[1])
-        local picker = ns.SettingsPanel.picker
-
-        assertTrue(picker:GetFrameLevel() > picker.catcher:GetFrameLevel())
-    end)
-end)
 
 describe("the picker rows taking the mouse", function()
     -- A Button made without a template does not arrive mouse-enabled. It
@@ -700,5 +619,64 @@ describe("the picker rows taking the mouse", function()
         for _, button in ipairs(ns.SettingsPanel.picker.buttons) do
             assertEqual("HIGHLIGHT", button.highlight.drawLayer)
         end
+    end)
+end)
+
+describe("closing the picker by clicking away", function()
+    local function opened(ns)
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[1].scripts.OnClick(control.picks[1])
+        return ns.SettingsPanel.picker
+    end
+
+    it("closes on a click on the panel behind it", function()
+        -- The panel, not a frame stretched over the screen. A covering frame
+        -- has to be above everything to see a click and below the list so as
+        -- not to take one, and getting that wrong left the list taking no
+        -- clicks at all. The panel is the list's own ancestor, so the list is
+        -- always above it.
+        local ns = loggedIn()
+        local picker = opened(ns)
+        assertTrue(picker:IsShown())
+
+        local panel = ns.SettingsPanel.panel
+        panel.scripts.OnMouseDown(panel)
+
+        assertFalse(picker:IsShown())
+    end)
+
+    it("leaves nothing covering the screen behind it", function()
+        -- What the covering frame cost: while it was up, every click on the
+        -- panel went to it rather than to what was clicked.
+        local ns = loggedIn()
+        opened(ns)
+
+        assertNil(ns.SettingsPanel.picker.catcher)
+    end)
+
+    it("takes the mouse on the panel so the click has somewhere to land", function()
+        local ns = loggedIn()
+        opened(ns)
+
+        assertTrue(ns.SettingsPanel.panel.mouseEnabled)
+    end)
+end)
+
+describe("the picker rows answering a click", function()
+    it("asks for both edges, as the spell buttons do", function()
+        -- This client acts on the press where others act on the release.
+        -- Choosing hides the list, so the second pass finds nothing to click
+        -- and only one choice is ever made.
+        local ns = loggedIn()
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[1].scripts.OnClick(control.picks[1])
+
+        local registered = {}
+        for _, click in ipairs(ns.SettingsPanel.picker.buttons[1].clickRegistrations or {}) do
+            registered[click] = true
+        end
+
+        assertTrue(registered.AnyDown, "the press, which is what this client acts on")
+        assertTrue(registered.AnyUp)
     end)
 end)

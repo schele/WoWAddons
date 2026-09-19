@@ -217,6 +217,12 @@ local function ensurePicker()
         -- cause away. The Pick buttons work only because their template
         -- does this for them.
         button:EnableMouse(true)
+        -- Both edges, for the reason the spell buttons ask for both: this
+        -- client acts on the press where others act on the release, and a
+        -- button registered for only one of them can be given a pass it
+        -- will not act on. Choosing hides the list, so the second pass finds
+        -- nothing to click and only one choice is ever made.
+        button:RegisterForClicks("AnyUp", "AnyDown")
 
         -- Drawn rather than taken from Blizzard's highlight art: the client
         -- shows and hides the HIGHLIGHT layer on mouseover by itself, and a
@@ -257,42 +263,24 @@ local function ensurePicker()
         refreshPicker()
     end)
 
-    -- A screen-wide frame behind the list, so a click anywhere but on the
-    -- list closes it -- the way every menu behaves. One strata below the
-    -- list, so a click on the list itself reaches the list and not this.
-    local catcher = CreateFrame("Frame", nil, UIParent)
-    catcher:SetAllPoints(UIParent)
-    -- The same strata as the list, with the levels saying which is on top.
-    -- Levels are compared directly within a strata; across two strata the
-    -- ordering is by strata alone, which is a longer chain to get right for
-    -- no benefit here.
-    catcher:SetFrameStrata("FULLSCREEN_DIALOG")
-    catcher:SetFrameLevel(1)
-    picker:SetFrameLevel(20)
-    catcher:EnableMouse(true)
-    catcher:SetScript("OnMouseDown", function()
-        -- Asked rather than assumed. Which frame a click reaches depends on
-        -- strata and level resolving the way they are meant to, and when
-        -- they did not, this frame swallowed the click that was aimed at the
-        -- list: the window closed and nothing was chosen. Checking where the
-        -- cursor actually is makes that impossible however the two frames
-        -- end up ordered.
-        if picker:IsMouseOver() then
-            return
-        end
-
+    -- Closing on a click elsewhere, using the panel that is already behind
+    -- the list rather than a frame stretched over the screen to catch one.
+    --
+    -- A covering frame has to be above everything to see a click and below
+    -- the list so as not to take one, and there is no arrangement of strata
+    -- and level that is obviously both. Getting it wrong left the list
+    -- taking no clicks at all -- no hover either, since a frame the cursor
+    -- cannot reach has no mouseover. The panel cannot have that problem: it
+    -- is the list's own ancestor, so the list is always above it.
+    --
+    -- The cost is that a click outside the settings window no longer closes
+    -- the list. There is nothing outside the settings window to click while
+    -- it is open.
+    panel:EnableMouse(true)
+    panel:SetScript("OnMouseDown", function()
         picker:Hide()
     end)
-    catcher:Hide()
 
-    -- Tied to the list rather than hidden alongside it at each call site:
-    -- the list closes from four places, and a catcher left showing would
-    -- swallow every click on the panel behind it.
-    picker:SetScript("OnHide", function()
-        catcher:Hide()
-    end)
-
-    picker.catcher = catcher
     picker:Hide()
     Panel.picker = picker
 end
@@ -313,7 +301,6 @@ local function openPicker(slot, anchorTo)
     picker:ClearAllPoints()
     picker:SetPoint("TOPLEFT", anchorTo, "BOTTOMLEFT", 0, -2)
     refreshPicker()
-    picker.catcher:Show()
     picker:Show()
 end
 

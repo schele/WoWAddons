@@ -93,7 +93,7 @@ There are three ways to put a spell in a slot, and they store the same thing:
   offers every spell you know that can be cast on a friendly target, so
   passives, attacks and professions stay out of it — as does any spell
   another slot already holds, since two buttons casting the same thing is one
-  button wasted. Its first entry empties the slot. Click anywhere else to
+  button wasted. Its first entry empties the slot. Click the panel behind it to
   close the list without choosing. The same out-of-combat/mid-fight split as
   dragging applies here too.
 
