@@ -140,6 +140,25 @@ describe("layout", function()
 
         assertEqual(party1Y - (ns.Row.HEIGHT + 2), playerY, "no hole where party2-4 would have gone")
     end)
+
+    it("still lays out a unit whose UnitExists raises", function()
+        -- Same secret-value problem as Row.Refresh: the client can refuse to
+        -- let tainted code branch on a boolean it returned. Skipping a unit
+        -- we cannot check would withhold a row from someone who is present,
+        -- so unknown counts as present and all five slots get placed --
+        -- against the three the stub's default party would otherwise place.
+        local ns, env = loggedIn()
+        env.UnitExists = function() error("secret boolean value") end
+
+        local ok = pcall(ns.Group.Layout)
+
+        assertTrue(ok, "Layout must not propagate the raise")
+
+        local placedRows = 5
+        assertEqual(placedRows * ns.Row.HEIGHT + (placedRows - 1) * 2,
+            ns.Group.Anchor():GetHeight(),
+            "a unit we cannot check must still get a row")
+    end)
 end)
 
 describe("the anchor", function()

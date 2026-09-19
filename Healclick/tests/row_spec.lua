@@ -691,4 +691,19 @@ describe("refreshing a row on a client that treats a value as secret", function(
 
         assertTrue(ok, "Refresh must not propagate the raise")
     end)
+
+    it("fills the row in anyway when UnitExists raises", function()
+        -- Blanking a row for someone who is in fact standing there costs the
+        -- healer a player they could have clicked; filling one in for someone
+        -- who has left costs a stale name until the next roster event. So a
+        -- unit we cannot check at all reads as present.
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+        env.UnitExists = function() error("secret boolean value") end
+
+        local ok = pcall(ns.Row.Refresh, row)
+
+        assertTrue(ok, "Refresh must not propagate the raise")
+        assertTrue(row.name:GetText() ~= "", "the row must not blank itself")
+    end)
 end)

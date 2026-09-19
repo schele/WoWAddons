@@ -213,7 +213,7 @@ function Group.Layout()
 
     for _, unit in ipairs(Group.Units()) do
         local row = rows[unit]
-        if row and UnitExists(unit) then
+        if row and ns.Row.Exists(unit) then
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, y)
             y = y - (ns.Row.HEIGHT + ROW_GAP)

@@ -385,6 +385,22 @@ local function guarded(fn, whenUnknown)
     return whenUnknown
 end
 
+--- Whether `unit` is someone to draw a row for at all.
+--
+-- Guarded for the reason given above `guarded`, and note which reads need it:
+-- the client keeps *booleans* secret, not numbers. A secret number survives
+-- `x or 0` because a number is never falsy, so testing it reveals nothing;
+-- a boolean's truthiness is the whole of its value, which is exactly what
+-- the client is refusing to hand over. Every boolean return we branch on is
+-- therefore a candidate, not just the one that has crashed so far.
+--
+-- Unknown counts as present: a row drawn for someone who has left is a stale
+-- name until the next roster event, while a row withheld from someone
+-- standing there is a player the healer cannot click.
+function Row.Exists(unit)
+    return guarded(function() return not not UnitExists(unit) end, true)
+end
+
 --- Whether clicking a heal on `unit` could land. False only when we could
 -- affirmatively tell otherwise; anything we could not check at all reads as
 -- reachable -- wrongly dimming a row that could in fact be healed costs a
@@ -417,7 +433,7 @@ end
 function Row.Refresh(row)
     local unit = row.unit
 
-    if not UnitExists(unit) then
+    if not Row.Exists(unit) then
         row.name:SetText("")
         return
     end
