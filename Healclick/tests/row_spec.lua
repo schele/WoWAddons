@@ -234,6 +234,29 @@ describe("applying spells", function()
         )
     end)
 
+    it("gives back exactly the width of a button it stops showing", function()
+        -- 2 is Row.lua's own BUTTON_GAP, not exported. Measured as a
+        -- difference rather than against a computed total, so this says what
+        -- it means -- a hidden button costs the row its own width -- without
+        -- restating Row.WIDTH's arithmetic and agreeing with itself.
+        local ns, env = loggedIn()
+        ns.db.bar.slots = 3
+        ns.Slots.Set(1, "Regrowth")
+        ns.Slots.Set(2, "Rejuvenation")
+        ns.Slots.Set(3, "Remove Curse")
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+        local threeButtons = row:GetWidth()
+
+        ns.Slots.Set(2, "Tranquility")
+        ns.Row.ApplySpells(row)
+
+        assertEqual(
+            threeButtons - (row.buttons[1]:GetWidth() + 2),
+            row:GetWidth()
+        )
+    end)
+
     it("hides the icon for an empty slot", function()
         local ns, env = loggedIn()
         local row = ns.Row.Create("party1", env.UIParent)

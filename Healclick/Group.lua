@@ -113,7 +113,7 @@ local function createAnchor()
     -- Real height comes from Group.Layout, which always runs right after
     -- this (from Build); this starting size only matters for the instant
     -- before that first Layout call.
-    anchor:SetSize(ns.Row.WIDTH, ns.Row.HEIGHT)
+    anchor:SetSize(ns.Row.CurrentWidth(), ns.Row.HEIGHT)
 
     local background = anchor:CreateTexture(nil, "BACKGROUND")
     background:SetAllPoints()
@@ -225,7 +225,13 @@ function Group.Layout()
     -- it is actually holding -- placed, not #Group.Units() -- or dragging
     -- would be grabbing a strip sized for rows that are not there.
     local rowCount = math.max(placed, 1)
-    anchor:SetSize(ns.Row.WIDTH, rowCount * ns.Row.HEIGHT + (rowCount - 1) * ROW_GAP)
+    -- Width from what the rows are showing, not from the slot maximum: the
+    -- anchor is the visible backdrop as well as the drag handle, so sized to
+    -- the maximum it would trail empty space past the last icon.
+    anchor:SetSize(
+        ns.Row.CurrentWidth(),
+        rowCount * ns.Row.HEIGHT + (rowCount - 1) * ROW_GAP
+    )
 end
 
 function Group.RefreshAll()
@@ -283,8 +289,17 @@ watcher:RegisterEvent("PLAYER_FLAGS_CHANGED")
 watcher:RegisterEvent("GROUP_ROSTER_UPDATE")
 watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
 watcher:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+watcher:RegisterEvent("SPELLS_CHANGED")
 
 watcher:SetScript("OnEvent", function(_, event, unit)
+    if event == "SPELLS_CHANGED" then
+        -- Which buttons exist at all depends on what the player knows, so
+        -- learning a spell changes the bar's shape -- and its width. ApplyAll
+        -- is what redraws both, and holds it for combat to end if it has to.
+        Group.ApplyAll()
+        return
+    end
+
     if event == "SPELL_UPDATE_COOLDOWN" then
         -- Carries no unit, and wants none: this is the one event here that
         -- is about the player's spells rather than about somebody's health.

@@ -117,8 +117,34 @@ describe("layout", function()
         local placedRows = 3
         local expectedHeight = placedRows * ns.Row.HEIGHT + (placedRows - 1) * 2
 
-        assertEqual(ns.Row.WIDTH, anchor:GetWidth())
+        assertEqual(
+            helpers.rowFor(ns, "player"):GetWidth(),
+            anchor:GetWidth(),
+            "the backdrop must match the rows sitting on it, not the slot maximum"
+        )
         assertEqual(expectedHeight, anchor:GetHeight())
+    end)
+
+    it("narrows the anchor when a slot stops showing a button", function()
+        local ns = loggedIn()
+        ns.db.bar.slots = 2
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.Slots.Set(2, "Regrowth")
+        ns.Group.ApplyAll()
+        local twoButtons = ns.Group.Anchor():GetWidth()
+
+        -- Not a spell this player has learned, so it loses its button.
+        ns.Slots.Set(2, "Tranquility")
+        ns.Group.ApplyAll()
+
+        assertTrue(
+            ns.Group.Anchor():GetWidth() < twoButtons,
+            "the backdrop must give back the space the hidden button held"
+        )
+        assertEqual(
+            helpers.rowFor(ns, "player"):GetWidth(),
+            ns.Group.Anchor():GetWidth()
+        )
     end)
 
     it("lays your row directly under the last present party member, leaving no hole, when selfBottom is on", function()
@@ -376,6 +402,22 @@ describe("keeping the rows current", function()
                 helpers.rowFor(ns, unit).buttons[1].cooldown:GetCooldownTimes()
             assertEqual(1.5, duration, unit .. " must sweep too")
         end
+    end)
+
+    it("gives a spell its button back the moment the player learns it", function()
+        -- Which buttons exist depends on what the player knows, so the bar
+        -- changes shape on levelling up. Without this the slot would sit
+        -- empty until the next roster change or reload.
+        local ns, env = loggedIn()
+        ns.db.bar.slots = 1
+        ns.Slots.Set(1, "Tranquility")
+        ns.Group.ApplyAll()
+        assertFalse(helpers.rowFor(ns, "player").buttons[1]:IsShown())
+
+        env.__spells["Tranquility"] = true
+        helpers.fire(env, "SPELLS_CHANGED")
+
+        assertTrue(helpers.rowFor(ns, "player").buttons[1]:IsShown())
     end)
 
     it("sweeps a spell that was already on cooldown when it was assigned", function()

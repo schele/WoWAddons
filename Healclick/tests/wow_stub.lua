@@ -67,9 +67,18 @@ local function makeWidget(kind, parent, template, env)
         if point then return table.unpack(point) end
     end
 
-    function widget:SetWidth(value) self.width = value end
+    -- Guarded like SetSize below: resizing a protected frame is refused in
+    -- combat whichever call does it, and a stub that let one of the three
+    -- through would hide exactly the bug the other two are here to catch.
+    function widget:SetWidth(value)
+        refuseInCombat(self, "SetWidth")
+        self.width = value
+    end
     function widget:GetWidth() return self.width end
-    function widget:SetHeight(value) self.height = value end
+    function widget:SetHeight(value)
+        refuseInCombat(self, "SetHeight")
+        self.height = value
+    end
     function widget:GetHeight() return self.height end
     function widget:SetSize(w, h)
         refuseInCombat(self, "SetSize")

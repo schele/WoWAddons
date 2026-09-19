@@ -20,9 +20,20 @@ local BUTTONS_START = NAME_WIDTH + BAR_WIDTH + PADDING * 3
 
 Row.HEIGHT = BUTTON_SIZE + 2
 
--- The last button's right edge, not one gap further -- there is no gap after
--- the final button, only between buttons.
-Row.WIDTH = BUTTONS_START + ns.Slots.MAX * (BUTTON_SIZE + BUTTON_GAP) - BUTTON_GAP
+--- How wide a row must be to carry `count` buttons: everything up to the
+-- button strip, then the strip. It reaches the last button's right edge and
+-- no further -- there is no gap after the final button, only between two.
+local function widthFor(count)
+    if count < 1 then
+        return BUTTONS_START
+    end
+    return BUTTONS_START + count * (BUTTON_SIZE + BUTTON_GAP) - BUTTON_GAP
+end
+
+-- The widest a row can ever be, which is what Group's layout arithmetic is
+-- checked against. What a row actually measures is Row.CurrentWidth below,
+-- and it is usually narrower.
+Row.WIDTH = widthFor(ns.Slots.MAX)
 
 -- How far a row fades when clicking it would achieve nothing.
 local DIM = 0.35
@@ -31,6 +42,32 @@ local DIM = 0.35
 -- the player knows the spell but the icon lookup came back empty, so that a
 -- client with no texture API costs the picture rather than the button.
 local UNKNOWN_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+
+--- Whether a slot's spell earns a button. A slot past the configured count
+-- has no spell as far as its caller is concerned, so one test covers both
+-- reasons a button might not appear.
+local function hasButton(spell)
+    return spell ~= nil and ns.Spells.IsKnown(spell)
+end
+
+--- How many buttons a row shows: the configured slots, less any holding a
+-- spell this player has not learned yet. ApplySpells counts the same thing
+-- as it goes; this answers it for callers that need the number before a row
+-- has been through it -- Group, sizing the frame the rows sit on.
+function Row.VisibleCount()
+    local shown = 0
+    for index = 1, ns.Slots.Count() do
+        if hasButton(ns.Slots.Spell(index)) then
+            shown = shown + 1
+        end
+    end
+    return shown
+end
+
+--- How wide a row measures as things currently stand.
+function Row.CurrentWidth()
+    return widthFor(Row.VisibleCount())
+end
 
 --- Store a spell in a slot and apply it -- the body shared by a drag-and-drop
 -- and a click-to-place assignment (see Row.Create), so the two paths cannot
@@ -99,7 +136,7 @@ end)
 --- Build one unit's row. Called once per unit, at login, out of combat.
 function Row.Create(unit, parent)
     local row = CreateFrame("Frame", "HealclickRow" .. unit, parent)
-    row:SetSize(Row.WIDTH, Row.HEIGHT)
+    row:SetSize(Row.CurrentWidth(), Row.HEIGHT)
     row.unit = unit
 
     -- Blizzard decides whether this row is on screen, via RegisterUnitWatch,
@@ -323,7 +360,7 @@ function Row.ApplySpells(row)
         -- reports one it cannot check as having no icon. Deciding on the
         -- icon would empty the whole bar on a client with no texture API,
         -- which is the one outcome that leaves a healer nothing to click.
-        if spell and ns.Spells.IsKnown(spell) then
+        if hasButton(spell) then
             button:SetAttribute("spell", spell)
 
             button.icon:SetTexture(ns.Spells.Texture(spell) or UNKNOWN_ICON)
@@ -353,6 +390,12 @@ function Row.ApplySpells(row)
             button:Hide()
         end
     end
+
+    -- Narrowed to what is actually on it, so the frame behind the row stops
+    -- where the last button does. Safe for the same reason every other
+    -- write here is: ApplySpells only ever runs out of combat, and resizing
+    -- a frame the client is watching is refused in it.
+    row:SetWidth(widthFor(shown))
 end
 
 --- Call `fn` and return what it returns, or `whenUnknown` if it raises.
