@@ -179,6 +179,11 @@ describe("the spell table", function()
 
         local box = controlFor(ns, "bar", "spells").boxes[6]
         ns.SettingsPanel.Refresh()
+        -- Boxes start unfocused since Fix 4 (Settings.lua's ClearFocus at
+        -- build time); without simulating the player having clicked into
+        -- this one first, OnEscapePressed's own ClearFocus() is a no-op and
+        -- the reverting guard below is never actually exercised.
+        box:SetFocus()
 
         box:SetText("Regrowth")
         local before = helpers.printed(env)

@@ -6,11 +6,20 @@
 
 local stub = {}
 
-local function makeWidget(kind, parent, template)
+-- env is threaded through explicitly at every top-level creation site
+-- (UIParent, CreateFrame, SettingsPanel, GameMenuFrame below); a child
+-- widget (CreateTexture/CreateFontString further down) inherits its
+-- parent's rather than needing every call site updated. SetAttribute is
+-- the one thing here that needs it, to refuse the way the real client does
+-- when __inCombat is true.
+local function makeWidget(kind, parent, template, env)
+    env = env or (parent and parent.__env)
+
     local widget = {
         kind = kind,
         parent = parent,
         template = template,
+        __env = env,
         points = {},
         scripts = {},
         registeredEvents = {},
@@ -94,7 +103,20 @@ local function makeWidget(kind, parent, template)
 
     -- The whole point. Secure attributes are what the client acts on, so the
     -- tests assert on these rather than on anything happening.
-    function widget:SetAttribute(name, value) self.attributes[name] = value end
+    --
+    -- Raises, rather than silently no-op-ing or recording a flag: the real
+    -- client refuses this outright in combat, loudly enough that an addon
+    -- calling it anyway finds out immediately. A stub that instead just
+    -- accepted the write quietly would let exactly this class of bug back
+    -- in -- a secure write reachable from a path the addon believed was
+    -- combat-safe -- the same way a too-permissive stub already has, more
+    -- than once, on this branch.
+    function widget:SetAttribute(name, value)
+        if self.__env and self.__env.__inCombat then
+            error("Interface action failed because of an AddOn (SetAttribute blocked during combat lockdown)", 2)
+        end
+        self.attributes[name] = value
+    end
     function widget:GetAttribute(name) return self.attributes[name] end
 
     function widget:SetAlpha(value) self.alpha = value end
@@ -162,7 +184,7 @@ function stub.newEnv()
     env.__inCombat = false
     env._G = env
 
-    env.UIParent = makeWidget("Frame")
+    env.UIParent = makeWidget("Frame", nil, nil, env)
     env.SlashCmdList = {}
     env.OKAY = "Okay"
 
@@ -175,7 +197,7 @@ function stub.newEnv()
     end
 
     function env.CreateFrame(kind, name, parent, template)
-        local frame = makeWidget(kind or "Frame", parent, template)
+        local frame = makeWidget(kind or "Frame", parent, template, env)
         frame.frameName = name
         table.insert(env.__frames, frame)
         if name then env[name] = frame end
@@ -332,8 +354,8 @@ function stub.newEnv()
     end
 
     -- Settings -------------------------------------------------------------
-    env.SettingsPanel = makeWidget("Frame")
-    env.GameMenuFrame = makeWidget("Frame")
+    env.SettingsPanel = makeWidget("Frame", nil, nil, env)
+    env.GameMenuFrame = makeWidget("Frame", nil, nil, env)
     function env.HideUIPanel(frame) if frame and frame.Hide then frame:Hide() end end
 
     env.Settings = {

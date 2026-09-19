@@ -270,14 +270,33 @@ function Row.Create(unit, parent)
         end)
 
         button:SetScript("PostClick", function(self)
+            if InCombatLockdown and InCombatLockdown() then
+                -- Belt-and-braces: PreClick already refuses to stash
+                -- anything while in combat, so this should be unreachable
+                -- from any path the addon itself takes. Clearing the stash
+                -- here regardless (not just returning) is what stops this
+                -- guard from stranding the exact bug it exists to prevent;
+                -- neither the attribute restore nor the assignment below may
+                -- run either way, since both are secure writes the client
+                -- refuses outright in combat.
+                self.pendingAssign = nil
+                return
+            end
+
             if not self.pendingAssign then
                 return
             end
 
             local name = self.pendingAssign
+            -- Cleared before the call below, not after: assignSpellToSlot
+            -- has five call sites (Slots.Set, ClearCursor, Group.ApplyAll,
+            -- SettingsPanel.Refresh, Print), four of them reaching real
+            -- client widgets. If any of them throws, the stash must not
+            -- survive to be found -- and acted on -- by a later, unrelated
+            -- click, possibly one that lands mid-fight.
+            self.pendingAssign = nil
             self:SetAttribute("type", "spell")
             assignSpellToSlot(self.slot, name)
-            self.pendingAssign = nil
         end)
 
         button:Hide()
@@ -296,6 +315,16 @@ function Row.ApplySpells(row)
     for index = 1, ns.Slots.MAX do
         local button = row.buttons[index]
         local spell = index <= count and ns.Slots.Spell(index) or nil
+
+        -- Reasserted on every call, not assumed to still hold from
+        -- creation: PreClick's click-suppression trick (above) nils this
+        -- out for the span of one click, and if PostClick were ever to
+        -- leave it that way -- a stranded stash from a bug, present or
+        -- future -- this is what recovers it, since some ApplyAll follows
+        -- shortly after anything that could go wrong. Safe here because
+        -- ApplySpells, like every secure write in this file, only ever runs
+        -- out of combat.
+        button:SetAttribute("type", "spell")
 
         if spell then
             button:SetAttribute("spell", spell)

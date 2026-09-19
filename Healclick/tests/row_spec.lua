@@ -199,6 +199,33 @@ describe("applying spells", function()
             table.concat(row.buttons[1].icon.texCoord, ", ")
         )
     end)
+
+    -- PreClick's click-suppression trick nils `type` out for the span of one
+    -- click. If PostClick ever left it that way -- a stranded stash, present
+    -- or future -- a button that can never cast again is the worst outcome
+    -- this addon has, and every ApplyAll is a free chance to notice and fix it.
+    it("restores a stranded type attribute on a slot holding a spell", function()
+        local ns, env = loggedIn()
+        ns.Slots.Set(1, "Regrowth")
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+
+        row.buttons[1]:SetAttribute("type", nil)
+        ns.Row.ApplySpells(row)
+
+        assertEqual("spell", helpers.attrs(row.buttons[1]).type)
+    end)
+
+    it("restores a stranded type attribute on an empty slot too", function()
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+
+        row.buttons[1]:SetAttribute("type", nil)
+        ns.Row.ApplySpells(row)
+
+        assertEqual("spell", helpers.attrs(row.buttons[1]).type)
+    end)
 end)
 
 describe("dropping a spell onto a button", function()
@@ -343,6 +370,62 @@ describe("clicking a spell onto a button", function()
 
         assertEqual(firstCount, secondCount, "the warning must not print a second time")
         assertEqual("spell", button:GetAttribute("type"))
+    end)
+
+    it("clears the stash even if the shared assignment throws, before a later combat click can exploit it", function()
+        local ns, env = loggedInWithGroup()
+        local row = helpers.rowFor(ns, "party1")
+        local button = row.buttons[3]
+        -- Slot 7 is "Tranquility", unlearned, so assignSpellToSlot reaches
+        -- its last call site, ns.Print(message) -- the one this test makes
+        -- throw. Everything before it (Slots.Set, ClearCursor, ApplyAll,
+        -- SettingsPanel.Refresh) has already run by the time it fires.
+        env.__cursor = { "spell", 7, "spell" }
+
+        button.scripts.PreClick(button)
+        assertEqual("Tranquility", button.pendingAssign)
+
+        local originalPrint = env.print
+        env.print = function() error("boom") end
+
+        local ok = pcall(button.scripts.PostClick, button)
+        env.print = originalPrint
+
+        assertFalse(ok, "the forced error must actually have propagated out of PostClick")
+        assertNil(button.pendingAssign, "the stash must not survive the throw")
+        assertEqual("Tranquility", ns.Slots.Spell(3), "Slots.Set itself had already run before the throw")
+
+        -- A later, ordinary click landing mid-fight must find nothing left
+        -- to exploit: no attribute write, no assignment.
+        env.__setCombat(true)
+        env.__cursor = nil
+        local typeBefore = button:GetAttribute("type")
+
+        button.scripts.PreClick(button)
+        button.scripts.PostClick(button)
+
+        assertEqual(typeBefore, button:GetAttribute("type"), "no attribute write happened")
+        assertEqual("Tranquility", ns.Slots.Spell(3), "no further assignment ran")
+    end)
+
+    it("PostClick's own combat guard refuses to act, and still clears the stash", function()
+        -- Contrived: PreClick already refuses to stash anything while in
+        -- combat, so PostClick should never see a stash and be in combat at
+        -- the same time from any path the addon itself takes. It must not
+        -- lean on that alone.
+        local ns, env = loggedInWithGroup()
+        local row = helpers.rowFor(ns, "party1")
+        local button = row.buttons[2]
+
+        button.pendingAssign = "Regrowth"
+        env.__setCombat(true)
+        local typeBefore = button:GetAttribute("type")
+
+        button.scripts.PostClick(button)
+
+        assertEqual(typeBefore, button:GetAttribute("type"), "no attribute write in combat")
+        assertNil(button.pendingAssign, "the stash is cleared regardless")
+        assertEqual("Rejuvenation", ns.Slots.Spell(2), "no assignment ran")
     end)
 end)
 
