@@ -98,7 +98,7 @@ Built against Classic Era 1.15.x (`11509`) and the 1.60.x Classic beta
 |---|---|
 | Buttons per player | How many slots each row shows, 1 to 8 |
 | Put my row at the bottom | Whether you sit above the party or below it |
-| Spells | One row per slot. Type a spell's name, or drag a spell from your spellbook onto the matching button instead |
+| Spells | One row per slot. Type a spell's name, or drag a spell from your spellbook onto any button in that slot instead (see "Icons, and assigning spells" above) |
 | Lock the frame | Stops the bar being dragged by accident |
 
 Slots are seeded with a starting set the first time you log in, for four
