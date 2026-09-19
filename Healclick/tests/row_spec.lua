@@ -707,3 +707,28 @@ describe("refreshing a row on a client that treats a value as secret", function(
         assertTrue(row.name:GetText() ~= "", "the row must not blank itself")
     end)
 end)
+
+describe("which clicks a spell button asks for", function()
+    it("registers for the button going down as well as coming up", function()
+        -- Registered for "AnyUp" alone, these buttons did not cast at all.
+        -- In-game tracing showed why: every hook fired, and the attributes
+        -- read type=spell spell=Rejuvenation unit=player at click time, but
+        -- only ever with down=false. The client performs the action on the
+        -- press, not the release, so a button that never asks for the press
+        -- hands the secure handler nothing it will act on.
+        --
+        -- The stub cannot reproduce that refusal -- it has no secure
+        -- handler -- so this asserts the registration itself, which is the
+        -- part that was wrong and the part a later tidy-up would undo.
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        local registered = {}
+        for _, click in ipairs(row.buttons[1].clickRegistrations or {}) do
+            registered[click] = true
+        end
+
+        assertTrue(registered.AnyDown, "must ask for the press, which is what casts")
+        assertTrue(registered.AnyUp, "and keep the release, for clients that act on it")
+    end)
+end)

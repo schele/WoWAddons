@@ -99,7 +99,11 @@ local function makeWidget(kind, parent, template, env)
 
     function widget:RegisterEvent(event) self.registeredEvents[event] = true end
     function widget:UnregisterEvent(event) self.registeredEvents[event] = nil end
-    function widget:RegisterForClicks() end
+    -- Recorded because which click types a secure button asks for decides
+    -- whether it casts at all. The stub cannot model the client's own
+    -- refusal to act on the wrong edge, so the registration is the only
+    -- thing a test can hold on to. See row_spec.
+    function widget:RegisterForClicks(...) self.clickRegistrations = { ... } end
     -- Recorded, not ignored: row_spec asserts a button never calls this,
     -- since RegisterForDrag is for STARTING a drag and this addon only ever
     -- receives one (see Row.Create's OnReceiveDrag).

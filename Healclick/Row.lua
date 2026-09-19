@@ -243,7 +243,17 @@ function Row.Create(unit, parent)
             BUTTONS_START + (index - 1) * (BUTTON_SIZE + BUTTON_GAP),
             0
         )
-        button:RegisterForClicks("AnyUp")
+        -- Both edges, and the press is the one that matters. Registered for
+        -- "AnyUp" alone these buttons silently refused to cast: tracing a
+        -- click in game showed OnMouseDown, OnMouseUp, PreClick and PostClick
+        -- all firing, with type=spell spell=Rejuvenation unit=player read
+        -- correctly at click time -- and always down=false. The client
+        -- performs a secure action on the press, so a button that only asks
+        -- for the release never gives it a pass it will act on. The release
+        -- stays registered because a client configured the other way acts on
+        -- that one instead, and the spare pass costs nothing: it finds an
+        -- empty cursor and falls straight through.
+        button:RegisterForClicks("AnyUp", "AnyDown")
 
         -- Fires on any mouse press the frame receives, whether or not that
         -- press is a click type this button is registered for -- which is
