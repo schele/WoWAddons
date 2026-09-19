@@ -43,6 +43,56 @@ local DIM = 0.35
 -- client with no texture API costs the picture rather than the button.
 local UNKNOWN_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
+-- The gold Blizzard's own selection art is drawn in, and how thick the
+-- outline reads at this button size.
+local HOVER_R, HOVER_G, HOVER_B = 1, 0.82, 0
+local HOVER_THICKNESS = 2
+
+--- Outline a button in gold, shown only while the cursor is over it.
+--
+-- Four solid edges in the HIGHLIGHT draw layer. The client shows and hides
+-- that layer on mouseover by itself, so there is no OnEnter or OnLeave to
+-- write, nothing left lit if the cursor leaves oddly, and nothing to toggle
+-- mid-fight -- which matters, because showing and hiding a secure button's
+-- own pieces is exactly what the client refuses in combat.
+--
+-- Drawn from colour fills rather than one of Blizzard's highlight textures
+-- because a texture path this client turns out not to have fails silently:
+-- nothing draws, and nothing says why. This client family has already been
+-- found missing two spell APIs the addon expected, so art it is asked for
+-- is not something to take on trust either.
+local function addHoverFrame(button)
+    local function edge()
+        local texture = button:CreateTexture(nil, "HIGHLIGHT")
+        texture:SetColorTexture(HOVER_R, HOVER_G, HOVER_B)
+        return texture
+    end
+
+    -- Each edge is pinned to two corners, so the frame follows the button's
+    -- size rather than restating it.
+    local top = edge()
+    top:SetPoint("TOPLEFT")
+    top:SetPoint("TOPRIGHT")
+    top:SetHeight(HOVER_THICKNESS)
+
+    local bottom = edge()
+    bottom:SetPoint("BOTTOMLEFT")
+    bottom:SetPoint("BOTTOMRIGHT")
+    bottom:SetHeight(HOVER_THICKNESS)
+
+    local left = edge()
+    left:SetPoint("TOPLEFT")
+    left:SetPoint("BOTTOMLEFT")
+    left:SetWidth(HOVER_THICKNESS)
+
+    local right = edge()
+    right:SetPoint("TOPRIGHT")
+    right:SetPoint("BOTTOMRIGHT")
+    right:SetWidth(HOVER_THICKNESS)
+
+    button.hoverFrame = { top, bottom, left, right }
+end
+
 --- Whether a slot's spell earns a button. A slot past the configured count
 -- has no spell as far as its caller is concerned, so one test covers both
 -- reasons a button might not appear.
@@ -220,12 +270,7 @@ function Row.Create(unit, parent)
         button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
         button.icon:Hide()
 
-        -- The action bar's own hover highlight, so these buttons light up
-        -- under the cursor the way the ones beside them do. The client draws
-        -- it; there is no OnEnter or OnLeave to write, and nothing to undo
-        -- when the cursor leaves. ADD blends it as a glow over the icon
-        -- rather than laying an opaque square on top of it.
-        button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+        addHoverFrame(button)
 
         -- Blizzard's own cooldown widget, so the sweep is the one the action
         -- bars draw and the client animates it for us; all we ever hand it is

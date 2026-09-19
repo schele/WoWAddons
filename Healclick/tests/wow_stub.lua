@@ -205,8 +205,12 @@ local function makeWidget(kind, parent, template, env)
     end
     function widget:SetHideCountdownNumbers() end
 
-    function widget:CreateTexture()
+    -- The draw layer is recorded because it is not merely cosmetic: the
+    -- client shows and hides anything in the HIGHLIGHT layer on mouseover by
+    -- itself, so the layer is the whole of how a hover effect works.
+    function widget:CreateTexture(name, layer)
         local texture = makeWidget("Texture", self)
+        texture.drawLayer = layer
         table.insert(self.children, texture)
         return texture
     end
