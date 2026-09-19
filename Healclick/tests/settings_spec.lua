@@ -46,6 +46,39 @@ describe("the panel", function()
 
         assertEqual("category-id", env.__openedCategory)
     end)
+
+    -- Opening the panel this way leaves the client queued to fall back to the
+    -- game menu when it closes, which is not where the player came from.
+    it("does not leave the game menu behind when it closes", function()
+        local ns, env = loggedIn()
+
+        ns.OpenSettings()
+        env.SettingsPanel.scripts.OnHide(env.SettingsPanel)
+
+        -- The client would show the game menu as part of closing our panel;
+        -- the backstop C_Timer.After queued above is what turns it away.
+        env.__runTimers()
+
+        assertFalse(env.GameMenuFrame:IsShown(), "turned away before a frame was drawn")
+    end)
+
+    it("leaves the game menu alone when the player opened it themselves", function()
+        local ns, env = loggedIn()
+
+        -- Open and close once through our own command, so the hook is set up
+        -- and that close has already settled.
+        ns.OpenSettings()
+        env.SettingsPanel.scripts.OnHide(env.SettingsPanel)
+        env.__runTimers()
+
+        -- Now the panel is reached through the game menu instead: closing it
+        -- must not touch the game menu, because openedByUs is false this time.
+        env.GameMenuFrame:Show()
+        env.SettingsPanel.scripts.OnHide(env.SettingsPanel)
+        env.__runTimers()
+
+        assertTrue(env.GameMenuFrame:IsShown(), "left where the client put it")
+    end)
 end)
 
 describe("the slot count slider", function()
@@ -99,5 +132,41 @@ describe("the spell table", function()
 
         ns.SettingsPanel.Refresh()
         assertEqual("Regrowth", controlFor(ns, "bar", "spells").boxes[4]:GetText())
+    end)
+
+    -- OnEnterPressed and OnEditFocusLost used to both be bound to the same
+    -- store function, and store ended by clearing its own focus -- which the
+    -- client turns straight back into an OnEditFocusLost. One Enter press ran
+    -- the store logic twice.
+    it("stores exactly once when Enter is pressed", function()
+        local ns, env = loggedIn()
+        local box = controlFor(ns, "bar", "spells").boxes[5]
+
+        box:SetText("Tranquility")
+        box.scripts.OnEnterPressed(box)
+
+        local _, count = helpers.printed(env):gsub("Tranquility", "Tranquility")
+        assertEqual(1, count, "the unlearned-spell warning printed exactly once")
+    end)
+
+    -- Escape's own revert-then-ClearFocus used to trigger the very store
+    -- logic it was trying to avoid, so opening a row that already holds an
+    -- unlearned spell and pressing Escape without changing anything spammed
+    -- the warning and reapplied for no reason.
+    it("discards an edit and prints nothing when Escape is pressed", function()
+        local ns, env = loggedIn()
+        ns.Slots.Set(6, "Tranquility")
+
+        local box = controlFor(ns, "bar", "spells").boxes[6]
+        ns.SettingsPanel.Refresh()
+
+        box:SetText("Regrowth")
+        local before = helpers.printed(env)
+
+        box.scripts.OnEscapePressed(box)
+
+        assertEqual("Tranquility", box:GetText(), "reverted to what was stored")
+        assertEqual("Tranquility", ns.Slots.Spell(6), "the typed edit was discarded")
+        assertEqual(before, helpers.printed(env), "no warning printed for the discarded edit")
     end)
 end)

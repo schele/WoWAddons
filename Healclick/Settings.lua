@@ -104,7 +104,16 @@ local function addSpellTable(setting, y)
         box:SetSize(180, BOX_HEIGHT - 4)
         box:SetAutoFocus(false)
 
+        -- Set while Escape reverts the text and lets go of focus, so the
+        -- OnEditFocusLost that ClearFocus() triggers as a side effect does
+        -- not re-store the value Escape just discarded.
+        local reverting = false
+
         local function store()
+            if reverting then
+                return
+            end
+
             local ok, message = ns.Slots.Set(index, box:GetText())
             if not ok then
                 ns.Print(message or "That slot does not exist.")
@@ -112,17 +121,24 @@ local function addSpellTable(setting, y)
                 ns.Print(message)
             end
 
-            box:ClearFocus()
             if setting.onChange then
                 setting.onChange()
             end
         end
 
-        box:SetScript("OnEnterPressed", store)
+        -- ClearFocus() itself fires OnEditFocusLost, which is where storing
+        -- happens. Binding store to OnEnterPressed too would run it twice for
+        -- one Enter press; ForeverPanel's key table splits the two for the
+        -- same reason.
+        box:SetScript("OnEnterPressed", function(self)
+            self:ClearFocus()
+        end)
         box:SetScript("OnEditFocusLost", store)
-        box:SetScript("OnEscapePressed", function()
-            box:SetText(ns.Slots.Spell(index) or "")
-            box:ClearFocus()
+        box:SetScript("OnEscapePressed", function(self)
+            reverting = true
+            self:SetText(ns.Slots.Spell(index) or "")
+            self:ClearFocus()
+            reverting = false
         end)
 
         boxes[index] = box

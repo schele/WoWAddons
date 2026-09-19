@@ -24,6 +24,10 @@ local function makeWidget(kind, parent, template)
         value = 0,
         minValue = 0,
         maxValue = 1,
+        -- An EditBox grabs focus as it comes into existence in the real
+        -- client, same as ForeverPanel's stub documents; that starting state
+        -- is what lets ClearFocus() fire OnEditFocusLost on the first call.
+        focused = (kind == "EditBox"),
     }
 
     function widget:SetPoint(...) table.insert(self.points, { ... }) end
@@ -67,7 +71,20 @@ local function makeWidget(kind, parent, template)
     function widget:SetJustifyH() end
     function widget:SetNormalTexture() end
     function widget:SetAutoFocus(value) self.autoFocus = value and true or false end
-    function widget:ClearFocus() self.focused = false end
+
+    -- Only a real focused -> unfocused transition fires the script, the way
+    -- the client does. Without that check, a handler that calls ClearFocus
+    -- on itself (as OnEditFocusLost's store logic must not) would recurse
+    -- forever instead of running exactly once.
+    function widget:ClearFocus()
+        if not self.focused then
+            return
+        end
+        self.focused = false
+        local handler = self.scripts.OnEditFocusLost
+        if handler then handler(self) end
+    end
+
     function widget:SetFocus() self.focused = true end
     function widget:HighlightText() end
     function widget:SetMaxLetters() end
