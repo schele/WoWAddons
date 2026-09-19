@@ -184,6 +184,7 @@ local function makeWidget(kind, parent, template, env)
     function widget:SetTexture(value) self.texture = value end
     function widget:GetTexture() return self.texture end
     function widget:SetTexCoord(...) self.texCoord = { ... } end
+    function widget:SetVertexColor(r, g, b, a) self.vertexColor = { r, g, b, a } end
 
     -- Recorded as plain fields rather than behind a getter: the real
     -- GetHighlightTexture hands back a Texture object, not the path, so a
@@ -351,6 +352,12 @@ function stub.newEnv()
     --       { startTime = 100, duration = 1.5, isEnabled = true }
     env.__spellCooldowns = {}
 
+    -- Which spells can reach which units, keyed "<spell>:<unit>". A pair
+    -- absent here reads as nil, the client's own way of saying it will not
+    -- answer -- which is the common case and must never dim anything.
+    --   env.__spellRanges["Rejuvenation:party1"] = false
+    env.__spellRanges = {}
+
     -- A numeric spellID -> name lookup, standing in for the shape some
     -- clients hand GetCursorInfo back with for a spellbook drag.
     env.__spellIDs = {
@@ -392,6 +399,10 @@ function stub.newEnv()
         -- difference is the whole reason Spells.Cooldown exists.
         GetSpellCooldown = function(name)
             return env.__spellCooldowns[name]
+        end,
+        -- A boolean, where the old global returned 1, 0 or nil.
+        IsSpellInRange = function(name, unit)
+            return env.__spellRanges[tostring(name) .. ":" .. tostring(unit)]
         end,
     }
 

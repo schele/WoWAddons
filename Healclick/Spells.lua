@@ -146,3 +146,43 @@ function Spells.Cooldown(spellName)
 
     return nil
 end
+
+--- Whether `spellName` can currently reach `unit`: true, false, or nil when
+-- this client will not say.
+--
+-- Per spell rather than per unit. UnitInRange answers for the unit as a
+-- whole, which is both less useful -- a 40 yard heal and a melee-range
+-- debuff do not have the same reach -- and, on this client, unavailable:
+-- its answer comes back as a secret value that tainted code may not inspect.
+-- The same may well be true here, so the call and the branch on its result
+-- both sit inside ns.Guarded.
+--
+-- nil means "cannot tell" and is deliberately distinct from false. Telling a
+-- healer a spell is out of reach when it is not costs them a cast they had.
+function Spells.InRange(spellName, unit)
+    if type(spellName) ~= "string" or spellName == "" or not unit then
+        return nil
+    end
+
+    return ns.Guarded(function()
+        if C_Spell and C_Spell.IsSpellInRange then
+            local result = C_Spell.IsSpellInRange(spellName, unit)
+            if result == nil then
+                return nil
+            end
+            return result and true or false
+        end
+
+        if IsSpellInRange then
+            -- 1 or 0, never a boolean. 0 is truthy in Lua, so it has to be
+            -- compared rather than tested.
+            local result = IsSpellInRange(spellName, unit)
+            if result == nil then
+                return nil
+            end
+            return result == 1 or result == true
+        end
+
+        return nil
+    end, nil)
+end

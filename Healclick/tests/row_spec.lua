@@ -799,3 +799,59 @@ describe("the cooldown sweep on a button", function()
         assertTrue(ok, "and refreshing must not trip over its absence")
     end)
 end)
+
+describe("dimming an icon its spell cannot reach", function()
+    local function armed(env, ns, spells)
+        ns.db.bar.slots = #spells
+        for index, spell in ipairs(spells) do
+            ns.Slots.Set(index, spell)
+        end
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+        return row
+    end
+
+    it("dims the icon of a spell that cannot reach the unit", function()
+        local ns, env = loggedIn()
+        local row = armed(env, ns, { "Rejuvenation" })
+        env.__spellRanges["Rejuvenation:party1"] = false
+
+        ns.Row.Refresh(row)
+
+        assertTrue(row.buttons[1].icon.vertexColor[1] < 1)
+    end)
+
+    it("leaves an icon at full colour when the spell reaches", function()
+        local ns, env = loggedIn()
+        local row = armed(env, ns, { "Rejuvenation" })
+        env.__spellRanges["Rejuvenation:party1"] = true
+
+        ns.Row.Refresh(row)
+
+        assertEqual(1, row.buttons[1].icon.vertexColor[1])
+    end)
+
+    it("leaves an icon alone when the client will not say", function()
+        local ns, env = loggedIn()
+        local row = armed(env, ns, { "Rejuvenation" })
+
+        ns.Row.Refresh(row)
+
+        assertEqual(1, row.buttons[1].icon.vertexColor[1])
+    end)
+
+    it("judges each spell separately, not the row as a whole", function()
+        -- Spells differ in reach, which is the whole reason this is not the
+        -- row-wide fade that dead and offline get -- those make every spell
+        -- useless at once, and being out of reach does not.
+        local ns, env = loggedIn()
+        local row = armed(env, ns, { "Rejuvenation", "Mark of the Wild" })
+        env.__spellRanges["Rejuvenation:party1"] = true
+        env.__spellRanges["Mark of the Wild:party1"] = false
+
+        ns.Row.Refresh(row)
+
+        assertEqual(1, row.buttons[1].icon.vertexColor[1])
+        assertTrue(row.buttons[2].icon.vertexColor[1] < 1)
+    end)
+end)

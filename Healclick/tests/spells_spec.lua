@@ -190,3 +190,57 @@ describe("reading a spell's cooldown", function()
         assertNil(ns.Spells.Cooldown(nil))
     end)
 end)
+
+describe("asking whether a spell can reach a unit", function()
+    it("reports a spell in range", function()
+        local ns, env = loggedIn()
+        env.__spellRanges["Rejuvenation:party1"] = true
+        assertTrue(ns.Spells.InRange("Rejuvenation", "party1"))
+    end)
+
+    it("reports a spell out of range", function()
+        local ns, env = loggedIn()
+        env.__spellRanges["Rejuvenation:party1"] = false
+        assertFalse(ns.Spells.InRange("Rejuvenation", "party1"))
+    end)
+
+    it("falls back to the old global, which answered 1 and 0", function()
+        local ns, env = loggedIn()
+        env.C_Spell.IsSpellInRange = nil
+
+        env.IsSpellInRange = function() return 1 end
+        assertTrue(ns.Spells.InRange("Rejuvenation", "party1"))
+
+        env.IsSpellInRange = function() return 0 end
+        assertFalse(ns.Spells.InRange("Rejuvenation", "party1"),
+            "0 is truthy in Lua, so passing it through would read as in range")
+    end)
+
+    it("says nothing, rather than out of range, when the client will not answer", function()
+        -- nil is "cannot tell", and must never dim: telling a healer a spell
+        -- is out of reach when it is not costs them a cast they had.
+        local ns = loggedIn()
+        assertNil(ns.Spells.InRange("Rejuvenation", "party1"))
+    end)
+
+    it("says nothing when neither API exists", function()
+        local ns, env = loggedIn()
+        env.C_Spell.IsSpellInRange = nil
+        assertNil(ns.Spells.InRange("Rejuvenation", "party1"))
+    end)
+
+    it("says nothing when the client keeps the answer secret", function()
+        -- UnitInRange already does exactly this, which is what took the
+        -- original range dimming away. The per-spell call may well go the
+        -- same way, so it is asked for behind the same guard.
+        local ns, env = loggedIn()
+        env.C_Spell.IsSpellInRange = function() error("secret boolean value") end
+        assertNil(ns.Spells.InRange("Rejuvenation", "party1"))
+    end)
+
+    it("says nothing for a missing spell or unit", function()
+        local ns = loggedIn()
+        assertNil(ns.Spells.InRange("", "party1"))
+        assertNil(ns.Spells.InRange("Rejuvenation", nil))
+    end)
+end)

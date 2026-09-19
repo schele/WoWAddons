@@ -43,6 +43,9 @@ Row.WIDTH = widthFor(ns.Slots.MAX)
 -- How far a row fades when clicking it would achieve nothing.
 local DIM = 0.35
 
+-- How far an icon darkens when its own spell cannot reach this row's unit.
+local RANGE_DIM = 0.4
+
 -- Blizzard's own stand-in for a spell it will not draw. Reached only when
 -- the player knows the spell but the icon lookup came back empty, so that a
 -- client with no texture API costs the picture rather than the button.
@@ -410,32 +413,11 @@ function Row.ApplySpells(row)
     row:SetWidth(widthFor(shown))
 end
 
---- Call `fn` and return what it returns, or `whenUnknown` if it raises.
---
--- Some clients hand tainted code (ours) a "secret" value: the API call that
--- produced it succeeds, but the client refuses to let addon code inspect
--- the result afterwards -- comparing it, or testing its truthiness, raises
--- "attempt to perform boolean test on ... a secret ... value". Which
--- particular return is secret varies by client build and by how the call
--- was reached, so every place below that branches on one of these values is
--- routed through here, in one place, rather than guarded ad hoc.
---
--- `fn` must both make the call and perform the branch that can raise, not
--- just fetch a value for the caller to test afterwards -- in the game it is
--- the branch that raises, the call having already succeeded. Routing both
--- through the same pcall is also what makes this testable at all: Lua has
--- no way to construct a value that raises when its truthiness is checked,
--- so a test instead makes the stubbed API call itself raise. Both failure
--- shapes land in this same pcall, so the fallback path is exercised even
--- though the exact in-game trigger (a secret value, not a raising call)
--- cannot be reproduced.
-local function guarded(fn, whenUnknown)
-    local ok, result = pcall(fn)
-    if ok then
-        return result
-    end
-    return whenUnknown
-end
+
+-- The secret-value guard lives in Healclick.lua, beside the explanation of
+-- what a secret value is and why a branch on one has to be wrapped. Spells.lua
+-- needs the same guard, so there is one of it rather than one per file.
+local guarded = ns.Guarded
 
 --- Whether `unit` is someone to draw a row for at all.
 --
@@ -506,6 +488,33 @@ function Row.RefreshCooldowns(row)
     end
 end
 
+--- Darken the icon of any spell that cannot reach this row's unit.
+--
+-- Per button, not per row. Spells differ in reach, so fading the whole row
+-- would be answering a question nobody asked -- and the row-wide fade is
+-- already spoken for by dead and offline, which make every spell on the row
+-- useless at once. Being out of reach of one of them does not.
+--
+-- Anything the client declines to answer leaves the icon at full colour. A
+-- healer told a spell is out of reach when it is not loses a cast they had,
+-- which is worse than never dimming at all.
+function Row.RefreshRange(row)
+    for index = 1, ns.Slots.MAX do
+        local button = row.buttons[index]
+        local spell = button:GetAttribute("spell")
+
+        if spell then
+            -- Compared against false rather than tested, because nil here
+            -- means "cannot tell" and must not dim.
+            if ns.Spells.InRange(spell, row.unit) == false then
+                button.icon:SetVertexColor(RANGE_DIM, RANGE_DIM, RANGE_DIM)
+            else
+                button.icon:SetVertexColor(1, 1, 1)
+            end
+        end
+    end
+end
+
 --- Name, colour, health and the dim state. Touches nothing secure, so this is
 -- safe at any time, including mid-fight when it matters most.
 function Row.Refresh(row)
@@ -544,4 +553,6 @@ function Row.Refresh(row)
     -- stop the hand before it does that. See Row.Reachable above for why
     -- each check behind this is guarded rather than tested plainly.
     row:SetAlpha(Row.Reachable(unit) and 1 or DIM)
+
+    Row.RefreshRange(row)
 end

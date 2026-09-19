@@ -34,6 +34,33 @@ function ns.Print(message)
     print(string.format("%s %s", ns.PREFIX, message))
 end
 
+--- Call `fn` and return what it returns, or `whenUnknown` if it raises.
+--
+-- Some clients hand tainted code (ours) a "secret" value: the API call that
+-- produced it succeeds, but the client refuses to let addon code inspect the
+-- result afterwards -- comparing it, or testing its truthiness, raises
+-- "attempt to perform boolean test on ... a secret ... value". Which
+-- particular return is secret varies by client build and by how the call was
+-- reached, so every branch on one of these values in this addon is routed
+-- through here, in one place, rather than guarded ad hoc.
+--
+-- `fn` must both make the call and perform the branch that can raise, not
+-- just fetch a value for the caller to test afterwards -- in the game it is
+-- the branch that raises, the call having already succeeded. Routing both
+-- through the same pcall is also what makes this testable at all: Lua has no
+-- way to construct a value that raises when its truthiness is checked, so a
+-- test instead makes the stubbed API call itself raise. Both failure shapes
+-- land in this same pcall, so the fallback path is exercised even though the
+-- exact in-game trigger (a secret value, not a raising call) cannot be
+-- reproduced.
+function ns.Guarded(fn, whenUnknown)
+    local ok, result = pcall(fn)
+    if ok then
+        return result
+    end
+    return whenUnknown
+end
+
 -- Settings registry. A file declares the config it owns, and Settings.lua
 -- renders what it finds.
 local settings = {}
