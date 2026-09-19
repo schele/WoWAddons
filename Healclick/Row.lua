@@ -158,6 +158,45 @@ local function assignSpellToSlot(slot, name)
     end
 end
 
+-- Diagnostic scaffolding, off unless `/hc debug` turns it on.
+--
+-- A secure button that will not cast gives nothing away from outside the
+-- game: the client's handler reads the attributes, then either acts or
+-- silently declines, and logs neither. These hooks bracket that moment so a
+-- single click says where it stopped.
+--
+--   OnMouseDown fires whenever the frame receives the mouse at all.
+--   PreClick fires only once the click matches RegisterForClicks and OnClick
+--   runs -- the same instant the secure handler reads `type`.
+--
+-- So neither line printing means the mouse never reached the button; the
+-- first without the second means the click arrived but was not a registered
+-- click type; both printing, with the attributes reading correctly, means
+-- the handler itself declined.
+local debugging = false
+
+local function debugClick(button, stage, detail)
+    if not debugging then
+        return
+    end
+
+    ns.Print(string.format(
+        "%s slot %s (%s) type=%s spell=%s unit=%s",
+        stage,
+        tostring(button.slot),
+        tostring(detail),
+        tostring(button:GetAttribute("type")),
+        tostring(button:GetAttribute("spell")),
+        tostring(button:GetAttribute("unit"))
+    ))
+end
+
+ns.RegisterCommand("debug", "Trace what happens when a button is clicked", function()
+    debugging = not debugging
+    ns.Print(debugging and "Click tracing on. Click a spell button."
+        or "Click tracing off.")
+end)
+
 --- Build one unit's row. Called once per unit, at login, out of combat.
 function Row.Create(unit, parent)
     local row = CreateFrame("Frame", "HealclickRow" .. unit, parent)
@@ -205,6 +244,18 @@ function Row.Create(unit, parent)
             0
         )
         button:RegisterForClicks("AnyUp")
+
+        -- Fires on any mouse press the frame receives, whether or not that
+        -- press is a click type this button is registered for -- which is
+        -- exactly what separates "the mouse never got here" from "the click
+        -- got here and was not one we asked for". See debugClick above.
+        button:SetScript("OnMouseDown", function(self, mouseButton)
+            debugClick(self, "OnMouseDown", mouseButton)
+        end)
+
+        button:SetScript("OnMouseUp", function(self, mouseButton)
+            debugClick(self, "OnMouseUp", mouseButton)
+        end)
 
         -- The two attributes that are written once and never again. Blizzard
         -- will not let us re-point a secure button in combat, so we never try:
@@ -255,7 +306,10 @@ function Row.Create(unit, parent)
         -- stash left over from this one.
         button.pendingAssign = nil
 
-        button:SetScript("PreClick", function(self)
+        button:SetScript("PreClick", function(self, mouseButton, down)
+            debugClick(self, "PreClick", string.format("%s down=%s",
+                tostring(mouseButton), tostring(down)))
+
             if InCombatLockdown and InCombatLockdown() then
                 -- SetAttribute is refused outright in combat, even to nil
                 -- `type` out for a single click, so a click mid-fight is left
@@ -276,7 +330,10 @@ function Row.Create(unit, parent)
             self:SetAttribute("type", nil)
         end)
 
-        button:SetScript("PostClick", function(self)
+        button:SetScript("PostClick", function(self, mouseButton, down)
+            debugClick(self, "PostClick", string.format("%s down=%s",
+                tostring(mouseButton), tostring(down)))
+
             if InCombatLockdown and InCombatLockdown() then
                 -- Belt-and-braces: PreClick already refuses to stash
                 -- anything while in combat, so this should be unreachable
