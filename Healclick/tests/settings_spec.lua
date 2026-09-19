@@ -526,3 +526,145 @@ describe("closing the picker by clicking away", function()
         assertFalse(picker.catcher:IsShown(), "and lets clicks through again")
     end)
 end)
+
+describe("slot rows following the button count", function()
+    local function control(ns)
+        return controlFor(ns, "bar", "spells")
+    end
+
+    it("shows a row for each button the bar is set to", function()
+        local ns = loggedIn()
+        ns.db.bar.slots = 4
+        ns.SettingsPanel.Refresh()
+
+        assertTrue(control(ns).slotRows[4]:IsShown())
+        assertTrue(control(ns).picks[4]:IsShown())
+    end)
+
+    it("hides the rows past it, Pick button and number with them", function()
+        -- A slot past the count has nowhere to appear on the bar, so
+        -- offering to fill it is offering nothing.
+        local ns = loggedIn()
+        ns.db.bar.slots = 4
+        ns.SettingsPanel.Refresh()
+
+        assertFalse(control(ns).slotRows[5]:IsShown())
+        assertFalse(control(ns).picks[5]:IsShown())
+    end)
+
+    it("brings rows back as the slider is dragged up", function()
+        local ns = loggedIn()
+        ns.db.bar.slots = 4
+        ns.SettingsPanel.Refresh()
+        assertFalse(control(ns).picks[6]:IsShown())
+
+        controlFor(ns, "bar", "slots").widget:SetValue(6)
+
+        assertTrue(control(ns).picks[6]:IsShown(), "the panel keeps up with the slider")
+        assertFalse(control(ns).picks[7]:IsShown())
+    end)
+
+    it("survives the slider refreshing itself without looping", function()
+        -- The slider's Refresh sets its own value, the client answers with
+        -- OnValueChanged, and that onChange refreshes the panel again.
+        local ns = loggedIn()
+
+        local ok = pcall(ns.SettingsPanel.Refresh)
+
+        assertTrue(ok, "a refresh must not start another that never ends")
+    end)
+end)
+
+describe("marking the spell a slot already holds", function()
+    local function openOn(ns, slot)
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[slot].scripts.OnClick(control.picks[slot])
+        return ns.SettingsPanel.picker
+    end
+
+    local function entryFor(picker, name)
+        for _, button in ipairs(picker.buttons) do
+            if button:IsShown() and button.label:GetText() == name then
+                return button
+            end
+        end
+    end
+
+    it("highlights the slot's current spell in the list", function()
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+        env.__learnSpells({ "Healing Touch", "Rejuvenation" })
+        ns.SettingsPanel.EnsureBuilt()
+        -- Emptied first: the seed fills slots 1-4, and a spell another slot
+        -- holds is not offered, so Rejuvenation would not be in the list to
+        -- check against.
+        for index = 1, ns.Slots.MAX do
+            ns.Slots.Set(index, "")
+        end
+        ns.Slots.Set(1, "Healing Touch")
+
+        local picker = openOn(ns, 1)
+
+        assertTrue(entryFor(picker, "Healing Touch").selected:IsShown())
+        assertFalse(entryFor(picker, "Rejuvenation").selected:IsShown())
+    end)
+
+    it("marks nothing when the slot is empty", function()
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+        env.__learnSpells({ "Healing Touch" })
+        ns.SettingsPanel.EnsureBuilt()
+        ns.Slots.Set(1, "")
+
+        local picker = openOn(ns, 1)
+
+        assertFalse(entryFor(picker, "Healing Touch").selected:IsShown())
+        assertFalse(entryFor(picker, "(empty this slot)").selected:IsShown(),
+            "emptying a slot is an action, not a thing a slot holds")
+    end)
+end)
+
+describe("a click aimed at the list reaching the list", function()
+    it("does not close when the cursor is over the list itself", function()
+        -- The catcher covers the whole screen. If it acts on a click that
+        -- landed on the list, the window closes and nothing is chosen --
+        -- which is exactly what it did.
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+        env.__learnSpells({ "Healing Touch" })
+        ns.SettingsPanel.EnsureBuilt()
+
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[1].scripts.OnClick(control.picks[1])
+        local picker = ns.SettingsPanel.picker
+
+        env.__mouseOver = picker
+        picker.catcher.scripts.OnMouseDown(picker.catcher)
+
+        assertTrue(picker:IsShown(), "the click belongs to the list, not the catcher")
+    end)
+
+    it("still closes on a click that landed anywhere else", function()
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+        ns.SettingsPanel.EnsureBuilt()
+
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[1].scripts.OnClick(control.picks[1])
+        local picker = ns.SettingsPanel.picker
+
+        env.__mouseOver = nil
+        picker.catcher.scripts.OnMouseDown(picker.catcher)
+
+        assertFalse(picker:IsShown())
+    end)
+
+    it("sits above the catcher by frame level, not strata alone", function()
+        local ns = loggedIn()
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[1].scripts.OnClick(control.picks[1])
+        local picker = ns.SettingsPanel.picker
+
+        assertTrue(picker:GetFrameLevel() > picker.catcher:GetFrameLevel())
+    end)
+end)

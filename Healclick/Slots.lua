@@ -125,6 +125,11 @@ ns.RegisterSetting({
     step = 1,
     onChange = function()
         if ns.Group then ns.Group.ApplyAll() end
+        -- The count decides how many slot rows the panel shows, so the panel
+        -- has to redraw itself as the slider moves. Panel.Refresh guards
+        -- against the loop this would otherwise make with the slider's own
+        -- Refresh.
+        if ns.SettingsPanel then ns.SettingsPanel.Refresh() end
     end,
 })
 

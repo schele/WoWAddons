@@ -127,6 +127,11 @@ local function makeWidget(kind, parent, template, env)
     function widget:RegisterForDrag(...) self.dragRegistered = { ... } end
     function widget:EnableMouse() end
     function widget:EnableMouseWheel() end
+    -- Driven by a test: env.__mouseOver = someFrame. The real answer depends
+    -- on where the cursor is, which a test has no way to arrange.
+    function widget:IsMouseOver() return self.__env.__mouseOver == self end
+    function widget:SetFrameLevel(value) self.frameLevel = value end
+    function widget:GetFrameLevel() return self.frameLevel or 1 end
     function widget:SetMovable() end
     function widget:StartMoving() self.moving = true end
     function widget:StopMovingOrSizing() self.moving = false end

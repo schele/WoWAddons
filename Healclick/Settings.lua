@@ -148,6 +148,14 @@ local function refreshPicker()
                 button.icon:Hide()
             end
 
+            -- The slot's current spell, marked in the list it was picked
+            -- from, so opening the list says what the slot already holds
+            -- rather than making the player remember.
+            button.selected:SetShown(
+                button.spellName ~= nil
+                and button.spellName == ns.Slots.Spell(picker.slot)
+            )
+
             button:Show()
         else
             button:Hide()
@@ -210,6 +218,15 @@ local function ensurePicker()
         highlight:SetAllPoints()
         highlight:SetColorTexture(1, 1, 1, 0.2)
 
+        -- Below the icon and label, above the list's own backing. Gold
+        -- rather than white so it reads as a selection and not as the
+        -- mouseover highlight above, which the cursor may be sitting on at
+        -- the same moment.
+        button.selected = button:CreateTexture(nil, "BACKGROUND")
+        button.selected:SetAllPoints()
+        button.selected:SetColorTexture(1, 0.82, 0, 0.3)
+        button.selected:Hide()
+
         button.icon = button:CreateTexture(nil, "ARTWORK")
         button.icon:SetSize(BOX_HEIGHT - 8, BOX_HEIGHT - 8)
         button.icon:SetPoint("LEFT", 2, 0)
@@ -237,9 +254,25 @@ local function ensurePicker()
     -- list, so a click on the list itself reaches the list and not this.
     local catcher = CreateFrame("Frame", nil, UIParent)
     catcher:SetAllPoints(UIParent)
-    catcher:SetFrameStrata("FULLSCREEN")
+    -- The same strata as the list, with the levels saying which is on top.
+    -- Levels are compared directly within a strata; across two strata the
+    -- ordering is by strata alone, which is a longer chain to get right for
+    -- no benefit here.
+    catcher:SetFrameStrata("FULLSCREEN_DIALOG")
+    catcher:SetFrameLevel(1)
+    picker:SetFrameLevel(20)
     catcher:EnableMouse(true)
     catcher:SetScript("OnMouseDown", function()
+        -- Asked rather than assumed. Which frame a click reaches depends on
+        -- strata and level resolving the way they are meant to, and when
+        -- they did not, this frame swallowed the click that was aimed at the
+        -- list: the window closed and nothing was chosen. Checking where the
+        -- cursor actually is makes that impossible however the two frames
+        -- end up ordered.
+        if picker:IsMouseOver() then
+            return
+        end
+
         picker:Hide()
     end)
     catcher:Hide()
@@ -289,6 +322,7 @@ local function addSpellTable(setting, y, x)
     local rows = setting.rows or 8
     local slotRows = {}
     local picks = {}
+    local numbers = {}
 
     local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     heading:SetPoint("TOPLEFT", x, y)
@@ -300,6 +334,7 @@ local function addSpellTable(setting, y, x)
         local number = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
         number:SetPoint("TOPLEFT", x, top - 4)
         number:SetText(tostring(index))
+        numbers[index] = number
 
         -- The spell's own icon and name, not an edit box. Picking is the
         -- only way into a slot now, so there is nothing left to type into --
@@ -338,9 +373,20 @@ local function addSpellTable(setting, y, x)
         picks = picks,
         height = ROW_HEIGHT + rows * BOX_HEIGHT,
         Refresh = function()
+            local count = ns.Slots.Count()
+
             for index = 1, rows do
                 local spell = ns.Slots.Spell(index)
                 local slotRow = slotRows[index]
+
+                -- A slot past the button count has nowhere to appear on the
+                -- bar, so offering to fill it is offering nothing. Hidden
+                -- rather than greyed: the count is right there above, and a
+                -- shorter list says what it means.
+                local inUse = index <= count
+                slotRow:SetShown(inUse)
+                picks[index]:SetShown(inUse)
+                numbers[index]:SetShown(inUse)
 
                 slotRow.label:SetText(spell or "")
 
@@ -356,10 +402,23 @@ local function addSpellTable(setting, y, x)
     }
 end
 
+-- Guards against a refresh that starts another. A slider's Refresh sets its
+-- own value, the client answers that with OnValueChanged, and that runs the
+-- setting's onChange -- which for the button count has to refresh the panel,
+-- since changing it shows and hides whole rows. Without this the two would
+-- call each other until the stack ran out.
+local refreshing = false
+
 function Panel.Refresh()
+    if refreshing then
+        return
+    end
+
+    refreshing = true
     for _, control in ipairs(Panel.controls) do
         control.Refresh()
     end
+    refreshing = false
 end
 
 local function ensureBuilt()
