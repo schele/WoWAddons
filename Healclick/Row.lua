@@ -10,8 +10,13 @@ ns.Row = Row
 local NAME_WIDTH = 70
 local BAR_WIDTH = 120
 local BUTTON_SIZE = 22
-local BUTTON_GAP = 2
+local BUTTON_GAP = 4
 local PADDING = 4
+
+-- Exported because the row's width, the gap a hidden button gives back and
+-- Group's own arithmetic all have to agree on it, and because a test that
+-- restates it as a literal stops agreeing the moment it changes.
+Row.BUTTON_GAP = BUTTON_GAP
 
 -- Where the button strip begins: past the name, the bar, and a PADDING gap
 -- after each. Create and WIDTH both anchor on this so they cannot drift

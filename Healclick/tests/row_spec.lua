@@ -209,8 +209,7 @@ describe("applying spells", function()
 
     it("closes the gap a hidden slot leaves, rather than laying out around it", function()
         -- Buttons are created at a fixed offset per slot index, so a hidden
-        -- slot in the middle would otherwise leave a hole. 2 is Row.lua's own
-        -- BUTTON_GAP, not exported.
+        -- slot in the middle would otherwise leave a hole.
         local ns, env = loggedIn()
         ns.db.bar.slots = 3
         ns.Slots.Set(1, "Regrowth")
@@ -225,7 +224,7 @@ describe("applying spells", function()
         local _, firstX = row.buttons[1]:GetPoint()
         local _, thirdX = row.buttons[3]:GetPoint()
         assertEqual(
-            row.buttons[1]:GetWidth() + 2,
+            row.buttons[1]:GetWidth() + ns.Row.BUTTON_GAP,
             thirdX - firstX,
             "slot 3 must sit where slot 2 would have been"
         )
@@ -253,10 +252,10 @@ describe("applying spells", function()
     end)
 
     it("gives back exactly the width of a button it stops showing", function()
-        -- 2 is Row.lua's own BUTTON_GAP, not exported. Measured as a
-        -- difference rather than against a computed total, so this says what
-        -- it means -- a hidden button costs the row its own width -- without
-        -- restating Row.WIDTH's arithmetic and agreeing with itself.
+        -- Measured as a difference rather than against a computed total, so
+        -- this says what it means -- a hidden button costs the row its own
+        -- width -- without restating Row.WIDTH's arithmetic and agreeing
+        -- with itself.
         local ns, env = loggedIn()
         ns.db.bar.slots = 3
         ns.Slots.Set(1, "Regrowth")
@@ -270,7 +269,7 @@ describe("applying spells", function()
         ns.Row.ApplySpells(row)
 
         assertEqual(
-            threeButtons - (row.buttons[1]:GetWidth() + 2),
+            threeButtons - (row.buttons[1]:GetWidth() + ns.Row.BUTTON_GAP),
             row:GetWidth()
         )
     end)
