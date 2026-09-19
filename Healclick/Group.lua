@@ -25,6 +25,11 @@ ns.AddDefaults({
 local anchor
 local rows = {}
 
+-- Set when Build was asked for during combat and could not run. Row.Create
+-- writes secure attributes the same way ApplySpells does, so the whole build
+-- -- not just the spells -- has to wait for the fight to end.
+local buildPending = false
+
 --- The five units in display order. A function rather than a constant,
 -- because where your own row sits is the player's choice.
 function Group.Units()
@@ -76,12 +81,26 @@ local function createAnchor()
     end)
 end
 
---- Build the anchor and one row per unit. Once, at login, out of combat.
+--- Build the anchor and one row per unit. Out of combat only: Row.Create's
+-- SetAttribute is refused mid-fight the same as anything ApplyAll queues,
+-- and PLAYER_LOGIN genuinely can fire while the player is fighting -- a
+-- /reload during a pull, or reconnecting after a disconnect mid-fight.
+-- Returns true once the rows exist (now, or from an earlier call), false
+-- when the build was held for later -- the same contract as ApplyAll.
 function Group.Build()
     if anchor then
-        return
+        return true
     end
 
+    if InCombatLockdown and InCombatLockdown() then
+        buildPending = true
+        return false
+    end
+
+    -- Cleared only here, after the check above: creating the anchor is what
+    -- satisfies the guard just above it, so it must not happen until we know
+    -- the row loop below is actually about to run.
+    buildPending = false
     createAnchor()
 
     -- Every unit gets a row, including ones nobody is standing in. They are
@@ -97,6 +116,7 @@ function Group.Build()
     end
 
     Group.Layout()
+    return true
 end
 
 --- Stack the rows under the anchor, in the configured order.
@@ -165,12 +185,69 @@ watcher:SetScript("OnEvent", function(_, event, unit)
     end
 end)
 
+-- Nothing secure may be written in combat: not a spell attribute, not showing
+-- or hiding a button, not moving a row, because moving a row moves the secure
+-- buttons inside it. Rather than attempt it and put an error in the player's
+-- face, hold the change and do it the moment the fight ends. ForeverPanel's
+-- ChatKeys.Apply holds its bindings the same way.
+local pending = false
+
+function Group.Pending()
+    return pending
+end
+
+--- Write every row's spells and re-stack the rows.
+-- Returns true when it happened, false when it was held for later.
+function Group.ApplyAll()
+    if not anchor then
+        return false
+    end
+
+    if InCombatLockdown and InCombatLockdown() then
+        pending = true
+        return false
+    end
+
+    pending = false
+    Group.Layout()
+
+    for _, row in pairs(rows) do
+        ns.Row.ApplySpells(row)
+    end
+
+    return true
+end
+
+local combatWatcher = CreateFrame("Frame")
+combatWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+combatWatcher:SetScript("OnEvent", function()
+    -- A build owed from login outranks the spells: there is nothing to apply
+    -- them to until the rows it was waiting to create actually exist.
+    if buildPending then
+        Group.Build()
+    end
+
+    if pending then
+        Group.ApplyAll()
+    end
+end)
+
 ns.OnLogin(function()
     local _, class = UnitClass("player")
     ns.Slots.Seed(class)
 
-    Group.Build()
-    Group.RefreshAll()
+    -- Build can be held by combat. When it is, Rows() is still empty, so
+    -- applying spells or refreshing would either quietly do nothing (and be
+    -- forgotten -- ApplyAll only remembers to retry once it has already been
+    -- asked while anchor exists) or, for RefreshAll, just no-op on an empty
+    -- table. Queue both behind the build instead, so the regen-enabled
+    -- handler above carries them out once the rows are real.
+    if Group.Build() then
+        Group.ApplyAll()
+        Group.RefreshAll()
+    else
+        pending = true
+    end
 
     if C_Timer and C_Timer.NewTicker then
         C_Timer.NewTicker(RANGE_INTERVAL, Group.RefreshAll)
