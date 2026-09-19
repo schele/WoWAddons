@@ -247,16 +247,23 @@ function stub.newEnv()
     -- A test staging a UI without them -- raid-style party frames are on, or
     -- a unit-frame addon has replaced them -- clears the ones it cares about:
     --   env.PlayerFrame = nil
-    -- Each with the health bar Healclick prefers to anchor to, since that is
-    -- where a unit frame visibly ends. A test wanting the bare frame clears
-    -- the health bar and leaves the frame.
+    -- Blizzard's unit frames, in the shape the target client actually has:
+    -- the player frame at a global of its own, the party frames as fields of
+    -- a container, and each health bar as a field rather than a global.
+    --
+    -- The pre-10.x names -- PartyMemberFrame1, PlayerFrameHealthBar -- are
+    -- deliberately absent. `/hc anchors` on the target client reports both
+    -- missing, and offering them here is exactly how this stub would let the
+    -- addon depend on names that are not there. A test covering an older
+    -- client adds them itself.
     env.PlayerFrame = makeWidget("Frame", env.UIParent, nil, env)
-    env.PlayerFrameHealthBar = makeWidget("StatusBar", env.PlayerFrame, nil, env)
+    env.PlayerFrame.healthBar = makeWidget("StatusBar", env.PlayerFrame, nil, env)
+
+    env.PartyFrame = makeWidget("Frame", env.UIParent, nil, env)
     for index = 1, 4 do
-        local frame = makeWidget("Frame", env.UIParent, nil, env)
-        env["PartyMemberFrame" .. index] = frame
-        env["PartyMemberFrame" .. index .. "HealthBar"] =
-            makeWidget("StatusBar", frame, nil, env)
+        local frame = makeWidget("Frame", env.PartyFrame, nil, env)
+        frame.healthBar = makeWidget("StatusBar", frame, nil, env)
+        env.PartyFrame["MemberFrame" .. index] = frame
     end
 
     env.SlashCmdList = {}

@@ -588,9 +588,15 @@ ns.RegisterCommand("anchors", "Report which unit frames the icons found", functi
             point, relativeTo, _, x, y = row:GetPoint(1)
         end
 
+        -- The path as well as the widget: which candidate name answered is
+        -- the thing worth knowing when nothing does, since Blizzard has
+        -- moved these frames between client versions.
+        local _, path = ns.Anchors.Frame(unit)
+
         ns.Print(string.format(
-            "%s: wants=%s exists=%s | row %s -> %s at %s,%s shown=%s",
+            "%s: frame=%s anchor=%s exists=%s | row %s -> %s at %s,%s shown=%s",
             unit,
+            path or "NONE",
             frameLabel(ns.Anchors.For(unit)),
             tostring(UnitExists and UnitExists(unit)),
             tostring(point),

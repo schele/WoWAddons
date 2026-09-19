@@ -16,12 +16,22 @@ ns.Anchors = Anchors
 -- Blizzard's frame for each unit this addon draws a row for. PlayerFrame is
 -- a different size and shape from the party frames, which is why the offsets
 -- below are per unit rather than one figure for all five.
-local FRAME_NAMES = {
-    player = "PlayerFrame",
-    party1 = "PartyMemberFrame1",
-    party2 = "PartyMemberFrame2",
-    party3 = "PartyMemberFrame3",
-    party4 = "PartyMemberFrame4",
+-- Blizzard has moved these, and PlayerFrame is the only one that stayed put.
+-- PartyMemberFrame1 was the global through Classic and Wrath; the 10.x UI
+-- rework replaced it with PartyFrame.MemberFrame1, and raid-style party
+-- frames use a compact frame in place of either. This client is a 1.60 beta
+-- on a modern base -- the same base that took GetSpellInfo and
+-- GetSpellBookItemName away from this addon -- so which of the three is here
+-- is asked rather than assumed. First to answer wins.
+--
+-- Order matters only in that every candidate names the same thing; a client
+-- carrying the old global as an alias for the new frame can use either.
+local FRAME_PATHS = {
+    player = { "PlayerFrame" },
+    party1 = { "PartyMemberFrame1", "PartyFrame.MemberFrame1", "CompactPartyFrameMember1" },
+    party2 = { "PartyMemberFrame2", "PartyFrame.MemberFrame2", "CompactPartyFrameMember2" },
+    party3 = { "PartyMemberFrame3", "PartyFrame.MemberFrame3", "CompactPartyFrameMember3" },
+    party4 = { "PartyMemberFrame4", "PartyFrame.MemberFrame4", "CompactPartyFrameMember4" },
 }
 
 --- The widget at this global name, or nil if there is nothing usable there.
@@ -29,12 +39,27 @@ local FRAME_NAMES = {
 -- A name that holds something which is not a widget -- a table another addon
 -- has parked there -- has to read as absent rather than be anchored to.
 -- GetObjectType is the cheapest thing only a real widget has.
-local function widgetNamed(name)
-    local value = _G and _G[name]
-    if type(value) ~= "table" or type(value.GetObjectType) ~= "function" then
-        return nil
+local function isWidget(value)
+    return type(value) == "table" and type(value.GetObjectType) == "function"
+end
+
+--- The widget at a global path, or nil if there is nothing usable there.
+--
+-- Dotted, because the modern frames live inside a container rather than at a
+-- global of their own -- "PartyFrame.MemberFrame1" is one lookup then one
+-- field. A path holding something which is not a widget, such as a table
+-- another addon has parked there, reads as absent rather than being anchored
+-- to; GetObjectType is the cheapest thing only a real widget has.
+local function widgetAt(path)
+    local value = _G
+    for part in path:gmatch("[^.]+") do
+        if type(value) ~= "table" then
+            return nil
+        end
+        value = value[part]
     end
-    return value
+
+    return isWidget(value) and value or nil
 end
 
 --- What `unit`'s buttons should hang off, or nil if this UI has nothing.
@@ -49,21 +74,42 @@ end
 -- Looked up through _G on every call rather than cached at load: these
 -- frames are built by Blizzard's own UI, which may not have run when this
 -- file loads, and an addon may swap one out later.
-function Anchors.For(unit)
-    local name = FRAME_NAMES[unit]
-    if not name then
+--- The unit frame itself, and the path it turned up at. nil when this UI has
+-- no frame for `unit` -- which is an ordinary answer, not a failure.
+function Anchors.Frame(unit)
+    local paths = FRAME_PATHS[unit]
+    if not paths then
         return nil
     end
 
+    for _, path in ipairs(paths) do
+        local frame = widgetAt(path)
+        if frame then
+            return frame, path
+        end
+    end
+
+    return nil
+end
+
+function Anchors.For(unit)
     -- The frame decides whether this unit has a usable anchor at all; the
-    -- health bar only refines where on it. A name holding something that is
-    -- not a frame is absent whatever else shares its prefix.
-    local frame = widgetNamed(name)
+    -- health bar below only refines where on it.
+    local frame, path = Anchors.Frame(unit)
     if not frame then
         return nil
     end
 
-    return widgetNamed(name .. "HealthBar") or frame
+    -- Modern frames keep the health bar as a field; the pre-10.x ones
+    -- published it as a global named after the frame. Try both, and settle
+    -- for the frame itself, which is a perfectly good anchor -- on this
+    -- client it is what the player frame falls back to, and the icons sit
+    -- correctly against it.
+    if isWidget(frame.healthBar) then
+        return frame.healthBar
+    end
+
+    return widgetAt(path .. "HealthBar") or frame
 end
 
 --- Whether attaching is possible at all: the player's own frame has to be
@@ -73,5 +119,5 @@ end
 -- two-person group as a matter of course, and that says nothing about
 -- whether this UI has party frames.
 function Anchors.Available()
-    return Anchors.For("player") ~= nil
+    return Anchors.Frame("player") ~= nil
 end
