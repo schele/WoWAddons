@@ -48,10 +48,6 @@ function Slots.Spell(index)
     local spells = ns.db and ns.db.bar.spells
     local spell = spells and spells[index]
 
-    if spell == "" then
-        return nil
-    end
-
     return spell
 end
 
