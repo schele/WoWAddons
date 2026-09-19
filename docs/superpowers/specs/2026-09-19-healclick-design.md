@@ -258,25 +258,34 @@ a typo.
 So the warning exists to catch the typo without blocking the plan: Healclick
 says "that is not a spell you know yet" once, and keeps what you typed.
 
-### Defaults, and a risk
+### Defaults, and a risk that turned out to be temporary
 
 ForeverPanel's code records that this client discards SavedVariables between
-sessions. For a bar layout and a URL history that is survivable. For Healclick
-it is close to fatal: **the player would retype their entire spellbar at every
-login.**
+sessions, and the spike confirmed it: the probe reported "loaded 0 times
+before this one" on a reload that followed a successful earlier load.
 
-Two responses, and the design takes both.
+**It is a beta-client artifact, not a property of the game.** SavedVariables
+persist normally on live Classic; this particular 1.60 beta is not writing
+them back. So Healclick stores its configuration the ordinary way and is not
+contorted around the bug - a design bent around a temporary restriction would
+be wrong the moment the restriction lifted, which is the worse failure of the
+two available.
 
-**Seed a starting set per class**, the way `ChatKeys` seeds `CTRL-S`, so an
-unsaved configuration is still immediately usable. `Slots.Seed(class)` fills
-empty slots from a small table - for a Druid, Regrowth, Rejuvenation, Remove
-Curse, Mark of the Wild - and sets `seeded` so a player who deliberately
-empties a slot does not have it refilled next login.
+What the addon does take from it is one thing it would want anyway:
 
-**Verify the assumption.** If SavedVariables do persist on the current client,
-that note is stale, and it should be deleted from ForeverPanel too rather than
-propagated into a third addon. This is a five-minute check at the same login as
-the spike below.
+**Seed a starting set per class**, the way `ChatKeys` seeds `CTRL-S`, so a
+configuration that has never been saved is still immediately usable.
+`Slots.Seed(class)` fills empty slots from a small table - for a Druid,
+Regrowth, Rejuvenation, Remove Curse, Mark of the Wild - and sets `seeded` so
+a player who deliberately empties a slot does not have it refilled next login.
+That is good first-run behaviour on any client, and on this one it happens to
+mean the bar works every login even while the beta forgets everything else.
+
+ForeverPanel's comments assert the discarding as though it were permanent, and
+several of its defaults are chosen because of it. Those comments are now known
+to be about a beta quirk rather than the game. Correcting them is a separate
+job in a separate addon, not this design's business, but it should not be
+forgotten.
 
 ## Commands
 
