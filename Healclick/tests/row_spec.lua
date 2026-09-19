@@ -343,7 +343,7 @@ describe("dropping a spell onto a button", function()
 
         row.buttons[2].scripts.OnReceiveDrag(row.buttons[2])
 
-        assertEqual("Rejuvenation", ns.Slots.Spell(2), "the seeded spell is untouched")
+        assertEqual("Healing Touch", ns.Slots.Spell(2), "the seeded spell is untouched")
         assertTrue(env.__cursor ~= nil, "the item is still on the cursor")
     end)
 
@@ -368,7 +368,7 @@ describe("dropping a spell onto a button", function()
 
         assertEqual("Regrowth", ns.Slots.Spell(2), "stored despite combat")
         assertEqual(
-            "Rejuvenation",
+            "Healing Touch",
             helpers.attrs(row.buttons[2]).spell,
             "not written yet -- the seeded spell is still there while combat is active"
         )
@@ -417,7 +417,7 @@ describe("clicking a spell onto a button", function()
         button.scripts.PostClick(button)
 
         assertEqual("spell", button:GetAttribute("type"))
-        assertEqual("Rejuvenation", ns.Slots.Spell(2), "the seeded spell is untouched")
+        assertEqual("Healing Touch", ns.Slots.Spell(2), "the seeded spell is untouched")
     end)
 
     it("casts normally and assigns nothing when the click lands during combat", function()
@@ -438,7 +438,7 @@ describe("clicking a spell onto a button", function()
         button.scripts.PostClick(button)
 
         assertEqual("spell", button:GetAttribute("type"))
-        assertEqual("Rejuvenation", ns.Slots.Spell(2), "nothing was assigned")
+        assertEqual("Healing Touch", ns.Slots.Spell(2), "nothing was assigned")
     end)
 
     it("clears the stash so a later ordinary click cannot replay the assignment", function()
@@ -520,7 +520,7 @@ describe("clicking a spell onto a button", function()
 
         assertEqual(typeBefore, button:GetAttribute("type"), "no attribute write in combat")
         assertNil(button.pendingAssign, "the stash is cleared regardless")
-        assertEqual("Rejuvenation", ns.Slots.Spell(2), "no assignment ran")
+        assertEqual("Healing Touch", ns.Slots.Spell(2), "no assignment ran")
     end)
 end)
 

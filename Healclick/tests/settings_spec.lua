@@ -369,13 +369,19 @@ describe("picking a spell instead of typing one", function()
     end)
 
     it("scrolls rather than hiding spells past the tenth", function()
+        -- A druid's whole curated list, which is longer than the ten rows
+        -- the list shows at once.
         local ns, env = helpers.loadAddon()
         helpers.login(ns, env)
-        local many = {}
-        for index = 1, 30 do
-            many[index] = string.format("Spell %02d", index)
+        env.__learnSpells({
+            "Rejuvenation", "Regrowth", "Healing Touch", "Tranquility",
+            "Mark of the Wild", "Gift of the Wild", "Thorns",
+            "Remove Curse", "Abolish Poison", "Cure Poison",
+            "Rebirth", "Innervate",
+        })
+        for index = 1, ns.Slots.MAX do
+            ns.Slots.Set(index, "")
         end
-        env.__learnSpells(many)
         ns.SettingsPanel.EnsureBuilt()
 
         local picker = openOn(ns, 1)
@@ -441,10 +447,12 @@ describe("what the picker will and will not offer", function()
         assertNil(shown["Dodge"])
     end)
 
-    it("shows everything when the client will not classify spells at all", function()
-        -- A filter that silently empties the picker is worse than one that
-        -- lets a few passives through.
+    it("shows everything when a class has no list and the client will not classify", function()
+        -- Both fallbacks at once, which is the worst case: no curated list
+        -- for this class and no way to ask. An empty picker is worse than
+        -- one that lets a few passives through.
         local ns, env = helpers.loadAddon()
+        env.units.player.class = "WARRIOR"
         helpers.login(ns, env)
         env.__learnSpells({ "Healing Touch", "Attack" })
         env.C_Spell.IsSpellHelpful = nil
@@ -488,7 +496,7 @@ describe("what the picker will and will not offer", function()
         ready(env, ns)
         ns.Slots.Set(1, "Healing Touch")
 
-        ns.Slots.Set(1, "")
+        for index = 1, ns.Slots.MAX do ns.Slots.Set(index, "") end
 
         assertTrue(labels(pickerFor(ns, 2))["Healing Touch"])
     end)
@@ -581,7 +589,7 @@ describe("marking the spell a slot already holds", function()
         helpers.login(ns, env)
         env.__learnSpells({ "Healing Touch" })
         ns.SettingsPanel.EnsureBuilt()
-        ns.Slots.Set(1, "")
+        for index = 1, ns.Slots.MAX do ns.Slots.Set(index, "") end
 
         local picker = openOn(ns, 1)
 
@@ -678,5 +686,97 @@ describe("the picker rows answering a click", function()
 
         assertTrue(registered.AnyDown, "the press, which is what this client acts on")
         assertTrue(registered.AnyUp)
+    end)
+end)
+
+describe("dragging a slot row to reorder it", function()
+    local function rows(ns)
+        return controlFor(ns, "bar", "spells").slotRows
+    end
+
+    local function dragOnto(env, from, to)
+        from.scripts.OnDragStart(from)
+        env.__mouseOver = to
+        from.scripts.OnDragStop(from)
+        env.__mouseOver = nil
+    end
+
+    it("takes the mouse, or there is nothing to start a drag with", function()
+        local ns = loggedIn()
+        for index, row in ipairs(rows(ns)) do
+            assertTrue(row.mouseEnabled, "row " .. index)
+            assertTrue(row.dragRegistered ~= nil, "row " .. index .. " accepts a drag")
+        end
+    end)
+
+    it("moves the dragged spell to the row it was dropped on", function()
+        local ns, env = loggedIn()
+        for index = 1, ns.Slots.MAX do ns.Slots.Set(index, "") end
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.Slots.Set(2, "Healing Touch")
+        ns.Slots.Set(3, "Mark of the Wild")
+        ns.SettingsPanel.Refresh()
+
+        dragOnto(env, rows(ns)[3], rows(ns)[1])
+
+        assertEqual("Mark of the Wild", ns.Slots.Spell(1))
+        assertEqual("Rejuvenation", ns.Slots.Spell(2))
+        assertEqual("Healing Touch", ns.Slots.Spell(3))
+    end)
+
+    it("shows the new order on the panel straight away", function()
+        local ns, env = loggedIn()
+        for index = 1, ns.Slots.MAX do ns.Slots.Set(index, "") end
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.Slots.Set(2, "Healing Touch")
+        ns.SettingsPanel.Refresh()
+
+        dragOnto(env, rows(ns)[2], rows(ns)[1])
+
+        assertEqual("Healing Touch", rows(ns)[1].label:GetText())
+    end)
+
+    it("puts the new order on the bar as well as in the panel", function()
+        local ns, env = loggedIn()
+        for index = 1, ns.Slots.MAX do ns.Slots.Set(index, "") end
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.Slots.Set(2, "Healing Touch")
+        ns.Group.ApplyAll()
+
+        dragOnto(env, rows(ns)[2], rows(ns)[1])
+
+        assertEqual(
+            "Healing Touch",
+            helpers.attrs(helpers.rowFor(ns, "party1").buttons[1]).spell
+        )
+    end)
+
+    it("changes nothing when the drag ends off every row", function()
+        local ns, env = loggedIn()
+        for index = 1, ns.Slots.MAX do ns.Slots.Set(index, "") end
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.Slots.Set(2, "Healing Touch")
+
+        local row = rows(ns)[2]
+        row.scripts.OnDragStart(row)
+        env.__mouseOver = nil
+        row.scripts.OnDragStop(row)
+
+        assertEqual("Rejuvenation", ns.Slots.Spell(1), "dropped on nothing, moved nothing")
+    end)
+
+    it("ignores a row hidden by the button count as a drop target", function()
+        -- Rows past the count are not on screen, so nothing can be dropped
+        -- on one -- and moving a spell into a slot the bar does not show
+        -- would look like the spell vanishing.
+        local ns, env = loggedIn()
+        ns.db.bar.slots = 2
+        for index = 1, ns.Slots.MAX do ns.Slots.Set(index, "") end
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.SettingsPanel.Refresh()
+
+        dragOnto(env, rows(ns)[1], rows(ns)[8])
+
+        assertEqual("Rejuvenation", ns.Slots.Spell(1), "still where it was")
     end)
 end)

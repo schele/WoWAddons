@@ -197,7 +197,7 @@ describe("logging in during combat", function()
 
         assertTrue(helpers.rowFor(ns, "party1") ~= nil, "rows built")
         assertEqual(
-            "Regrowth",
+            "Rejuvenation",
             helpers.attrs(helpers.rowFor(ns, "party1").buttons[1]).spell,
             "spells applied (the stub player is a druid)"
         )
@@ -235,7 +235,7 @@ describe("logging in during combat", function()
 
         assertTrue(helpers.rowFor(ns, "party1") ~= nil, "rows built")
         assertEqual(
-            "Regrowth",
+            "Rejuvenation",
             helpers.attrs(helpers.rowFor(ns, "party1").buttons[1]).spell,
             "spells applied"
         )

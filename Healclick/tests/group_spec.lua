@@ -91,7 +91,7 @@ describe("building the group", function()
 
     it("seeds the spells from the player's class", function()
         local ns = loggedIn()
-        assertEqual("Regrowth", ns.Slots.Spell(1), "the stub player is a druid")
+        assertEqual("Rejuvenation", ns.Slots.Spell(1), "the stub player is a druid")
     end)
 end)
 

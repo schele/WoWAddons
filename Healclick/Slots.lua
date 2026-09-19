@@ -19,7 +19,7 @@ Slots.DEFAULT_COUNT = 6
 -- A starting set per class, so a configuration that was never saved is still
 -- usable. ForeverPanel seeds its chat keys for the same reason.
 local SEED = {
-    DRUID   = { "Regrowth", "Rejuvenation", "Remove Curse", "Mark of the Wild" },
+    DRUID   = { "Rejuvenation", "Healing Touch", "Mark of the Wild" },
     PRIEST  = { "Flash Heal", "Renew", "Dispel Magic", "Power Word: Fortitude" },
     PALADIN = { "Holy Light", "Flash of Light", "Cleanse", "Blessing of Might" },
     SHAMAN  = { "Healing Wave", "Lesser Healing Wave", "Cure Poison", "Lightning Shield" },
@@ -169,3 +169,58 @@ ns.RegisterSetting({
     name = "Lock the frame",
     tooltip = "Stops the bar being dragged around by accident.",
 })
+
+--- Move the spell in `from` to `to`, sliding everything between along.
+--
+-- A move rather than a swap: dragging row 5 onto row 1 means "put this
+-- first", and swapping would send whatever was first down to row 5, which
+-- nobody dragging asked for. Sliding is what a list does.
+--
+-- Returns true when something actually moved, so a caller can skip the
+-- reapply that follows -- a drag that ends where it started is not a change.
+function Slots.Move(from, to)
+    if type(from) ~= "number" or type(to) ~= "number" then
+        return false
+    end
+
+    if from < 1 or from > Slots.MAX or to < 1 or to > Slots.MAX or from == to then
+        return false
+    end
+
+    local spells = ns.db and ns.db.bar.spells
+    if not spells then
+        return false
+    end
+
+    -- Read the whole strip out first. Slots are a sparse table -- an empty
+    -- slot is a hole, not an empty string -- so shifting in place would have
+    -- to special-case every gap.
+    local order = {}
+    for index = 1, Slots.MAX do
+        order[index] = spells[index]
+    end
+
+    -- Shifted by hand rather than with table.remove and table.insert. Those
+    -- want a sequence, and this is not one: an empty slot is a hole, so the
+    -- length operator stops at the first gap and a move across one is
+    -- refused outright.
+    local moving = order[from]
+
+    if from < to then
+        for index = from, to - 1 do
+            order[index] = order[index + 1]
+        end
+    else
+        for index = from, to + 1, -1 do
+            order[index] = order[index - 1]
+        end
+    end
+
+    order[to] = moving
+
+    for index = 1, Slots.MAX do
+        spells[index] = order[index]
+    end
+
+    return true
+end

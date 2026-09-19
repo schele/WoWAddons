@@ -91,10 +91,10 @@ describe("seeding", function()
         local ns = loggedIn()
         ns.Slots.Seed("DRUID")
 
-        assertEqual("Regrowth", ns.Slots.Spell(1))
-        assertEqual("Rejuvenation", ns.Slots.Spell(2))
-        assertEqual("Remove Curse", ns.Slots.Spell(3))
-        assertEqual("Mark of the Wild", ns.Slots.Spell(4))
+        assertEqual("Rejuvenation", ns.Slots.Spell(1))
+        assertEqual("Healing Touch", ns.Slots.Spell(2))
+        assertEqual("Mark of the Wild", ns.Slots.Spell(3))
+        assertNil(ns.Slots.Spell(4), "the seed is three long; the rest stay empty")
     end)
 
     it("leaves a slot the player already chose", function()
@@ -138,10 +138,9 @@ describe("seeding", function()
         ns.Slots.Seed("WARRIOR")
         ns.Slots.Seed("DRUID")
 
-        assertEqual("Regrowth", ns.Slots.Spell(1))
-        assertEqual("Rejuvenation", ns.Slots.Spell(2))
-        assertEqual("Remove Curse", ns.Slots.Spell(3))
-        assertEqual("Mark of the Wild", ns.Slots.Spell(4))
+        assertEqual("Rejuvenation", ns.Slots.Spell(1))
+        assertEqual("Healing Touch", ns.Slots.Spell(2))
+        assertEqual("Mark of the Wild", ns.Slots.Spell(3))
     end)
 end)
 
@@ -150,5 +149,87 @@ describe("slot defaults", function()
         local ns = loggedIn()
         assertFalse(ns.db.bar.locked)
         assertFalse(ns.db.bar.selfBottom)
+    end)
+end)
+
+describe("moving a spell to another slot", function()
+    local function filled(ns, names)
+        for index = 1, ns.Slots.MAX do
+            ns.Slots.Set(index, names[index] or "")
+        end
+    end
+
+    it("slides the ones between along rather than swapping", function()
+        -- Dragging row 3 onto row 1 means "put this first". A swap would
+        -- send whatever was first down to row 3, which nobody dragging
+        -- asked for.
+        local ns = loggedIn()
+        filled(ns, { "Rejuvenation", "Healing Touch", "Regrowth" })
+
+        assertTrue(ns.Slots.Move(3, 1))
+
+        assertEqual("Regrowth", ns.Slots.Spell(1))
+        assertEqual("Rejuvenation", ns.Slots.Spell(2))
+        assertEqual("Healing Touch", ns.Slots.Spell(3))
+    end)
+
+    it("slides the other way just as well", function()
+        local ns = loggedIn()
+        filled(ns, { "Rejuvenation", "Healing Touch", "Regrowth" })
+
+        ns.Slots.Move(1, 3)
+
+        assertEqual("Healing Touch", ns.Slots.Spell(1))
+        assertEqual("Regrowth", ns.Slots.Spell(2))
+        assertEqual("Rejuvenation", ns.Slots.Spell(3))
+    end)
+
+    it("carries empty slots along like any other", function()
+        -- A slot holds nothing as a hole in the table, not an empty string,
+        -- so shifting in place would have to special-case every gap.
+        local ns = loggedIn()
+        filled(ns, { "Rejuvenation", nil, "Regrowth" })
+
+        ns.Slots.Move(3, 1)
+
+        assertEqual("Regrowth", ns.Slots.Spell(1))
+        assertEqual("Rejuvenation", ns.Slots.Spell(2))
+        assertNil(ns.Slots.Spell(3))
+    end)
+
+    it("reports nothing moved when it lands where it started", function()
+        local ns = loggedIn()
+        filled(ns, { "Rejuvenation" })
+
+        assertFalse(ns.Slots.Move(1, 1))
+        assertEqual("Rejuvenation", ns.Slots.Spell(1))
+    end)
+
+    it("refuses a slot outside the range, and changes nothing", function()
+        local ns = loggedIn()
+        filled(ns, { "Rejuvenation", "Healing Touch" })
+
+        assertFalse(ns.Slots.Move(0, 1))
+        assertFalse(ns.Slots.Move(1, ns.Slots.MAX + 1))
+        assertFalse(ns.Slots.Move(nil, 1))
+
+        assertEqual("Rejuvenation", ns.Slots.Spell(1), "left alone")
+    end)
+
+    it("leaves every slot accounted for, none lost or duplicated", function()
+        local ns = loggedIn()
+        filled(ns, { "Rejuvenation", "Healing Touch", "Regrowth", "Thorns" })
+
+        ns.Slots.Move(2, 4)
+
+        local seen = {}
+        for index = 1, ns.Slots.MAX do
+            local spell = ns.Slots.Spell(index)
+            if spell then
+                assertNil(seen[spell], spell .. " appears once")
+                seen[spell] = true
+            end
+        end
+        assertEqual("Healing Touch", ns.Slots.Spell(4))
     end)
 end)

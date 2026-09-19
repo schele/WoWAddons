@@ -93,7 +93,9 @@ There are three ways to put a spell in a slot, and they store the same thing:
   offers every spell you know that can be cast on a friendly target, so
   passives, attacks and professions stay out of it — as does any spell
   another slot already holds, since two buttons casting the same thing is one
-  button wasted. Its first entry empties the slot. Click the panel behind it to
+  button wasted, and the list is your class's own -- heals, blessings, buffs
+  and dispels, not the racials and professions that share a spellbook with
+  them. Its first entry empties the slot. Click the panel behind it to
   close the list without choosing. The same out-of-combat/mid-fight split as
   dragging applies here too.
 
@@ -101,6 +103,10 @@ There are three ways to put a spell in a slot, and they store the same thing:
   thing typing could do that picking cannot: setting up a spell you have not
   learned yet. A seeded slot can still hold one, and the panel goes on
   showing it — the picker simply will not offer it until you learn it.
+
+  **Drag a row** onto another to reorder the slots. The rows in between
+  slide along, so dropping row 5 on row 1 means "put this first" rather than
+  swapping the two.
 
 Dropping something that is not a spell — an item, a macro — onto a button
 does nothing: the button is unchanged and whatever you were carrying stays

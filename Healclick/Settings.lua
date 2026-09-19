@@ -318,6 +318,9 @@ local function addSpellTable(setting, y, x)
     local slotRows = {}
     local picks = {}
     local numbers = {}
+    -- Which row is being dragged, while one is. Shared by every row's two
+    -- handlers, so it lives outside the loop that makes them.
+    local dragging
 
     local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     heading:SetPoint("TOPLEFT", x, y)
@@ -348,6 +351,43 @@ local function addSpellTable(setting, y, x)
         slotRow.label = slotRow:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
         slotRow.label:SetPoint("LEFT", slotRow.icon, "RIGHT", 6, 0)
         slotRow.label:SetJustifyH("LEFT")
+
+        -- Dragged to reorder. The row has to take the mouse for that, and a
+        -- Frame made without a template does not arrive with it -- the same
+        -- omission that left the picker's own rows inert.
+        slotRow:EnableMouse(true)
+        slotRow:RegisterForDrag("LeftButton")
+        slotRow.slot = index
+
+        slotRow:SetScript("OnDragStart", function(self)
+            dragging = self.slot
+            self.label:SetTextColor(1, 0.82, 0)
+        end)
+
+        slotRow:SetScript("OnDragStop", function(self)
+            self.label:SetTextColor(1, 1, 1)
+
+            -- Which row the cursor is over, asked of the rows themselves.
+            -- They are at known positions, but working the answer out from
+            -- coordinates means duplicating the layout arithmetic here and
+            -- keeping the copy in step; asking is one call each and cannot
+            -- drift.
+            local target
+            for _, candidate in ipairs(slotRows) do
+                if candidate:IsShown() and candidate:IsMouseOver() then
+                    target = candidate.slot
+                end
+            end
+
+            if dragging and target and ns.Slots.Move(dragging, target) then
+                if setting.onChange then
+                    setting.onChange()
+                end
+                Panel.Refresh()
+            end
+
+            dragging = nil
+        end)
 
         local pick = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
         pick:SetSize(46, BOX_HEIGHT - 4)

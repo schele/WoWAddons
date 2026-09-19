@@ -242,6 +242,76 @@ function Spells.IsHelpful(spellName)
     end, nil)
 end
 
+-- What each class can usefully put in a slot.
+--
+-- Curated, which is a reversal: IsHelpful above was meant to answer this in
+-- general, and on this client it does not. Shadowmeld, Wisp Spirit, Find
+-- Minerals, Quickness and Elune's Light all came back as things you could
+-- cast on a party member, and a picker full of racials and tracking
+-- abilities is no better than the raw spellbook it was meant to tidy.
+--
+-- A list is wrong the day Blizzard adds a spell; the filter was wrong today,
+-- on every character. So: a list where there is one, and IsHelpful for any
+-- class nobody has curated -- a long picker beats an empty one, and an
+-- omission here should cost tidiness rather than the feature.
+local CLASS_SPELLS = {
+    DRUID = {
+        "Rejuvenation", "Regrowth", "Healing Touch", "Tranquility",
+        "Mark of the Wild", "Gift of the Wild", "Thorns",
+        "Remove Curse", "Abolish Poison", "Cure Poison",
+        "Rebirth", "Innervate",
+    },
+    PRIEST = {
+        "Lesser Heal", "Heal", "Greater Heal", "Flash Heal", "Renew",
+        "Prayer of Healing", "Power Word: Shield",
+        "Power Word: Fortitude", "Prayer of Fortitude",
+        "Divine Spirit", "Prayer of Spirit",
+        "Shadow Protection", "Prayer of Shadow Protection",
+        "Dispel Magic", "Abolish Disease", "Cure Disease",
+        "Resurrection", "Fear Ward",
+    },
+    PALADIN = {
+        "Holy Light", "Flash of Light", "Lay on Hands", "Redemption",
+        "Cleanse", "Purify", "Divine Intervention",
+        "Blessing of Might", "Blessing of Wisdom", "Blessing of Kings",
+        "Blessing of Salvation", "Blessing of Light",
+        "Blessing of Sanctuary", "Blessing of Freedom",
+        "Blessing of Protection", "Blessing of Sacrifice",
+        "Greater Blessing of Might", "Greater Blessing of Wisdom",
+        "Greater Blessing of Kings", "Greater Blessing of Salvation",
+        "Greater Blessing of Light", "Greater Blessing of Sanctuary",
+    },
+    SHAMAN = {
+        "Healing Wave", "Lesser Healing Wave", "Chain Heal",
+        "Cure Poison", "Cure Disease", "Ancestral Spirit",
+        "Water Breathing", "Water Walking", "Lightning Shield",
+    },
+    MAGE = {
+        "Arcane Intellect", "Arcane Brilliance", "Dampen Magic",
+        "Amplify Magic", "Remove Lesser Curse", "Slow Fall",
+    },
+    WARLOCK = {
+        "Unending Breath", "Detect Invisibility", "Soulstone Resurrection",
+    },
+}
+
+-- Turned into sets once, at load, so the walk below is a lookup per spell
+-- rather than a scan of the whole list.
+local CLASS_SPELL_SET = {}
+for class, names in pairs(CLASS_SPELLS) do
+    local set = {}
+    for _, name in ipairs(names) do
+        set[name] = true
+    end
+    CLASS_SPELL_SET[class] = set
+end
+
+--- The list for the player's class, or nil for a class nobody has curated.
+local function allowedForPlayer()
+    local _, class = UnitClass("player")
+    return class and CLASS_SPELL_SET[class] or nil
+end
+
 --- Every distinct spell the player can cast on a friendly target, by name,
 -- in alphabetical order.
 --
@@ -251,6 +321,7 @@ end
 -- player has, so the list has no use for the other two.
 function Spells.Pickable()
     local names, seen = {}, {}
+    local allowed = allowedForPlayer()
     local bank = playerSpellBank()
 
     for index = 1, SPELLBOOK_LIMIT do
@@ -259,9 +330,17 @@ function Spells.Pickable()
             break
         end
 
-        -- Only false excludes. A spell this client will not classify is kept,
-        -- so a missing API costs a tidy list rather than the whole picker.
-        if not seen[name] and Spells.IsHelpful(name) ~= false then
+        -- The class list decides where there is one. Where there is not,
+        -- only a definite "not helpful" excludes, so a missing API costs a
+        -- tidy list rather than the whole picker.
+        local wanted
+        if allowed then
+            wanted = allowed[name] == true
+        else
+            wanted = Spells.IsHelpful(name) ~= false
+        end
+
+        if wanted and not seen[name] then
             seen[name] = true
             names[#names + 1] = name
         end
