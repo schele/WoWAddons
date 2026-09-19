@@ -194,6 +194,7 @@ function Group.Build()
     -- satisfies the guard just above it, so it must not happen until we know
     -- the row loop below is actually about to run.
     buildPending = false
+    ns.Row.SyncSize()
     createAnchor()
 
     -- Every unit gets a row, including ones nobody is standing in. They are
@@ -476,6 +477,9 @@ function Group.ApplyAll()
     end
 
     pending = false
+    -- Before Layout, which reads Row.HEIGHT and Row.WIDTH: the icon size is
+    -- a setting, and those two are derived from it.
+    ns.Row.SyncSize()
     -- A fresh set of retries: whatever prompted this apply -- a roster
     -- change, entering the world, a settings toggle -- is exactly the kind
     -- of thing that brings Blizzard's party frames into being.

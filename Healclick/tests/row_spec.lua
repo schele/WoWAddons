@@ -1005,3 +1005,77 @@ describe("the remaining time under an icon", function()
         assertTrue(asked <= 2, "one walk that stops at the first gap, not one per button")
     end)
 end)
+
+describe("the icon size", function()
+    local function applied(ns, env, size)
+        ns.db.bar.iconSize = size
+        ns.db.bar.slots = 2
+        ns.Slots.Set(1, "Regrowth")
+        ns.Slots.Set(2, "Rejuvenation")
+        ns.Row.SyncSize()
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+        return row
+    end
+
+    it("defaults to the size the buttons have always been", function()
+        local ns = loggedIn()
+        assertEqual(ns.Row.DEFAULT_BUTTON_SIZE, ns.db.bar.iconSize)
+    end)
+
+    it("sizes the buttons to it", function()
+        local ns, env = loggedIn()
+        local row = applied(ns, env, 32)
+
+        assertEqual(32, row.buttons[1]:GetWidth())
+        assertEqual(32, row.buttons[1]:GetHeight())
+    end)
+
+    it("resizes buttons that already exist, since rows outlive the setting", function()
+        -- Rows can only be built out of combat, so rebuilding them is not
+        -- something a settings change can rely on doing.
+        local ns, env = loggedIn()
+        local row = applied(ns, env, 22)
+
+        ns.db.bar.iconSize = 40
+        ns.Row.SyncSize()
+        ns.Row.ApplySpells(row)
+
+        assertEqual(40, row.buttons[1]:GetWidth())
+    end)
+
+    it("spaces the buttons by the new size", function()
+        local ns, env = loggedIn()
+        local row = applied(ns, env, 32)
+
+        local _, first = row.buttons[1]:GetPoint()
+        local _, second = row.buttons[2]:GetPoint()
+
+        assertEqual(32 + ns.Row.BUTTON_GAP, second - first)
+    end)
+
+    it("grows the row's height and width with it", function()
+        local ns, env = loggedIn()
+        local small = applied(ns, env, 16)
+        local narrow = small:GetWidth()
+        local short = ns.Row.HEIGHT
+
+        local big = applied(ns, env, 40)
+
+        assertTrue(big:GetWidth() > narrow, "wider icons need a wider row")
+        assertTrue(ns.Row.HEIGHT > short, "and a taller one")
+    end)
+
+    it("refuses a size outside the bounds, whatever the database says", function()
+        -- A slider cannot produce one, but a saved variable edited by hand
+        -- can, and a frame sized from a negative number is one the client
+        -- complains about.
+        local ns, env = loggedIn()
+
+        local tiny = applied(ns, env, -50)
+        assertEqual(ns.Row.MIN_BUTTON_SIZE, tiny.buttons[1]:GetWidth())
+
+        local huge = applied(ns, env, 5000)
+        assertEqual(ns.Row.MAX_BUTTON_SIZE, huge.buttons[1]:GetWidth())
+    end)
+end)

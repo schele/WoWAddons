@@ -693,3 +693,30 @@ describe("turning your own icons off", function()
         assertFalse(ns.db.bar.showSelf)
     end)
 end)
+
+describe("the icon size reaching the layout", function()
+    it("stacks the rows by the new height", function()
+        -- Group reads Row.HEIGHT from half a dozen places, so the size has
+        -- to be synced before anything is laid out rather than after.
+        local ns = loggedIn()
+        ns.db.bar.iconSize = 40
+        ns.Group.ApplyAll()
+
+        local _, _, _, _, firstY = helpers.rowFor(ns, "player"):GetPoint(1)
+        local _, _, _, _, secondY = helpers.rowFor(ns, "party1"):GetPoint(1)
+
+        assertEqual(-(ns.Row.HEIGHT + 2), secondY - firstY,
+            "the gap between rows follows the icons")
+        assertEqual(42, ns.Row.HEIGHT, "40 plus the row's own 2")
+    end)
+
+    it("sizes the backdrop to the taller rows", function()
+        local ns = loggedIn()
+        local before = ns.Group.Anchor():GetHeight()
+
+        ns.db.bar.iconSize = 40
+        ns.Group.ApplyAll()
+
+        assertTrue(ns.Group.Anchor():GetHeight() > before)
+    end)
+end)

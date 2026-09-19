@@ -9,7 +9,34 @@ ns.Row = Row
 
 local NAME_WIDTH = 70
 local BAR_WIDTH = 120
-local BUTTON_SIZE = 22
+-- Blizzard's own action buttons are 36; this is smaller because five rows of
+-- these stack beside five unit frames rather than sitting alone at the foot
+-- of the screen. The bounds are what a spell icon still reads at, and what
+-- fits beside a unit frame without swamping it.
+Row.DEFAULT_BUTTON_SIZE = 22
+Row.MIN_BUTTON_SIZE = 12
+Row.MAX_BUTTON_SIZE = 48
+
+--- The icon size in force, as a whole number inside the bounds.
+--
+-- Clamped here rather than trusted from the database: the slider cannot
+-- produce a bad value, but a saved variable edited by hand can, and a row
+-- sized from a negative number is a frame the client complains about.
+local function buttonSize()
+    local size = math.floor(
+        tonumber(ns.db and ns.db.bar and ns.db.bar.iconSize)
+            or Row.DEFAULT_BUTTON_SIZE
+    )
+
+    if size < Row.MIN_BUTTON_SIZE then
+        return Row.MIN_BUTTON_SIZE
+    elseif size > Row.MAX_BUTTON_SIZE then
+        return Row.MAX_BUTTON_SIZE
+    end
+
+    return size
+end
+
 local BUTTON_GAP = 4
 local PADDING = 4
 
@@ -23,7 +50,7 @@ Row.BUTTON_GAP = BUTTON_GAP
 -- apart the way they did when WIDTH counted its own, separate offset.
 local BUTTONS_START = NAME_WIDTH + BAR_WIDTH + PADDING * 3
 
-Row.HEIGHT = BUTTON_SIZE + 2
+
 
 --- Whether rows hang off Blizzard's own unit frames rather than off a bar of
 -- ours.
@@ -74,13 +101,24 @@ local function widthFor(count)
         -- sized zero is a thing the client has opinions about.
         return math.max(start, 1)
     end
-    return start + count * (BUTTON_SIZE + BUTTON_GAP) - BUTTON_GAP
+    return start + count * (buttonSize() + BUTTON_GAP) - BUTTON_GAP
 end
 
--- The widest a row can ever be, which is what Group's layout arithmetic is
--- checked against. What a row actually measures is Row.CurrentWidth below,
--- and it is usually narrower.
-Row.WIDTH = widthFor(ns.Slots.MAX)
+--- Recompute the exported HEIGHT and WIDTH from the icon size now in force.
+--
+-- These stay values rather than becoming functions because Group reads them
+-- from half a dozen places, including before a row has been through
+-- ApplySpells. This is what keeps them true once the size setting moves;
+-- Group calls it before it lays anything out.
+function Row.SyncSize()
+    Row.HEIGHT = buttonSize() + 2
+    Row.WIDTH = widthFor(ns.Slots.MAX)
+end
+
+-- Once now, so HEIGHT and WIDTH exist before anything reads them. WIDTH is
+-- the widest a row can be at the current icon size; what one actually
+-- measures is Row.CurrentWidth below, and it is usually narrower.
+Row.SyncSize()
 
 -- How far a row fades when clicking it would achieve nothing.
 local DIM = 0.35
@@ -223,10 +261,10 @@ function Row.Create(unit, parent)
             row,
             "SecureActionButtonTemplate"
         )
-        button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
+        button:SetSize(buttonSize(), buttonSize())
         button:SetPoint(
             "LEFT",
-            buttonsStart() + (index - 1) * (BUTTON_SIZE + BUTTON_GAP),
+            buttonsStart() + (index - 1) * (buttonSize() + BUTTON_GAP),
             0
         )
         -- Both edges, and the press is the one that matters. Registered for
@@ -400,6 +438,15 @@ end
 function Row.ApplySpells(row)
     local count = ns.Slots.Count()
     local shown = 0
+    local size = buttonSize()
+
+    -- Resized here, not only at creation, because the icon size is a setting
+    -- and the rows outlive a change to it -- they can only be built out of
+    -- combat, so rebuilding them is not an option the setting has. Safe for
+    -- the same reason every other write in this function is: ApplySpells
+    -- runs out of combat only, and resizing a secure button is refused in it.
+    row:SetHeight(Row.HEIGHT)
+    row.health:SetHeight(math.max(Row.HEIGHT - 6, 1))
 
     -- Attached, Blizzard's frame is already showing this unit's name and
     -- health, so drawing ours would put a second copy of each right beside
@@ -446,10 +493,11 @@ function Row.ApplySpells(row)
             -- same for the rows themselves, for the same reason. Safe here
             -- because ApplySpells only ever runs out of combat, and moving
             -- a secure frame is refused in it.
+            button:SetSize(size, size)
             button:ClearAllPoints()
             button:SetPoint(
                 "LEFT",
-                buttonsStart() + shown * (BUTTON_SIZE + BUTTON_GAP),
+                buttonsStart() + shown * (size + BUTTON_GAP),
                 0
             )
             shown = shown + 1
@@ -657,3 +705,29 @@ function Row.Refresh(row)
     Row.RefreshRange(row)
     Row.RefreshAuras(row)
 end
+
+-- Declared here rather than with Group's layout settings: this file owns the
+-- size -- it clamps it, derives HEIGHT and WIDTH from it, and sizes the
+-- buttons by it -- so it owns what happens when nothing has set one.
+ns.AddDefaults({
+    bar = {
+        iconSize = Row.DEFAULT_BUTTON_SIZE,
+    },
+})
+
+ns.RegisterSetting({
+    store = "bar",
+    key = "iconSize",
+    type = "slider",
+    name = "Icon size",
+    tooltip = "How big each spell icon is. Blizzard's own action buttons are 36; these are smaller by default because five rows of them sit beside five unit frames rather than one bar sitting alone.",
+    min = Row.MIN_BUTTON_SIZE,
+    max = Row.MAX_BUTTON_SIZE,
+    step = 1,
+    onChange = function()
+        -- ApplyAll syncs the derived sizes before it lays anything out, and
+        -- resizes the buttons that already exist on its way through
+        -- ApplySpells.
+        if ns.Group then ns.Group.ApplyAll() end
+    end,
+})
