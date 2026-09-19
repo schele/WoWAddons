@@ -1,7 +1,7 @@
 ## Interface: 11509, 16001
 ## Title: UrlCopy
 ## Notes: Makes URLs spoken in chat clickable, and copyable.
-## IconTexture: Interface\Icons\INV_Misc_Note_01
+## IconTexture: Interface\AddOns\UrlCopy\icon
 ## Author: You
 ## Version: 0.1.0
 ## SavedVariables: UrlCopyDB
