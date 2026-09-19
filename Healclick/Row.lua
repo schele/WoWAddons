@@ -27,111 +27,10 @@ Row.WIDTH = BUTTONS_START + ns.Slots.MAX * (BUTTON_SIZE + BUTTON_GAP) - BUTTON_G
 -- How far a row fades when clicking it would achieve nothing.
 local DIM = 0.35
 
--- A button shows the spell's own icon when one can be found. Row.Label below
--- is what it falls back to when it cannot -- the one thing standing between
--- a healer and casting the wrong spell under pressure, on a client that will
--- not tell us what the icon is.
-
---- Split a string into its UTF-8 characters, without assuming a UTF-8
--- library exists on the client. A continuation byte (0x80-0xBF) never starts
--- a character, so any other byte is where the previous character ends and
--- the next begins.
-local function characters(text)
-    local chars = {}
-    local charStart = 1
-
-    for index = 1, #text do
-        local byte = text:byte(index)
-        local isContinuation = byte >= 0x80 and byte <= 0xBF
-        if not isContinuation and index > charStart then
-            table.insert(chars, text:sub(charStart, index - 1))
-            charStart = index
-        end
-    end
-
-    if charStart <= #text then
-        table.insert(chars, text:sub(charStart, #text))
-    end
-
-    return chars
-end
-
---- The first `count` characters of `text`, never cutting a multi-byte one.
-local function firstChars(text, count)
-    local chars = characters(text)
-    local pieces = {}
-    for index = 1, math.min(count, #chars) do
-        pieces[index] = chars[index]
-    end
-    return table.concat(pieces)
-end
-
--- Lua's %p is ASCII punctuation only, so this leaves multi-byte characters
--- (all of them >= 0x80, none of them %p) untouched.
-local function withoutPunctuation(word)
-    return (word:gsub("%p", ""))
-end
-
--- A fixed list, not a length rule: "Cat", "Ice" and "War" are short but
--- carry the spell's meaning ("Cat Form", "Ice Block", "War Stomp" all need
--- their first letter), so word length cannot tell a filler word from a
--- significant one. Only these specific connectives are ever dropped.
-local STOP_WORDS = {
-    ["of"] = true,
-    ["the"] = true,
-    ["a"] = true,
-    ["an"] = true,
-    ["and"] = true,
-    ["to"] = true,
-}
-
---- A connective skipped when a multi-word label is built, compared
--- case-insensitively against the fixed list above.
-local function isStopWord(word)
-    return STOP_WORDS[word:lower()] == true
-end
-
---- The text a button shows for a spell, since there is no icon.
--- A single-word name gives its first four characters. A multi-word name
--- gives the first letter of each significant word (the connectives in
--- STOP_WORDS are dropped, unless dropping them would leave nothing), which
--- is what keeps "Remove Curse" from reading the same as "Regrowth".
-function Row.Label(spellName)
-    if type(spellName) ~= "string" or spellName == "" then
-        return ""
-    end
-
-    local words = {}
-    for word in spellName:gmatch("%S+") do
-        table.insert(words, word)
-    end
-
-    if #words == 0 then
-        return ""
-    elseif #words == 1 then
-        return firstChars(words[1], 4)
-    end
-
-    local significant = {}
-    for _, word in ipairs(words) do
-        if not isStopWord(withoutPunctuation(word)) then
-            table.insert(significant, word)
-        end
-    end
-    if #significant == 0 then
-        significant = words
-    end
-
-    local letters = {}
-    for index = 1, math.min(4, #significant) do
-        local firstChar = characters(withoutPunctuation(significant[index]))[1]
-        if firstChar then
-            table.insert(letters, firstChar:upper())
-        end
-    end
-
-    return table.concat(letters)
-end
+-- Blizzard's own stand-in for a spell it will not draw. Reached only when
+-- the player knows the spell but the icon lookup came back empty, so that a
+-- client with no texture API costs the picture rather than the button.
+local UNKNOWN_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 --- Store a spell in a slot and apply it -- the body shared by a drag-and-drop
 -- and a click-to-place assignment (see Row.Create), so the two paths cannot
@@ -302,8 +201,6 @@ function Row.Create(unit, parent)
             button.cooldown = cooldown
         end
 
-        button.label = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        button.label:SetPoint("CENTER")
 
         -- RegisterForDrag is for STARTING a drag; this button's left-click
         -- already casts a spell, and registering it for drag risks a drag
@@ -403,6 +300,7 @@ end
 -- responsible for not being in any. Group.ApplyAll is that caller.
 function Row.ApplySpells(row)
     local count = ns.Slots.Count()
+    local shown = 0
 
     for index = 1, ns.Slots.MAX do
         local button = row.buttons[index]
@@ -418,26 +316,40 @@ function Row.ApplySpells(row)
         -- out of combat.
         button:SetAttribute("type", "spell")
 
-        if spell then
+        -- Whether the player knows the spell, never whether an icon turned
+        -- up. The two nearly always agree -- both are name lookups against
+        -- the spellbook -- but they fail differently: Spells.IsKnown reports
+        -- a spell it cannot check at all as known, while Spells.Texture
+        -- reports one it cannot check as having no icon. Deciding on the
+        -- icon would empty the whole bar on a client with no texture API,
+        -- which is the one outcome that leaves a healer nothing to click.
+        if spell and ns.Spells.IsKnown(spell) then
             button:SetAttribute("spell", spell)
 
-            local texture = ns.Spells.Texture(spell)
-            if texture then
-                button.icon:SetTexture(texture)
-                button.icon:Show()
-                button.label:SetText("")
-            else
-                button.icon:Hide()
-                button.label:SetText(Row.Label(spell))
-            end
+            button.icon:SetTexture(ns.Spells.Texture(spell) or UNKNOWN_ICON)
+            button.icon:Show()
+
+            -- Placed by how many buttons are already showing, not by slot
+            -- index: a slot hidden in the middle would otherwise leave a
+            -- hole where its button would have been. Group.Layout does the
+            -- same for the rows themselves, for the same reason. Safe here
+            -- because ApplySpells only ever runs out of combat, and moving
+            -- a secure frame is refused in it.
+            button:ClearAllPoints()
+            button:SetPoint(
+                "LEFT",
+                BUTTONS_START + shown * (BUTTON_SIZE + BUTTON_GAP),
+                0
+            )
+            shown = shown + 1
 
             button:Show()
         else
-            -- An empty slot is hidden rather than shown and inert. A button
-            -- that looks pressable and does nothing is the worse failure.
+            -- Hidden rather than shown and inert, whether the slot is empty
+            -- or holds a spell this player cannot cast yet. A button that
+            -- looks pressable and does nothing is the worse failure.
             button:SetAttribute("spell", nil)
             button.icon:Hide()
-            button.label:SetText("")
             button:Hide()
         end
     end

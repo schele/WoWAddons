@@ -164,7 +164,7 @@ describe("applying spells", function()
         assertNil(helpers.attrs(row.buttons[1]).spell)
     end)
 
-    it("shows the icon and clears the label when a texture is found", function()
+    it("shows the spell's own icon", function()
         local ns, env = loggedIn()
         ns.Slots.Set(1, "Regrowth")
         local row = ns.Row.Create("party1", env.UIParent)
@@ -173,10 +173,52 @@ describe("applying spells", function()
 
         assertEqual(136085, row.buttons[1].icon:GetTexture())
         assertTrue(row.buttons[1].icon:IsShown())
-        assertEqual("", row.buttons[1].label:GetText())
     end)
 
-    it("falls back to the label when no texture can be found", function()
+    it("hides a slot holding a spell the player has not learned", function()
+        -- The bar is a row of icons, and a spell the client will not draw an
+        -- icon for has nothing to put there. Hiding it is also what keeps the
+        -- icons that remain sitting together.
+        local ns, env = loggedIn()
+        ns.Slots.Set(1, "Tranquility")
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        ns.Row.ApplySpells(row)
+
+        assertFalse(row.buttons[1]:IsShown())
+        assertNil(helpers.attrs(row.buttons[1]).spell, "and it must not stay castable")
+    end)
+
+    it("closes the gap a hidden slot leaves, rather than laying out around it", function()
+        -- Buttons are created at a fixed offset per slot index, so a hidden
+        -- slot in the middle would otherwise leave a hole. 2 is Row.lua's own
+        -- BUTTON_GAP, not exported.
+        local ns, env = loggedIn()
+        ns.db.bar.slots = 3
+        ns.Slots.Set(1, "Regrowth")
+        ns.Slots.Set(2, "Tranquility")
+        ns.Slots.Set(3, "Remove Curse")
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        ns.Row.ApplySpells(row)
+
+        assertFalse(row.buttons[2]:IsShown())
+
+        local _, firstX = row.buttons[1]:GetPoint()
+        local _, thirdX = row.buttons[3]:GetPoint()
+        assertEqual(
+            row.buttons[1]:GetWidth() + 2,
+            thirdX - firstX,
+            "slot 3 must sit where slot 2 would have been"
+        )
+    end)
+
+    it("keeps a known spell visible even when its icon cannot be looked up", function()
+        -- Whether a button appears is decided by whether the player knows the
+        -- spell, never by whether an icon lookup happened to succeed. On a
+        -- client with no texture API at all the second rule would empty the
+        -- whole bar, which is the one outcome that leaves a healer with
+        -- nothing to click.
         local ns, env = loggedIn()
         env.C_Spell.GetSpellTexture = nil
         ns.Slots.Set(1, "Regrowth")
@@ -184,18 +226,21 @@ describe("applying spells", function()
 
         ns.Row.ApplySpells(row)
 
-        assertFalse(row.buttons[1].icon:IsShown())
-        assertEqual("Regr", row.buttons[1].label:GetText())
+        assertTrue(row.buttons[1]:IsShown())
+        assertEqual("Regrowth", helpers.attrs(row.buttons[1]).spell)
+        assertEqual(
+            "Interface\\Icons\\INV_Misc_QuestionMark",
+            row.buttons[1].icon:GetTexture()
+        )
     end)
 
-    it("hides the icon along with the label for an empty slot", function()
+    it("hides the icon for an empty slot", function()
         local ns, env = loggedIn()
         local row = ns.Row.Create("party1", env.UIParent)
 
         ns.Row.ApplySpells(row)
 
         assertFalse(row.buttons[1].icon:IsShown())
-        assertEqual("", row.buttons[1].label:GetText())
     end)
 
     it("applies the standard border crop to every button's icon", function()
@@ -436,91 +481,6 @@ describe("clicking a spell onto a button", function()
         assertEqual(typeBefore, button:GetAttribute("type"), "no attribute write in combat")
         assertNil(button.pendingAssign, "the stash is cleared regardless")
         assertEqual("Rejuvenation", ns.Slots.Spell(2), "no assignment ran")
-    end)
-end)
-
-describe("labelling a spell button", function()
-    -- There is no icon, so this label is the only thing telling a healer
-    -- which button is which. Two buttons reading the same thing under
-    -- pressure is the wrong-spell-on-the-right-person failure this addon
-    -- exists to prevent.
-
-    it("takes the first four characters of a single-word name", function()
-        local ns = loggedIn()
-        assertEqual("Regr", ns.Row.Label("Regrowth"))
-    end)
-
-    it("takes the first four characters of another single-word name", function()
-        local ns = loggedIn()
-        assertEqual("Reju", ns.Row.Label("Rejuvenation"))
-    end)
-
-    it("takes the first letter of each significant word", function()
-        local ns = loggedIn()
-        assertEqual("RC", ns.Row.Label("Remove Curse"))
-    end)
-
-    it("drops short connective words like 'of' and 'the'", function()
-        local ns = loggedIn()
-        assertEqual("MW", ns.Row.Label("Mark of the Wild"))
-    end)
-
-    it("keeps a short word that is significant rather than filler", function()
-        -- "Cat", "Ice" and "War" are exactly as short as "the", but dropping
-        -- them the way a length rule would leaves a single letter that
-        -- disambiguates nothing -- the whole reason Row.Label exists. Only a
-        -- fixed stopword list, not word length, can tell these apart from
-        -- "of" or "the".
-        local ns = loggedIn()
-        assertEqual("CF", ns.Row.Label("Cat Form"))
-        assertEqual("IB", ns.Row.Label("Ice Block"))
-        assertEqual("WS", ns.Row.Label("War Stomp"))
-    end)
-
-    it("strips punctuation before taking a word's first letter", function()
-        local ns = loggedIn()
-        assertEqual("PWF", ns.Row.Label("Power Word: Fortitude"))
-    end)
-
-    it("matches the rest of the worked examples", function()
-        local ns = loggedIn()
-        assertEqual("FL", ns.Row.Label("Flash of Light"))
-        assertEqual("BF", ns.Row.Label("Bear Form"))
-        assertEqual("CP", ns.Row.Label("Cure Poison"))
-    end)
-
-    it("returns an empty string for no spell at all", function()
-        local ns = loggedIn()
-        assertEqual("", ns.Row.Label(nil))
-        assertEqual("", ns.Row.Label(""))
-    end)
-
-    it("gives the four shipped Druid seeds four distinct labels", function()
-        local ns = loggedIn()
-        local seeds = { "Regrowth", "Rejuvenation", "Remove Curse", "Mark of the Wild" }
-        local seen = {}
-        local uniqueCount = 0
-
-        for _, spell in ipairs(seeds) do
-            local label = ns.Row.Label(spell)
-            if not seen[label] then
-                seen[label] = true
-                uniqueCount = uniqueCount + 1
-            end
-        end
-
-        assertEqual(4, uniqueCount, "all four seeds must read differently on the button")
-    end)
-
-    it("never splits a multi-byte character in half", function()
-        -- Five copies of U+3042 (Hiragana A), three bytes each in UTF-8. A
-        -- byte-based sub(1, 4) would take one whole character plus one
-        -- stray continuation byte of the next -- invalid UTF-8.
-        local ns = loggedIn()
-        local hiragana = "\227\129\130"
-        local name = hiragana:rep(5)
-
-        assertEqual(hiragana:rep(4), ns.Row.Label(name))
     end)
 end)
 
