@@ -129,22 +129,44 @@ function Spells.Cooldown(spellName)
         return nil
     end
 
-    if C_Spell and C_Spell.GetSpellCooldown then
-        local info = C_Spell.GetSpellCooldown(spellName)
-        if type(info) ~= "table" then
+    -- Gathered into a table before it leaves the guard, because ns.Guarded is
+    -- a pcall and a pcall returns one value.
+    local reading = ns.Guarded(function()
+        local start, duration, enabled
+
+        if C_Spell and C_Spell.GetSpellCooldown then
+            local info = C_Spell.GetSpellCooldown(spellName)
+            if type(info) ~= "table" then
+                return nil
+            end
+            start, duration = info.startTime, info.duration
+            enabled = info.isEnabled ~= false
+        elseif GetSpellCooldown then
+            start, duration, enabled = GetSpellCooldown(spellName)
+            enabled = enabled ~= 0 and enabled ~= false
+        else
             return nil
         end
-        return info.startTime, info.duration, info.isEnabled ~= false
-    end
 
-    if GetSpellCooldown then
-        local start, duration, enabled = GetSpellCooldown(spellName)
-        if start then
-            return start, duration, enabled ~= 0 and enabled ~= false
+        -- Both numbers are compared in here rather than handed out for the
+        -- caller to test, and that placement is the whole point. A number
+        -- this client will not disclose is truthy and survives `or 0`, so
+        -- having fetched one proves nothing about it; comparing it is what
+        -- raises. Comparing both here turns "the client will not say" into a
+        -- missing sweep, where doing it upstairs took the refresh down for
+        -- every remaining button on every remaining row.
+        if not start or not duration or start < 0 or duration <= 0 then
+            return nil
         end
+
+        return { start = start, duration = duration, enabled = enabled }
+    end, nil)
+
+    if not reading then
+        return nil
     end
 
-    return nil
+    return reading.start, reading.duration, reading.enabled
 end
 
 --- Whether `spellName` can currently reach `unit`: true, false, or nil when
@@ -423,10 +445,21 @@ function Spells.AuraRemaining(unit, spellName, auras)
     auras = auras or Spells.PlayerAuras(unit)
 
     local expires = auras[spellName]
-    if not expires or expires == 0 then
+    if not expires then
         return nil
     end
 
-    local remaining = expires - (GetTime and GetTime() or 0)
-    return remaining > 0 and remaining or nil
+    -- PlayerAuras guards the reading, not the reading's result: an expiry the
+    -- client will not disclose is truthy, so it rides out of that guard in the
+    -- table and arrives here untouched. Subtracting from it and comparing the
+    -- result are both things it raises on, so they belong inside a guard of
+    -- their own -- which costs one icon its timer instead of the refresh.
+    return ns.Guarded(function()
+        if expires == 0 then
+            return nil
+        end
+
+        local remaining = expires - (GetTime and GetTime() or 0)
+        return remaining > 0 and remaining or nil
+    end, nil)
 end

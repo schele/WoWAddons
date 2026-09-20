@@ -402,11 +402,41 @@ function stub.newEnv()
         ["Healing Touch"] = 136041,
     }
 
+    --- A number this client refuses to disclose to tainted code.
+    --
+    -- The shape is the whole point, and it is not the shape the addon was
+    -- written against. A secret number is *truthy*, so `if x then` and
+    -- `x or 0` wave it through without touching it -- which is why a guard
+    -- that only fetches a value is not a guard at all. It raises the moment
+    -- anything inspects it: a comparison, or arithmetic. Lua models that
+    -- exactly, through metamethods that fire on those and on nothing else.
+    --
+    -- This stub could not express a secret value until 2026-09-20, when a
+    -- `duration > 0` on a cooldown took out every row's refresh in the live
+    -- client while all 306 tests stayed green. That gap was the defect.
+    function env.__secret()
+        local function raise()
+            error("attempt to compare a secret number value, "
+                .. "while execution tainted by 'ClickHeal'", 0)
+        end
+
+        return setmetatable({}, {
+            __lt = raise, __le = raise,
+            __add = raise, __sub = raise, __mul = raise, __div = raise,
+            __unm = raise, __mod = raise, __pow = raise, __concat = raise,
+            -- Readable in a failure message, because a test that trips over
+            -- one of these has to be able to say so.
+            __tostring = function() return "<secret number>" end,
+        })
+    end
+
     -- What is on cooldown right now. Empty by default: a spell absent here
     -- is simply off cooldown, which is the state nearly every test wants.
     -- A test stages one with
     --   env.__spellCooldowns["Rejuvenation"] =
     --       { startTime = 100, duration = 1.5, isEnabled = true }
+    -- or, for the case the client withholds,
+    --   { startTime = env.__secret(), duration = env.__secret(), isEnabled = true }
     env.__spellCooldowns = {}
 
     -- Which spells can reach which units, keyed "<spell>:<unit>". A pair

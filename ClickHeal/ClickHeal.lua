@@ -46,13 +46,18 @@ end
 --
 -- `fn` must both make the call and perform the branch that can raise, not
 -- just fetch a value for the caller to test afterwards -- in the game it is
--- the branch that raises, the call having already succeeded. Routing both
--- through the same pcall is also what makes this testable at all: Lua has no
--- way to construct a value that raises when its truthiness is checked, so a
--- test instead makes the stubbed API call itself raise. Both failure shapes
--- land in this same pcall, so the fallback path is exercised even though the
--- exact in-game trigger (a secret value, not a raising call) cannot be
--- reproduced.
+-- the branch that raises, the call having already succeeded. A value fetched
+-- through a guard and inspected outside it is not guarded at all, which is
+-- worth stating because it is how this addon crashed on 2026-09-20: the read
+-- was inside, the `duration > 0` was outside.
+--
+-- Which operations raise is not uniform, and the difference matters when
+-- placing a guard. A secret *number* is truthy and survives `or 0`, so those
+-- can sit safely outside; comparing one or doing arithmetic on it raises, so
+-- those cannot. A secret *boolean* raises on the truthiness test itself.
+-- Only that last shape is beyond Lua to construct, so tests reproduce it by
+-- making the stubbed call raise; the number shapes are modelled directly, by
+-- env.__secret().
 function ns.Guarded(fn, whenUnknown)
     local ok, result = pcall(fn)
     if ok then

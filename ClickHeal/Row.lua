@@ -583,7 +583,11 @@ function Row.RefreshCooldowns(row)
             local start, duration, enabled =
                 ns.Spells.Cooldown(row.buttons[index]:GetAttribute("spell"))
 
-            if start and duration and duration > 0 and enabled then
+            -- No comparison here. Spells.Cooldown has already proven both
+            -- numbers readable inside its guard, so anything that arrives is
+            -- safe to hand straight to the widget; a `duration > 0` on this
+            -- line is what the live crash of 2026-09-20 was.
+            if start and enabled then
                 cooldown:SetCooldown(start, duration)
             else
                 -- A zero-length cooldown is how the widget is told to draw

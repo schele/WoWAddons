@@ -781,6 +781,54 @@ describe("the cooldown sweep on a button", function()
         assertEqual(0, duration)
     end)
 
+    it("draws no sweep when the client will not disclose the numbers", function()
+        -- The live crash of 2026-09-20, which ran 37 times before it was
+        -- reported. `start and duration` waved both secret numbers straight
+        -- through, because a secret number is truthy; `duration > 0` was what
+        -- raised, and it took out every later button on every later row.
+        local ns, env = loggedIn()
+        local row = armed(env, ns, 1, "Rejuvenation")
+        env.__spellCooldowns["Rejuvenation"] = {
+            startTime = env.__secret(),
+            duration = env.__secret(),
+            isEnabled = true,
+        }
+
+        local ok, err = pcall(ns.Row.RefreshCooldowns, row)
+
+        assertTrue(ok, "a withheld cooldown must cost the sweep, not the "
+            .. "refresh: " .. tostring(err))
+        local _, duration = row.buttons[1].cooldown:GetCooldownTimes()
+        assertEqual(0, duration, "and nothing may be drawn from a number it "
+            .. "was never allowed to read")
+    end)
+
+    it("keeps refreshing the rest of the row past a withheld cooldown", function()
+        -- The damage was never one icon. RefreshCooldowns walks every slot in
+        -- one loop, so raising on slot 1 meant slots 2..8 were never reached.
+        local ns, env = loggedIn()
+        ns.db.bar.slots = 2
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.Slots.Set(2, "Healing Touch")
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+
+        env.__spellCooldowns["Rejuvenation"] = {
+            startTime = env.__secret(),
+            duration = env.__secret(),
+            isEnabled = true,
+        }
+        env.__spellCooldowns["Healing Touch"] =
+            { startTime = 100, duration = 1.5, isEnabled = true }
+
+        ns.Row.RefreshCooldowns(row)
+
+        local start, duration = row.buttons[2].cooldown:GetCooldownTimes()
+        assertEqual(100, start, "slot 2 is past the unreadable one and must "
+            .. "still get its sweep")
+        assertEqual(1.5, duration)
+    end)
+
     it("still builds a working button when the client has no cooldown template", function()
         -- The sweep is decoration; casting is the point. This client family
         -- has already dropped APIs the addon expected, and an unknown

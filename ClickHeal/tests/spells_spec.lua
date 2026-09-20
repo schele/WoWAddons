@@ -189,6 +189,37 @@ describe("reading a spell's cooldown", function()
         assertNil(ns.Spells.Cooldown(""))
         assertNil(ns.Spells.Cooldown(nil))
     end)
+
+    it("returns nil rather than a number the client is withholding", function()
+        -- Both comparisons belong inside this function's guard. A secret
+        -- number reaches a caller looking exactly like a real one -- truthy,
+        -- and unchanged by `or 0` -- so handing one out is handing out a
+        -- crash that fires wherever the caller happens to test it.
+        local ns, env = loggedIn()
+        env.__spellCooldowns["Rejuvenation"] = {
+            startTime = env.__secret(),
+            duration = env.__secret(),
+            isEnabled = true,
+        }
+
+        local ok, start = pcall(ns.Spells.Cooldown, "Rejuvenation")
+
+        assertTrue(ok, "reading it must not raise: " .. tostring(start))
+        assertNil(start, "and an unreadable cooldown is no cooldown")
+    end)
+
+    it("returns nil for a withheld cooldown from the old global too", function()
+        local ns, env = loggedIn()
+        env.C_Spell.GetSpellCooldown = nil
+        env.GetSpellCooldown = function()
+            return env.__secret(), env.__secret(), 1
+        end
+
+        local ok, start = pcall(ns.Spells.Cooldown, "Rejuvenation")
+
+        assertTrue(ok, "reading it must not raise: " .. tostring(start))
+        assertNil(start)
+    end)
 end)
 
 describe("asking whether a spell can reach a unit", function()
@@ -377,5 +408,21 @@ describe("reading the player's own buffs on a unit", function()
         env.C_UnitAuras.GetAuraDataByIndex = function() error("must not be asked") end
 
         assertEqual(9, ns.Spells.AuraRemaining("party1", "Rejuvenation", gathered))
+    end)
+
+    it("says nothing for an expiry the client is withholding", function()
+        -- PlayerAuras guards the reading, but a secret expiry is truthy and
+        -- rides out of that guard inside the table. The subtraction here is
+        -- what raises -- the same defect as the cooldown crash, one path over.
+        local ns, env = loggedIn()
+        env.__now = 1000
+        env.__auras.party1 =
+            { { name = "Rejuvenation", expirationTime = env.__secret() } }
+
+        local ok, remaining = pcall(ns.Spells.AuraRemaining, "party1", "Rejuvenation")
+
+        assertTrue(ok, "an unreadable expiry must cost one timer, not the "
+            .. "refresh: " .. tostring(remaining))
+        assertNil(remaining)
     end)
 end)
