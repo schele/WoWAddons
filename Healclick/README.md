@@ -104,8 +104,10 @@ There are three ways to put a spell in a slot, and they store the same thing:
   learned yet. A seeded slot can still hold one, and the panel goes on
   showing it — the picker simply will not offer it until you learn it.
 
-  **Drag a row** onto another to reorder the slots. The rows in between
-  slide along, so dropping row 5 on row 1 means "put this first" rather than
+  **Drag a row** to reorder the slots. The row you are holding follows the
+  cursor and the others part to leave a gap where it will land, so you can
+  see the order you are about to get before you let go. The rows in between
+  slide along, which means dropping row 5 on row 1 puts it first rather than
   swapping the two.
 
 Dropping something that is not a spell — an item, a macro — onto a button

@@ -690,15 +690,35 @@ describe("the picker rows answering a click", function()
 end)
 
 describe("dragging a slot row to reorder it", function()
+    local STRIP_TOP = 500
+
     local function rows(ns)
         return controlFor(ns, "bar", "spells").slotRows
     end
 
-    local function dragOnto(env, from, to)
-        from.scripts.OnDragStart(from)
-        env.__mouseOver = to
-        from.scripts.OnDragStop(from)
-        env.__mouseOver = nil
+    local function filled(ns, names)
+        for index = 1, ns.Slots.MAX do
+            ns.Slots.Set(index, names[index] or "")
+        end
+        ns.SettingsPanel.Refresh()
+    end
+
+    --- Drive a whole drag: grab `from`, move the cursor over position `to`,
+    -- let go. The row's own top is staged so the strip's resting geometry --
+    -- read once at drag start -- works out to STRIP_TOP.
+    local function dragOnto(ns, env, from, to)
+        local pitch = ns.SettingsPanel.ROW_PITCH
+        local row = rows(ns)[from]
+
+        row.top = STRIP_TOP - (from - 1) * pitch
+        row.scripts.OnDragStart(row)
+
+        -- Half a row into the target, which is where a hand aiming at it
+        -- would be.
+        env.__cursorY = STRIP_TOP - (to - 1) * pitch - pitch / 2
+        row.scripts.OnUpdate(row)
+
+        row.scripts.OnDragStop(row)
     end
 
     it("takes the mouse, or there is nothing to start a drag with", function()
@@ -709,15 +729,11 @@ describe("dragging a slot row to reorder it", function()
         end
     end)
 
-    it("moves the dragged spell to the row it was dropped on", function()
+    it("moves the dragged spell to the position it was dropped on", function()
         local ns, env = loggedIn()
-        for index = 1, ns.Slots.MAX do ns.Slots.Set(index, "") end
-        ns.Slots.Set(1, "Rejuvenation")
-        ns.Slots.Set(2, "Healing Touch")
-        ns.Slots.Set(3, "Mark of the Wild")
-        ns.SettingsPanel.Refresh()
+        filled(ns, { "Rejuvenation", "Healing Touch", "Mark of the Wild" })
 
-        dragOnto(env, rows(ns)[3], rows(ns)[1])
+        dragOnto(ns, env, 3, 1)
 
         assertEqual("Mark of the Wild", ns.Slots.Spell(1))
         assertEqual("Rejuvenation", ns.Slots.Spell(2))
@@ -726,24 +742,19 @@ describe("dragging a slot row to reorder it", function()
 
     it("shows the new order on the panel straight away", function()
         local ns, env = loggedIn()
-        for index = 1, ns.Slots.MAX do ns.Slots.Set(index, "") end
-        ns.Slots.Set(1, "Rejuvenation")
-        ns.Slots.Set(2, "Healing Touch")
-        ns.SettingsPanel.Refresh()
+        filled(ns, { "Rejuvenation", "Healing Touch" })
 
-        dragOnto(env, rows(ns)[2], rows(ns)[1])
+        dragOnto(ns, env, 2, 1)
 
         assertEqual("Healing Touch", rows(ns)[1].label:GetText())
     end)
 
     it("puts the new order on the bar as well as in the panel", function()
         local ns, env = loggedIn()
-        for index = 1, ns.Slots.MAX do ns.Slots.Set(index, "") end
-        ns.Slots.Set(1, "Rejuvenation")
-        ns.Slots.Set(2, "Healing Touch")
+        filled(ns, { "Rejuvenation", "Healing Touch" })
         ns.Group.ApplyAll()
 
-        dragOnto(env, rows(ns)[2], rows(ns)[1])
+        dragOnto(ns, env, 2, 1)
 
         assertEqual(
             "Healing Touch",
@@ -751,32 +762,110 @@ describe("dragging a slot row to reorder it", function()
         )
     end)
 
-    it("changes nothing when the drag ends off every row", function()
+    it("changes nothing when it is let go where it started", function()
         local ns, env = loggedIn()
-        for index = 1, ns.Slots.MAX do ns.Slots.Set(index, "") end
-        ns.Slots.Set(1, "Rejuvenation")
-        ns.Slots.Set(2, "Healing Touch")
+        filled(ns, { "Rejuvenation", "Healing Touch" })
 
-        local row = rows(ns)[2]
-        row.scripts.OnDragStart(row)
-        env.__mouseOver = nil
-        row.scripts.OnDragStop(row)
+        dragOnto(ns, env, 1, 1)
 
-        assertEqual("Rejuvenation", ns.Slots.Spell(1), "dropped on nothing, moved nothing")
+        assertEqual("Rejuvenation", ns.Slots.Spell(1))
     end)
 
-    it("ignores a row hidden by the button count as a drop target", function()
-        -- Rows past the count are not on screen, so nothing can be dropped
-        -- on one -- and moving a spell into a slot the bar does not show
-        -- would look like the spell vanishing.
+    it("parts the other rows to leave a gap where it would land", function()
+        -- The whole point of the drag: seeing the others move is what says
+        -- where the one in hand is going.
         local ns, env = loggedIn()
-        ns.db.bar.slots = 2
-        for index = 1, ns.Slots.MAX do ns.Slots.Set(index, "") end
-        ns.Slots.Set(1, "Rejuvenation")
-        ns.SettingsPanel.Refresh()
+        filled(ns, { "Rejuvenation", "Healing Touch", "Mark of the Wild" })
 
-        dragOnto(env, rows(ns)[1], rows(ns)[8])
+        local pitch = ns.SettingsPanel.ROW_PITCH
+        local row = rows(ns)[3]
+        local before = select(3, rows(ns)[1]:GetPoint())
 
-        assertEqual("Rejuvenation", ns.Slots.Spell(1), "still where it was")
+        row.top = STRIP_TOP - 2 * pitch
+        row.scripts.OnDragStart(row)
+        env.__cursorY = STRIP_TOP - pitch / 2
+        row.scripts.OnUpdate(row)
+
+        local during = select(3, rows(ns)[1]:GetPoint())
+        assertTrue(during < before, "row 1 moved down to open the gap at the top")
+    end)
+
+    it("puts every row back where it belongs once the drag is over", function()
+        -- The preview leaves rows somewhere that means nothing afterwards,
+        -- and a drag that changes no order must leave the strip looking
+        -- exactly as it did.
+        local ns, env = loggedIn()
+        filled(ns, { "Rejuvenation", "Healing Touch", "Mark of the Wild" })
+
+        local before = select(3, rows(ns)[1]:GetPoint())
+        dragOnto(ns, env, 1, 1)
+
+        assertEqual(before, select(3, rows(ns)[1]:GetPoint()))
+    end)
+
+    it("lifts the dragged row above the ones it passes over", function()
+        local ns, env = loggedIn()
+        filled(ns, { "Rejuvenation", "Healing Touch" })
+
+        local row = rows(ns)[2]
+        row.top = STRIP_TOP - ns.SettingsPanel.ROW_PITCH
+        row.scripts.OnDragStart(row)
+
+        assertTrue(row.moving, "and follows the cursor")
+        assertTrue(row:GetFrameLevel() > rows(ns)[1]:GetFrameLevel())
+    end)
+end)
+
+describe("working out where a dragged row would land", function()
+    local function position(ns, stripTop, cursorY, count)
+        return ns.SettingsPanel.DropPosition(stripTop, cursorY, 24, count)
+    end
+
+    it("reads a height as the row it falls in", function()
+        local ns = loggedIn()
+
+        assertEqual(1, position(ns, 500, 490, 6), "ten below the top is row 1")
+        assertEqual(2, position(ns, 500, 470, 6))
+        assertEqual(3, position(ns, 500, 450, 6))
+    end)
+
+    it("clamps to the strip rather than running off either end", function()
+        local ns = loggedIn()
+
+        assertEqual(1, position(ns, 500, 900, 6), "above the strip")
+        assertEqual(6, position(ns, 500, -900, 6), "below it")
+    end)
+
+    it("says nothing when the client will not give a cursor height", function()
+        local ns = loggedIn()
+        assertNil(position(ns, 500, nil, 6))
+        assertNil(ns.SettingsPanel.DropPosition(500, 400, 0, 6))
+    end)
+end)
+
+describe("where the other rows go during a drag", function()
+    it("leaves a gap at the target and keeps the rest in order", function()
+        local ns = loggedIn()
+        local positions = ns.SettingsPanel.PreviewPositions(3, 1, 3)
+
+        assertNil(positions[3], "the dragged row is not theirs to place")
+        assertEqual(2, positions[1], "pushed down past the gap")
+        assertEqual(3, positions[2])
+    end)
+
+    it("leaves the gap at the bottom just as readily", function()
+        local ns = loggedIn()
+        local positions = ns.SettingsPanel.PreviewPositions(1, 3, 3)
+
+        assertEqual(1, positions[2])
+        assertEqual(2, positions[3])
+    end)
+
+    it("changes nothing when the gap is where the row already was", function()
+        local ns = loggedIn()
+        local positions = ns.SettingsPanel.PreviewPositions(2, 2, 3)
+
+        assertEqual(1, positions[1])
+        assertEqual(3, positions[3])
     end)
 end)

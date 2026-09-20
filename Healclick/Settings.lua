@@ -89,6 +89,28 @@ local function addSlider(setting, y, x)
     }
 end
 
+--- The cursor's height on screen, in the same units frames report theirs in.
+-- GetCursorPosition answers in raw pixels; everything else here is in UI
+-- units, and the two differ by the interface scale.
+local function cursorY()
+    if not GetCursorPosition then
+        return nil
+    end
+
+    local _, height = GetCursorPosition()
+    if not height then
+        return nil
+    end
+
+    local scale = UIParent and UIParent.GetEffectiveScale
+        and UIParent:GetEffectiveScale() or 1
+
+    return height / (scale ~= 0 and scale or 1)
+end
+
+-- The strip's row pitch, exported because a drop target is measured in it.
+Panel.ROW_PITCH = BOX_HEIGHT
+
 -- The spell picker: one shared list, opened against whichever row asked for
 -- it.
 --
@@ -161,6 +183,51 @@ local function refreshPicker()
             button:Hide()
         end
     end
+end
+
+--- Which position in a strip of `count` rows the cursor is over.
+--
+-- Measured against where the rows rest, captured once when the drag starts,
+-- rather than against where they are now. The preview below moves them as
+-- the drag goes on, and a target read from moved rows would change what is
+-- under the cursor, which would move them again -- a list that flickers
+-- between two orderings while the hand holds still.
+function Panel.DropPosition(stripTop, cursorY, rowHeight, count)
+    if not (stripTop and cursorY and rowHeight and rowHeight > 0) then
+        return nil
+    end
+
+    local position = math.floor((stripTop - cursorY) / rowHeight) + 1
+
+    if position < 1 then
+        return 1
+    elseif position > count then
+        return count
+    end
+
+    return position
+end
+
+--- Where every row but the dragged one goes while the drag is in progress:
+-- index -> position, in order, with a gap left at `to`.
+--
+-- The gap is the whole point. Seeing the others part is what says where the
+-- one in hand will land, in a way an outline around a row does not.
+function Panel.PreviewPositions(from, to, count)
+    local positions = {}
+    local position = 0
+
+    for index = 1, count do
+        if index ~= from then
+            position = position + 1
+            if position == to then
+                position = position + 1
+            end
+            positions[index] = position
+        end
+    end
+
+    return positions
 end
 
 --- Put `name` in `slot` and close the list. nil empties the slot.
@@ -318,9 +385,28 @@ local function addSpellTable(setting, y, x)
     local slotRows = {}
     local picks = {}
     local numbers = {}
-    -- Which row is being dragged, while one is. Shared by every row's two
-    -- handlers, so it lives outside the loop that makes them.
+    -- Which row is being dragged, while one is, and where the strip rested
+    -- when the drag began. Shared by every row's handlers, so they live
+    -- outside the loop that makes them.
     local dragging
+    local stripTop
+
+    --- Put a row at a visual position, which is its slot index at rest and
+    -- something else while a drag is previewing the order it would leave.
+    local function placeRow(row, position)
+        row:ClearAllPoints()
+        row:SetPoint(
+            "TOPLEFT", x + 20, y - ROW_HEIGHT - (position - 1) * BOX_HEIGHT
+        )
+    end
+
+    --- Put every row back where its slot index says, which is where they all
+    -- belong once a drag is over and the data has caught up.
+    local function restRows()
+        for index, row in ipairs(slotRows) do
+            placeRow(row, index)
+        end
+    end
 
     local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     heading:SetPoint("TOPLEFT", x, y)
@@ -339,7 +425,7 @@ local function addSpellTable(setting, y, x)
         -- and an icon says which spell a slot holds faster than its name
         -- does, which is the same reason the buttons themselves show icons.
         local slotRow = CreateFrame("Frame", nil, panel)
-        slotRow:SetPoint("TOPLEFT", x + 20, top)
+        placeRow(slotRow, index)
         slotRow:SetSize(180, BOX_HEIGHT - 4)
 
         slotRow.icon = slotRow:CreateTexture(nil, "ARTWORK")
@@ -359,34 +445,68 @@ local function addSpellTable(setting, y, x)
         slotRow:RegisterForDrag("LeftButton")
         slotRow.slot = index
 
+        slotRow:SetMovable(true)
+
         slotRow:SetScript("OnDragStart", function(self)
             dragging = self.slot
+            -- Where the strip rests, read now, while it still does. Every
+            -- drop target for the rest of this drag is measured from here.
+            stripTop = self:GetTop() and (self:GetTop() + (self.slot - 1) * BOX_HEIGHT)
+
+            -- Lifted: out of the strip and above the rows it passes over, so
+            -- what the hand is holding is never behind what it is moving
+            -- between.
+            self:SetFrameLevel(panel:GetFrameLevel() + 10)
             self.label:SetTextColor(1, 0.82, 0)
+            self:StartMoving()
+        end)
+
+        slotRow:SetScript("OnUpdate", function(self)
+            if dragging ~= self.slot then
+                return
+            end
+
+            local target = Panel.DropPosition(
+                stripTop, cursorY(), BOX_HEIGHT, ns.Slots.Count()
+            )
+            if not target then
+                return
+            end
+
+            -- The others part to leave a gap where this one would land. They
+            -- move; the one in hand is following the cursor and is not
+            -- theirs to place.
+            for other, position in pairs(Panel.PreviewPositions(
+                dragging, target, ns.Slots.Count()
+            )) do
+                placeRow(slotRows[other], position)
+            end
+
+            self.dropTarget = target
         end)
 
         slotRow:SetScript("OnDragStop", function(self)
+            self:StopMovingOrSizing()
+            self:SetFrameLevel(panel:GetFrameLevel() + 1)
             self.label:SetTextColor(1, 1, 1)
 
-            -- Which row the cursor is over, asked of the rows themselves.
-            -- They are at known positions, but working the answer out from
-            -- coordinates means duplicating the layout arithmetic here and
-            -- keeping the copy in step; asking is one call each and cannot
-            -- drift.
-            local target
-            for _, candidate in ipairs(slotRows) do
-                if candidate:IsShown() and candidate:IsMouseOver() then
-                    target = candidate.slot
-                end
-            end
+            local target = self.dropTarget
+            self.dropTarget = nil
+            dragging = nil
+            stripTop = nil
 
-            if dragging and target and ns.Slots.Move(dragging, target) then
+            -- Back to rest first, whatever happens next: the preview left
+            -- every row somewhere that means nothing once the drag is over,
+            -- and a move that is refused has to leave the strip looking
+            -- exactly as it did.
+            restRows()
+
+            if target and ns.Slots.Move(self.slot, target) then
                 if setting.onChange then
                     setting.onChange()
                 end
                 Panel.Refresh()
             end
-
-            dragging = nil
         end)
 
         local pick = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")

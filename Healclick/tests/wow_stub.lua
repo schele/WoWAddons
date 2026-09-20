@@ -132,6 +132,10 @@ local function makeWidget(kind, parent, template, env)
     -- Driven by a test: env.__mouseOver = someFrame. The real answer depends
     -- on where the cursor is, which a test has no way to arrange.
     function widget:IsMouseOver() return self.__env.__mouseOver == self end
+    -- Geometry the stub does not otherwise model. A test that needs a frame
+    -- to have a top sets one: row.top = 400.
+    function widget:GetTop() return self.top end
+    function widget:GetEffectiveScale() return self.__env.__uiScale or 1 end
     function widget:SetFrameLevel(value) self.frameLevel = value end
     function widget:GetFrameLevel() return self.frameLevel or 1 end
     function widget:SetMovable() end
@@ -285,6 +289,11 @@ function stub.newEnv()
         frame.healthBar = makeWidget("StatusBar", frame, nil, env)
         env.PartyFrame["MemberFrame" .. index] = frame
     end
+
+    -- Where the cursor is, in raw pixels, which is what the real call
+    -- answers in. A test drags by moving this between handler calls.
+    env.__cursorY = 0
+    function env.GetCursorPosition() return 0, env.__cursorY end
 
     env.SlashCmdList = {}
     env.OKAY = "Okay"
