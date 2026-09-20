@@ -88,10 +88,14 @@ end
 
 -- Guards against a refresh that starts another. A slider's Refresh sets its
 -- own value, which the client answers with OnValueChanged, which runs the
--- setting's onChange. None of the three settings here call Refresh from
--- onChange, so the guard never actually fires today -- but a future setting
--- that does would call back into a Refresh already in progress, and this
--- stops that turning into unbounded recursion.
+-- setting's onChange -- and locked's onChange now calls Refresh directly, so
+-- that path genuinely exists today. It still cannot recurse from inside a
+-- Refresh already running: the checkbox branch of Refresh uses SetChecked,
+-- which fires no script in the stub or the real client, so locked's
+-- onChange is never reached from inside Refresh at all. For a slider, the
+-- second line of defence is ns.SetSettingValue's unchanged-value early
+-- return -- Refresh always sets the control to exactly the value already
+-- stored, so the onChange that setting could trigger never actually runs.
 local refreshing = false
 
 function Panel.Refresh()

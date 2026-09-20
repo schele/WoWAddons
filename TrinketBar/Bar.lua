@@ -432,11 +432,12 @@ end)
 local lockedSetting
 
 ns.RegisterCommand("lock", "Stop the bar being dragged", function()
-    -- Routed through ns.SetSettingValue like every other writer, rather than
-    -- assigning ns.db.bar.locked directly: a direct write left the settings
-    -- panel's checkbox not knowing the value had changed, so opening
-    -- /tb settings and then typing /tb lock left a checkbox reading
-    -- unlocked while the bar was actually locked.
+    -- Routed through ns.SetSettingValue rather than assigning
+    -- ns.db.bar.locked directly, like every other writer -- but routing
+    -- alone only fixes where the value is stored. What actually keeps the
+    -- settings panel's checkbox from going stale when /tb lock changes the
+    -- value out from under it is the setting's own onChange (below), which
+    -- SetSettingValue is what makes reachable.
     ns.SetSettingValue(lockedSetting, not ns.db.bar.locked)
     ns.Print(ns.db.bar.locked and "Bar locked." or "Bar unlocked.")
 end)
