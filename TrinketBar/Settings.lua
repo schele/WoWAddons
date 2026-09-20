@@ -112,11 +112,11 @@ local function ensureBuilt()
     end
     built = true
 
-    -- logo, not icon. They are the same cross drawn twice: icon.tga has the
+    -- logo, not icon. They are the same gem drawn twice: icon.tga has the
     -- tile behind it that the AddOns list needs, because every entry there
     -- is a square and one that is not looks broken. Here the opposite is
-    -- true -- a square of dark green on a dark grey panel reads as a sticker
-    -- pasted on it -- so logo.tga is the cross alone, on transparency.
+    -- true -- a square tile on a dark grey panel reads as a sticker pasted
+    -- on it -- so logo.tga is the gem alone, on transparency.
     --
     -- Built from addonName rather than spelled out: the .toc already names
     -- this folder, and a second copy of the path is the one that goes stale
