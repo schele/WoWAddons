@@ -262,17 +262,49 @@ function Bar.Apply()
     return true
 end
 
+--- A fresh name -> entry map, used to re-resolve a trinket's coordinates for
+-- a cooldown lookup rather than trusting whatever Apply last wrote.
+local function freshEntriesByName()
+    local byName = {}
+    for _, entry in ipairs(ns.Items.All()) do
+        byName[entry.name] = entry
+    end
+    return byName
+end
+
 --- Draw each button's cooldown sweep.
 --
 -- Separate from Apply because a cooldown starts without anything else
 -- changing: the bar is right, only the sweeps are stale.
+--
+-- Re-resolved by name from a fresh bag walk rather than read through
+-- button.entry.bag/.slot: those coordinates are a snapshot from the last
+-- Apply, and Apply cannot repair them mid-fight. Clicking a button equips
+-- the trinket it names and drops whatever comes off into that same bag
+-- slot -- PLAYER_EQUIPMENT_CHANGED fires, but combat holds Apply, so
+-- button.entry still names the old trinket at coordinates a different item
+-- now occupies. Reading (bag, slot) at face value would paint the new
+-- occupant's cooldown on a button whose macro still names the old trinket,
+-- for as long as the fight lasts. Walking the bags is a pure read, legal in
+-- combat, so it costs nothing to do here every time.
+--
+-- button.entry itself is left untouched: it drives the macro, which is a
+-- secure attribute, and only the cooldown lookup uses the fresh coordinates.
 function Bar.RefreshCooldowns()
+    local fresh
+
     for index = 1, Bar.MAX_BUTTONS do
         local button = buttons[index]
         local cooldown = button and button.cooldown
 
         if cooldown then
-            local start, duration = ns.Items.Cooldown(button.entry)
+            fresh = fresh or freshEntriesByName()
+
+            -- nil when the name is no longer carried and not worn -- gone
+            -- from the bags and the body both -- in which case no sweep is
+            -- drawn rather than a wrong one.
+            local current = button.entry and fresh[button.entry.name]
+            local start, duration = ns.Items.Cooldown(current)
 
             if start and duration and duration > 0 then
                 cooldown:SetCooldown(start, duration)

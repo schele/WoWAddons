@@ -518,4 +518,41 @@ describe("what a button looks like", function()
         local _, duration = ns.Bar.Buttons()[1].cooldown:GetCooldownTimes()
         assertEqual(120, duration)
     end)
+
+    it("re-resolves a carried trinket's coordinates by name, not the bag slot Apply last saw", function()
+        -- Click the button mid-fight: /equipslot pulls the trinket out of
+        -- its bag slot and the trinket that comes off lands in that same
+        -- slot. PLAYER_EQUIPMENT_CHANGED fires, but Apply is held by
+        -- combat, so button.entry still says the old bag coordinates even
+        -- though a different item sits there now. If RefreshCooldowns
+        -- trusts those stale coordinates, it paints the new occupant's
+        -- cooldown on a button whose macro still names the old trinket.
+        local ns, env = carrying({ "Old Trinket" })
+        ns.Bar.Apply()
+
+        env.__setCombat(true)
+
+        -- The equip: "Old Trinket" is now worn in slot 13, and whatever it
+        -- displaced -- "New Occupant" -- is sitting in the bag slot Apply
+        -- last recorded for button 1.
+        env.__wear(13, "Old Trinket")
+        env.__carry(0, 1, "New Occupant")
+
+        -- The occupant's cooldown, at the stale coordinates button.entry
+        -- still points at -- must not end up on button 1's sweep.
+        env.__cooldowns["bag:0:1"] = { start = 999, duration = 999 }
+        -- The trinket's own, correct cooldown, now that it is worn.
+        env.__cooldowns["worn:13"] = { start = 500, duration = 30 }
+
+        helpers.fire(env, "BAG_UPDATE_COOLDOWN")
+
+        local start, duration = ns.Bar.Buttons()[1].cooldown:GetCooldownTimes()
+        assertEqual(500, start, "the trinket's own cooldown, not the new occupant's")
+        assertEqual(30, duration)
+
+        -- The macro must still name the original trinket: only the
+        -- cooldown lookup is re-resolved, never the secure attribute.
+        assertEqual("/equipslot 13 Old Trinket",
+            helpers.attrs(ns.Bar.Buttons()[1]).macrotext1)
+    end)
 end)
