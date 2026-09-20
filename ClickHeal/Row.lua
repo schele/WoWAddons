@@ -182,7 +182,7 @@ local function assignSpellToSlot(slot, name)
     end
 end
 
--- Diagnostic scaffolding, off unless `/hc debug` turns it on.
+-- Diagnostic scaffolding, off unless `/ch debug` turns it on.
 --
 -- A secure button that will not cast gives nothing away from outside the
 -- game: the client's handler reads the attributes, then either acts or
@@ -223,7 +223,7 @@ end)
 
 --- Build one unit's row. Called once per unit, at login, out of combat.
 function Row.Create(unit, parent)
-    local row = CreateFrame("Frame", "HealclickRow" .. unit, parent)
+    local row = CreateFrame("Frame", "ClickHealRow" .. unit, parent)
     row:SetSize(Row.CurrentWidth(), Row.HEIGHT)
     row.unit = unit
 
@@ -256,8 +256,8 @@ function Row.Create(unit, parent)
             "Button",
             -- The separator matters once slot counts grow past single digits:
             -- without it, unit "raid1" slot 11 and unit "raid11" slot 1 both
-            -- name themselves HealclickButtonraid111, clobbering a _G entry.
-            string.format("HealclickButton%s_%d", unit, index),
+            -- name themselves ClickHealButtonraid111, clobbering a _G entry.
+            string.format("ClickHealButton%s_%d", unit, index),
             row,
             "SecureActionButtonTemplate"
         )
@@ -521,7 +521,7 @@ function Row.ApplySpells(row)
 end
 
 
--- The secret-value guard lives in Healclick.lua, beside the explanation of
+-- The secret-value guard lives in ClickHeal.lua, beside the explanation of
 -- what a secret value is and why a branch on one has to be wrapped. Spells.lua
 -- needs the same guard, so there is one of it rather than one per file.
 local guarded = ns.Guarded

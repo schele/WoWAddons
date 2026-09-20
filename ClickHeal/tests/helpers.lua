@@ -3,7 +3,7 @@ local stub = require("wow_stub")
 local M = {}
 
 M.FILES = {
-    "Healclick.lua",
+    "ClickHeal.lua",
     "Anchors.lua",
     "Spells.lua",
     "Slots.lua",
@@ -21,7 +21,7 @@ function M.loadAddon(files)
 
     for _, path in ipairs(files or M.FILES) do
         local chunk = assert(loadfile(path, "t", env))
-        chunk("Healclick", ns)
+        chunk("ClickHeal", ns)
     end
 
     return ns, env
@@ -41,12 +41,12 @@ function M.fire(env, event, ...)
 end
 
 function M.login(ns, env)
-    M.fire(env, "ADDON_LOADED", "Healclick")
+    M.fire(env, "ADDON_LOADED", "ClickHeal")
     M.fire(env, "PLAYER_LOGIN")
 end
 
 function M.command(env, text)
-    env.SlashCmdList.HEALCLICK(text)
+    env.SlashCmdList.CLICKHEAL(text)
 end
 
 function M.printed(env)

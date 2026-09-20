@@ -355,7 +355,7 @@ end
 -- matters on a client that answers for every index it is asked about.
 local AURA_LIMIT = 40
 
--- Helpful auras this player cast, which is the only kind a Healclick button
+-- Helpful auras this player cast, which is the only kind a ClickHeal button
 -- can be responsible for. Someone else's Rejuvenation on the same target is
 -- not this button's business.
 local AURA_FILTER = "HELPFUL|PLAYER"

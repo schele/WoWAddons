@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local ONLY_CORE = { "Healclick.lua" }
+local ONLY_CORE = { "ClickHeal.lua" }
 
 describe("the database", function()
     it("applies defaults at login", function()
@@ -12,7 +12,7 @@ describe("the database", function()
 
     it("lets a stored value win over a default", function()
         local ns, env = helpers.loadAddon(ONLY_CORE)
-        env.HealclickDB = { version = 99 }
+        env.ClickHealDB = { version = 99 }
         helpers.login(ns, env)
 
         assertEqual(99, ns.db.version)
@@ -21,7 +21,7 @@ describe("the database", function()
     it("fills in a nested table added since the value was saved", function()
         local ns, env = helpers.loadAddon(ONLY_CORE)
         ns.AddDefaults({ later = { added = "yes" } })
-        env.HealclickDB = { version = 1 }
+        env.ClickHealDB = { version = 1 }
         helpers.login(ns, env)
 
         assertEqual("yes", ns.db.later.added)
@@ -39,7 +39,7 @@ describe("commands", function()
         assertEqual("there", got)
     end)
 
-    it("shows the command list for a bare /hc, the way /fp and /url do", function()
+    it("shows the command list for a bare /ch, the way /fp and /url do", function()
         local ns, env = helpers.loadAddon(ONLY_CORE)
         ns.RegisterCommand("ping", "Ping the thing", function() end)
         helpers.login(ns, env)

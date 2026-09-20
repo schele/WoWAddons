@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local FILES = { "Healclick.lua", "Anchors.lua", "Spells.lua" }
+local FILES = { "ClickHeal.lua", "Anchors.lua", "Spells.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)

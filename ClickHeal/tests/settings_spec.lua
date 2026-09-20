@@ -54,7 +54,7 @@ describe("the panel", function()
         assertEqual(before, #ns.SettingsPanel.controls)
     end)
 
-    it("opens from /hc settings", function()
+    it("opens from /ch settings", function()
         local ns, env = loggedIn()
         helpers.command(env, "settings")
 
@@ -242,7 +242,7 @@ describe("the panel's heading", function()
         -- tile on a dark panel reads as a sticker pasted onto it.
         local ns = loggedIn()
         assertEqual(
-            [[Interface\AddOns\Healclick\logo]],
+            [[Interface\AddOns\ClickHeal\logo]],
             ns.SettingsPanel.logo:GetTexture()
         )
     end)
@@ -252,7 +252,7 @@ describe("the panel's heading", function()
         -- well is the one that goes stale when the folder is renamed.
         local ns = loggedIn()
         assertTrue(
-            ns.SettingsPanel.logo:GetTexture():find("Healclick", 1, true) ~= nil
+            ns.SettingsPanel.logo:GetTexture():find("ClickHeal", 1, true) ~= nil
         )
     end)
 

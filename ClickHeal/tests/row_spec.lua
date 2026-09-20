@@ -1,7 +1,7 @@
 local helpers = require("helpers")
 
-local FILES = { "Healclick.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "Row.lua" }
-local FILES_WITH_GROUP = { "Healclick.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "Row.lua", "Group.lua" }
+local FILES = { "ClickHeal.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "Row.lua" }
+local FILES_WITH_GROUP = { "ClickHeal.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "Row.lua", "Group.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)
@@ -81,7 +81,7 @@ describe("building a row", function()
 
     it("gives every button the action bar's own hover highlight", function()
         -- The same texture and blend Blizzard's action buttons use, so a
-        -- Healclick button lights up under the cursor exactly as the ones
+        -- ClickHeal button lights up under the cursor exactly as the ones
         -- beside it do. ADD is what makes it a glow rather than an opaque
         -- square laid over the icon.
         local ns, env = loggedIn()

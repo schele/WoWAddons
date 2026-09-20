@@ -1,13 +1,13 @@
 local helpers = require("helpers")
 
-local FILES = { "Healclick.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "Row.lua", "Group.lua" }
+local FILES = { "ClickHeal.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "Row.lua", "Group.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)
     -- These are about re-stacking rows on the addon's own bar, which is the
     -- layout that does any stacking. Set before login, not after: rows are
     -- built during it and take their width from the layout in force then.
-    env.HealclickDB = { bar = { attached = false, showSelf = true } }
+    env.ClickHealDB = { bar = { attached = false, showSelf = true } }
     helpers.login(ns, env)
     return ns, env
 end
@@ -250,7 +250,7 @@ end)
 describe("Build asked for directly, without going through login", function()
     it("still arms the apply for whenever the deferred build completes", function()
         local ns, env = helpers.loadAddon(FILES)
-        helpers.fire(env, "ADDON_LOADED", "Healclick")
+        helpers.fire(env, "ADDON_LOADED", "ClickHeal")
         ns.Slots.Set(1, "Regrowth")
 
         env.__setCombat(true)

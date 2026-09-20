@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local FILES = { "Healclick.lua", "Anchors.lua" }
+local FILES = { "ClickHeal.lua", "Anchors.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)
@@ -32,7 +32,7 @@ describe("finding Blizzard's frame for a unit", function()
     it("finds each party member's frame inside the modern container", function()
         -- PartyMemberFrame1 was the global through Classic and Wrath. The
         -- 10.x rework moved it to PartyFrame.MemberFrame1, and this client
-        -- is a 1.60 beta on that base -- /hc anchors reported the old global
+        -- is a 1.60 beta on that base -- /ch anchors reported the old global
         -- missing while PlayerFrame was still there.
         local ns, env = loggedIn()
         for index = 1, 4 do

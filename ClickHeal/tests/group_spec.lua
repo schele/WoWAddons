@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local FILES = { "Healclick.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "Row.lua", "Group.lua" }
+local FILES = { "ClickHeal.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "Row.lua", "Group.lua" }
 
 local function loggedIn(before)
     local ns, env = helpers.loadAddon(FILES)
@@ -11,16 +11,16 @@ local function loggedIn(before)
     -- the attached layout is what ships by default. Set in the saved
     -- variables rather than on ns.db after login, because rows are built
     -- during login and take their width from the layout in force at the
-    -- time. Set after `before` so a test seeding its own HealclickDB does
+    -- time. Set after `before` so a test seeding its own ClickHealDB does
     -- not lose it. The attached describe at the foot of the file turns it
     -- back on and re-applies, which is what a real settings change does.
-    env.HealclickDB = env.HealclickDB or {}
-    env.HealclickDB.bar = env.HealclickDB.bar or {}
-    env.HealclickDB.bar.attached = false
+    env.ClickHealDB = env.ClickHealDB or {}
+    env.ClickHealDB.bar = env.ClickHealDB.bar or {}
+    env.ClickHealDB.bar.attached = false
     -- Likewise: the player's row ships switched off, and most of this file
     -- is about a stack that includes it. The describe that covers switching
     -- it off turns it off itself.
-    env.HealclickDB.bar.showSelf = true
+    env.ClickHealDB.bar.showSelf = true
 
     helpers.login(ns, env)
     return ns, env
@@ -39,7 +39,7 @@ describe("the order of the rows", function()
 
     it("puts you last when you ask for it", function()
         local ns = loggedIn(function(_, env)
-            env.HealclickDB = { bar = { selfBottom = true } }
+            env.ClickHealDB = { bar = { selfBottom = true } }
         end)
         local units = ns.Group.Units()
 
@@ -49,7 +49,7 @@ describe("the order of the rows", function()
 
     it("keeps the party in party order either way", function()
         local ns = loggedIn(function(_, env)
-            env.HealclickDB = { bar = { selfBottom = true } }
+            env.ClickHealDB = { bar = { selfBottom = true } }
         end)
         local units = ns.Group.Units()
 
@@ -171,7 +171,7 @@ describe("layout", function()
         -- so the visible rows stay contiguous.
         local ns, env = loggedIn(function(_, e)
             e.units.party2 = nil
-            e.HealclickDB = { bar = { selfBottom = true } }
+            e.ClickHealDB = { bar = { selfBottom = true } }
         end)
         ns.Group.Layout()
 
@@ -275,7 +275,7 @@ describe("the anchor", function()
         assertEqual(-200, ns.db.anchor.y)
     end)
 
-    it("goes back to the middle on /hc reset", function()
+    it("goes back to the middle on /ch reset", function()
         local ns, env = loggedIn()
         ns.db.anchor.point, ns.db.anchor.x, ns.db.anchor.y = "TOPLEFT", 120, -40
 
@@ -286,7 +286,7 @@ describe("the anchor", function()
     end)
 
     it("stores the reset position immediately in combat, but leaves the frame alone until combat ends", function()
-        -- FIX 3: /hc reset used to call SetPoint on the anchor unguarded,
+        -- FIX 3: /ch reset used to call SetPoint on the anchor unguarded,
         -- moving every row hanging off it -- rows full of secure buttons --
         -- mid-fight. The database write is not secure and must not wait;
         -- only the actual move does, via the same pending queue ApplyAll
@@ -383,7 +383,7 @@ describe("the anchor", function()
         assertFalse(ns.Group.Pending())
     end)
 
-    it("toggles the lock on /hc lock", function()
+    it("toggles the lock on /ch lock", function()
         local ns, env = loggedIn()
         assertFalse(ns.db.bar.locked)
 
@@ -620,7 +620,7 @@ describe("the anchor report", function()
 
         local ok = pcall(helpers.command, env, "anchors")
 
-        assertTrue(ok, "/hc anchors must survive whatever it finds")
+        assertTrue(ok, "/ch anchors must survive whatever it finds")
         local printed = helpers.printed(env)
         for _, unit in ipairs(ns.Group.Units()) do
             assertTrue(printed:find(unit, 1, true) ~= nil, unit .. " is reported")

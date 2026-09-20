@@ -82,7 +82,7 @@ local function runPending()
     end
 
     if pending then
-        -- Covers a deferred /hc reset or drag-stop as well as a deferred
+        -- Covers a deferred /ch reset or drag-stop as well as a deferred
         -- ApplyAll: repositioning to whatever db.anchor already holds is a
         -- harmless no-op when nothing moved the anchor, and is exactly the
         -- move a reset or drag needs when something did. Guarded the same
@@ -127,7 +127,7 @@ function Group.Anchor()
 end
 
 local function createAnchor()
-    anchor = CreateFrame("Frame", "HealclickAnchor", UIParent)
+    anchor = CreateFrame("Frame", "ClickHealAnchor", UIParent)
     -- Real height comes from Group.Layout, which always runs right after
     -- this (from Build); this starting size only matters for the instant
     -- before that first Layout call.
@@ -488,7 +488,7 @@ function Group.ApplyAll()
     -- was guarding belongs here too -- not just in runPending -- or whichever
     -- of ApplyAll's other callers (GROUP_ROSTER_UPDATE, a Slots.lua onChange,
     -- a Row.lua assignment) happens to be the one that clears a pending
-    -- /hc reset or drag-stop discards it silently instead of performing it.
+    -- /ch reset or drag-stop discards it silently instead of performing it.
     repositionAnchor()
     Group.Layout()
 

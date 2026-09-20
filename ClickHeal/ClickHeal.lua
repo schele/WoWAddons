@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
-ns.PREFIX = "|cff66ccffHealclick|r"
+ns.PREFIX = "|cff66ccffClickHeal|r"
 
 -- Defaults are contributed by each file at load time, so every piece of config
 -- lives next to the code that reads it and this file never learns the others.
@@ -111,12 +111,12 @@ function ns.SetSettingValue(setting, value)
 end
 
 local function ensureDatabase()
-    if type(HealclickDB) ~= "table" then
-        HealclickDB = {}
+    if type(ClickHealDB) ~= "table" then
+        ClickHealDB = {}
     end
 
-    applyDefaults(HealclickDB, defaults)
-    ns.db = HealclickDB
+    applyDefaults(ClickHealDB, defaults)
+    ns.db = ClickHealDB
 end
 
 ns.ensureDatabase = ensureDatabase
@@ -161,7 +161,7 @@ local function showHelp()
     table.sort(names)
 
     for _, name in ipairs(names) do
-        ns.Print(string.format("/hc %s - %s", name, commands[name].help))
+        ns.Print(string.format("/ch %s - %s", name, commands[name].help))
     end
 end
 
@@ -170,7 +170,7 @@ ns.ShowHelp = showHelp
 local function runCommand(msg)
     local input = msg and msg:match("^%s*(.-)%s*$") or ""
 
-    -- A bare "/hc" lists the commands, the same as "/fp" and "/url" do. Three
+    -- A bare "/ch" lists the commands, the same as "/fp" and "/url" do. Three
     -- addons whose login lines sit together must not disagree about this.
     if input == "" or input == "help" then
         showHelp()
@@ -190,9 +190,9 @@ local function runCommand(msg)
     showHelp()
 end
 
-SLASH_HEALCLICK1 = "/healclick"
-SLASH_HEALCLICK2 = "/hc"
-SlashCmdList.HEALCLICK = runCommand
+SLASH_CLICKHEAL1 = "/clickheal"
+SLASH_CLICKHEAL2 = "/ch"
+SlashCmdList.CLICKHEAL = runCommand
 
 -- Work to do once the player is in the world and the database exists.
 local loginHandlers = {}
@@ -215,6 +215,6 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
             handler()
         end
 
-        ns.Print("Loaded. Type /hc for commands.")
+        ns.Print("Loaded. Type /ch for commands.")
     end
 end)

@@ -1,12 +1,12 @@
 ## Interface: 11509, 16001
-## Title: Healclick
+## Title: ClickHeal
 ## Notes: A row of spell buttons beside every party member.
-## IconTexture: Interface\AddOns\Healclick\icon
+## IconTexture: Interface\AddOns\ClickHeal\icon
 ## Author: You
 ## Version: 0.1.0
-## SavedVariables: HealclickDB
+## SavedVariables: ClickHealDB
 
-Healclick.lua
+ClickHeal.lua
 Anchors.lua
 Spells.lua
 Slots.lua

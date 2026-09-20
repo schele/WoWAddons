@@ -276,7 +276,7 @@ function stub.newEnv()
     -- a container, and each health bar as a field rather than a global.
     --
     -- The pre-10.x names -- PartyMemberFrame1, PlayerFrameHealthBar -- are
-    -- deliberately absent. `/hc anchors` on the target client reports both
+    -- deliberately absent. `/ch anchors` on the target client reports both
     -- missing, and offering them here is exactly how this stub would let the
     -- addon depend on names that are not there. A test covering an older
     -- client adds them itself.

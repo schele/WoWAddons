@@ -98,7 +98,7 @@ function Slots.Seed(class)
 
     local seed = SEED[class or ""]
     if not seed then
-        -- Not burnt here: HealclickDB is account-wide, so a first login on a
+        -- Not burnt here: ClickHealDB is account-wide, so a first login on a
         -- class with no seed set (Warrior, Rogue, Mage) must not permanently
         -- deny every other character on the account -- a Druid main included
         -- -- its own seed the first time it logs in.

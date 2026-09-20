@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local FILES = { "Healclick.lua", "Anchors.lua", "Spells.lua", "Slots.lua" }
+local FILES = { "ClickHeal.lua", "Anchors.lua", "Spells.lua", "Slots.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)
@@ -131,7 +131,7 @@ describe("seeding", function()
     end)
 
     it("does not burn the account-wide flag on a class with no seed, so a later class still gets one", function()
-        -- HealclickDB is account-wide (## SavedVariables): a first login on
+        -- ClickHealDB is account-wide (## SavedVariables): a first login on
         -- a Warrior must not permanently deny a Druid alt its own seed the
         -- first time it logs in.
         local ns = loggedIn()

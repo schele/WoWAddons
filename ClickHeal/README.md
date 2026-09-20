@@ -1,10 +1,10 @@
-# Healclick (World of Warcraft AddOn)
+# ClickHeal (World of Warcraft AddOn)
 
 A row of spell buttons beside every member of your party, so healing,
 dispelling or buffing someone is one click on a button that already knows who
 it is for.
 
-Blizzard's party frames make you target first and cast second. Healclick
+Blizzard's party frames make you target first and cast second. ClickHeal
 removes the targeting step.
 
 By default the buttons hang off Blizzard's own unit frames, so a row of icons
@@ -21,7 +21,7 @@ sits beside the person it casts on:
 ```
 
 If your UI has no party frames to hang from — raid-style party frames replace
-them, and so do most unit-frame addons — Healclick falls back to a bar of its
+them, and so do most unit-frame addons — ClickHeal falls back to a bar of its
 own, which draws the names and health itself and can be dragged anywhere:
 
 ```
@@ -46,7 +46,7 @@ cannot land go dark while the rest stay lit.
 
 Both depend on the client being willing to answer, and some are not: range in
 particular comes back on some clients as a value an addon is not allowed to
-read. Healclick does not guess. Where it cannot tell, it leaves the icon lit,
+read. ClickHeal does not guess. Where it cannot tell, it leaves the icon lit,
 because being told a spell is out of reach when it is not costs you a cast you
 had.
 
@@ -84,12 +84,12 @@ There are three ways to put a spell in a slot, and they store the same thing:
 - **Click it there.** Click a spell in your spellbook to pick it up instead
   of dragging it, then click a button — no click-and-hold needed. Out of
   combat this assigns the spell exactly as a drag does. Mid-fight it does
-  not, and not merely by being held: the game will not let Healclick
+  not, and not merely by being held: the game will not let ClickHeal
   intercept that click at all, so it falls through to an ordinary click
   instead — the button casts whatever spell it already had, on that party
   member, and the spell you picked up is left sitting on your cursor for
   you to place once the fight is over.
-- **Pick it.** Open `/hc settings` and press **Pick** beside a slot. The list
+- **Pick it.** Open `/ch settings` and press **Pick** beside a slot. The list
   offers every spell you know that can be cast on a friendly target, so
   passives, attacks and professions stay out of it — as does any spell
   another slot already holds, since two buttons casting the same thing is one
@@ -115,19 +115,19 @@ does nothing: the button is unchanged and whatever you were carrying stays
 exactly where it was, on your cursor.
 
 Clicking a button while carrying one of those is different, not nothing:
-Healclick has no way to tell that click apart from an ordinary one, so the
+ClickHeal has no way to tell that click apart from an ordinary one, so the
 button casts normally, on whoever its row is for, while the item or macro is
 left sitting on your cursor, unplaced, for you to deal with afterward.
 
 A spell you have not learned yet is kept, not rejected — setting up the Remove
-Curse you get at level 24 is sensible, not a typo. Healclick says so once and
+Curse you get at level 24 is sensible, not a typo. ClickHeal says so once and
 keeps it.
 
 ## What it cannot do, and why
 
 **Addon code cannot cast a spell in this game.** Casting on a unit is
 protected: the only route is one of Blizzard's secure buttons carrying "cast
-*this* on *that unit*", which **you** click. Healclick sets those attributes;
+*this* on *that unit*", which **you** click. ClickHeal sets those attributes;
 the game does the rest.
 
 Three consequences you will notice:
@@ -135,9 +135,9 @@ Three consequences you will notice:
 - **Changes take effect out of combat.** Editing a spell — by typing or by
   dragging — changing the number of buttons, or moving your own row to the
   bottom is held until the fight ends. The game refuses those changes
-  mid-fight, so Healclick waits rather than putting an error on your screen.
+  mid-fight, so ClickHeal waits rather than putting an error on your screen.
   Picking a spell up and clicking a button, rather than dragging it, is the
-  exception: mid-fight the game will not even let Healclick suppress that
+  exception: mid-fight the game will not even let ClickHeal suppress that
   click, so instead of holding the assignment for later it lets the click
   through as an ordinary cast and leaves the spell on your cursor — see
   "Icons, and assigning spells" above.
@@ -149,13 +149,13 @@ Three consequences you will notice:
 
 ## Install
 
-1. Copy this folder into your client's `Interface/AddOns` as `Healclick`, so
-   the result is `.../Interface/AddOns/Healclick/Healclick.toc`.
-2. Restart the client and enable Healclick from the AddOns list.
+1. Copy this folder into your client's `Interface/AddOns` as `ClickHeal`, so
+   the result is `.../Interface/AddOns/ClickHeal/ClickHeal.toc`.
+2. Restart the client and enable ClickHeal from the AddOns list.
 
 The repo's `package.ps1` does step 1 for you, from the root:
 
-    .\package.ps1 Healclick -Install
+    .\package.ps1 ClickHeal -Install
 
 See the [repo README](../README.md) for packaging and test commands.
 
@@ -164,13 +164,13 @@ Built against Classic Era 1.15.x (`11509`) and the 1.60.x Classic beta
 
 ## Commands
 
-`/healclick` or the short `/hc`:
+`/clickheal` or the short `/ch`:
 
-- `/hc` - Show the command list
-- `/hc lock` - Stop the bar being dragged
-- `/hc reset` - Put the bar back in the middle
-- `/hc settings` - Open the settings panel
-- `/hc debug` - Print what happens when a spell button is clicked, for
+- `/ch` - Show the command list
+- `/ch lock` - Stop the bar being dragged
+- `/ch reset` - Put the bar back in the middle
+- `/ch settings` - Open the settings panel
+- `/ch debug` - Print what happens when a spell button is clicked, for
   working out why one is not casting
 
 `lock` and `reset` are about the addon's own bar. Attached to the unit
@@ -215,7 +215,7 @@ by unit tests that run outside the game against a stubbed WoW API
 From the repo root:
 
 ```powershell
-.\run-tests.ps1 Healclick
+.\run-tests.ps1 ClickHeal
 ```
 
 Or a single suite by hand, from this folder:
@@ -224,6 +224,6 @@ Or a single suite by hand, from this folder:
 lua tests/runner.lua tests/slots_spec.lua
 ```
 
-What the tests prove is that Healclick asks for the right thing: that party2's
+What the tests prove is that ClickHeal asks for the right thing: that party2's
 third button carries `spell="Remove Curse"` and `unit="party2"`. Whether the
 client honours it is something only the client can answer.
