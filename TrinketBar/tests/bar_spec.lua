@@ -454,11 +454,35 @@ describe("the anchor", function()
         assertMatch("combat", helpers.printed(env))
     end)
 
+    it("does not announce a save after a refused drag that never started", function()
+        -- The client fires OnDragStart and OnDragStop as a matched pair for
+        -- one mouse gesture regardless of what OnDragStart's handler does,
+        -- so a drag attempted in combat used to print both "Cannot move the
+        -- bar in combat." (the refusal) and "Bar position will be saved
+        -- once combat ends." (OnDragStop's now-removed deferral message) --
+        -- contradicting itself in the same breath. OnDragStop no longer
+        -- defers or announces anything at all, so this should stay true no
+        -- matter what OnDragStop is later given to say.
+        local ns, env = loggedIn()
+        local frame = ns.Bar.Anchor()
+
+        env.__setCombat(true)
+        frame.scripts.OnDragStart(frame)
+        frame.scripts.OnDragStop(frame)
+
+        assertMatch("combat", helpers.printed(env))
+        assertFalse(helpers.printed(env):find("will be saved") ~= nil,
+            "a drag that never started must not announce a save")
+    end)
+
     it("lets the drag end safely if combat starts before the mouse is released", function()
         -- A drag can start out of combat and still be running when a mob
         -- pulls -- the release then runs on a frame every secure button
-        -- hangs off. The release must never raise, and must not move the
-        -- bar or write its position until combat actually ends.
+        -- hangs off, so it must never raise. But saving the dropped
+        -- position is a GetPoint (a read) and three writes to a plain Lua
+        -- table, not a secure write -- nothing here is ever refused, so
+        -- there is nothing to defer. The position is saved immediately,
+        -- combat or not.
         local ns, env = loggedIn()
         local frame = ns.Bar.Anchor()
 
@@ -470,13 +494,39 @@ describe("the anchor", function()
 
         local ok = pcall(frame.scripts.OnDragStop, frame)
         assertTrue(ok, "the release itself must never raise")
-        assertFalse(ns.db.anchor.x == 200, "not saved yet -- combat is still on")
-        assertMatch("combat", helpers.printed(env))
+        assertEqual(200, ns.db.anchor.x, "saved immediately -- nothing here is a secure write")
+        assertEqual(-60, ns.db.anchor.y)
+    end)
+
+    it("does not let a stale queued drag-save clobber a later /tb reset", function()
+        -- Proved failure from an earlier, wrong fix: the drag's own write
+        -- was deferred to PLAYER_REGEN_ENABLED the same as a reset's
+        -- reposition. Both then ran inside the same runPending(), in a
+        -- fixed order (save, then reposition) that had nothing to do with
+        -- which one the player actually did last. Here the release happens
+        -- BEFORE the reset -- reset is genuinely the last word -- but the
+        -- old deferred save would still run at combat-end and overwrite the
+        -- freshly-reset database with the stale, already-superseded drag
+        -- position, breaking the "Bar will move back once combat ends."
+        -- promise. Writing the drag's position immediately, at release time
+        -- rather than batched later, means nothing queued can reach forward
+        -- past a change that came after it.
+        local ns, env = loggedIn()
+        local frame = ns.Bar.Anchor()
+
+        frame.scripts.OnDragStart(frame)
+        frame:ClearAllPoints()
+        frame:SetPoint("TOPLEFT", env.UIParent, "TOPLEFT", 300, -80)
+
+        env.__setCombat(true)
+        frame.scripts.OnDragStop(frame)
+        helpers.command(env, "reset")
 
         env.__setCombat(false)
 
-        assertEqual(200, ns.db.anchor.x, "saved the instant combat ends")
-        assertEqual(-60, ns.db.anchor.y)
+        assertEqual("CENTER", ns.db.anchor.point, "the reset is the last word, so it must win")
+        assertEqual(0, ns.db.anchor.x)
+        assertEqual(-160, ns.db.anchor.y)
     end)
 
     it("remembers where it was dropped", function()
