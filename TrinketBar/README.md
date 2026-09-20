@@ -88,8 +88,14 @@ up as soon as they do.
 On a client that cannot read your bags at all, TrinketBar says so once in
 chat — *"This client will not let me read your bags, so the bar shows only
 what you are wearing."* — and falls back to showing only the two trinkets you
-have equipped. That message prints once, not every time your bags change; if
-you see it, it is not a bug, it is what this client will let TrinketBar do.
+have equipped.
+
+If your bags can be read but one particular trinket cannot, that one trinket
+is left off the bar instead — everything else you are carrying still shows,
+and TrinketBar says so with a different line: *"This client would not read
+some of what you are carrying, so the bar may be missing a trinket."* Each of
+these two messages prints once, not every time your bags change; if you see
+either one, it is not a bug, it is what this client will let TrinketBar do.
 
 ## Install
 

@@ -20,17 +20,33 @@ Items.TRINKET_SLOTS = {
 -- answers with something else, which is the whole filter.
 local TRINKET_LOCATION = "INVTYPE_TRINKET"
 
--- Said once per session, not once per bag change. Carried() runs on every
--- BAG_UPDATE_DELAYED, and a message repeating that often is worse than the
--- fault it reports.
-local warnedAboutBags = false
+-- Said once per session each, not once per bag change: Carried() runs on
+-- every BAG_UPDATE_DELAYED, and a message repeating that often is worse than
+-- the fault it reports.
+--
+-- Two flags, not one, because the two failures are not the same claim.
+-- "The bar shows only what you are wearing" is true when nothing could be
+-- read at all; it is false, and actively misleading, when some trinkets
+-- read fine and are sitting right there on the bar next to the two worn
+-- ones. Which one applies is decided by the caller, by whether anything
+-- ended up on the list.
+local warnedBagsUnreadable = false
+local warnedSomeItemsUnreadable = false
 
-local function warnOnce()
-    if warnedAboutBags then
+local function warnBagsUnreadable()
+    if warnedBagsUnreadable then
         return
     end
-    warnedAboutBags = true
+    warnedBagsUnreadable = true
     ns.Print("This client will not let me read your bags, so the bar shows only what you are wearing.")
+end
+
+local function warnSomeItemsUnreadable()
+    if warnedSomeItemsUnreadable then
+        return
+    end
+    warnedSomeItemsUnreadable = true
+    ns.Print("This client would not read some of what you are carrying, so the bar may be missing a trinket.")
 end
 
 --- How many slots a bag has, through whichever API this client has.
@@ -95,14 +111,15 @@ end
 -- that refuses one of these reads still answers for the rest of them, and a
 -- single unreadable item should cost that item, not every trinket on the
 -- bar. Every failure along the way -- missing API, a raise counting a bag's
--- slots, a raise reading one of them -- feeds the same "at most once"
--- warning, since the player does not need to be told twice that the same
--- client limitation is in effect.
+-- slots, a raise reading one of them -- sets the same flag, but which
+-- warning that flag triggers below depends on whether the walk still found
+-- anything: total failure and partial failure are different claims to the
+-- player and must not share a message.
 function Items.Carried()
     local canWalk = (C_Container and C_Container.GetContainerNumSlots)
         or GetContainerNumSlots
     if not canWalk then
-        warnOnce()
+        warnBagsUnreadable()
         return {}
     end
 
@@ -149,7 +166,14 @@ function Items.Carried()
     end
 
     if anyUnreadable then
-        warnOnce()
+        -- Nothing on the list is the only case where "the bar shows only
+        -- what you are wearing" is actually true. Anything else and the
+        -- bar contradicts that claim the moment it is on screen.
+        if #found == 0 then
+            warnBagsUnreadable()
+        else
+            warnSomeItemsUnreadable()
+        end
     end
 
     table.sort(found, function(left, right)

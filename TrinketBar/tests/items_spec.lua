@@ -188,6 +188,72 @@ describe("finding the trinkets in the bags", function()
         assertEqual(1, count)
     end)
 
+    it("does not claim the bar shows only what is worn when some trinkets read fine", function()
+        -- warnOnce() was broadened to fire on any failing read, but kept
+        -- describing total failure. Three trinkets carried, one of them
+        -- unreadable: the other two are visibly on the bar, so "the bar
+        -- shows only what you are wearing" is false the moment it prints.
+        local ns, env = loggedIn()
+        env.__carry(0, 1, "Hand of Justice")
+        env.__carry(0, 2, "Kiss of the Spider")
+        env.__carry(0, 3, "Zandalarian Hero Charm")
+
+        local original = env.C_Container.GetContainerItemLink
+        env.C_Container.GetContainerItemLink = function(bag, slot)
+            if slot == 2 then
+                error("secret value")
+            end
+            return original(bag, slot)
+        end
+
+        local carried = ns.Items.Carried()
+
+        assertEqual(2, #carried, "the two readable trinkets still show")
+        assertFalse(helpers.printed(env):find("shows only what you are wearing") ~= nil,
+            "false and misleading when trinkets are visibly on the bar")
+    end)
+
+    it("says something for a partial failure too, just not the total-failure claim", function()
+        -- Silence would be its own bug: a player missing a trinket they
+        -- know they are carrying needs a reason, even a partial one.
+        local ns, env = loggedIn()
+        env.__carry(0, 1, "Hand of Justice")
+        env.__carry(0, 2, "Kiss of the Spider")
+
+        local original = env.C_Container.GetContainerItemLink
+        env.C_Container.GetContainerItemLink = function(bag, slot)
+            if slot == 1 then
+                error("secret value")
+            end
+            return original(bag, slot)
+        end
+
+        ns.Items.Carried()
+
+        assertMatch("carrying", helpers.printed(env))
+    end)
+
+    it("warns about a partial failure at most once too", function()
+        local ns, env = loggedIn()
+        env.__carry(0, 1, "Hand of Justice")
+        env.__carry(0, 2, "Kiss of the Spider")
+
+        local original = env.C_Container.GetContainerItemLink
+        env.C_Container.GetContainerItemLink = function(bag, slot)
+            if slot == 1 then
+                error("secret value")
+            end
+            return original(bag, slot)
+        end
+
+        ns.Items.Carried()
+        ns.Items.Carried()
+        ns.Items.Carried()
+
+        local _, count = helpers.printed(env):gsub("carrying", "carrying")
+        assertEqual(1, count)
+    end)
+
     it("does not pass through a texture value that is not a number or a string", function()
         -- Bar.Apply branches on entry.texture ("if entry.texture then")
         -- outside any guard, from an event handler. Lua cannot construct a
