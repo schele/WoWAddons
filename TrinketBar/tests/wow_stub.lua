@@ -36,11 +36,14 @@ local function makeWidget(kind, parent, template, env)
         minValue = 0,
         maxValue = 1,
         -- Whether the real client would refuse a secure-adjacent write on
-        -- this frame in combat. Set automatically for a secure template
-        -- (see CreateFrame below) and by hand for a frame like the bar's
-        -- anchor, which carries no template of its own but moves, shows and
-        -- hides every secure button hanging off it.
-        protected = false,
+        -- this frame in combat. Inherited from the parent at creation time,
+        -- then possibly upgraded to true below by CreateFrame's own checks
+        -- (a secure template, or the bar's anchor by name). The real
+        -- client's IsProtected() returns (isProtected, isExplicit) for
+        -- exactly this reason: protection flows down from a protected
+        -- frame to everything created under it -- a secure button's own
+        -- icon texture is no less untouchable in combat than the button is.
+        protected = parent and parent.protected or false,
         -- An EditBox grabs focus as it comes into existence in the real
         -- client, same as ForeverPanel's stub documents; that starting state
         -- is what lets ClearFocus() fire OnEditFocusLost on the first call.

@@ -30,6 +30,22 @@ describe("building the bar", function()
         assertEqual("SecureActionButtonTemplate", ns.Bar.Buttons()[1].template)
     end)
 
+    it("carries protection down to a button's own icon, worn marker and cooldown", function()
+        -- A texture or cooldown frame created under a secure button is no
+        -- less untouchable in combat than the button itself -- the real
+        -- client's IsProtected() is inherited down the parent chain for
+        -- exactly this reason. Without that inheritance in the fixture, an
+        -- illegal combat write reachable only through one of these children
+        -- (button.icon:Hide(), say, from RefreshCooldowns -- the one path
+        -- deliberately allowed to run in combat) would go entirely unnoticed.
+        local ns = loggedIn()
+        local button = ns.Bar.Buttons()[1]
+
+        assertTrue(button.icon:IsProtected())
+        assertTrue(button.worn:IsProtected())
+        assertTrue(button.cooldown:IsProtected())
+    end)
+
     it("asks for both click edges", function()
         -- This client acts on the press where others act on the release.
         local ns = loggedIn()
