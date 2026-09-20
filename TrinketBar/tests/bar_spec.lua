@@ -208,3 +208,143 @@ describe("keeping up with the bags", function()
             helpers.attrs(ns.Bar.Buttons()[1]).macrotext1)
     end)
 end)
+
+describe("laying the buttons out", function()
+    local function carrying(count)
+        local names = {}
+        for index = 1, count do
+            names[index] = string.format("Trinket %02d", index)
+        end
+
+        return loggedIn(function(_, env)
+            for index, name in ipairs(names) do
+                env.__carry(0, index, name)
+            end
+        end)
+    end
+
+    it("puts them in a row, left to right", function()
+        local ns = carrying(3)
+        ns.Bar.Apply()
+
+        -- Fourth and fifth returns, not second: buttons are anchored to the
+        -- bar with the explicit five-argument SetPoint (point, relativeTo,
+        -- relativePoint, x, y), the same as the wrap test below reads. The
+        -- second return is the relativeTo frame, not an offset -- reading it
+        -- as one instead compares two frames and proves nothing about order.
+        local _, _, _, firstX = ns.Bar.Buttons()[1]:GetPoint()
+        local _, _, _, secondX = ns.Bar.Buttons()[2]:GetPoint()
+
+        assertTrue(secondX > firstX)
+    end)
+
+    it("wraps onto a second row past the configured width", function()
+        -- Sixteen in a line is wider than most screens.
+        local ns = carrying(3)
+        ns.db.bar.perRow = 2
+        ns.Bar.Apply()
+
+        local _, _, _, secondX, secondY = ns.Bar.Buttons()[2]:GetPoint()
+        local _, _, _, thirdX, thirdY = ns.Bar.Buttons()[3]:GetPoint()
+
+        assertTrue(thirdY < secondY, "the third button dropped a row")
+        assertTrue(thirdX < secondX, "and went back to the left")
+    end)
+
+    it("sizes the buttons to the setting", function()
+        local ns = carrying(1)
+        ns.db.bar.iconSize = 40
+        ns.Bar.Apply()
+
+        assertEqual(40, ns.Bar.Buttons()[1]:GetWidth())
+    end)
+
+    it("sizes the anchor to the buttons it is actually holding", function()
+        -- The anchor is the drag handle as well as the backdrop, so one
+        -- sized for sixteen buttons would be a strip of empty air to grab.
+        local ns = carrying(2)
+        ns.db.bar.perRow = 8
+        ns.Bar.Apply()
+
+        local width = ns.Bar.Anchor():GetWidth()
+        local buttonWidth = ns.Bar.Buttons()[1]:GetWidth()
+
+        assertTrue(width < buttonWidth * 8, "not sized for a full row")
+        assertTrue(width >= buttonWidth * 2, "but wide enough for two")
+    end)
+end)
+
+describe("the anchor", function()
+    it("starts where the database says", function()
+        local ns = loggedIn()
+        assertEqual("CENTER", ns.db.anchor.point)
+    end)
+
+    it("does not move while locked", function()
+        local ns = loggedIn()
+        ns.db.bar.locked = true
+
+        local frame = ns.Bar.Anchor()
+        frame.scripts.OnDragStart(frame)
+
+        assertFalse(frame.moving == true, "a locked bar stays put")
+    end)
+
+    it("moves while unlocked", function()
+        local ns = loggedIn()
+        ns.db.bar.locked = false
+
+        local frame = ns.Bar.Anchor()
+        frame.scripts.OnDragStart(frame)
+
+        assertTrue(frame.moving)
+    end)
+
+    it("refuses to start moving in combat, and says why", function()
+        -- Moving the anchor moves every secure button hanging off it.
+        local ns, env = loggedIn()
+        env.__setCombat(true)
+
+        local frame = ns.Bar.Anchor()
+        frame.scripts.OnDragStart(frame)
+
+        assertFalse(frame.moving == true)
+        assertMatch("combat", helpers.printed(env))
+    end)
+
+    it("remembers where it was dropped", function()
+        local ns, env = loggedIn()
+        local frame = ns.Bar.Anchor()
+
+        frame.scripts.OnDragStart(frame)
+        frame:ClearAllPoints()
+        -- The five-argument form, because that is what the client hands
+        -- back from GetPoint after a real drag, and OnDragStop reads the
+        -- fourth and fifth returns. A three-argument point would leave the
+        -- offsets nil and the test would be proving nothing.
+        frame:SetPoint("TOPLEFT", env.UIParent, "TOPLEFT", 120, -40)
+        frame.scripts.OnDragStop(frame)
+
+        assertEqual("TOPLEFT", ns.db.anchor.point)
+        assertEqual(120, ns.db.anchor.x)
+    end)
+
+    it("toggles the lock on /tb lock", function()
+        local ns, env = loggedIn()
+        assertFalse(ns.db.bar.locked)
+
+        helpers.command(env, "lock")
+        assertTrue(ns.db.bar.locked)
+    end)
+
+    it("puts the bar back in the middle on /tb reset", function()
+        local ns, env = loggedIn()
+        ns.db.anchor.point = "TOPLEFT"
+        ns.db.anchor.x = 400
+
+        helpers.command(env, "reset")
+
+        assertEqual("CENTER", ns.db.anchor.point)
+        assertEqual(0, ns.db.anchor.x)
+    end)
+end)

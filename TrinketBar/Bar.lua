@@ -14,6 +14,27 @@ Bar.MAX_BUTTONS = 16
 local BUTTON_SIZE = 24
 local BUTTON_GAP = 4
 
+local DEFAULT_ANCHOR = { point = "CENTER", x = 0, y = -160 }
+
+ns.AddDefaults({
+    anchor = {
+        point = DEFAULT_ANCHOR.point,
+        x = DEFAULT_ANCHOR.x,
+        y = DEFAULT_ANCHOR.y,
+    },
+    bar = {
+        iconSize = 24,
+        -- Eight, because sixteen in a line is wider than most screens and
+        -- nobody carries sixteen anyway.
+        perRow = 8,
+        locked = false,
+    },
+})
+
+-- Faint enough not to compete with the icons over it, visible enough that
+-- the drag region reads as a thing you can grab rather than empty air.
+local BACKDROP_ALPHA = 0.12
+
 local anchor
 local buttons = {}
 
@@ -36,10 +57,68 @@ function Bar.Pending()
     return pending
 end
 
+--- The icon size in force, clamped where it is read rather than trusted from
+-- the database: a slider cannot produce a bad value but a saved variable
+-- edited by hand can, and a frame sized from a negative number is one the
+-- client complains about.
+local function iconSize()
+    local size = math.floor(tonumber(ns.db and ns.db.bar and ns.db.bar.iconSize) or 24)
+    if size < 12 then return 12 end
+    if size > 48 then return 48 end
+    return size
+end
+
+local function perRow()
+    local count = math.floor(tonumber(ns.db and ns.db.bar and ns.db.bar.perRow) or 8)
+    if count < 1 then return 1 end
+    if count > Bar.MAX_BUTTONS then return Bar.MAX_BUTTONS end
+    return count
+end
+
+local function repositionAnchor()
+    if anchor then
+        anchor:ClearAllPoints()
+        anchor:SetPoint(ns.db.anchor.point, ns.db.anchor.x, ns.db.anchor.y)
+    end
+end
+
 local function createAnchor()
     anchor = CreateFrame("Frame", "TrinketBarAnchor", UIParent)
     anchor:SetSize(BUTTON_SIZE, BUTTON_SIZE)
-    anchor:SetPoint("CENTER", 0, -160)
+
+    local background = anchor:CreateTexture(nil, "BACKGROUND")
+    background:SetAllPoints()
+    background:SetColorTexture(1, 1, 1, BACKDROP_ALPHA)
+    anchor.background = background
+
+    repositionAnchor()
+    anchor:SetMovable(true)
+    anchor:EnableMouse(true)
+    anchor:RegisterForDrag("LeftButton")
+
+    anchor:SetScript("OnDragStart", function(self)
+        if ns.db.bar.locked then
+            return
+        end
+
+        if InCombatLockdown and InCombatLockdown() then
+            -- StartMoving repositions every button hanging off this frame,
+            -- which the client refuses in combat the same as any other
+            -- secure change.
+            ns.Print("Cannot move the bar in combat.")
+            return
+        end
+
+        self:StartMoving()
+    end)
+
+    anchor:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local point, _, _, x, y = self:GetPoint(1)
+        ns.db.anchor.point = point or DEFAULT_ANCHOR.point
+        ns.db.anchor.x = x or DEFAULT_ANCHOR.x
+        ns.db.anchor.y = y or DEFAULT_ANCHOR.y
+    end)
 end
 
 --- Build the pool. Out of combat only: creating a secure button writes
@@ -98,6 +177,7 @@ function Bar.Apply()
     pending = false
 
     local all = ns.Items.All()
+    local shown = 0
 
     for index = 1, Bar.MAX_BUTTONS do
         local button = buttons[index]
@@ -115,6 +195,7 @@ function Bar.Apply()
 
             button.entry = entry
             button:Show()
+            shown = shown + 1
         else
             -- Cleared, not merely hidden. A hidden button still carrying an
             -- instruction is one keybind away from running it.
@@ -128,13 +209,56 @@ function Bar.Apply()
         end
     end
 
+    Bar.Layout(shown)
+
     return true
+end
+
+--- Place the buttons that are showing, and size the anchor to hold them.
+--
+-- Placed by how many are showing rather than by index, so a gap never opens
+-- where a hidden button would have been. Safe here because Apply only ever
+-- runs out of combat, and moving a secure button is refused in it.
+function Bar.Layout(shown)
+    local size = iconSize()
+    local columns = perRow()
+    local placed = 0
+
+    for index = 1, Bar.MAX_BUTTONS do
+        local button = buttons[index]
+
+        if index <= shown then
+            local column = placed % columns
+            local row = math.floor(placed / columns)
+
+            button:SetSize(size, size)
+            button:ClearAllPoints()
+            button:SetPoint(
+                "TOPLEFT", anchor, "TOPLEFT",
+                column * (size + BUTTON_GAP),
+                -row * (size + BUTTON_GAP)
+            )
+            placed = placed + 1
+        end
+    end
+
+    local across = math.min(math.max(shown, 1), columns)
+    local down = math.max(math.ceil(shown / columns), 1)
+
+    anchor:SetSize(
+        across * size + (across - 1) * BUTTON_GAP,
+        down * size + (down - 1) * BUTTON_GAP
+    )
 end
 
 --- Run whatever combat was holding.
 local function runPending()
     if buildPending and Bar.Build() then
         pending = true
+    end
+
+    if pending and not (InCombatLockdown and InCombatLockdown()) then
+        repositionAnchor()
     end
 
     if pending then
@@ -167,4 +291,24 @@ end)
 ns.OnLogin(function()
     Bar.Build()
     Bar.Apply()
+end)
+
+ns.RegisterCommand("lock", "Stop the bar being dragged", function()
+    ns.db.bar.locked = not ns.db.bar.locked
+    ns.Print(ns.db.bar.locked and "Bar locked." or "Bar unlocked.")
+end)
+
+ns.RegisterCommand("reset", "Put the bar back in the middle", function()
+    ns.db.anchor.point = DEFAULT_ANCHOR.point
+    ns.db.anchor.x = DEFAULT_ANCHOR.x
+    ns.db.anchor.y = DEFAULT_ANCHOR.y
+
+    if InCombatLockdown and InCombatLockdown() then
+        pending = true
+        ns.Print("Bar will move back once combat ends.")
+        return
+    end
+
+    repositionAnchor()
+    ns.Print("Bar back in the middle.")
 end)
