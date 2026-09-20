@@ -126,7 +126,13 @@ describe("finding the trinkets in the bags", function()
         -- Every client read here goes through ns.Guarded, because a read
         -- this client refuses to let tainted code inspect raises rather
         -- than returning nothing.
+        --
+        -- Something has to be in a bag first. With every bag empty the walk
+        -- runs `for slot = 1, 0`, never calls the read at all, and returns
+        -- an empty list by falling through -- which looks exactly like the
+        -- guard working and would pass with the guard deleted.
         local ns, env = loggedIn()
+        env.__carry(0, 1, "Hand of Justice")
         env.C_Container.GetContainerItemLink = function() error("secret value") end
 
         local ok, carried = pcall(ns.Items.Carried)
