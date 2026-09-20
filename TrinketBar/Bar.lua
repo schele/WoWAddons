@@ -44,6 +44,7 @@ local buttons = {}
 -- moment the fight ends.
 local pending = false
 local buildPending = false
+local dragPending = false
 
 function Bar.Buttons()
     return buttons
@@ -82,6 +83,16 @@ local function repositionAnchor()
     end
 end
 
+--- Read the anchor's current point and save it. The inverse of
+-- repositionAnchor: that writes ns.db to the anchor, this reads the anchor
+-- into ns.db.
+local function saveAnchorPosition()
+    local point, _, _, x, y = anchor:GetPoint(1)
+    ns.db.anchor.point = point or DEFAULT_ANCHOR.point
+    ns.db.anchor.x = x or DEFAULT_ANCHOR.x
+    ns.db.anchor.y = y or DEFAULT_ANCHOR.y
+end
+
 local function createAnchor()
     anchor = CreateFrame("Frame", "TrinketBarAnchor", UIParent)
     anchor:SetSize(BUTTON_SIZE, BUTTON_SIZE)
@@ -113,11 +124,23 @@ local function createAnchor()
     end)
 
     anchor:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local point, _, _, x, y = self:GetPoint(1)
-        ns.db.anchor.point = point or DEFAULT_ANCHOR.point
-        ns.db.anchor.x = x or DEFAULT_ANCHOR.x
-        ns.db.anchor.y = y or DEFAULT_ANCHOR.y
+        -- A refusal here must not raise: the drag has to be able to end even
+        -- if a mob pulls between the last mouse-move and the release, or the
+        -- bar is stuck to the cursor for the rest of the fight. Refusing to
+        -- start (OnDragStart above) is the safe place to hold the line;
+        -- refusing to stop is not.
+        pcall(self.StopMovingOrSizing, self)
+
+        if InCombatLockdown and InCombatLockdown() then
+            -- The position itself is real -- the drag already happened --
+            -- but saving it is a write like any other the combat queue
+            -- holds, so it waits for PLAYER_REGEN_ENABLED the same way.
+            dragPending = true
+            ns.Print("Bar position will be saved once combat ends.")
+            return
+        end
+
+        saveAnchorPosition()
     end)
 end
 
@@ -359,6 +382,14 @@ end
 local function runPending()
     if buildPending and Bar.Build() then
         pending = true
+    end
+
+    -- This only ever runs from PLAYER_REGEN_ENABLED, so combat has already
+    -- ended by the time it does -- unlike the general `pending` queue below,
+    -- there is no "still in combat" branch to fall through here.
+    if dragPending then
+        dragPending = false
+        saveAnchorPosition()
     end
 
     if pending and not (InCombatLockdown and InCombatLockdown()) then

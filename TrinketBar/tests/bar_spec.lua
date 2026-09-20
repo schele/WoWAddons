@@ -353,6 +353,31 @@ describe("the anchor", function()
         assertMatch("combat", helpers.printed(env))
     end)
 
+    it("lets the drag end safely if combat starts before the mouse is released", function()
+        -- A drag can start out of combat and still be running when a mob
+        -- pulls -- the release then runs on a frame every secure button
+        -- hangs off. The release must never raise, and must not move the
+        -- bar or write its position until combat actually ends.
+        local ns, env = loggedIn()
+        local frame = ns.Bar.Anchor()
+
+        frame.scripts.OnDragStart(frame)
+        frame:ClearAllPoints()
+        frame:SetPoint("TOPLEFT", env.UIParent, "TOPLEFT", 200, -60)
+
+        env.__setCombat(true)
+
+        local ok = pcall(frame.scripts.OnDragStop, frame)
+        assertTrue(ok, "the release itself must never raise")
+        assertFalse(ns.db.anchor.x == 200, "not saved yet -- combat is still on")
+        assertMatch("combat", helpers.printed(env))
+
+        env.__setCombat(false)
+
+        assertEqual(200, ns.db.anchor.x, "saved the instant combat ends")
+        assertEqual(-60, ns.db.anchor.y)
+    end)
+
     it("remembers where it was dropped", function()
         local ns, env = loggedIn()
         local frame = ns.Bar.Anchor()
