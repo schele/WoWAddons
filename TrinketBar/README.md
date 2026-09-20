@@ -56,16 +56,21 @@ re-point a button:
 - **`/tb reset` is held until combat ends**, then puts the bar back in the
   middle the instant you leave the fight — moving it is the same secure write
   as anything else here.
-- **Dragging the bar mid-fight is refused, not queued.** Moving the anchor
-  would move every secure button hanging off it, so the game blocks the drag
-  outright and TrinketBar says so in chat; let go and the bar is exactly where
-  it already was, not where you tried to drop it.
+- **Starting a drag while you are already in combat is refused outright, not
+  queued.** Moving the anchor would move every secure button hanging off it,
+  so the game blocks the drag before it begins and TrinketBar says so in chat;
+  let go and the bar has not moved.
+- **A drag already underway when combat starts is not cut short, and dropping
+  it mid-fight works exactly as it would outside one.** Only moving the bar's
+  frame is a secure write; letting go of the mouse is not, so the new
+  position is saved the instant you release it — the bar is exactly where you
+  dropped it, combat or not.
 - **`/tb lock` takes effect immediately, combat or not.** It flips a plain
   setting rather than touching the bar itself, so there is nothing for combat
   to hold.
 
-TrinketBar prints when it refuses a drag or holds a reset, so a bar that did
-not move is not left unexplained.
+TrinketBar prints when it refuses to start a drag or holds a reset, so a bar
+that did not move is not left unexplained.
 
 ## What is on the bar
 
