@@ -129,3 +129,110 @@ function Items.Carried()
         return found
     end, {})
 end
+
+--- What is in each trinket slot: { [13] = entry, [14] = entry }, with a slot
+-- missing where nothing is worn.
+function Items.Worn()
+    return ns.Guarded(function()
+        local worn = {}
+
+        for _, slot in ipairs(Items.TRINKET_SLOTS) do
+            local link = GetInventoryItemLink and GetInventoryItemLink("player", slot)
+
+            if link then
+                local name, _, texture = itemFacts(link)
+                if name then
+                    worn[slot] = {
+                        name = name,
+                        link = link,
+                        texture = texture,
+                        wornSlot = slot,
+                    }
+                end
+            end
+        end
+
+        return worn
+    end, {})
+end
+
+--- Everything the bar shows: the worn and the carried, as one list sorted by
+-- name.
+--
+-- A trinket that is both worn and carried -- a second copy in the bags --
+-- appears once, as the worn one. The worn entry says strictly more: it
+-- carries which slot it is in, which is what the marker on the button needs.
+function Items.All()
+    local all, seen = {}, {}
+
+    for _, entry in pairs(Items.Worn()) do
+        if not seen[entry.name] then
+            seen[entry.name] = true
+            all[#all + 1] = entry
+        end
+    end
+
+    for _, entry in ipairs(Items.Carried()) do
+        if not seen[entry.name] then
+            seen[entry.name] = true
+            all[#all + 1] = entry
+        end
+    end
+
+    table.sort(all, function(left, right)
+        return left.name < right.name
+    end)
+
+    return all
+end
+
+--- When a trinket's cooldown started and how long it runs, or nil when there
+-- is none to draw.
+--
+-- Which call answers depends on where the trinket is, which is why the entry
+-- is passed rather than a name: a worn trinket is asked about by inventory
+-- slot, a carried one by bag and slot, and nothing can turn one into the
+-- other.
+function Items.Cooldown(entry)
+    if type(entry) ~= "table" then
+        return nil
+    end
+
+    -- Gathered into a table before it leaves the guard, because ns.Guarded
+    -- returns one value -- it is a pcall, and the second return of a pcall
+    -- is the first return of what it called. Two loose values cannot come
+    -- back through it, and asking the client twice to get them would be two
+    -- reads where the answer must not disagree with itself.
+    local reading = ns.Guarded(function()
+        local start, duration
+
+        if entry.wornSlot then
+            if not GetInventoryItemCooldown then
+                return nil
+            end
+            start, duration = GetInventoryItemCooldown("player", entry.wornSlot)
+        else
+            local read = (C_Container and C_Container.GetContainerItemCooldown)
+                or GetContainerItemCooldown
+            if not read then
+                return nil
+            end
+            start, duration = read(entry.bag, entry.slot)
+        end
+
+        -- Zero duration is how the client says "not on cooldown", and it is
+        -- the common answer. Returning it as a cooldown would draw a sweep
+        -- of no length over every button.
+        if not start or not duration or duration <= 0 then
+            return nil
+        end
+
+        return { start = start, duration = duration }
+    end, nil)
+
+    if not reading then
+        return nil
+    end
+
+    return reading.start, reading.duration
+end

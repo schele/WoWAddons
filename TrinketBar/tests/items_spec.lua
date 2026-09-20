@@ -140,3 +140,113 @@ describe("finding the trinkets in the bags", function()
         assertEqual(0, #carried)
     end)
 end)
+
+describe("what is worn", function()
+    it("reads both trinket slots", function()
+        local ns, env = loggedIn()
+        env.__wear(13, "Hand of Justice")
+        env.__wear(14, "Kiss of the Spider")
+
+        local worn = ns.Items.Worn()
+
+        assertEqual("Hand of Justice", worn[13].name)
+        assertEqual("Kiss of the Spider", worn[14].name)
+    end)
+
+    it("says nothing for an empty slot", function()
+        local ns, env = loggedIn()
+        env.__wear(13, "Hand of Justice")
+
+        assertNil(ns.Items.Worn()[14])
+    end)
+
+    it("is empty, not broken, when the read raises", function()
+        local ns, env = loggedIn()
+        env.GetInventoryItemLink = function() error("secret value") end
+
+        local ok, worn = pcall(ns.Items.Worn)
+        assertTrue(ok)
+        assertNil(worn[13])
+    end)
+end)
+
+describe("everything the bar shows", function()
+    it("puts the worn and the carried in one list, sorted by name", function()
+        local ns, env = loggedIn()
+        env.__wear(13, "Mark of the Chosen")
+        env.__carry(0, 1, "Zandalarian Hero Charm")
+        env.__carry(0, 2, "Hand of Justice")
+
+        local all = ns.Items.All()
+
+        assertEqual(3, #all)
+        assertEqual("Hand of Justice", all[1].name)
+        assertEqual("Mark of the Chosen", all[2].name)
+        assertEqual("Zandalarian Hero Charm", all[3].name)
+    end)
+
+    it("marks which slot a worn one is in", function()
+        -- Without this the bar says what could go on but not what is on,
+        -- and the swap is blind.
+        local ns, env = loggedIn()
+        env.__wear(14, "Mark of the Chosen")
+        env.__carry(0, 1, "Hand of Justice")
+
+        local all = ns.Items.All()
+
+        assertNil(all[1].wornSlot, "the carried one is not worn")
+        assertEqual(14, all[2].wornSlot)
+    end)
+
+    it("lists a trinket once even if a second copy is in the bags", function()
+        local ns, env = loggedIn()
+        env.__wear(13, "Hand of Justice")
+        env.__carry(0, 1, "Hand of Justice")
+
+        local all = ns.Items.All()
+
+        assertEqual(1, #all)
+        assertEqual(13, all[1].wornSlot, "the worn one wins, since it says more")
+    end)
+end)
+
+describe("a trinket's cooldown", function()
+    it("reads a worn one from its inventory slot", function()
+        local ns, env = loggedIn()
+        env.__wear(13, "Hand of Justice")
+        env.__cooldowns["worn:13"] = { start = 100, duration = 120 }
+
+        local start, duration = ns.Items.Cooldown(ns.Items.All()[1])
+
+        assertEqual(100, start)
+        assertEqual(120, duration)
+    end)
+
+    it("reads a carried one from its bag slot", function()
+        local ns, env = loggedIn()
+        env.__carry(2, 5, "Hand of Justice")
+        env.__cooldowns["bag:2:5"] = { start = 100, duration = 90 }
+
+        local start, duration = ns.Items.Cooldown(ns.Items.All()[1])
+
+        assertEqual(100, start)
+        assertEqual(90, duration)
+    end)
+
+    it("says nothing when there is no cooldown running", function()
+        local ns, env = loggedIn()
+        env.__carry(0, 1, "Hand of Justice")
+
+        assertNil(ns.Items.Cooldown(ns.Items.All()[1]))
+    end)
+
+    it("says nothing when the read raises", function()
+        local ns, env = loggedIn()
+        env.__carry(0, 1, "Hand of Justice")
+        env.C_Container.GetContainerItemCooldown = function() error("secret") end
+
+        local ok, start = pcall(ns.Items.Cooldown, ns.Items.All()[1])
+        assertTrue(ok)
+        assertNil(start)
+    end)
+end)

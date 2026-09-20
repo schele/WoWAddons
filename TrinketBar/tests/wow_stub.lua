@@ -332,6 +332,39 @@ function stub.newEnv()
     env.__now = 1000
     function env.GetTime() return env.__now end
 
+    -- What is in the trinket slots: env.__worn[13] = "item link".
+    env.__worn = {}
+
+    -- When something comes off cooldown, keyed the way each API is asked:
+    --   env.__cooldowns["worn:13"]  = { start = 100, duration = 120 }
+    --   env.__cooldowns["bag:0:1"]  = { start = 100, duration = 120 }
+    env.__cooldowns = {}
+
+    env.INVSLOT_TRINKET1 = 13
+    env.INVSLOT_TRINKET2 = 14
+
+    --- Test helper: put a trinket in a worn slot and register what it is.
+    function env.__wear(slot, name)
+        local link = string.format("|Hitem:%s|h[%s]|h", name, name)
+        env.__worn[slot] = link
+        env.__items[link] = {
+            name = name,
+            equipLoc = "INVTYPE_TRINKET",
+            texture = 133308,
+        }
+        return link
+    end
+
+    function env.GetInventoryItemLink(unit, slot)
+        return unit == "player" and env.__worn[slot] or nil
+    end
+
+    function env.GetInventoryItemCooldown(unit, slot)
+        local entry = env.__cooldowns["worn:" .. tostring(slot)]
+        if not entry then return 0, 0, 1 end
+        return entry.start, entry.duration, 1
+    end
+
     -- Cursor ----------------------------------------------------------------
     -- Tests drive this directly: env.__cursor = { "spell", 5, "spell" } for a
     -- spellbook-index drag, or { "spell", nil, nil, 8936, n = 4 } for one that
@@ -443,6 +476,11 @@ function stub.newEnv()
         end,
         GetContainerItemLink = function(bag, slot)
             return env.__bags[bag] and env.__bags[bag][slot] or nil
+        end,
+        GetContainerItemCooldown = function(bag, slot)
+            local entry = env.__cooldowns[string.format("bag:%d:%d", bag, slot)]
+            if not entry then return 0, 0, 1 end
+            return entry.start, entry.duration, 1
         end,
     }
 
