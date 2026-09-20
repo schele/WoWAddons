@@ -123,15 +123,10 @@ local function makeWidget(kind, parent, template, env)
     end
     function widget:IsShown() return self.shown end
 
-    -- The stub's own concept of "would the real client refuse a
-    -- secure-adjacent write on this frame in combat" -- see refuseInCombat
-    -- above. A real secure button is protected by its template; a plain
-    -- container that merely holds secure children, like the bar's anchor,
-    -- has no template of its own to detect and has to say so explicitly.
-    function widget:SetProtected(value)
-        if value == nil then value = true end
-        self.protected = value and true or false
-    end
+    -- Real, and read-only from addon code: protection comes from a secure
+    -- template or from being a Blizzard frame, never from an addon asking
+    -- for it. There is no SetProtected on a real Frame -- see CreateFrame
+    -- below for how this fixture decides the flag instead.
     function widget:IsProtected() return self.protected == true end
 
     function widget:SetScript(name, fn) self.scripts[name] = fn end
@@ -328,9 +323,19 @@ function stub.newEnv()
         local frame = makeWidget(kind or "Frame", parent, template, env)
         frame.frameName = name
         -- A secure template is what makes the real client refuse a write on
-        -- this frame in combat; anything else (SetProtected, above) has to
-        -- be marked by hand.
+        -- this frame in combat.
         if template and template:find("Secure") then
+            frame.protected = true
+        end
+        -- TrinketBar's anchor carries no secure template of its own, but
+        -- every button in the pool hangs off it -- moving, showing or
+        -- hiding it moves, shows or hides them too. The real client gives
+        -- addon code no way to make a plain frame protected (there is no
+        -- SetProtected setter, only the read-only IsProtected), so the
+        -- fixture has to know this one frame is combat-sensitive by its
+        -- name, the same seam Bar.lua already uses to find it back
+        -- (CreateFrame("Frame", "TrinketBarAnchor", ...)).
+        if name == "TrinketBarAnchor" then
             frame.protected = true
         end
         table.insert(env.__frames, frame)

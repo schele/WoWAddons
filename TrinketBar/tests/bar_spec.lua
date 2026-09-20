@@ -409,6 +409,19 @@ describe("the anchor", function()
         assertTrue(registered.LeftButton, "or the client never calls OnDragStart")
     end)
 
+    it("is protected, the way every button in the pool hanging off it is", function()
+        -- The anchor's whole combat tripwire depends on the fixture knowing
+        -- it is combat-sensitive. There is no real client call an addon can
+        -- make to become protected (SetProtected is not a real Frame
+        -- method -- only the read-only IsProtected is), so the fixture
+        -- marks it by frame name in CreateFrame. Pinned here so that seam
+        -- cannot be silently deleted the way the old SetProtected(true)
+        -- call in Bar.lua was: removing it left the suite green with the
+        -- anchor's combat guard quietly disarmed.
+        local ns = loggedIn()
+        assertTrue(ns.Bar.Anchor():IsProtected())
+    end)
+
     it("does not move while locked", function()
         local ns = loggedIn()
         ns.db.bar.locked = true
