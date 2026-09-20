@@ -670,7 +670,7 @@ git commit -m "Find the trinkets in the bags"
 
 **Interfaces:**
 - Consumes: `ns.Items.Carried()` and `ns.Guarded` from Tasks 1-2.
-- Produces: `ns.Items.Worn()` returning `{ [13] = entry or nil, [14] = entry or nil }`; `ns.Items.All()` returning one name-sorted list where a worn entry carries `wornSlot`; `ns.Items.Cooldown(entry)` returning `start, duration, enabled` or nil.
+- Produces: `ns.Items.Worn()` returning `{ [13] = entry or nil, [14] = entry or nil }`; `ns.Items.All()` returning one name-sorted list where a worn entry carries `wornSlot`; `ns.Items.Cooldown(entry)` returning `start, duration` or nil.
 
 - [ ] **Step 1: Teach the stub about worn slots and cooldowns**
 
@@ -1420,8 +1420,13 @@ describe("laying the buttons out", function()
         local ns = carrying(3)
         ns.Bar.Apply()
 
-        local _, firstX = ns.Bar.Buttons()[1]:GetPoint()
-        local _, secondX = ns.Bar.Buttons()[2]:GetPoint()
+        -- Fourth return, not second: buttons are anchored with the explicit
+        -- five-argument SetPoint (point, relativeTo, relativePoint, x, y),
+        -- the same as the wrap test below reads. The second return is the
+        -- relativeTo frame, not an offset -- reading it as one compares two
+        -- frames and proves nothing about order.
+        local _, _, _, firstX = ns.Bar.Buttons()[1]:GetPoint()
+        local _, _, _, secondX = ns.Bar.Buttons()[2]:GetPoint()
 
         assertTrue(secondX > firstX)
     end)

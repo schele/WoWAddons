@@ -95,7 +95,7 @@ Items.Worn()          -- { [13] = { name, link, texture }, [14] = ... }
 Items.All()           -- one list, sorted by name, of the worn and the
                       -- carried together; a worn entry carries `wornSlot`
 
-Items.Cooldown(entry) -- start, duration, enabled -- or nil
+Items.Cooldown(entry) -- start, duration -- or nil
 ```
 
 **Walking the bags.** Bags `0` through `NUM_BAG_SLOTS` (4 where the constant
