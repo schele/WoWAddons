@@ -236,10 +236,13 @@ describe("the two columns", function()
 end)
 
 describe("the panel's heading", function()
-    it("shows the addon's own icon", function()
+    it("shows the logo, not the AddOns list icon", function()
+        -- The same cross drawn twice. icon.tga carries the tile the AddOns
+        -- list needs; logo.tga is the cross alone on transparency, because a
+        -- tile on a dark panel reads as a sticker pasted onto it.
         local ns = loggedIn()
         assertEqual(
-            [[Interface\AddOns\Healclick\icon]],
+            [[Interface\AddOns\Healclick\logo]],
             ns.SettingsPanel.logo:GetTexture()
         )
     end)

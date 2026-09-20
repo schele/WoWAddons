@@ -582,14 +582,19 @@ local function ensureBuilt()
     end
     built = true
 
-    -- The addon's own icon, the one the AddOns list shows, built from
-    -- addonName rather than spelled out: the .toc already points at this
-    -- file, and a second copy of the path here would be the thing that goes
-    -- stale when the folder is renamed.
+    -- logo, not icon. They are the same cross drawn twice: icon.tga has the
+    -- tile behind it that the AddOns list needs, because every entry there
+    -- is a square and one that is not looks broken. Here the opposite is
+    -- true -- a square of dark green on a dark grey panel reads as a sticker
+    -- pasted on it -- so logo.tga is the cross alone, on transparency.
+    --
+    -- Built from addonName rather than spelled out: the .toc already names
+    -- this folder, and a second copy of the path is the one that goes stale
+    -- when it is renamed.
     local logo = panel:CreateTexture(nil, "ARTWORK")
     logo:SetSize(LOGO_SIZE, LOGO_SIZE)
     logo:SetPoint("TOPLEFT", PADDING, -PADDING)
-    logo:SetTexture("Interface\\AddOns\\" .. addonName .. "\\icon")
+    logo:SetTexture("Interface\\AddOns\\" .. addonName .. "\\logo")
     Panel.logo = logo
 
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
