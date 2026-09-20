@@ -93,14 +93,31 @@ describe("what a button is told to do", function()
 
     it("clears the macro of a button it stops using", function()
         -- A hidden button that still carries an instruction is one keybind
-        -- away from running it.
+        -- away from running it. All four attributes, not just the left-click
+        -- pair: a regression that cleared only those would leave a hidden
+        -- button whose right-click still fires a stale macro.
         local ns, env = carrying({ "Hand of Justice", "Kiss of the Spider" })
         ns.Bar.Apply()
 
         env.__bags[0][2] = nil
         ns.Bar.Apply()
 
-        assertNil(helpers.attrs(ns.Bar.Buttons()[2]).macrotext1)
+        local attrs = helpers.attrs(ns.Bar.Buttons()[2])
+        assertNil(attrs.type1)
+        assertNil(attrs.macrotext1)
+        assertNil(attrs.type2)
+        assertNil(attrs.macrotext2)
+    end)
+
+    it("keeps an apostrophe intact in the macro text", function()
+        -- Real trinket names carry apostrophes -- Hakkar's Blood is one --
+        -- and the macro is built by string concatenation, not escaping, so
+        -- this is a case worth pinning down rather than assuming.
+        local ns = carrying({ "Hakkar's Blood" })
+        ns.Bar.Apply()
+
+        assertEqual("/equipslot 13 Hakkar's Blood",
+            helpers.attrs(ns.Bar.Buttons()[1]).macrotext1)
     end)
 
     it("shows a worn trinket too, so the bar says what is on", function()
@@ -262,15 +279,20 @@ describe("laying the buttons out", function()
     it("sizes the anchor to the buttons it is actually holding", function()
         -- The anchor is the drag handle as well as the backdrop, so one
         -- sized for sixteen buttons would be a strip of empty air to grab.
+        --
+        -- Exact width, not a range: a two-sided inequality would still pass
+        -- if the column count were off by one. BUTTON_GAP is not exposed by
+        -- Bar.lua, so 4 here is that file's own BUTTON_GAP, written in by
+        -- hand.
         local ns = carrying(2)
         ns.db.bar.perRow = 8
         ns.Bar.Apply()
 
-        local width = ns.Bar.Anchor():GetWidth()
+        local gap = 4
         local buttonWidth = ns.Bar.Buttons()[1]:GetWidth()
+        local width = ns.Bar.Anchor():GetWidth()
 
-        assertTrue(width < buttonWidth * 8, "not sized for a full row")
-        assertTrue(width >= buttonWidth * 2, "but wide enough for two")
+        assertEqual(2 * buttonWidth + 1 * gap, width)
     end)
 end)
 
@@ -346,5 +368,155 @@ describe("the anchor", function()
 
         assertEqual("CENTER", ns.db.anchor.point)
         assertEqual(0, ns.db.anchor.x)
+    end)
+
+    it("defers /tb reset in combat instead of moving the anchor", function()
+        -- Moving the anchor moves every secure button hanging off it, so
+        -- reset has to wait the same as a drag would.
+        local ns, env = loggedIn()
+        local frame = ns.Bar.Anchor()
+
+        -- Put the anchor somewhere other than the default first, the same
+        -- way a real drag would, so a reset that actually moved it would be
+        -- visible in GetPoint rather than accidentally matching the target.
+        frame.scripts.OnDragStart(frame)
+        frame:ClearAllPoints()
+        frame:SetPoint("TOPLEFT", env.UIParent, "TOPLEFT", 120, -40)
+        frame.scripts.OnDragStop(frame)
+
+        env.__setCombat(true)
+        helpers.command(env, "reset")
+
+        local point, _, _, x, y = frame:GetPoint()
+        assertEqual("TOPLEFT", point, "the anchor did not move")
+        assertEqual(120, x)
+        assertEqual(-40, y)
+        assertTrue(ns.Bar.Pending())
+        assertMatch("combat", helpers.printed(env))
+    end)
+end)
+
+describe("what a button looks like", function()
+    local function carrying(names, before)
+        return loggedIn(function(ns, env)
+            for index, name in ipairs(names) do
+                env.__carry(0, index, name)
+            end
+            if before then before(ns, env) end
+        end)
+    end
+
+    it("shows the trinket's own icon", function()
+        local ns = carrying({ "Hand of Justice" })
+        ns.Bar.Apply()
+
+        assertEqual(133308, ns.Bar.Buttons()[1].icon:GetTexture())
+        assertTrue(ns.Bar.Buttons()[1].icon:IsShown())
+    end)
+
+    it("marks the ones being worn", function()
+        -- Without this the bar says what could go on but not what is on,
+        -- and the swap is blind.
+        local ns = carrying({ "Hand of Justice" }, function(_, env)
+            env.__wear(13, "Mark of the Chosen")
+        end)
+        ns.Bar.Apply()
+
+        local all = ns.Items.All()
+        local buttons = ns.Bar.Buttons()
+
+        -- "Hand of Justice" sorts before "Mark of the Chosen".
+        assertFalse(buttons[1].worn:IsShown(), "carried, not worn")
+        assertTrue(buttons[2].worn:IsShown(), "worn")
+    end)
+
+    it("stops marking one that has just come off", function()
+        local ns, env = carrying({ "Hand of Justice" }, function(_, e)
+            e.__wear(13, "Hand of Justice")
+        end)
+        ns.Bar.Apply()
+        assertTrue(ns.Bar.Buttons()[1].worn:IsShown())
+
+        env.__worn[13] = nil
+        ns.Bar.Apply()
+
+        assertFalse(ns.Bar.Buttons()[1].worn:IsShown())
+    end)
+
+    it("takes the mouse, or it shows no hover and takes no click", function()
+        -- A Button made without a template does not arrive mouse-enabled,
+        -- and one that is not looks entirely correct otherwise: right size,
+        -- right place, right icon, and inert.
+        local ns = loggedIn()
+        assertTrue(ns.Bar.Buttons()[1].mouseEnabled)
+    end)
+
+    it("puts the hover art in the layer the client shows on mouseover", function()
+        -- HIGHLIGHT is not decoration here: the client shows and hides that
+        -- layer on mouseover by itself, so the layer is the whole of how a
+        -- hover effect works.
+        local ns = loggedIn()
+
+        local found = false
+        for _, child in ipairs(ns.Bar.Buttons()[1].children) do
+            if child.drawLayer == "HIGHLIGHT" then
+                found = true
+            end
+        end
+
+        assertTrue(found, "something is drawn in the highlight layer")
+    end)
+
+    it("draws the cooldown the client reports", function()
+        local ns, env = carrying({ "Hand of Justice" })
+        ns.Bar.Apply()
+        env.__cooldowns["bag:0:1"] = { start = 100, duration = 120 }
+
+        ns.Bar.RefreshCooldowns()
+
+        local start, duration = ns.Bar.Buttons()[1].cooldown:GetCooldownTimes()
+        assertEqual(100, start)
+        assertEqual(120, duration)
+    end)
+
+    it("clears a sweep that has finished rather than leaving it frozen", function()
+        local ns, env = carrying({ "Hand of Justice" })
+        ns.Bar.Apply()
+        env.__cooldowns["bag:0:1"] = { start = 100, duration = 120 }
+        ns.Bar.RefreshCooldowns()
+
+        env.__cooldowns["bag:0:1"] = nil
+        ns.Bar.RefreshCooldowns()
+
+        local _, duration = ns.Bar.Buttons()[1].cooldown:GetCooldownTimes()
+        assertEqual(0, duration)
+    end)
+
+    it("still builds a working button when the client has no cooldown template", function()
+        -- The sweep is decoration; equipping is the point. An unknown
+        -- template raises rather than returning nil.
+        local ns, env = helpers.loadAddon(FILES)
+        env.__missingTemplates["CooldownFrameTemplate"] = true
+        helpers.login(ns, env)
+        env.__carry(0, 1, "Hand of Justice")
+        ns.Bar.Apply()
+
+        assertNil(ns.Bar.Buttons()[1].cooldown)
+        assertEqual("/equipslot 13 Hand of Justice",
+            helpers.attrs(ns.Bar.Buttons()[1]).macrotext1)
+
+        local ok = pcall(ns.Bar.RefreshCooldowns)
+        assertTrue(ok, "and refreshing must not trip over its absence")
+    end)
+
+    it("redraws the sweeps when the client says a cooldown started", function()
+        local ns, env = carrying({ "Hand of Justice" })
+        ns.Bar.Apply()
+        env.__cooldowns["bag:0:1"] = { start = 100, duration = 120 }
+
+        helpers.fire(env, "BAG_UPDATE_COOLDOWN")
+
+        local _, duration = ns.Bar.Buttons()[1].cooldown:GetCooldownTimes()
+        assertEqual(120, duration)
     end)
 end)

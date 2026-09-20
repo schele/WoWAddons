@@ -154,6 +154,41 @@ function Bar.Build()
         -- where others act on the release, and a button registered for only
         -- one of them can be handed a pass it will not act on.
         button:RegisterForClicks("AnyUp", "AnyDown")
+
+        button.icon = button:CreateTexture(nil, "ARTWORK")
+        button.icon:SetAllPoints(button)
+        -- The standard action-bar crop: item icons carry their own border
+        -- baked in, and without trimming it every button looks wrong next
+        -- to the ones the game draws.
+        button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+        button.icon:Hide()
+
+        -- A gold border on whichever trinkets are on. Drawn rather than
+        -- taken from Blizzard's art: a texture path this client turns out
+        -- not to have fails silently, drawing nothing and saying nothing
+        -- about why.
+        button.worn = button:CreateTexture(nil, "OVERLAY")
+        button.worn:SetAllPoints(button)
+        button.worn:SetColorTexture(1, 0.82, 0, 0.35)
+        button.worn:Hide()
+
+        local highlight = button:CreateTexture(nil, "HIGHLIGHT")
+        highlight:SetAllPoints(button)
+        highlight:SetColorTexture(1, 1, 1, 0.2)
+
+        -- Blizzard's own cooldown widget, so the sweep is the one the
+        -- action bars draw. Through pcall because a template is not
+        -- something this client family can be trusted to have, and an
+        -- unknown one raises rather than returning nil. The sweep is
+        -- decoration; equipping is the point.
+        local created, cooldown = pcall(
+            CreateFrame, "Cooldown", nil, button, "CooldownFrameTemplate"
+        )
+        if created and cooldown then
+            cooldown:SetAllPoints(button)
+            button.cooldown = cooldown
+        end
+
         button:Hide()
 
         buttons[index] = button
@@ -193,6 +228,15 @@ function Bar.Apply()
             button:SetAttribute("macrotext2", "/equipslot "
                 .. ns.Items.TRINKET_SLOTS[2] .. " " .. entry.name)
 
+            if entry.texture then
+                button.icon:SetTexture(entry.texture)
+                button.icon:Show()
+            else
+                button.icon:Hide()
+            end
+
+            button.worn:SetShown(entry.wornSlot ~= nil)
+
             button.entry = entry
             button:Show()
             shown = shown + 1
@@ -204,14 +248,42 @@ function Bar.Apply()
             button:SetAttribute("type2", nil)
             button:SetAttribute("macrotext2", nil)
 
+            button.icon:Hide()
+            button.worn:Hide()
+
             button.entry = nil
             button:Hide()
         end
     end
 
     Bar.Layout(shown)
+    Bar.RefreshCooldowns()
 
     return true
+end
+
+--- Draw each button's cooldown sweep.
+--
+-- Separate from Apply because a cooldown starts without anything else
+-- changing: the bar is right, only the sweeps are stale.
+function Bar.RefreshCooldowns()
+    for index = 1, Bar.MAX_BUTTONS do
+        local button = buttons[index]
+        local cooldown = button and button.cooldown
+
+        if cooldown then
+            local start, duration = ns.Items.Cooldown(button.entry)
+
+            if start and duration and duration > 0 then
+                cooldown:SetCooldown(start, duration)
+            else
+                -- A zero-length cooldown is how the widget is told to draw
+                -- nothing. Without this an expired sweep would sit there
+                -- for good, since nothing else ever clears one.
+                cooldown:SetCooldown(0, 0)
+            end
+        end
+    end
 end
 
 --- Place the buttons that are showing, and size the anchor to hold them.
@@ -275,10 +347,20 @@ watcher:RegisterEvent("PLAYER_REGEN_ENABLED")
 -- from the bar with nothing else to bring it back. This event is the client
 -- saying it has since learned what the item is.
 watcher:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+watcher:RegisterEvent("BAG_UPDATE_COOLDOWN")
 
 watcher:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_REGEN_ENABLED" then
         runPending()
+        return
+    end
+
+    if event == "BAG_UPDATE_COOLDOWN" then
+        -- Nothing about the bar changed, only the sweeps over it. Re-pointing
+        -- sixteen secure buttons for that would be a secure write for a
+        -- purely cosmetic reason -- and refused outright mid-fight, which is
+        -- exactly when trinket cooldowns are being watched.
+        Bar.RefreshCooldowns()
         return
     end
 
