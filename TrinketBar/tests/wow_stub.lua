@@ -2,7 +2,7 @@
 -- game. Widgets record what was done to them so tests can assert on it.
 --
 -- The point of interest is SetAttribute, SetPoint, SetSize, Show and Hide.
--- We can never test that Blizzard casts the right spell, or actually moves a
+-- We can never test that Blizzard equips the right item, or actually moves a
 -- frame on screen; we can test that we asked it to, and that we refused to
 -- ask while a real client would have refused the ask outright.
 
@@ -363,26 +363,6 @@ function stub.newEnv()
         local entry = env.__cooldowns["worn:" .. tostring(slot)]
         if not entry then return 0, 0, 1 end
         return entry.start, entry.duration, 1
-    end
-
-    -- Cursor ----------------------------------------------------------------
-    -- Tests drive this directly: env.__cursor = { "spell", 5, "spell" } for a
-    -- spellbook-index drag, or { "spell", nil, nil, 8936, n = 4 } for one that
-    -- carries a spellID instead (the explicit n covers the hole a plain #
-    -- would trip over). GetCursorInfo reports it positionally, the way the
-    -- real API does; ClearCursor empties it the way a completed drop does.
-    env.__cursor = nil
-
-    function env.GetCursorInfo()
-        if not env.__cursor then
-            return nil
-        end
-        local cursor = env.__cursor
-        return table.unpack(cursor, 1, cursor.n or #cursor)
-    end
-
-    function env.ClearCursor()
-        env.__cursor = nil
     end
 
     -- Secure visibility ----------------------------------------------------

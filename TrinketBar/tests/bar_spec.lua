@@ -422,7 +422,6 @@ describe("what a button looks like", function()
         end)
         ns.Bar.Apply()
 
-        local all = ns.Items.All()
         local buttons = ns.Bar.Buttons()
 
         -- "Hand of Justice" sorts before "Mark of the Chosen".

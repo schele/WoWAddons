@@ -66,9 +66,9 @@ end
 local settings = {}
 ns.settings = settings
 
--- checkbox and slider are the shapes UrlCopy's panel already knows. spelltable
--- is this addon's own: one row per slot, holding a spell name.
-local SETTING_TYPES = { checkbox = true, slider = true, spelltable = true }
+-- The only two shapes the panel renders: a slider for a number, a checkbox
+-- for a flag.
+local SETTING_TYPES = { checkbox = true, slider = true }
 
 function ns.RegisterSetting(definition)
     assert(type(definition) == "table", "RegisterSetting expects a table")

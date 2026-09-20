@@ -394,3 +394,37 @@ ns.RegisterCommand("reset", "Put the bar back in the middle", function()
     repositionAnchor()
     ns.Print("Bar back in the middle.")
 end)
+
+-- Declared next to the code that reads them. Settings.lua renders whatever
+-- has been declared, so adding one here needs no edit there.
+ns.RegisterSetting({
+    store = "bar",
+    key = "iconSize",
+    type = "slider",
+    name = "Icon size",
+    tooltip = "How big each trinket icon is.",
+    min = 12,
+    max = 48,
+    step = 1,
+    onChange = function() Bar.Apply() end,
+})
+
+ns.RegisterSetting({
+    store = "bar",
+    key = "perRow",
+    type = "slider",
+    name = "Buttons per row",
+    tooltip = "How many icons sit side by side before the bar wraps onto another row.",
+    min = 1,
+    max = Bar.MAX_BUTTONS,
+    step = 1,
+    onChange = function() Bar.Apply() end,
+})
+
+ns.RegisterSetting({
+    store = "bar",
+    key = "locked",
+    type = "checkbox",
+    name = "Lock the bar",
+    tooltip = "Stops the bar being dragged around by accident.",
+})
