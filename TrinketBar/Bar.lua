@@ -97,6 +97,12 @@ local function createAnchor()
     anchor = CreateFrame("Frame", "TrinketBarAnchor", UIParent)
     anchor:SetSize(BUTTON_SIZE, BUTTON_SIZE)
 
+    -- Carries no secure template of its own, but every button in the pool
+    -- hangs off it -- moving, showing or hiding it moves, shows or hides
+    -- them too, so combat has to refuse it the same as it would any one of
+    -- them directly.
+    anchor:SetProtected(true)
+
     local background = anchor:CreateTexture(nil, "BACKGROUND")
     background:SetAllPoints()
     background:SetColorTexture(1, 1, 1, BACKDROP_ALPHA)

@@ -35,6 +35,12 @@ local function makeWidget(kind, parent, template, env)
         value = 0,
         minValue = 0,
         maxValue = 1,
+        -- Whether the real client would refuse a secure-adjacent write on
+        -- this frame in combat. Set automatically for a secure template
+        -- (see CreateFrame below) and by hand for a frame like the bar's
+        -- anchor, which carries no template of its own but moves, shows and
+        -- hides every secure button hanging off it.
+        protected = false,
         -- An EditBox grabs focus as it comes into existence in the real
         -- client, same as ForeverPanel's stub documents; that starting state
         -- is what lets ClearFocus() fire OnEditFocusLost on the first call.
@@ -42,16 +48,23 @@ local function makeWidget(kind, parent, template, env)
     }
 
     -- Shared by every secure-adjacent write below (SetAttribute already had
-    -- its own copy of this check; SetPoint, SetSize, Show and Hide used to
-    -- have none at all). Raises, rather than silently no-op-ing or recording
-    -- a flag: the real client refuses these outright in combat, loudly
-    -- enough that an addon doing one anyway finds out immediately. A stub
-    -- that instead just accepted the call quietly would let exactly this
-    -- class of bug back in -- a frame move or a show/hide reachable from a
-    -- path the addon believed was combat-safe -- the same way a
-    -- too-permissive stub already has, more than once, on this branch.
+    -- its own copy of this check; SetPoint, SetSize, Show, Hide, SetShown
+    -- and ClearAllPoints used to have none at all, or none consistently).
+    -- Raises, rather than silently no-op-ing or recording a flag: the real
+    -- client refuses these outright in combat, loudly enough that an addon
+    -- doing one anyway finds out immediately. A stub that instead just
+    -- accepted the call quietly would let exactly this class of bug back in
+    -- -- a frame move or a show/hide reachable from a path the addon
+    -- believed was combat-safe -- the same way a too-permissive stub
+    -- already has, more than once, on this branch.
+    --
+    -- Gated on self.protected rather than applied to every widget: the real
+    -- client only refuses these on a protected frame, not on a plain options
+    -- panel, and a stub that refused universally hid the case of the whole
+    -- addon logging in mid-fight, because the only way to dodge a false
+    -- refusal on Settings.lua's unprotected panel was to not load it.
     local function refuseInCombat(self, name)
-        if self.__env and self.__env.__inCombat then
+        if self.protected and self.__env and self.__env.__inCombat then
             error("Interface action failed because of an AddOn (" .. name .. " blocked during combat lockdown)", 3)
         end
     end
@@ -60,7 +73,10 @@ local function makeWidget(kind, parent, template, env)
         refuseInCombat(self, "SetPoint")
         table.insert(self.points, { ... })
     end
-    function widget:ClearAllPoints() self.points = {} end
+    function widget:ClearAllPoints()
+        refuseInCombat(self, "ClearAllPoints")
+        self.points = {}
+    end
     function widget:SetAllPoints() end
     function widget:GetPoint(index)
         local point = self.points[index or 1]
@@ -101,8 +117,22 @@ local function makeWidget(kind, parent, template, env)
         local handler = self.scripts.OnHide
         if handler then handler(self) end
     end
-    function widget:SetShown(value) self.shown = value and true or false end
+    function widget:SetShown(value)
+        refuseInCombat(self, "SetShown")
+        self.shown = value and true or false
+    end
     function widget:IsShown() return self.shown end
+
+    -- The stub's own concept of "would the real client refuse a
+    -- secure-adjacent write on this frame in combat" -- see refuseInCombat
+    -- above. A real secure button is protected by its template; a plain
+    -- container that merely holds secure children, like the bar's anchor,
+    -- has no template of its own to detect and has to say so explicitly.
+    function widget:SetProtected(value)
+        if value == nil then value = true end
+        self.protected = value and true or false
+    end
+    function widget:IsProtected() return self.protected == true end
 
     function widget:SetScript(name, fn) self.scripts[name] = fn end
     function widget:GetScript(name) return self.scripts[name] end
@@ -297,6 +327,12 @@ function stub.newEnv()
 
         local frame = makeWidget(kind or "Frame", parent, template, env)
         frame.frameName = name
+        -- A secure template is what makes the real client refuse a write on
+        -- this frame in combat; anything else (SetProtected, above) has to
+        -- be marked by hand.
+        if template and template:find("Secure") then
+            frame.protected = true
+        end
         table.insert(env.__frames, frame)
         if name then env[name] = frame end
         return frame

@@ -189,6 +189,27 @@ describe("applying in combat", function()
         env.__setCombat(false)
         assertEqual(ns.Bar.MAX_BUTTONS, #ns.Bar.Buttons())
     end)
+
+    it("brings up the whole addon, settings panel included, when login lands mid-fight", function()
+        -- The stub used to refuse every widget's combat-guarded calls, not
+        -- just protected ones, which hid this: Settings.lua's panel is a
+        -- plain, unprotected frame, and hiding it at login (register()
+        -- calls panel:Hide()) is legal in the real client even mid-fight.
+        -- The three-file test above only proves Bar.lua's own combat queue;
+        -- avoiding a false refusal on the panel meant never loading
+        -- Settings.lua alongside a mid-fight login at all -- so nothing
+        -- covered the finished addon, all four files, logging in mid-fight.
+        local ns, env = helpers.loadAddon()
+        env.__setCombat(true)
+
+        local ok = pcall(helpers.login, ns, env)
+
+        assertTrue(ok, "logging in mid-fight must not raise")
+        assertTrue(ns.Bar.Pending())
+
+        env.__setCombat(false)
+        assertEqual(ns.Bar.MAX_BUTTONS, #ns.Bar.Buttons())
+    end)
 end)
 
 describe("keeping up with the bags", function()
