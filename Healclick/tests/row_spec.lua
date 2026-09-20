@@ -920,10 +920,15 @@ describe("the remaining time under an icon", function()
     it("writes seconds, minutes and hours the way the game's buff frames do", function()
         local ns = loggedIn()
 
+        -- Rounding up above a minute is what SecondsToTimeAbbrev does, and
+        -- matching it is the point: our number sits on the same screen as
+        -- the game's own for the same buff, and rounding down put the two a
+        -- whole minute apart.
         assertEqual("7s", ns.Row.FormatDuration(6.2), "seconds round up, so a live buff never reads 0s")
-        assertEqual("1m", ns.Row.FormatDuration(90), "minutes round down, so 90s is not 2m")
-        assertEqual("38m", ns.Row.FormatDuration(2280))
-        assertEqual("1h", ns.Row.FormatDuration(3700))
+        assertEqual("2m", ns.Row.FormatDuration(90), "as the game writes it")
+        assertEqual("38m", ns.Row.FormatDuration(2280), "exactly 38 minutes is 38m, not 39m")
+        assertEqual("57m", ns.Row.FormatDuration(56 * 60 + 30), "the case that did not match")
+        assertEqual("2h", ns.Row.FormatDuration(3700))
     end)
 
     it("writes nothing at all when there is nothing to count", function()

@@ -624,10 +624,14 @@ end
 
 --- How long is left, written the way the game's own buff frames write it.
 --
--- One unit, never two: under a 22 pixel icon "38m" is readable and "38m 12s"
--- is a smear. Seconds round up so a buff still running never reads 0s, and
--- minutes round down so one that has just over a minute left does not claim
--- two.
+-- One unit, never two: under a small icon "38m" is readable and "38m 12s" is
+-- a smear.
+--
+-- Minutes and hours round up, which is what the game's own buff frames do --
+-- SecondsToTimeAbbrev ceils everything above a minute. Rounding down instead
+-- put our number a whole minute below the one Blizzard was showing for the
+-- same buff, side by side on the same screen: 56m against 57 m. Seconds
+-- round up too, so a buff still running never reads 0s.
 function Row.FormatDuration(seconds)
     if not seconds or seconds <= 0 then
         return ""
@@ -638,10 +642,10 @@ function Row.FormatDuration(seconds)
     end
 
     if seconds < 3600 then
-        return string.format("%dm", math.max(math.floor(seconds / 60), 1))
+        return string.format("%dm", math.ceil(seconds / 60))
     end
 
-    return string.format("%dh", math.max(math.floor(seconds / 3600), 1))
+    return string.format("%dh", math.ceil(seconds / 3600))
 end
 
 --- Write the remaining time of each button's own spell on this row's unit.
