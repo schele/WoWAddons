@@ -53,11 +53,19 @@ re-point a button:
   in combat, but pointing an unused one at a freshly-looted trinket is a
   secure write, and the game refuses that mid-fight the same as anything else.
   The bar catches up the moment combat ends.
-- **Dragging the bar, `/tb lock`ing it, and `/tb reset`ing it** are held the
-  same way if you manage to trigger them mid-fight, and applied the instant
-  you leave combat.
+- **`/tb reset` is held until combat ends**, then puts the bar back in the
+  middle the instant you leave the fight — moving it is the same secure write
+  as anything else here.
+- **Dragging the bar mid-fight is refused, not queued.** Moving the anchor
+  would move every secure button hanging off it, so the game blocks the drag
+  outright and TrinketBar says so in chat; let go and the bar is exactly where
+  it already was, not where you tried to drop it.
+- **`/tb lock` takes effect immediately, combat or not.** It flips a plain
+  setting rather than touching the bar itself, so there is nothing for combat
+  to hold.
 
-Nothing about this puts an error on your screen. TrinketBar just waits.
+TrinketBar prints when it refuses a drag or holds a reset, so a bar that did
+not move is not left unexplained.
 
 ## What is on the bar
 
@@ -71,6 +79,12 @@ equipping either one does the same thing.
 If a trinket you are carrying does not show up right after logging in, give it
 a moment — some clients have not looked up its icon yet, and the bar catches
 up as soon as they do.
+
+On a client that cannot read your bags at all, TrinketBar says so once in
+chat — *"This client will not let me read your bags, so the bar shows only
+what you are wearing."* — and falls back to showing only the two trinkets you
+have equipped. That message prints once, not every time your bags change; if
+you see it, it is not a bug, it is what this client will let TrinketBar do.
 
 ## Install
 
