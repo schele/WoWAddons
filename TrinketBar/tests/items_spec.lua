@@ -139,6 +139,69 @@ describe("finding the trinkets in the bags", function()
         assertTrue(ok, "a refused read must not take the bar down")
         assertEqual(0, #carried)
     end)
+
+    it("says so when an item read raises, not only when the bag API is missing", function()
+        -- warnOnce() used to be reachable only from the "no bag API at all"
+        -- gate. A raising read (the secret-value case) fell into the whole
+        -- walk's guard and said nothing -- silently emptying the bar with no
+        -- explanation, which is worse than the fault it reports.
+        local ns, env = loggedIn()
+        env.__carry(0, 1, "Hand of Justice")
+        env.C_Container.GetContainerItemLink = function() error("secret value") end
+
+        ns.Items.Carried()
+
+        assertMatch("bags", helpers.printed(env))
+    end)
+
+    it("skips only the item whose read raises, not the rest of the walk", function()
+        -- The guard used to wrap the whole walk, so one unreadable item cost
+        -- every item. Now it is pushed down to per-item, so a bad read costs
+        -- only that item.
+        local ns, env = loggedIn()
+        env.__carry(0, 1, "Hand of Justice")
+        env.__carry(0, 2, "Kiss of the Spider")
+
+        local original = env.C_Container.GetContainerItemLink
+        env.C_Container.GetContainerItemLink = function(bag, slot)
+            if slot == 1 then
+                error("secret value")
+            end
+            return original(bag, slot)
+        end
+
+        local carried = ns.Items.Carried()
+
+        assertEqual(1, #carried)
+        assertEqual("Kiss of the Spider", carried[1].name)
+    end)
+
+    it("warns once even when several items in the same walk fail", function()
+        local ns, env = loggedIn()
+        env.__carry(0, 1, "Hand of Justice")
+        env.__carry(0, 2, "Kiss of the Spider")
+        env.C_Container.GetContainerItemLink = function() error("secret value") end
+
+        ns.Items.Carried()
+
+        local _, count = helpers.printed(env):gsub("bags", "bags")
+        assertEqual(1, count)
+    end)
+
+    it("does not pass through a texture value that is not a number or a string", function()
+        -- Bar.Apply branches on entry.texture ("if entry.texture then")
+        -- outside any guard, from an event handler. Lua cannot construct a
+        -- value that raises on a truthiness test, so this proves the
+        -- coercion directly: an unreasonable shape (a table) comes back as
+        -- nil, same as no icon at all.
+        local ns, env = loggedIn()
+        local link = env.__carry(0, 1, "Hand of Justice")
+        env.__items[link].texture = {}
+
+        local carried = ns.Items.Carried()
+
+        assertNil(carried[1].texture)
+    end)
 end)
 
 describe("what is worn", function()

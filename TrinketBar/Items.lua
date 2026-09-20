@@ -75,6 +75,13 @@ local function itemFacts(link)
         return nil
     end
 
+    -- Coerced the same as name is rejected above: Bar.Apply branches on this
+    -- one ("if entry.texture then") outside any guard, so whatever the
+    -- client hands back here has to be a shape that branch can test safely.
+    if type(texture) ~= "number" and type(texture) ~= "string" then
+        texture = nil
+    end
+
     return name, equipLoc, texture
 end
 
@@ -84,9 +91,13 @@ end
 -- are tidied, and a bar that reshuffles then is one no muscle memory can form
 -- on. The set changing is the only thing that should move a button.
 --
--- Guarded whole rather than per call: a client that refuses one of these
--- reads refuses them all, and a half-walked bag is not a better answer than
--- an empty one.
+-- Guarded per bag and per slot rather than around the whole walk: a client
+-- that refuses one of these reads still answers for the rest of them, and a
+-- single unreadable item should cost that item, not every trinket on the
+-- bar. Every failure along the way -- missing API, a raise counting a bag's
+-- slots, a raise reading one of them -- feeds the same "at most once"
+-- warning, since the player does not need to be told twice that the same
+-- client limitation is in effect.
 function Items.Carried()
     local canWalk = (C_Container and C_Container.GetContainerNumSlots)
         or GetContainerNumSlots
@@ -95,39 +106,57 @@ function Items.Carried()
         return {}
     end
 
-    return ns.Guarded(function()
-        local found, seen = {}, {}
+    local found, seen = {}, {}
+    local anyUnreadable = false
 
-        for bag = 0, (NUM_BAG_SLOTS or 4) do
-            for slot = 1, bagSlots(bag) do
-                local link = bagLink(bag, slot)
+    for bag = 0, (NUM_BAG_SLOTS or 4) do
+        local slots = ns.Guarded(function() return bagSlots(bag) end, nil)
 
-                if link then
-                    local name, equipLoc, texture = itemFacts(link)
+        if slots == nil then
+            anyUnreadable = true
+        else
+            for slot = 1, slots do
+                local ok = ns.Guarded(function()
+                    local link = bagLink(bag, slot)
 
-                    -- Two of the same trinket collapse to one: /equipslot
-                    -- takes the first match by name, so a second button for
-                    -- the second copy would do exactly what the first does.
-                    if name and equipLoc == TRINKET_LOCATION and not seen[name] then
-                        seen[name] = true
-                        found[#found + 1] = {
-                            name = name,
-                            link = link,
-                            texture = texture,
-                            bag = bag,
-                            slot = slot,
-                        }
+                    if link then
+                        local name, equipLoc, texture = itemFacts(link)
+
+                        -- Two of the same trinket collapse to one: /equipslot
+                        -- takes the first match by name, so a second button
+                        -- for the second copy would do exactly what the
+                        -- first does.
+                        if name and equipLoc == TRINKET_LOCATION and not seen[name] then
+                            seen[name] = true
+                            found[#found + 1] = {
+                                name = name,
+                                link = link,
+                                texture = texture,
+                                bag = bag,
+                                slot = slot,
+                            }
+                        end
                     end
+
+                    return true
+                end, false)
+
+                if not ok then
+                    anyUnreadable = true
                 end
             end
         end
+    end
 
-        table.sort(found, function(left, right)
-            return left.name < right.name
-        end)
+    if anyUnreadable then
+        warnOnce()
+    end
 
-        return found
-    end, {})
+    table.sort(found, function(left, right)
+        return left.name < right.name
+    end)
+
+    return found
 end
 
 --- What is in each trinket slot: { [13] = entry, [14] = entry }, with a slot
