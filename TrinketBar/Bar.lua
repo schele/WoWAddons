@@ -407,8 +407,17 @@ ns.OnLogin(function()
     Bar.Apply()
 end)
 
+-- Assigned below, where the setting is declared -- forward-declared here so
+-- the command's closure can reach it without caring about file order.
+local lockedSetting
+
 ns.RegisterCommand("lock", "Stop the bar being dragged", function()
-    ns.db.bar.locked = not ns.db.bar.locked
+    -- Routed through ns.SetSettingValue like every other writer, rather than
+    -- assigning ns.db.bar.locked directly: a direct write left the settings
+    -- panel's checkbox not knowing the value had changed, so opening
+    -- /tb settings and then typing /tb lock left a checkbox reading
+    -- unlocked while the bar was actually locked.
+    ns.SetSettingValue(lockedSetting, not ns.db.bar.locked)
     ns.Print(ns.db.bar.locked and "Bar locked." or "Bar unlocked.")
 end)
 
@@ -453,10 +462,19 @@ ns.RegisterSetting({
     onChange = function() Bar.Apply() end,
 })
 
-ns.RegisterSetting({
+lockedSetting = ns.RegisterSetting({
     store = "bar",
     key = "locked",
     type = "checkbox",
     name = "Lock the bar",
     tooltip = "Stops the bar being dragged around by accident.",
+    -- Keeps the checkbox honest when the value changes from somewhere other
+    -- than the checkbox itself -- /tb lock, now that it is routed through
+    -- here too. Refresh sets the same value the widget already has when the
+    -- change came from the widget, which is harmless, not a loop.
+    onChange = function()
+        if ns.SettingsPanel then
+            ns.SettingsPanel.Refresh()
+        end
+    end,
 })

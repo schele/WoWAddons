@@ -96,3 +96,22 @@ describe("the checkbox", function()
         assertTrue(ns.db.bar.locked)
     end)
 end)
+
+describe("the lock command", function()
+    it("keeps the panel's checkbox in sync with /tb lock", function()
+        -- /tb lock used to write ns.db.bar.locked directly, bypassing
+        -- ns.SetSettingValue -- every other writer's path. The panel's
+        -- checkbox never learned the value had changed, so a player who
+        -- opened /tb settings and then typed /tb lock saw a checkbox still
+        -- reading unlocked. Clicking it to fix that set it checked, which
+        -- SetSettingValue saw as already matching the (out-of-band) stored
+        -- value and skipped -- so it took two clicks to undo one command.
+        local ns, env = loggedIn()
+
+        helpers.command(env, "lock")
+
+        assertTrue(ns.db.bar.locked, "the command itself still has to work")
+        assertTrue(controlFor(ns, "bar", "locked").widget:GetChecked(),
+            "and the panel must not go stale")
+    end)
+end)
