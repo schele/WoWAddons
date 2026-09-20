@@ -7,7 +7,6 @@ local addonName, ns = ...
 local PADDING = 16
 local ROW_HEIGHT = 30
 local SLIDER_EXTRA = 24
-local BOX_HEIGHT = 24
 
 -- Wide enough for a 200px slider with room to spare, and comfortably inside
 -- the canvas the game gives us.
@@ -88,10 +87,11 @@ local function addSlider(setting, y, x)
 end
 
 -- Guards against a refresh that starts another. A slider's Refresh sets its
--- own value, the client answers that with OnValueChanged, and that runs the
--- setting's onChange -- which for the button count has to refresh the panel,
--- since changing it shows and hides whole rows. Without this the two would
--- call each other until the stack ran out.
+-- own value, which the client answers with OnValueChanged, which runs the
+-- setting's onChange. None of the three settings here call Refresh from
+-- onChange, so the guard never actually fires today -- but a future setting
+-- that does would call back into a Refresh already in progress, and this
+-- stops that turning into unbounded recursion.
 local refreshing = false
 
 function Panel.Refresh()
