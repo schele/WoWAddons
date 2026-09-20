@@ -404,6 +404,60 @@ function stub.newEnv()
         for _, ticker in ipairs(env.__tickers) do ticker.fn() end
     end
 
+    -- What is in the bags: env.__bags[bag][slot] = "item link". Bag 0 is the
+    -- backpack, 1-4 the worn bags, which is the range the real API uses.
+    env.__bags = { [0] = {}, {}, {}, {}, {} }
+
+    -- What the client knows about an item, by link:
+    --   env.__items["|cff...|Hitem:1|h[Card]|h|r"] =
+    --       { name = "Card", equipLoc = "INVTYPE_TRINKET", texture = 133308 }
+    env.__items = {}
+
+    env.NUM_BAG_SLOTS = 4
+
+    --- Test helper: put a trinket in a bag slot and register what it is.
+    function env.__carry(bag, slot, name, equipLoc)
+        local link = string.format("|Hitem:%s|h[%s]|h", name, name)
+        env.__bags[bag] = env.__bags[bag] or {}
+        env.__bags[bag][slot] = link
+        env.__items[link] = {
+            name = name,
+            equipLoc = equipLoc or "INVTYPE_TRINKET",
+            texture = 133308,
+        }
+        return link
+    end
+
+    -- Namespaced by default, which is the shape this client family has been
+    -- moving towards. A test covering an older client deletes these and adds
+    -- the globals itself, from the same __bags and __items tables.
+    env.C_Container = {
+        GetContainerNumSlots = function(bag)
+            local contents = env.__bags[bag]
+            if not contents then return 0 end
+            local highest = 0
+            for slot in pairs(contents) do
+                if slot > highest then highest = slot end
+            end
+            return highest
+        end,
+        GetContainerItemLink = function(bag, slot)
+            return env.__bags[bag] and env.__bags[bag][slot] or nil
+        end,
+    }
+
+    env.C_Item = {
+        GetItemInfo = function(link)
+            local item = env.__items[link]
+            if not item then return nil end
+            -- name, link, quality, level, minLevel, type, subType,
+            -- stackCount, equipLoc, texture -- the real call's shape, which
+            -- is what Items.lua has to read positionally.
+            return item.name, link, 1, 1, 1, "Armor", "Miscellaneous", 1,
+                item.equipLoc, item.texture
+        end,
+    }
+
     function env.hooksecurefunc(target, name, post)
         if type(target) == "string" then
             target, name, post = env, target, name
