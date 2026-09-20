@@ -27,10 +27,18 @@ describe("the slash command", function()
     it("lists the commands for a bare /tb", function()
         -- The same as /fp, /url and /ch. Four addons whose login lines sit
         -- together must not disagree about what a bare command does.
+        --
+        -- Asserting only "Commands:" is not enough to prove the early
+        -- return survives: the fall-through path also prints "Unknown
+        -- command:" first and then shows the same help underneath it, so a
+        -- deleted early return would still match this pattern. Proving the
+        -- early return means proving the fall-through line is absent.
         local ns, env = loggedIn()
         helpers.command(env, "")
 
         assertMatch("Commands:", helpers.printed(env))
+        assertFalse(helpers.printed(env):find("Unknown command") ~= nil,
+            "a bare /tb is not an unknown command falling through")
     end)
 
     it("says so for a command it does not have", function()

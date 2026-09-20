@@ -17,6 +17,14 @@ describe("building the bar", function()
         assertEqual(ns.Bar.MAX_BUTTONS, #ns.Bar.Buttons())
     end)
 
+    it("keeps the pool at sixteen, which the spec states outright", function()
+        -- The test above compares MAX_BUTTONS against #Buttons(), which is
+        -- self-referential and cannot catch the constant itself changing --
+        -- both sides move together. Pin the literal the spec names.
+        local ns = loggedIn()
+        assertEqual(16, ns.Bar.MAX_BUTTONS)
+    end)
+
     it("makes every button a secure action button", function()
         local ns = loggedIn()
         assertEqual("SecureActionButtonTemplate", ns.Bar.Buttons()[1].template)
@@ -107,6 +115,22 @@ describe("what a button is told to do", function()
         assertNil(attrs.macrotext1)
         assertNil(attrs.type2)
         assertNil(attrs.macrotext2)
+    end)
+
+    it("hides a button that had a trinket and lost it, not just one that never had one", function()
+        -- A button that was never shown is hidden because Build() already
+        -- guarantees that; the case worth proving is the transition, where
+        -- a button that HAD a trinket loses it. Without the Hide() here it
+        -- would stay on screen as an empty, still-clickable square.
+        local ns, env = carrying({ "Hand of Justice", "Kiss of the Spider" })
+        ns.Bar.Apply()
+        assertTrue(ns.Bar.Buttons()[2]:IsShown())
+
+        env.__bags[0][2] = nil
+        ns.Bar.Apply()
+
+        assertFalse(ns.Bar.Buttons()[2]:IsShown(),
+            "an empty clickable square is worse than none")
     end)
 
     it("keeps an apostrophe intact in the macro text", function()
@@ -314,6 +338,49 @@ describe("laying the buttons out", function()
         local width = ns.Bar.Anchor():GetWidth()
 
         assertEqual(2 * buttonWidth + 1 * gap, width)
+    end)
+
+    it("clamps a hand-edited icon size instead of trusting the database", function()
+        -- A hand-edited TrinketBarDB is exactly the case the clamp in
+        -- iconSize() exists for: nothing on the slider can produce an
+        -- out-of-range value, but a saved variable edited by hand can.
+        local ns = carrying(1)
+
+        ns.db.bar.iconSize = 999
+        ns.Bar.Apply()
+        assertEqual(48, ns.Bar.Buttons()[1]:GetWidth(), "clamped to the max")
+
+        ns.db.bar.iconSize = 0
+        ns.Bar.Apply()
+        assertEqual(12, ns.Bar.Buttons()[1]:GetWidth(), "clamped to the min")
+
+        ns.db.bar.iconSize = -5
+        ns.Bar.Apply()
+        assertEqual(12, ns.Bar.Buttons()[1]:GetWidth(), "a negative value clamps too")
+    end)
+
+    it("clamps a hand-edited perRow instead of dividing by it unchecked", function()
+        -- perRow = 0 reaches `placed % 0` in Layout -- the same hand-edited
+        -- TrinketBarDB case the icon-size clamp above exists for.
+        local ns = carrying(3)
+
+        ns.db.bar.perRow = 0
+        local ok = pcall(ns.Bar.Apply)
+        assertTrue(ok, "perRow = 0 must not reach placed % 0")
+
+        local _, _, _, firstX, firstY = ns.Bar.Buttons()[1]:GetPoint()
+        local _, _, _, secondX, secondY = ns.Bar.Buttons()[2]:GetPoint()
+        assertTrue(secondY < firstY, "clamped to 1 per row, so each button wraps")
+        assertEqual(firstX, secondX, "and stays in the same column")
+
+        ns.db.bar.perRow = -3
+        ok = pcall(ns.Bar.Apply)
+        assertTrue(ok, "a negative perRow must not reach placed % perRow either")
+
+        ns.db.bar.perRow = 999
+        ns.Bar.Apply()
+        local _, _, _, thirdX, thirdY = ns.Bar.Buttons()[3]:GetPoint()
+        assertEqual(firstY, thirdY, "clamped to MAX_BUTTONS, so three still fit on one row")
     end)
 end)
 
@@ -582,6 +649,22 @@ describe("what a button looks like", function()
 
         local _, duration = ns.Bar.Buttons()[1].cooldown:GetCooldownTimes()
         assertEqual(120, duration)
+    end)
+
+    it("does not arm pending when a cooldown ticks over in combat", function()
+        -- BAG_UPDATE_COOLDOWN redraws a sweep, nothing else. Handling it
+        -- with a full Bar.Apply() instead of RefreshCooldowns() would
+        -- attempt a secure write every time a cooldown starts -- refused
+        -- mid-fight, which is exactly when cooldowns are being watched --
+        -- and leave `pending` armed for the rest of any fight.
+        local ns, env = carrying({ "Hand of Justice" })
+        ns.Bar.Apply()
+
+        env.__setCombat(true)
+        env.__cooldowns["bag:0:1"] = { start = 100, duration = 120 }
+        helpers.fire(env, "BAG_UPDATE_COOLDOWN")
+
+        assertFalse(ns.Bar.Pending())
     end)
 
     it("re-resolves a carried trinket's coordinates by name, not the bag slot Apply last saw", function()

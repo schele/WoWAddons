@@ -83,6 +83,22 @@ describe("the sliders", function()
         ns.SettingsPanel.Refresh()
         assertEqual(5, controlFor(ns, "bar", "perRow").widget:GetValue())
     end)
+
+    it("sets the real slider's min and max, not just the setting's declared ones", function()
+        -- The spec's 12-48 and 1-16 ranges are asserted elsewhere on the
+        -- setting definitions, but never on the control the player actually
+        -- drags -- a deleted SetMinMaxValues call would leave the widget at
+        -- its default 0-1 range while every other assertion kept passing.
+        local ns = loggedIn()
+
+        local low, high = controlFor(ns, "bar", "iconSize").widget:GetMinMaxValues()
+        assertEqual(12, low)
+        assertEqual(48, high)
+
+        low, high = controlFor(ns, "bar", "perRow").widget:GetMinMaxValues()
+        assertEqual(1, low)
+        assertEqual(16, high)
+    end)
 end)
 
 describe("the checkbox", function()
