@@ -302,6 +302,25 @@ describe("the anchor", function()
         assertEqual("CENTER", ns.db.anchor.point)
     end)
 
+    it("takes the mouse and registers for the drag that would ever call OnDragStart", function()
+        -- Every drag test below proves the handler's logic by calling
+        -- OnDragStart/OnDragStop directly, which is the only way to test a
+        -- handler -- but it never asks whether the client would call it at
+        -- all. Deleting EnableMouse(true) or RegisterForDrag("LeftButton")
+        -- leaves a bar that looks right and cannot be grabbed, and the
+        -- suite would not notice without these two assertions.
+        local ns = loggedIn()
+        local anchor = ns.Bar.Anchor()
+
+        assertTrue(anchor.mouseEnabled, "or nothing can grab it")
+
+        local registered = {}
+        for _, click in ipairs(anchor.dragRegistered or {}) do
+            registered[click] = true
+        end
+        assertTrue(registered.LeftButton, "or the client never calls OnDragStart")
+    end)
+
     it("does not move while locked", function()
         local ns = loggedIn()
         ns.db.bar.locked = true
