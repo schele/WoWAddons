@@ -7,6 +7,7 @@ World of Warcraft addons, one folder each.
 | [ForeverPanel](ForeverPanel/) | A full-width bar across the top of the screen showing XP, money, bag space and the time |
 | [UrlCopy](UrlCopy/) | Makes URLs spoken in chat clickable, and opens the one you click in a box you can copy from |
 | [ClickHeal](ClickHeal/) | A row of spell buttons beside every party member, so healing or dispelling someone is one click |
+| [TrinketBar](TrinketBar/) | Every trinket you are carrying, on a bar: left-click to equip in slot 1, right-click for slot 2 |
 
 ## Layout
 
