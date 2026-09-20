@@ -5,6 +5,9 @@ local addonName, ns = ...
 -- been declared, in declaration order.
 
 local PADDING = 16
+-- Big enough to read as a logo beside a GameFontNormalLarge title without
+-- crowding the line below it.
+local LOGO_SIZE = 24
 local ROW_HEIGHT = 30
 local SLIDER_EXTRA = 24
 local PANEL_WIDTH = 400
@@ -91,8 +94,25 @@ local function ensureBuilt()
     end
     built = true
 
+    -- logo, not icon. They are the same glyph drawn twice: icon.tga carries
+    -- the tile the AddOns list needs, because every entry there is a square
+    -- and one that is not looks broken. On a dark panel the tile is the
+    -- problem instead -- a square of colour with rounded corners reads as a
+    -- sticker pasted on -- so logo.tga is the glyph alone, on transparency.
+    --
+    -- Built from addonName rather than spelled out: the .toc already names
+    -- this folder, and a second copy of the path is the one that goes stale
+    -- when it is renamed.
+    local logo = panel:CreateTexture(nil, "ARTWORK")
+    logo:SetSize(LOGO_SIZE, LOGO_SIZE)
+    logo:SetPoint("TOPLEFT", PADDING, -PADDING)
+    logo:SetTexture("Interface\\AddOns\\" .. addonName .. "\\logo")
+    Panel.logo = logo
+
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", PADDING, -PADDING)
+    -- Centred against the icon rather than pinned to the panel, so the two
+    -- read as one heading whatever size the icon is given.
+    title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
     title:SetText("UrlCopy")
 
     -- From the addon's own metadata, not a constant here, which would drift

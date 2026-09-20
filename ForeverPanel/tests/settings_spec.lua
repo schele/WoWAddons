@@ -341,3 +341,24 @@ describe("the settings panel", function()
         error("no control for pushUIDown")
     end)
 end)
+
+describe("the panel's heading", function()
+    it("shows the logo, not the AddOns list icon", function()
+        -- The same glyph drawn twice. icon.tga carries the tile the AddOns
+        -- list needs; logo.tga is the glyph alone on transparency, because a
+        -- tile on a dark panel reads as a sticker pasted onto it.
+        local ns = loggedIn()
+        assertEqual(
+            [[Interface\AddOns\ForeverPanel\logo]],
+            ns.Settings.logo:GetTexture()
+        )
+    end)
+
+    it("builds that path from the addon name, not a second copy of it", function()
+        -- The .toc already names this folder. A path spelled out here as well
+        -- is the one that goes stale when it is renamed.
+        local ns = loggedIn()
+        assertTrue(ns.Settings.logo:GetTexture():find("ForeverPanel", 1, true) ~= nil)
+        assertTrue(ns.Settings.logo:GetWidth() > 0, "and has a size to draw at")
+    end)
+end)

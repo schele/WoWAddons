@@ -204,7 +204,8 @@ local function makeWidget(kind, parent)
     function widget:SetGradient(orientation, from, to)
         self.gradient = { orientation = orientation, from = from, to = to }
     end
-    function widget:SetTexture() end
+    function widget:SetTexture(value) self.texture = value end
+    function widget:GetTexture() return self.texture end
     function widget:SetFont(file, size, flags)
         self.font = { file = file, size = size, flags = flags or "" }
     end

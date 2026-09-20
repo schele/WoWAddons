@@ -114,8 +114,15 @@ local function makeWidget(kind, parent)
     function widget:SetFocus() self.focused = true end
     function widget:ClearFocus() self.focused = false end
 
-    function widget:CreateTexture()
+    -- Recorded, so a test can ask which art a texture was given. The draw
+    -- layer comes with it: the client shows and hides the HIGHLIGHT layer on
+    -- mouseover by itself, so the layer is not merely cosmetic.
+    function widget:SetTexture(value) self.texture = value end
+    function widget:GetTexture() return self.texture end
+
+    function widget:CreateTexture(name, layer)
         local texture = makeWidget("Texture", self)
+        texture.drawLayer = layer
         table.insert(self.children, texture)
         return texture
     end
