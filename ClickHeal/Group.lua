@@ -331,9 +331,10 @@ function Group.Layout()
         return
     end
 
-    -- The backdrop and the drag handle only mean anything on our own bar, and
-    -- the attached layout may have just put them away.
-    anchor.background:Show()
+    -- The drag handle only means anything on our own bar, and the attached
+    -- layout may have just put it away. The backdrop is decided below
+    -- instead, once the stack has been counted: it depends on what got
+    -- placed, which is not known yet.
     anchor:EnableMouse(true)
 
     local y = 0
@@ -362,6 +363,13 @@ function Group.Layout()
         ns.Row.CurrentWidth(),
         rowCount * ns.Row.HEIGHT + (rowCount - 1) * ROW_GAP
     )
+
+    -- rowCount holds the anchor at one row's height even when it stacked
+    -- nothing, so that there is still something to grab. The backdrop must
+    -- not follow it there: drawn over that empty strip it is a pale
+    -- rectangle sitting in the middle of the screen holding nothing, which
+    -- reads as a stray texture rather than as a drag handle.
+    anchor.background:SetShown(placed > 0)
 end
 
 function Group.RefreshAll()

@@ -202,6 +202,42 @@ describe("layout", function()
             ns.Group.Anchor():GetHeight(),
             "a unit we cannot check must still get a row")
     end)
+
+    -- Solo, with your own row switched off, so the stack holds nothing. The
+    -- stub's default party has party1 and party2 in the world; clearing them
+    -- and party3/party4's absence leaves UnitExists false for all four.
+    local function holdingNothing(ns, env)
+        for _, unit in ipairs({ "party1", "party2", "party3", "party4" }) do
+            env.units[unit] = nil
+        end
+        ns.db.bar.showSelf = false
+        ns.Group.Layout()
+    end
+
+    it("hides the backdrop while it is holding no rows", function()
+        -- Layout clamps the anchor to one row's height (math.max(placed, 1))
+        -- so that there is still something to grab. That clamp is what makes
+        -- hiding the backdrop necessary: drawn over that empty strip it is a
+        -- pale rectangle sitting in the middle of the screen with nothing in
+        -- it, which reads as a stray texture rather than as a drag handle.
+        local ns, env = loggedIn()
+        holdingNothing(ns, env)
+
+        assertFalse(ns.Group.Anchor().background:IsShown())
+    end)
+
+    it("puts the backdrop back as soon as a row returns", function()
+        -- The other edge of the same rule: hiding on empty is only correct
+        -- if a row coming back brings it with it, or the bar stays invisible
+        -- for the rest of the session.
+        local ns, env = loggedIn()
+        holdingNothing(ns, env)
+
+        ns.db.bar.showSelf = true
+        ns.Group.Layout()
+
+        assertTrue(ns.Group.Anchor().background:IsShown())
+    end)
 end)
 
 describe("the anchor", function()
