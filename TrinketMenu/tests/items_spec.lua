@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local FILES = { "TrinketBar.lua", "Items.lua" }
+local FILES = { "TrinketMenu.lua", "Items.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)

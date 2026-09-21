@@ -3,7 +3,7 @@ local stub = require("wow_stub")
 local M = {}
 
 M.FILES = {
-    "TrinketBar.lua",
+    "TrinketMenu.lua",
     "Items.lua",
     "Bar.lua",
     "Settings.lua",
@@ -18,7 +18,7 @@ function M.loadAddon(files)
 
     for _, path in ipairs(files or M.FILES) do
         local chunk = assert(loadfile(path, "t", env))
-        chunk("TrinketBar", ns)
+        chunk("TrinketMenu", ns)
     end
 
     return ns, env
@@ -38,12 +38,12 @@ function M.fire(env, event, ...)
 end
 
 function M.login(ns, env)
-    M.fire(env, "ADDON_LOADED", "TrinketBar")
+    M.fire(env, "ADDON_LOADED", "TrinketMenu")
     M.fire(env, "PLAYER_LOGIN")
 end
 
 function M.command(env, text)
-    env.SlashCmdList.TRINKETBAR(text)
+    env.SlashCmdList.TRINKETMENU(text)
 end
 
 function M.printed(env)

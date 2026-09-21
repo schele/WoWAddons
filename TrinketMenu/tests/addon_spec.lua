@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local ONLY_CORE = { "TrinketBar.lua" }
+local ONLY_CORE = { "TrinketMenu.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(ONLY_CORE)
@@ -16,7 +16,7 @@ describe("the database", function()
 
     it("keeps a value that was already saved", function()
         local ns, env = helpers.loadAddon(ONLY_CORE)
-        env.TrinketBarDB = { bar = { locked = true } }
+        env.TrinketMenuDB = { bar = { locked = true } }
         helpers.login(ns, env)
 
         assertTrue(ns.db.bar.locked)
@@ -24,7 +24,7 @@ describe("the database", function()
 end)
 
 describe("the slash command", function()
-    it("lists the commands for a bare /tb", function()
+    it("lists the commands for a bare /tm", function()
         -- The same as /fp, /url and /ch. Four addons whose login lines sit
         -- together must not disagree about what a bare command does.
         --
@@ -38,7 +38,7 @@ describe("the slash command", function()
 
         assertMatch("Commands:", helpers.printed(env))
         assertFalse(helpers.printed(env):find("Unknown command") ~= nil,
-            "a bare /tb is not an unknown command falling through")
+            "a bare /tm is not an unknown command falling through")
     end)
 
     it("says so for a command it does not have", function()

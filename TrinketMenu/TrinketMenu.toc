@@ -1,12 +1,12 @@
 ## Interface: 11509, 16001
-## Title: TrinketBar
+## Title: TrinketMenu
 ## Notes: Every trinket you are carrying, on a bar. Left-click to equip in slot 1, right-click for slot 2.
-## IconTexture: Interface\AddOns\TrinketBar\icon
+## IconTexture: Interface\AddOns\TrinketMenu\icon
 ## Author: You
 ## Version: 0.1.0
-## SavedVariables: TrinketBarDB
+## SavedVariables: TrinketMenuDB
 
-TrinketBar.lua
+TrinketMenu.lua
 Items.lua
 Bar.lua
 Settings.lua

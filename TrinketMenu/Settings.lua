@@ -135,7 +135,7 @@ local function ensureBuilt()
     -- Centred against the icon rather than pinned to the panel, so the two
     -- read as one heading whatever size the icon is given.
     title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
-    title:SetText("TrinketBar")
+    title:SetText("TrinketMenu")
 
     -- From the addon's own metadata, not a constant here, which would drift
     -- from the .toc the first time either is bumped without the other.
@@ -179,7 +179,7 @@ Panel.EnsureBuilt = ensureBuilt
 local function register()
     panel = CreateFrame("Frame", nil, UIParent)
     panel:Hide()
-    panel.name = "TrinketBar"
+    panel.name = "TrinketMenu"
     Panel.panel = panel
 
     panel:SetScript("OnShow", function()
@@ -190,7 +190,7 @@ local function register()
     -- A canvas category holds widgets we own, which avoids
     -- Settings.RegisterAddOnSetting: its argument list changed in 11.0 and a
     -- wrong guess there registers nothing and fails silently.
-    category = Settings.RegisterCanvasLayoutCategory(panel, "TrinketBar")
+    category = Settings.RegisterCanvasLayoutCategory(panel, "TrinketMenu")
     Settings.RegisterAddOnCategory(category)
 end
 
@@ -245,7 +245,7 @@ end
 
 function ns.OpenSettings()
     if not category then
-        ns.Print("This client has no settings panel. Use /tb for commands.")
+        ns.Print("This client has no settings panel. Use /tm for commands.")
         return
     end
 
@@ -265,6 +265,6 @@ ns.OnLogin(function()
     if Settings and Settings.RegisterCanvasLayoutCategory then
         register()
     else
-        ns.Print("This client has no settings panel API. Use /tb instead.")
+        ns.Print("This client has no settings panel API. Use /tm instead.")
     end
 end)

@@ -28,6 +28,11 @@ ns.AddDefaults({
         -- nobody carries sixteen anyway.
         perRow = 8,
         locked = false,
+        -- On by default. The backdrop earns its keep while you are placing
+        -- the bar and is dead weight afterwards, and a player who has not
+        -- gone looking for the setting should not be given a pale square to
+        -- wonder about.
+        hideBackdrop = true,
     },
 })
 
@@ -68,6 +73,14 @@ local function iconSize()
     return size
 end
 
+--- Whether the drag handle's backdrop is switched off. Read defensively and
+-- defaulting to hidden, the same as the clamps above: a saved variable that
+-- is missing or hand-edited to something that is not a boolean must land on
+-- the shipped behaviour rather than on whatever `not value` makes of it.
+local function backdropHidden()
+    return (ns.db and ns.db.bar and ns.db.bar.hideBackdrop) ~= false
+end
+
 local function perRow()
     local count = math.floor(tonumber(ns.db and ns.db.bar and ns.db.bar.perRow) or 8)
     if count < 1 then return 1 end
@@ -93,7 +106,7 @@ local function saveAnchorPosition()
 end
 
 local function createAnchor()
-    anchor = CreateFrame("Frame", "TrinketBarAnchor", UIParent)
+    anchor = CreateFrame("Frame", "TrinketMenuAnchor", UIParent)
     anchor:SetSize(BUTTON_SIZE, BUTTON_SIZE)
 
     local background = anchor:CreateTexture(nil, "BACKGROUND")
@@ -135,7 +148,7 @@ local function createAnchor()
         -- nothing here is ever refused and nothing needs deferring. An
         -- earlier version queued this for PLAYER_REGEN_ENABLED, which lost
         -- data -- runPending() repositions the anchor from ns.db.anchor
-        -- before a queued save would run, so a /tb reset issued mid-drag
+        -- before a queued save would run, so a /tm reset issued mid-drag
         -- was clobbered by the stale position the drag was carrying.
         saveAnchorPosition()
     end)
@@ -164,7 +177,7 @@ function Bar.Build()
     for index = 1, Bar.MAX_BUTTONS do
         local button = CreateFrame(
             "Button",
-            string.format("TrinketBarButton%d", index),
+            string.format("TrinketMenuButton%d", index),
             anchor,
             "SecureActionButtonTemplate"
         )
@@ -373,6 +386,15 @@ function Bar.Layout(shown)
         across * size + (across - 1) * BUTTON_GAP,
         down * size + (down - 1) * BUTTON_GAP
     )
+
+    -- Two separate reasons to draw nothing. The setting is the player's own
+    -- choice and covers every case. The count covers the one the setting
+    -- cannot: the anchor keeps one icon's worth of size even while it holds
+    -- nothing, so that there is still something to grab when a trinket turns
+    -- up, and a backdrop drawn over that empty cell parks a pale square in
+    -- the middle of the screen for anyone carrying no trinkets -- a stray
+    -- texture to look at rather than a drag handle to use.
+    anchor.background:SetShown(shown > 0 and not backdropHidden())
 end
 
 --- Run whatever combat was holding.
@@ -435,7 +457,7 @@ ns.RegisterCommand("lock", "Stop the bar being dragged", function()
     -- Routed through ns.SetSettingValue rather than assigning
     -- ns.db.bar.locked directly, like every other writer -- but routing
     -- alone only fixes where the value is stored. What actually keeps the
-    -- settings panel's checkbox from going stale when /tb lock changes the
+    -- settings panel's checkbox from going stale when /tm lock changes the
     -- value out from under it is the setting's own onChange (below), which
     -- SetSettingValue is what makes reachable.
     ns.SetSettingValue(lockedSetting, not ns.db.bar.locked)
@@ -490,7 +512,7 @@ lockedSetting = ns.RegisterSetting({
     name = "Lock the bar",
     tooltip = "Stops the bar being dragged around by accident.",
     -- Keeps the checkbox honest when the value changes from somewhere other
-    -- than the checkbox itself -- /tb lock, now that it is routed through
+    -- than the checkbox itself -- /tm lock, now that it is routed through
     -- here too. Refresh sets the same value the widget already has when the
     -- change came from the widget, which is harmless, not a loop.
     onChange = function()
@@ -498,4 +520,20 @@ lockedSetting = ns.RegisterSetting({
             ns.SettingsPanel.Refresh()
         end
     end,
+})
+
+-- Exposed so the tests can drive it the way the checkbox does, through
+-- SetSettingValue, rather than writing the table behind its back and missing
+-- whether onChange does its job.
+ns.BackdropSetting = ns.RegisterSetting({
+    store = "bar",
+    key = "hideBackdrop",
+    type = "checkbox",
+    name = "Hide the backdrop",
+    tooltip = "Hides the faint square behind the bar. It is only there to "
+        .. "give you something to grab while you place the bar.",
+    -- Apply rather than Layout: it is the one path that knows how many
+    -- buttons are showing, and it is already the thing that holds a change
+    -- until combat ends instead of attempting it mid-fight.
+    onChange = function() Bar.Apply() end,
 })

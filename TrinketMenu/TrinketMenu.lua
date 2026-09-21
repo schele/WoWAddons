@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
-ns.PREFIX = "|cffcc88ffTrinketBar|r"
+ns.PREFIX = "|cffcc88ffTrinketMenu|r"
 
 -- Defaults are contributed by each file at load time, so every piece of config
 -- lives next to the code that reads it and this file never learns the others.
@@ -111,12 +111,12 @@ function ns.SetSettingValue(setting, value)
 end
 
 local function ensureDatabase()
-    if type(TrinketBarDB) ~= "table" then
-        TrinketBarDB = {}
+    if type(TrinketMenuDB) ~= "table" then
+        TrinketMenuDB = {}
     end
 
-    applyDefaults(TrinketBarDB, defaults)
-    ns.db = TrinketBarDB
+    applyDefaults(TrinketMenuDB, defaults)
+    ns.db = TrinketMenuDB
 end
 
 ns.ensureDatabase = ensureDatabase
@@ -151,7 +151,7 @@ local function showHelp()
     table.sort(names)
 
     for _, name in ipairs(names) do
-        ns.Print(string.format("/tb %s - %s", name, commands[name].help))
+        ns.Print(string.format("/tm %s - %s", name, commands[name].help))
     end
 end
 
@@ -160,7 +160,7 @@ ns.ShowHelp = showHelp
 local function runCommand(msg)
     local input = msg and msg:match("^%s*(.-)%s*$") or ""
 
-    -- A bare "/tb" lists the commands, the same as "/fp", "/url" and "/ch" do.
+    -- A bare "/tm" lists the commands, the same as "/fp", "/url" and "/ch" do.
     -- Four addons whose login lines sit together must not disagree about this.
     if input == "" or input == "help" then
         showHelp()
@@ -180,9 +180,9 @@ local function runCommand(msg)
     showHelp()
 end
 
-SLASH_TRINKETBAR1 = "/trinketbar"
-SLASH_TRINKETBAR2 = "/tb"
-SlashCmdList.TRINKETBAR = runCommand
+SLASH_TRINKETMENU1 = "/trinketmenu"
+SLASH_TRINKETMENU2 = "/tm"
+SlashCmdList.TRINKETMENU = runCommand
 
 -- Work to do once the player is in the world and the database exists.
 local loginHandlers = {}
@@ -205,6 +205,6 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
             handler()
         end
 
-        ns.Print("Loaded. Type /tb for commands.")
+        ns.Print("Loaded. Type /tm for commands.")
     end
 end)

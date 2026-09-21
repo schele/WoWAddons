@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local FILES = { "TrinketBar.lua", "Items.lua", "Bar.lua" }
+local FILES = { "TrinketMenu.lua", "Items.lua", "Bar.lua" }
 
 local function loggedIn(before)
     local ns, env = helpers.loadAddon(FILES)
@@ -356,8 +356,76 @@ describe("laying the buttons out", function()
         assertEqual(2 * buttonWidth + 1 * gap, width)
     end)
 
+    -- The backdrop ships switched off, so every test below that wants to see
+    -- it has to ask. Showing is the interesting state to assert on, and a
+    -- test that turned the setting on by accident would prove nothing.
+    local function showingBackdrop(count)
+        local ns, env = carrying(count)
+        ns.db.bar.hideBackdrop = false
+        ns.Bar.Apply()
+        return ns, env
+    end
+
+    it("hides the backdrop while the bar is empty", function()
+        -- Layout clamps the anchor to one icon (math.max(shown, 1)) so that
+        -- an empty bar still leaves something to grab. That clamp is what
+        -- makes hiding the backdrop necessary: without it, a player carrying
+        -- no trinkets gets a bare pale square parked in the middle of the
+        -- screen, holding nothing. Asserted with the setting off, or the
+        -- setting alone would carry the test and the clamp rule would go
+        -- unchecked.
+        local ns = showingBackdrop(0)
+
+        assertTrue(not ns.Bar.Anchor().background:IsShown(),
+            "nothing to hold, so nothing to draw")
+    end)
+
+    it("shows the backdrop again once a trinket turns up", function()
+        -- The other edge of the same rule: hiding on empty is only correct
+        -- if picking one up brings it back, or the bar stays invisible for
+        -- the rest of the session.
+        local ns, env = showingBackdrop(0)
+
+        env.__carry(0, 1, "Hand of Justice")
+        ns.Bar.Apply()
+
+        assertTrue(ns.Bar.Anchor().background:IsShown())
+    end)
+
+    it("keeps the backdrop off by default, trinkets or no trinkets", function()
+        -- The setting ships on: the backdrop is an aid for placing the bar,
+        -- not something to leave sitting on screen afterwards.
+        local ns = carrying(2)
+        ns.Bar.Apply()
+
+        assertTrue(ns.db.bar.hideBackdrop, "on out of the box")
+        assertTrue(not ns.Bar.Anchor().background:IsShown(),
+            "so nothing is drawn behind a bar that is otherwise fine")
+    end)
+
+    it("draws the backdrop once the setting is turned off", function()
+        local ns = showingBackdrop(2)
+
+        assertTrue(ns.Bar.Anchor().background:IsShown())
+    end)
+
+    it("acts on the setting the moment it changes, without waiting for a bag event", function()
+        -- Through SetSettingValue rather than the table, which is the path
+        -- the checkbox takes: a setting whose onChange does not re-apply
+        -- looks broken until the next time something else moves the bar.
+        local ns = carrying(2)
+        ns.Bar.Apply()
+
+        local setting = ns.BackdropSetting
+        ns.SetSettingValue(setting, false)
+        assertTrue(ns.Bar.Anchor().background:IsShown(), "turned off, so drawn")
+
+        ns.SetSettingValue(setting, true)
+        assertTrue(not ns.Bar.Anchor().background:IsShown(), "turned on, so gone")
+    end)
+
     it("clamps a hand-edited icon size instead of trusting the database", function()
-        -- A hand-edited TrinketBarDB is exactly the case the clamp in
+        -- A hand-edited TrinketMenuDB is exactly the case the clamp in
         -- iconSize() exists for: nothing on the slider can produce an
         -- out-of-range value, but a saved variable edited by hand can.
         local ns = carrying(1)
@@ -377,7 +445,7 @@ describe("laying the buttons out", function()
 
     it("clamps a hand-edited perRow instead of dividing by it unchecked", function()
         -- perRow = 0 reaches `placed % 0` in Layout -- the same hand-edited
-        -- TrinketBarDB case the icon-size clamp above exists for.
+        -- TrinketMenuDB case the icon-size clamp above exists for.
         local ns = carrying(3)
 
         ns.db.bar.perRow = 0
@@ -514,7 +582,7 @@ describe("the anchor", function()
         assertEqual(-60, ns.db.anchor.y)
     end)
 
-    it("does not let a stale queued drag-save clobber a later /tb reset", function()
+    it("does not let a stale queued drag-save clobber a later /tm reset", function()
         -- Proved failure from an earlier, wrong fix: the drag's own write
         -- was deferred to PLAYER_REGEN_ENABLED the same as a reset's
         -- reposition. Both then ran inside the same runPending(), in a
@@ -562,7 +630,7 @@ describe("the anchor", function()
         assertEqual(120, ns.db.anchor.x)
     end)
 
-    it("toggles the lock on /tb lock", function()
+    it("toggles the lock on /tm lock", function()
         local ns, env = loggedIn()
         assertFalse(ns.db.bar.locked)
 
@@ -570,7 +638,7 @@ describe("the anchor", function()
         assertTrue(ns.db.bar.locked)
     end)
 
-    it("puts the bar back in the middle on /tb reset", function()
+    it("puts the bar back in the middle on /tm reset", function()
         local ns, env = loggedIn()
         ns.db.anchor.point = "TOPLEFT"
         ns.db.anchor.x = 400
@@ -581,7 +649,7 @@ describe("the anchor", function()
         assertEqual(0, ns.db.anchor.x)
     end)
 
-    it("defers /tb reset in combat instead of moving the anchor", function()
+    it("defers /tm reset in combat instead of moving the anchor", function()
         -- Moving the anchor moves every secure button hanging off it, so
         -- reset has to wait the same as a drag would.
         local ns, env = loggedIn()

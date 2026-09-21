@@ -330,15 +330,15 @@ function stub.newEnv()
         if template and template:find("Secure") then
             frame.protected = true
         end
-        -- TrinketBar's anchor carries no secure template of its own, but
+        -- TrinketMenu's anchor carries no secure template of its own, but
         -- every button in the pool hangs off it -- moving, showing or
         -- hiding it moves, shows or hides them too. The real client gives
         -- addon code no way to make a plain frame protected (there is no
         -- SetProtected setter, only the read-only IsProtected), so the
         -- fixture has to know this one frame is combat-sensitive by its
         -- name, the same seam Bar.lua already uses to find it back
-        -- (CreateFrame("Frame", "TrinketBarAnchor", ...)).
-        if name == "TrinketBarAnchor" then
+        -- (CreateFrame("Frame", "TrinketMenuAnchor", ...)).
+        if name == "TrinketMenuAnchor" then
             frame.protected = true
         end
         table.insert(env.__frames, frame)

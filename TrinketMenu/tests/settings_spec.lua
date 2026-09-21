@@ -22,6 +22,7 @@ describe("the declared settings", function()
         assertTrue(controlFor(ns, "bar", "iconSize") ~= nil, "how big")
         assertTrue(controlFor(ns, "bar", "perRow") ~= nil, "how many across")
         assertTrue(controlFor(ns, "bar", "locked") ~= nil, "the lock")
+        assertTrue(controlFor(ns, "bar", "hideBackdrop") ~= nil, "the backdrop")
     end)
 end)
 
@@ -39,7 +40,7 @@ describe("the panel", function()
         assertEqual(before, #ns.SettingsPanel.controls)
     end)
 
-    it("opens from /tb settings", function()
+    it("opens from /tm settings", function()
         local ns, env = loggedIn()
         helpers.command(env, "settings")
 
@@ -52,7 +53,7 @@ describe("the panel", function()
         -- a tile on a dark panel reads as a sticker pasted onto it.
         local ns = loggedIn()
         assertEqual(
-            [[Interface\AddOns\TrinketBar\logo]],
+            [[Interface\AddOns\TrinketMenu\logo]],
             ns.SettingsPanel.logo:GetTexture()
         )
     end)
@@ -114,11 +115,11 @@ describe("the checkbox", function()
 end)
 
 describe("the lock command", function()
-    it("keeps the panel's checkbox in sync with /tb lock", function()
-        -- /tb lock used to write ns.db.bar.locked directly, bypassing
+    it("keeps the panel's checkbox in sync with /tm lock", function()
+        -- /tm lock used to write ns.db.bar.locked directly, bypassing
         -- ns.SetSettingValue -- every other writer's path. The panel's
         -- checkbox never learned the value had changed, so a player who
-        -- opened /tb settings and then typed /tb lock saw a checkbox still
+        -- opened /tm settings and then typed /tm lock saw a checkbox still
         -- reading unlocked. Clicking it to fix that set it checked, which
         -- SetSettingValue saw as already matching the (out-of-band) stored
         -- value and skipped -- so it took two clicks to undo one command.
