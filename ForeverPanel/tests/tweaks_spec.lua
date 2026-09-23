@@ -168,3 +168,95 @@ describe("health and mana numbers", function()
         assertEqual("0", env.__cvars.statusText)
     end)
 end)
+
+describe("sell prices on quest rewards", function()
+    -- A tooltip showing a quest reward, which the client gives no price.
+    local function rewardTooltip(env, sellPrice)
+        local tooltip = env.CreateFrame("GameTooltip")
+        function tooltip:GetItem()
+            return "Footman Tunic", "item:1234"
+        end
+
+        env.GetItemInfo = function()
+            return "Footman Tunic", "item:1234", 2, 10, 5, "Armor", "Leather", 1,
+                "INVTYPE_CHEST", 0, sellPrice
+        end
+        env.__moneyLines = {}
+        env.SetTooltipMoney = function(frame, money, kind, prefix)
+            table.insert(env.__moneyLines, { money = money, prefix = prefix })
+            frame.shownMoneyFrames = (frame.shownMoneyFrames or 0) + 1
+        end
+
+        return tooltip
+    end
+
+    it("adds the price, the setting defaulting on", function()
+        local ns, env = loggedIn()
+        local tooltip = rewardTooltip(env, 345)
+
+        ns.AddSellPrice(tooltip)
+
+        assertEqual(1, #env.__moneyLines)
+        assertEqual(345, env.__moneyLines[1].money)
+    end)
+
+    it("leaves a tooltip that already shows a price alone", function()
+        local ns, env = loggedIn()
+        local tooltip = rewardTooltip(env, 345)
+        tooltip.shownMoneyFrames = 1
+
+        ns.AddSellPrice(tooltip)
+
+        assertEqual(0, #env.__moneyLines)
+    end)
+
+    it("says nothing for an item that cannot be sold", function()
+        local ns, env = loggedIn()
+        local tooltip = rewardTooltip(env, 0)
+
+        ns.AddSellPrice(tooltip)
+
+        assertEqual(0, #env.__moneyLines)
+    end)
+
+    it("stops when turned off", function()
+        local ns, env = loggedIn()
+        local tooltip = rewardTooltip(env, 345)
+
+        ns.SetSettingValue(settingFor(ns, "ui", "showSellPrice"), false)
+        ns.AddSellPrice(tooltip)
+
+        assertEqual(0, #env.__moneyLines)
+    end)
+end)
+
+describe("sell prices on a client with only C_Item", function()
+    -- The 1.60 client dropped the global GetItemInfo, and hands the item's id
+    -- to TooltipDataProcessor callbacks.
+    it("looks the item up through C_Item by the id it is given", function()
+        local ns, env = loggedIn()
+        local tooltip = env.CreateFrame("GameTooltip")
+        function tooltip:GetItem()
+            return "Footman Tunic", "item:1234"
+        end
+
+        local askedFor
+        env.GetItemInfo = nil
+        env.C_Item = {
+            GetItemInfo = function(item)
+                askedFor = item
+                return "Footman Tunic", "item:1234", 2, 10, 5, "Armor", "Leather", 1,
+                    "INVTYPE_CHEST", 0, 345
+            end,
+        }
+        local shown
+        env.SetTooltipMoney = function(frame, money)
+            shown = money
+        end
+
+        ns.AddSellPrice(tooltip, { id = 1234 })
+
+        assertEqual(1234, askedFor)
+        assertEqual(345, shown)
+    end)
+end)

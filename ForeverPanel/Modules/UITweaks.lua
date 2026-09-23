@@ -9,6 +9,7 @@ ns.AddDefaults({
         hideEndCaps = true,
         showStatusText = true,
         statusTextSize = 14,
+        showSellPrice = true,
     },
 })
 
@@ -157,6 +158,80 @@ ns.RegisterSetting({
     min = 10,
     max = 24,
     onChange = applyStatusTextFont,
+})
+
+--------------------------------------------------------------------------------
+-- Sell prices on quest rewards
+--------------------------------------------------------------------------------
+
+--- Add the vendor price to an item tooltip that left it out.
+-- The client shows it on items you carry but not on quest rewards, which is
+-- exactly where it matters when picking one to sell. A tooltip that already
+-- carries a price is left alone, so it never shows twice.
+local function addSellPrice(tooltip, data)
+    if not (ns.db and ns.db.ui.showSellPrice) then
+        return
+    end
+    if type(tooltip) ~= "table" or not tooltip.GetItem or not SetTooltipMoney then
+        return
+    end
+    if (tooltip.shownMoneyFrames or 0) > 0 then
+        return
+    end
+
+    -- The 1.60 client only has the C_Item version; older ones only the global.
+    local getItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+    if not getItemInfo then
+        return
+    end
+
+    -- TooltipDataProcessor hands over the item's id; the older script path
+    -- has to ask the tooltip for its link.
+    local item = type(data) == "table" and data.id or nil
+    if not item then
+        local _, link = tooltip:GetItem()
+        item = link
+    end
+    if not item then
+        return
+    end
+
+    -- Nil until the client has the item cached; the tooltip refreshes once it
+    -- arrives, and this runs again then.
+    local sellPrice = select(11, getItemInfo(item))
+    if not sellPrice or sellPrice <= 0 then
+        return
+    end
+
+    SetTooltipMoney(tooltip, sellPrice, nil, (SELL_PRICE or "Sell Price") .. ":")
+    if tooltip:IsShown() then
+        -- Resize around the new line.
+        tooltip:Show()
+    end
+end
+
+ns.AddSellPrice = addSellPrice
+
+-- Newer clients route every tooltip through TooltipDataProcessor and may never
+-- fire OnTooltipSetItem; older ones only have the script.
+if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall
+    and Enum and Enum.TooltipDataType and Enum.TooltipDataType.Item then
+    TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, addSellPrice)
+else
+    for _, tooltip in ipairs({ GameTooltip, ItemRefTooltip }) do
+        if tooltip and tooltip.HookScript then
+            tooltip:HookScript("OnTooltipSetItem", addSellPrice)
+        end
+    end
+end
+
+ns.RegisterSetting({
+    store = "ui",
+    key = "showSellPrice",
+    type = "checkbox",
+    section = "extras",
+    name = "Show sell prices on quest rewards",
+    tooltip = "Adds the vendor price to item tooltips that leave it out, such as quest rewards.",
 })
 
 --------------------------------------------------------------------------------
