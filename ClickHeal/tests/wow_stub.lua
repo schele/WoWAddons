@@ -462,10 +462,90 @@ function stub.newEnv()
     -- says an aura never runs out.
     env.__auras = {}
 
+    -- The client's own filtering, because the filter string is part of what
+    -- the addon asks for and a stub that ignores it cannot tell a walk that
+    -- found nothing from one that asked for the wrong thing. An aura with no
+    -- caster named was cast by the player, which is what nearly every test
+    -- here means by putting one on a unit.
+    -- Who the client says cast an aura: the unit token it names, or nothing
+    -- at all. An entry with no `caster` field was cast by the player, which
+    -- is what nearly every test here means by putting one on a unit;
+    -- `caster = false` is this client reporting the aura and declining to
+    -- attribute it, which is what it does for every buff on your own unit.
+    local function auraCaster(aura)
+        if aura.caster == nil then
+            return "player"
+        end
+
+        return aura.caster or nil
+    end
+
+    local function auraMatches(aura, filter)
+        if not filter or not filter:find("PLAYER", 1, true) then
+            return true
+        end
+
+        if aura.caster == "secret" then
+            return true
+        end
+
+        return auraCaster(aura) == "player"
+    end
+
+    -- Built rather than handed straight back, so an aura the client will not
+    -- attribute has no sourceUnit at all rather than a field the test left
+    -- out by accident.
+    --
+    -- `caster = "secret"` is the fourth answer, and the one 1.60.1 gives:
+    -- the field is not missing, reading it raises. Modelled as a metatable
+    -- rather than a raising call, because where it raises is the point --
+    -- read in the same statement as the name and the expiry it takes the
+    -- whole walk with it, and no test could see that if the stub raised
+    -- somewhere else.
+    local function auraData(aura)
+        if aura.caster == "secret" then
+            return setmetatable(
+                { name = aura.name, expirationTime = aura.expirationTime },
+                {
+                    __index = function(_, key)
+                        if key == "sourceUnit" then
+                            error("attempt to read a secret value, while "
+                                .. "execution tainted by 'ClickHeal'", 0)
+                        end
+                        return nil
+                    end,
+                }
+            )
+        end
+
+        return {
+            name = aura.name,
+            expirationTime = aura.expirationTime,
+            sourceUnit = auraCaster(aura),
+        }
+    end
+
     env.C_UnitAuras = {
-        GetAuraDataByIndex = function(unit, index)
+        -- Indexed over what the filter leaves, not over the whole list: the
+        -- client hands back a contiguous run of whatever was asked for, and
+        -- a walk that stops at the first gap depends on that.
+        GetAuraDataByIndex = function(unit, index, filter)
             local list = env.__auras[unit]
-            return list and list[index] or nil
+            if not list then
+                return nil
+            end
+
+            local seen = 0
+            for _, aura in ipairs(list) do
+                if auraMatches(aura, filter) then
+                    seen = seen + 1
+                    if seen == index then
+                        return auraData(aura)
+                    end
+                end
+            end
+
+            return nil
         end,
     }
 

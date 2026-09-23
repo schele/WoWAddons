@@ -19,7 +19,7 @@ Slots.DEFAULT_COUNT = 6
 -- A starting set per class, so a configuration that was never saved is still
 -- usable. ForeverPanel seeds its chat keys for the same reason.
 local SEED = {
-    DRUID   = { "Rejuvenation", "Healing Touch", "Mark of the Wild" },
+    DRUID   = { "Rejuvenation", "Healing Touch", "Mark of the Wild", "Thorns" },
     PRIEST  = { "Flash Heal", "Renew", "Dispel Magic", "Power Word: Fortitude" },
     PALADIN = { "Holy Light", "Flash of Light", "Cleanse", "Blessing of Might" },
     SHAMAN  = { "Healing Wave", "Lesser Healing Wave", "Cure Poison", "Lightning Shield" },

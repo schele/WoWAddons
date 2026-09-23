@@ -52,9 +52,22 @@ had.
 
 Under each icon is how long your own copy of that spell has left on that
 person — 7s of Rejuvenation ticking down on one party member, 38m of Mark of
-the Wild on another. Blank means it is not on them, which is the signal to
+the Wild on another. Blank means nobody has it on them, which is the signal to
 click. It depends on the client being willing to say, on the same terms as
 range above.
+
+A buff somebody else cast counts, and is greyed. Re-casting over a Mark of the
+Wild that is already running buys nothing, so a blank there would be asking
+for a wasted global cooldown — but two druids' Rejuvenations run on the same
+target independently, so a white 7s that turned out to be another druid's
+would be a heal you thought you had. Grey says "it is covered, and not by
+you".
+
+On your own row every number is white, because this client will not say who
+cast the buffs on your own unit: asked which of them you cast, it answers
+none, including the Mark of the Wild you cast on yourself a moment earlier.
+Silence is read as yours there rather than as somebody else's, which would
+grey the whole row. `/ch auras` prints what the client is actually saying.
 
 Buttons show the cooldown sweep, the same one the action bars draw — including
 the global cooldown, so a click gives you the feedback you expect.
@@ -172,6 +185,9 @@ Built against Classic Era 1.15.x (`11509`) and the 1.60.x Classic beta
 - `/ch settings` - Open the settings panel
 - `/ch debug` - Print what happens when a spell button is clicked, for
   working out why one is not casting
+- `/ch anchors` - Report which unit frame each row found to hang off
+- `/ch auras` - Report what the buff timers can read on each unit, for
+  working out why an icon has no number under it
 
 `lock` and `reset` are about the addon's own bar. Attached to the unit
 frames there is nothing to drag: the frames decide where the icons go, and
@@ -192,7 +208,7 @@ the two offsets in Settings nudge them from there.
 | Lock the frame | Stops the bar being dragged by accident. Only affects the bar |
 
 Slots are seeded with a starting set the first time you log in, for four
-classes: Druid (Regrowth, Rejuvenation, Remove Curse, Mark of the Wild),
+classes: Druid (Rejuvenation, Healing Touch, Mark of the Wild, Thorns),
 Priest (Flash Heal, Renew, Dispel Magic, Power Word: Fortitude), Paladin (Holy
 Light, Flash of Light, Cleanse, Blessing of Might) and Shaman (Healing Wave,
 Lesser Healing Wave, Cure Poison, Lightning Shield). Any other class starts

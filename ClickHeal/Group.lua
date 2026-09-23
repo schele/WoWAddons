@@ -630,6 +630,24 @@ ns.RegisterCommand("anchors", "Report which unit frames the icons found", functi
     end
 end)
 
+--- Report what the buff timers can actually read, per unit.
+--
+-- The same shape of problem as /ch anchors, one layer down: an icon with no
+-- number under it says nothing about why there is none. The aura path
+-- flattens "nothing of ours is on them", "it is on them under another name"
+-- and "the client will not let us read the expiry" into the same blank
+-- label, and only the client can tell the three apart. This asks it, and
+-- prints what it said.
+ns.RegisterCommand("auras", "Report what the buff timers can read on each unit", function()
+    for _, unit in ipairs(Group.Units()) do
+        local row = rows[unit]
+
+        for _, line in ipairs(ns.Spells.Report(unit, row and ns.Row.AssignedSpells(row))) do
+            ns.Print(line)
+        end
+    end
+end)
+
 ns.RegisterSetting({
     store = "bar",
     key = "showSelf",

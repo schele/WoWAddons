@@ -377,13 +377,47 @@ end
 -- matters on a client that answers for every index it is asked about.
 local AURA_LIMIT = 40
 
--- Helpful auras this player cast, which is the only kind a ClickHeal button
--- can be responsible for. Someone else's Rejuvenation on the same target is
--- not this button's business.
-local AURA_FILTER = "HELPFUL|PLAYER"
+-- Every helpful aura on a unit, whoever cast it. Narrowed to this player's
+-- own once, and no longer: a Mark of the Wild somebody else put on someone is
+-- one you do not need to re-cast, so a blank where one is running told a
+-- healer to spend a global cooldown on nothing. Who cast it is still read --
+-- see castByPlayer below -- because it decides how the number is drawn, not
+-- whether there is one.
+--
+-- The PLAYER half of this filter went with that change, and would have had to
+-- go anyway: /ch auras on 1.60.1, 2026-09-22 found HELPFUL|PLAYER returning 0
+-- auras for "player" while plain HELPFUL returned the Mark of the Wild that
+-- character had cast on themselves a minute earlier, name and expiry both
+-- readable -- with the same filtered walk answering correctly for party1 in
+-- the same report. The row beside your own frame was the only one in the
+-- group with no numbers on it.
+local AURA_FILTER = "HELPFUL"
 
---- When each of the player's own helpful auras on `unit` expires, by spell
--- name. Empty when there are none, or when the client will not say.
+--- Whether the client says this player cast the aura, given something that
+-- fetches the caster.
+--
+-- A function rather than the value, because on 1.60.1 fetching it is itself
+-- a thing the client refuses: `data.sourceUnit` raises where `data.name` and
+-- `data.expirationTime` beside it do not. Read in the same statement as
+-- those two -- which is how this shipped for one build -- it took down the
+-- whole walk, for every unit and both filters, and the bar lost every number
+-- it had. So the fetch and the comparison sit in one guard, and the guard is
+-- per aura: an unreadable caster costs its own answer and nothing else.
+--
+-- Unknown is yours, whether the client stayed silent or refused outright.
+-- Silence is not "somebody else cast it", and on your own unit this client is
+-- silent about every aura, including the one you cast a second ago -- the
+-- other reading greys the row you look at most.
+local function castByPlayer(fetchSource)
+    return ns.Guarded(function()
+        local source = fetchSource()
+        return source == nil or source == "player"
+    end, true)
+end
+
+--- Every helpful aura on `unit`, by spell name: when it expires, and whether
+-- this player is the one who cast it. Empty when there are none, or when the
+-- client will not say.
 --
 -- Gathered per unit rather than asked per button: with eight buttons on each
 -- of five rows, refreshed five times a second, asking per button would be
@@ -392,16 +426,16 @@ local AURA_FILTER = "HELPFUL|PLAYER"
 -- Guarded, like every other read here that the client might hand back as a
 -- secret value -- an expiry time is exactly the sort of combat-relevant
 -- number this client family has started withholding.
-function Spells.PlayerAuras(unit)
+function Spells.HelpfulAuras(unit)
     if not unit then
         return {}
     end
 
     return ns.Guarded(function()
-        local expiries = {}
+        local auras = {}
 
         for index = 1, AURA_LIMIT do
-            local name, expires
+            local name, expires, source
 
             if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
                 local data = C_UnitAuras.GetAuraDataByIndex(unit, index, AURA_FILTER)
@@ -409,57 +443,254 @@ function Spells.PlayerAuras(unit)
                     break
                 end
                 name, expires = data.name, data.expirationTime
+                -- Not fetched here, and not on this line: see castByPlayer.
+                source = function() return data.sourceUnit end
             elseif UnitAura then
-                -- name, icon, count, dispelType, duration, expirationTime
-                local found, _, _, _, _, expirationTime = UnitAura(unit, index, AURA_FILTER)
+                -- name, icon, count, dispelType, duration, expirationTime, caster
+                local found, _, _, _, _, expirationTime, caster =
+                    UnitAura(unit, index, AURA_FILTER)
                 if not found then
                     break
                 end
                 name, expires = found, expirationTime
+                source = function() return caster end
             else
                 break
             end
 
             -- First wins: a spell appearing twice is the same spell, and the
             -- one the client lists first is the one it considers current.
-            if type(name) == "string" and expiries[name] == nil then
-                expiries[name] = expires or 0
+            if type(name) == "string" and auras[name] == nil then
+                auras[name] = {
+                    expires = expires or 0,
+                    -- Judged here, where the source is still in reach: a
+                    -- caller holding the gathered table has no way back to
+                    -- it.
+                    mine = castByPlayer(source),
+                }
             end
         end
 
-        return expiries
+        return auras
     end, {})
 end
 
---- Seconds left on the player's own `spellName` aura on `unit`, or nil when
--- it is not there, never expires, or cannot be read.
+--- Seconds left on `spellName` on `unit`, and whether this player is the one
+-- who cast it. Nil when it is not there, never expires, or cannot be read.
 --
 -- nil rather than 0 throughout: a slot with nothing on it and a slot whose
 -- buff has just run out both mean "no number to show", and neither is worth
 -- distinguishing under a 22 pixel icon.
+--
+-- The second return is only ever read alongside a number -- there is nothing
+-- to draw in whose colour otherwise -- so every path with no aura to report
+-- leaves it nil.
 function Spells.AuraRemaining(unit, spellName, auras)
     if type(spellName) ~= "string" or spellName == "" then
         return nil
     end
 
-    auras = auras or Spells.PlayerAuras(unit)
+    auras = auras or Spells.HelpfulAuras(unit)
 
-    local expires = auras[spellName]
-    if not expires then
+    local aura = auras[spellName]
+    if not aura then
         return nil
     end
 
-    -- PlayerAuras guards the reading, not the reading's result: an expiry the
+    -- HelpfulAuras guards the reading, not the reading's result: an expiry the
     -- client will not disclose is truthy, so it rides out of that guard in the
     -- table and arrives here untouched. Subtracting from it and comparing the
     -- result are both things it raises on, so they belong inside a guard of
     -- their own -- which costs one icon its timer instead of the refresh.
-    return ns.Guarded(function()
-        if expires == 0 then
+    local remaining = ns.Guarded(function()
+        if aura.expires == 0 then
             return nil
         end
 
-        local remaining = expires - (GetTime and GetTime() or 0)
-        return remaining > 0 and remaining or nil
+        local left = aura.expires - (GetTime and GetTime() or 0)
+        return left > 0 and left or nil
     end, nil)
+
+    if not remaining then
+        return nil
+    end
+
+    return remaining, aura.mine
+end
+
+-- How many of a unit's auras the report below prints one by one. A report is
+-- read in the chat frame, where a line per aura past the first handful is a
+-- wall nobody scrolls back through; the count that follows them still covers
+-- the whole walk.
+local REPORT_LIMIT = 8
+
+--- Render a value the client handed back, without assuming it can be
+-- inspected at all.
+--
+-- Even tostring is an inspection as far as a secret value is concerned, so
+-- the whole description happens inside a guard. A value that cannot be
+-- described is itself the finding, and must not take the report down on its
+-- way to being reported.
+local function describe(value)
+    return ns.Guarded(function()
+        if value == nil then
+            return "nil"
+        end
+
+        if type(value) == "string" then
+            return string.format("%q", value)
+        end
+
+        return string.format("%s %s", type(value), tostring(value))
+    end, "WITHHELD")
+end
+
+--- What an expiry says when you try to use it: how long is left, that it
+-- never runs out, or that this client will not let tainted code do the
+-- arithmetic. The third is the whole reason the report exists, and is what
+-- an icon with no number under it looks like from in game.
+local function describeRemaining(expires)
+    return ns.Guarded(function()
+        if expires == nil then
+            return "-"
+        end
+
+        if expires == 0 then
+            return "never"
+        end
+
+        return string.format("%.0fs", expires - (GetTime and GetTime() or 0))
+    end, "WITHHELD")
+end
+
+--- One pass over `unit`'s auras under `filter`, reporting each index rather
+-- than gathering them. Returns how many the client answered for.
+--
+-- Per index, and each read on its own guard: which index the walk stopped at,
+-- and whether it stopped because the client ran out of auras or because it
+-- raised, are distinctions HelpfulAuras is entitled to flatten into one empty
+-- table and a report is not.
+local function walkAuras(unit, filter, add)
+    local found = 0
+
+    for index = 1, AURA_LIMIT do
+        -- "raised" as the unknown value rather than nil, because nil is what
+        -- an honest end of the list looks like and the two must not read the
+        -- same here.
+        local entry = ns.Guarded(function()
+            if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+                local data = C_UnitAuras.GetAuraDataByIndex(unit, index, filter)
+                if type(data) ~= "table" then
+                    return nil
+                end
+                return {
+                    name = data.name,
+                    expires = data.expirationTime,
+                    -- Described in its own guard, inside this one: the read
+                    -- raises on 1.60.1, and a report that goes down on the
+                    -- field it was added to investigate reports nothing at
+                    -- all. See castByPlayer.
+                    source = ns.Guarded(function()
+                        return describe(data.sourceUnit)
+                    end, "RAISED ON READ"),
+                }
+            end
+
+            if UnitAura then
+                local name, _, _, _, _, expires, caster = UnitAura(unit, index, filter)
+                if name == nil then
+                    return nil
+                end
+                return {
+                    name = name,
+                    expires = expires,
+                    source = ns.Guarded(function()
+                        return describe(caster)
+                    end, "RAISED ON READ"),
+                }
+            end
+
+            return nil
+        end, "raised")
+
+        if entry == "raised" then
+            add("  %s #%d: the client raised on the read", filter, index)
+            return found
+        end
+
+        if entry == nil then
+            break
+        end
+
+        found = found + 1
+        if found <= REPORT_LIMIT then
+            -- The caster among them, because who the client says cast an
+            -- aura is what decides the colour of its number: a walk
+            -- whose every source reads nil is the client declining to
+            -- attribute anything, which is a different world from one that
+            -- names a party member.
+            add("  %s #%d: name=%s source=%s expires=%s remaining=%s", filter,
+                index, describe(entry.name), entry.source,
+                describe(entry.expires), describeRemaining(entry.expires))
+        end
+    end
+
+    return found
+end
+
+--- What the timers can actually read on `unit`, layer by layer, as lines of
+-- plain text.
+--
+-- Deliberately not HelpfulAuras with its answer printed. Flattening every way
+-- a client can decline into one empty table is exactly right under a 22 pixel
+-- icon and useless here: a blank timer looks the same whether the client
+-- returned no auras at all, returned the buff under a name the slot does not
+-- hold, or returned an expiry it will not let us subtract from. Those want
+-- three different fixes, so the report walks the same ground keeping them
+-- apart.
+--
+-- `spells` is what that unit's buttons are holding, so the last lines answer
+-- the question actually being asked: this icon, on this person, why no
+-- number.
+function Spells.Report(unit, spells)
+    local lines = {}
+    local function add(format, ...)
+        lines[#lines + 1] = string.format(format, ...)
+    end
+
+    local api = "NONE"
+    if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+        api = "C_UnitAuras"
+    elseif UnitAura then
+        api = "UnitAura"
+    end
+
+    add("%s: api=%s exists=%s", unit, api, tostring(
+        ns.Guarded(function() return not not UnitExists(unit) end, "WITHHELD")
+    ))
+
+    add("  %s: %d aura(s)", AURA_FILTER, walkAuras(unit, AURA_FILTER, add))
+
+    -- Asked the narrow way as well, because that is the answer this client
+    -- gets wrong: on your own unit it comes back empty however many auras the
+    -- walk above found. A day when it does not is a day this file can go back
+    -- to letting the client do the filtering.
+    add("  HELPFUL|PLAYER: %d aura(s)", walkAuras(unit, "HELPFUL|PLAYER", add))
+
+    local auras = Spells.HelpfulAuras(unit)
+    local names = {}
+    for name, aura in pairs(auras) do
+        names[#names + 1] = aura.mine and name or (name .. " (not yours)")
+    end
+    table.sort(names)
+    add("  HelpfulAuras: %d (%s)", #names, table.concat(names, ", "))
+
+    for _, spell in ipairs(spells or {}) do
+        local remaining, mine = Spells.AuraRemaining(unit, spell, auras)
+        add("  %s: %s", spell, remaining
+            and string.format("%.0fs%s", remaining, mine and "" or " (not yours)")
+            or "no number")
+    end
+
+    return lines
 end

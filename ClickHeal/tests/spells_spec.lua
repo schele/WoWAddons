@@ -340,7 +340,7 @@ describe("listing the spells a slot can be given", function()
     end)
 end)
 
-describe("reading the player's own buffs on a unit", function()
+describe("reading the helpful buffs on a unit", function()
     it("collects them by name, with when each runs out", function()
         local ns, env = loggedIn()
         env.__auras.party1 = {
@@ -348,22 +348,48 @@ describe("reading the player's own buffs on a unit", function()
             { name = "Mark of the Wild", expirationTime = 3280 },
         }
 
-        local auras = ns.Spells.PlayerAuras("party1")
+        local auras = ns.Spells.HelpfulAuras("party1")
 
-        assertEqual(1012, auras.Rejuvenation)
-        assertEqual(3280, auras["Mark of the Wild"])
+        assertEqual(1012, auras.Rejuvenation.expires)
+        assertEqual(3280, auras["Mark of the Wild"].expires)
+    end)
+
+    it("says which of them this player cast", function()
+        local ns, env = loggedIn()
+        env.__auras.party1 = {
+            { name = "Rejuvenation", expirationTime = 1012 },
+            { name = "Mark of the Wild", expirationTime = 3280, caster = "party2" },
+        }
+
+        local auras = ns.Spells.HelpfulAuras("party1")
+
+        assertTrue(auras.Rejuvenation.mine)
+        assertFalse(auras["Mark of the Wild"].mine)
+    end)
+
+    it("counts one it will not attribute as this player's", function()
+        -- Every aura on your own unit, on 1.60.1. Read as somebody else's it
+        -- would grey every number on the row beside your own frame.
+        local ns, env = loggedIn()
+        env.__auras.player =
+            { { name = "Mark of the Wild", expirationTime = 3280, caster = false } }
+
+        local aura = ns.Spells.HelpfulAuras("player")["Mark of the Wild"]
+
+        assertEqual(3280, aura.expires)
+        assertTrue(aura.mine)
     end)
 
     it("is empty rather than broken for a unit with nothing on it", function()
         local ns = loggedIn()
-        assertEqual(0, #ns.Spells.PlayerAuras("party1"))
+        assertNil(next(ns.Spells.HelpfulAuras("party1")))
     end)
 
     it("is empty when the client keeps its auras secret", function()
         local ns, env = loggedIn()
         env.C_UnitAuras.GetAuraDataByIndex = function() error("secret value") end
 
-        local ok, auras = pcall(ns.Spells.PlayerAuras, "party1")
+        local ok, auras = pcall(ns.Spells.HelpfulAuras, "party1")
         assertTrue(ok, "a secret aura must not take the row down with it")
         assertNil(auras.Rejuvenation)
     end)
@@ -404,14 +430,26 @@ describe("reading the player's own buffs on a unit", function()
         -- What lets a row ask once and answer for all eight of its buttons.
         local ns, env = loggedIn()
         env.__now = 1000
-        local gathered = { Rejuvenation = 1009 }
+        local gathered = { Rejuvenation = { expires = 1009, mine = true } }
         env.C_UnitAuras.GetAuraDataByIndex = function() error("must not be asked") end
 
         assertEqual(9, ns.Spells.AuraRemaining("party1", "Rejuvenation", gathered))
     end)
 
+    it("says whose cast the number belongs to, alongside it", function()
+        local ns, env = loggedIn()
+        env.__now = 1000
+        env.__auras.party1 =
+            { { name = "Rejuvenation", expirationTime = 1009, caster = "party2" } }
+
+        local remaining, mine = ns.Spells.AuraRemaining("party1", "Rejuvenation")
+
+        assertEqual(9, remaining)
+        assertFalse(mine, "somebody else's Rejuvenation is not a heal you have")
+    end)
+
     it("says nothing for an expiry the client is withholding", function()
-        -- PlayerAuras guards the reading, but a secret expiry is truthy and
+        -- HelpfulAuras guards the reading, but a secret expiry is truthy and
         -- rides out of that guard inside the table. The subtraction here is
         -- what raises -- the same defect as the cooldown crash, one path over.
         local ns, env = loggedIn()
@@ -424,5 +462,207 @@ describe("reading the player's own buffs on a unit", function()
         assertTrue(ok, "an unreadable expiry must cost one timer, not the "
             .. "refresh: " .. tostring(remaining))
         assertNil(remaining)
+    end)
+end)
+
+describe("reading the helpful buffs on a unit, by caster", function()
+    it("keeps a buff somebody else cast, and says it is theirs", function()
+        -- The number is worth having -- the buff is on them -- and so is
+        -- knowing it is not yours.
+        local ns, env = loggedIn()
+        env.__auras.party1 = {
+            { name = "Mark of the Wild", expirationTime = 3280, caster = "party2" },
+            { name = "Rejuvenation", expirationTime = 1012 },
+        }
+
+        local auras = ns.Spells.HelpfulAuras("party1")
+
+        assertFalse(auras["Mark of the Wild"].mine)
+        assertTrue(auras.Rejuvenation.mine)
+    end)
+end)
+
+describe("the aura report", function()
+    local function report(ns, unit, spells)
+        return table.concat(ns.Spells.Report(unit, spells), "\n")
+    end
+
+    it("names every aura it found and how long each has left", function()
+        local ns, env = loggedIn()
+        env.__now = 1000
+        env.__auras.party1 = { { name = "Mark of the Wild", expirationTime = 1030 } }
+
+        local printed = report(ns, "party1")
+
+        assertMatch("Mark of the Wild", printed)
+        assertMatch("30s", printed)
+        assertMatch("1 aura", printed)
+    end)
+
+    it("says the expiry was withheld rather than going down with it", function()
+        -- The case the timers cannot tell apart from an empty slot, and the
+        -- whole reason this report exists: the aura is there, its name reads,
+        -- and the number behind it is one tainted code may not do arithmetic
+        -- on.
+        local ns, env = loggedIn()
+        env.__auras.party1 =
+            { { name = "Mark of the Wild", expirationTime = env.__secret() } }
+
+        local ok, lines = pcall(ns.Spells.Report, "party1")
+
+        assertTrue(ok, "a diagnostic that throws is worse than none: "
+            .. tostring(lines))
+        local printed = table.concat(lines, "\n")
+        assertMatch("Mark of the Wild", printed)
+        assertMatch("WITHHELD", printed)
+    end)
+
+    it("shows what the unfiltered walk finds when ours comes back empty", function()
+        -- Separates "nothing of ours is on them" from "asking only for ours
+        -- is what emptied it", which look identical under an icon.
+        local ns, env = loggedIn()
+        env.__auras.party1 = {
+            { name = "Mark of the Wild", expirationTime = 1030, caster = "party2" },
+        }
+
+        local printed = report(ns, "party1")
+
+        assertMatch("HELPFUL|PLAYER: 0 aura", printed)
+        assertMatch("HELPFUL: 1 aura", printed)
+    end)
+
+    it("says so, once, when the client raises on the read itself", function()
+        local ns, env = loggedIn()
+        env.C_UnitAuras.GetAuraDataByIndex = function() error("secret value") end
+
+        local ok, lines = pcall(ns.Spells.Report, "party1")
+
+        assertTrue(ok, "the report must survive the client it is reporting on")
+        assertMatch("raised", table.concat(lines, "\n"))
+    end)
+
+    it("answers for each spell the row's buttons are holding", function()
+        local ns, env = loggedIn()
+        env.__now = 1000
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1007 } }
+
+        local printed = report(ns, "party1", { "Rejuvenation", "Mark of the Wild" })
+
+        assertMatch("Rejuvenation: 7s", printed)
+        assertMatch("Mark of the Wild: no number", printed)
+    end)
+end)
+
+describe("your own buffs on your own unit", function()
+    it("counts one this client will not attribute to anybody", function()
+        -- The bug, exactly as /ch auras reported it on 1.60.1: the client
+        -- hands back the Mark of the Wild on your own unit and answers the
+        -- PLAYER half of the filter with nothing, so the row beside your own
+        -- frame was the only one with no numbers on it.
+        local ns, env = loggedIn()
+        env.__auras.player =
+            { { name = "Mark of the Wild", expirationTime = 3280, caster = false } }
+
+        assertEqual(3280, ns.Spells.HelpfulAuras("player")["Mark of the Wild"].expires)
+    end)
+
+    it("still counts one the client does attribute to you", function()
+        local ns, env = loggedIn()
+        env.__auras.player = { { name = "Rejuvenation", expirationTime = 1012 } }
+
+        assertEqual(1012, ns.Spells.HelpfulAuras("player").Rejuvenation.expires)
+    end)
+
+    it("takes both, however the client attributes each", function()
+        -- The two answers arrive in one walk, so a buff it does name cannot
+        -- crowd out one it does not.
+        local ns, env = loggedIn()
+        env.__auras.player = {
+            { name = "Thorns", expirationTime = 1300 },
+            { name = "Mark of the Wild", expirationTime = 3280, caster = false },
+        }
+
+        local auras = ns.Spells.HelpfulAuras("player")
+
+        assertEqual(1300, auras.Thorns.expires)
+        assertEqual(3280, auras["Mark of the Wild"].expires)
+    end)
+
+    it("keeps a buff the client says somebody else cast on you, as theirs", function()
+        -- Kept, because re-casting over a Mark of the Wild that is already
+        -- running buys nothing; marked, because it is not your doing.
+        local ns, env = loggedIn()
+        env.__auras.player =
+            { { name = "Mark of the Wild", expirationTime = 3280, caster = "party1" } }
+
+        local aura = ns.Spells.HelpfulAuras("player")["Mark of the Wild"]
+
+        assertEqual(3280, aura.expires)
+        assertFalse(aura.mine)
+    end)
+end)
+
+describe("the aura report naming who cast what", function()
+    it("names the caster the client gave", function()
+        local ns, env = loggedIn()
+        env.__auras.party1 = { { name = "Thorns", expirationTime = 1300 } }
+
+        assertMatch('source="player"',
+            table.concat(ns.Spells.Report("party1"), "\n"))
+    end)
+
+    it("says nothing was named when the client would not say", function()
+        -- The state the player's own unit is in on 1.60.1, and the one line
+        -- that tells a later reader whether that is still true.
+        local ns, env = loggedIn()
+        env.__auras.player =
+            { { name = "Mark of the Wild", expirationTime = 3280, caster = false } }
+
+        assertMatch("source=nil", table.concat(ns.Spells.Report("player"), "\n"))
+    end)
+end)
+
+describe("a client that will not say who cast an aura", function()
+    it("keeps the aura, and the number under the icon with it", function()
+        -- The whole walk went down on this: /ch auras on 1.60.1 answered
+        -- "the client raised on the read" for every unit and every filter at
+        -- index 1, and the bar lost every timer it had. One unreadable field
+        -- may cost its own answer and nothing else.
+        local ns, env = loggedIn()
+        env.__auras.party1 =
+            { { name = "Rejuvenation", expirationTime = 1012, caster = "secret" } }
+
+        local auras = ns.Spells.HelpfulAuras("party1")
+
+        assertEqual(1012, auras.Rejuvenation.expires)
+    end)
+
+    it("counts it as yours, which is how it is drawn", function()
+        local ns, env = loggedIn()
+        env.__auras.party1 =
+            { { name = "Rejuvenation", expirationTime = 1012, caster = "secret" } }
+
+        assertTrue(ns.Spells.HelpfulAuras("party1").Rejuvenation.mine)
+    end)
+
+    it("does not stop the walk reaching the auras behind it", function()
+        local ns, env = loggedIn()
+        env.__auras.party1 = {
+            { name = "Rejuvenation", expirationTime = 1012, caster = "secret" },
+            { name = "Mark of the Wild", expirationTime = 3280 },
+        }
+
+        assertEqual(3280, ns.Spells.HelpfulAuras("party1")["Mark of the Wild"].expires)
+    end)
+
+    it("reports the aura rather than only the raise", function()
+        local ns, env = loggedIn()
+        env.__auras.party1 =
+            { { name = "Rejuvenation", expirationTime = 1012, caster = "secret" } }
+
+        local printed = table.concat(ns.Spells.Report("party1"), "\n")
+
+        assertMatch("Rejuvenation", printed)
+        assertMatch("HELPFUL: 1 aura", printed)
     end)
 end)

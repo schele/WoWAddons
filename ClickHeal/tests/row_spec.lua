@@ -1132,3 +1132,116 @@ describe("the icon size", function()
         assertEqual(ns.Row.MAX_BUTTON_SIZE, huge.buttons[1]:GetWidth())
     end)
 end)
+
+describe("what a row's buttons are holding", function()
+    it("lists the spells in button order", function()
+        local ns, env = loggedIn()
+        ns.db.bar.slots = 2
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.Slots.Set(2, "Regrowth")
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+
+        local spells = ns.Row.AssignedSpells(row)
+
+        assertEqual(2, #spells)
+        assertEqual("Rejuvenation", spells[1])
+        assertEqual("Regrowth", spells[2])
+    end)
+
+    it("leaves out a slot with no button on screen", function()
+        -- A spell this character has not learned has no button, so a report
+        -- listing it would be answering for an icon nobody can see.
+        local ns, env = loggedIn()
+        ns.db.bar.slots = 2
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.Slots.Set(2, "Tranquility")
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+
+        local spells = ns.Row.AssignedSpells(row)
+
+        assertEqual(1, #spells)
+        assertEqual("Rejuvenation", spells[1])
+    end)
+end)
+
+describe("whose cast the number under an icon is", function()
+    local function rowWithRejuvenation(ns, env)
+        ns.db.bar.slots = 1
+        ns.Slots.Set(1, "Rejuvenation")
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+        return row
+    end
+
+    it("counts down a buff somebody else cast, rather than leaving it blank", function()
+        -- Re-casting over a Rejuvenation that is already running buys
+        -- nothing, so a blank there would be asking for a wasted global.
+        local ns, env = loggedIn()
+        local row = rowWithRejuvenation(ns, env)
+        env.__now = 1000
+        env.__auras.party1 =
+            { { name = "Rejuvenation", expirationTime = 1007, caster = "party2" } }
+
+        ns.Row.Refresh(row)
+
+        assertEqual("7s", row.buttons[1].timer:GetText())
+    end)
+
+    it("greys that number, because it is not a heal you have", function()
+        local ns, env = loggedIn()
+        local row = rowWithRejuvenation(ns, env)
+        env.__now = 1000
+        env.__auras.party1 =
+            { { name = "Rejuvenation", expirationTime = 1007, caster = "party2" } }
+
+        ns.Row.Refresh(row)
+
+        local colour = row.buttons[1].timer.textColor
+        assertTrue(colour and colour[1] < 1, "somebody else's number is greyed")
+    end)
+
+    it("leaves your own number at full strength", function()
+        local ns, env = loggedIn()
+        local row = rowWithRejuvenation(ns, env)
+        env.__now = 1000
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1007 } }
+
+        ns.Row.Refresh(row)
+
+        assertEqual(1, row.buttons[1].timer.textColor[1])
+    end)
+
+    it("takes back the grey when the buff becomes yours again", function()
+        -- Nothing else ever resets the colour, so a button that greyed once
+        -- would stay grey over every cast that followed.
+        local ns, env = loggedIn()
+        local row = rowWithRejuvenation(ns, env)
+        env.__now = 1000
+        env.__auras.party1 =
+            { { name = "Rejuvenation", expirationTime = 1007, caster = "party2" } }
+        ns.Row.Refresh(row)
+
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1007 } }
+        ns.Row.Refresh(row)
+
+        assertEqual(1, row.buttons[1].timer.textColor[1])
+    end)
+
+    it("reads a buff on your own unit as yours, since this client will not say", function()
+        local ns, env = loggedIn()
+        ns.db.bar.slots = 1
+        ns.Slots.Set(1, "Mark of the Wild")
+        local row = ns.Row.Create("player", env.UIParent)
+        ns.Row.ApplySpells(row)
+        env.__now = 1000
+        env.__auras.player =
+            { { name = "Mark of the Wild", expirationTime = 3280, caster = false } }
+
+        ns.Row.Refresh(row)
+
+        assertEqual("38m", row.buttons[1].timer:GetText())
+        assertEqual(1, row.buttons[1].timer.textColor[1])
+    end)
+end)

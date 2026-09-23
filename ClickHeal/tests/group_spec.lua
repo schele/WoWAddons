@@ -756,3 +756,35 @@ describe("the icon size reaching the layout", function()
         assertTrue(ns.Group.Anchor():GetHeight() > before)
     end)
 end)
+
+describe("the aura report", function()
+    it("reports every unit, and what each row's buttons are holding", function()
+        -- Reached for when an icon has no number under it, which is to say
+        -- when something is already wrong: it has to survive whatever it
+        -- finds, and it has to cover the units the player is looking at.
+        local ns, env = loggedIn()
+        env.__now = 1000
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1007 } }
+
+        local ok = pcall(helpers.command, env, "auras")
+
+        assertTrue(ok, "/ch auras must survive whatever it finds")
+        local printed = helpers.printed(env)
+        for _, unit in ipairs(ns.Group.Units()) do
+            assertTrue(printed:find(unit, 1, true) ~= nil, unit .. " is reported")
+        end
+        assertMatch("Rejuvenation: 7s", printed)
+    end)
+
+    it("survives being asked before the rows exist", function()
+        -- A build held back by combat leaves no rows at all, and that is
+        -- exactly the state someone runs a diagnostic in.
+        local ns, env = helpers.loadAddon(FILES)
+        env.__inCombat = true
+        helpers.login(ns, env)
+
+        local ok = pcall(helpers.command, env, "auras")
+
+        assertTrue(ok, "a diagnostic with no rows to read must still report")
+    end)
+end)

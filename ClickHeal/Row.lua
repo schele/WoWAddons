@@ -126,6 +126,11 @@ local DIM = 0.35
 -- How far an icon darkens when its own spell cannot reach this row's unit.
 local RANGE_DIM = 0.4
 
+-- How far a timer greys when the buff under it is somebody else's cast. Far
+-- enough to read as the quieter of two numbers side by side, not so far that
+-- it stops being legible against a spell icon.
+local OTHERS_DIM = 0.55
+
 -- Blizzard's own stand-in for a spell it will not draw. Reached only when
 -- the player knows the spell but the icon lookup came back empty, so that a
 -- client with no texture API costs the picture rather than the button.
@@ -652,22 +657,63 @@ function Row.FormatDuration(seconds)
     return string.format("%dh", math.ceil(seconds / 3600))
 end
 
+--- The spells this row's buttons are actually holding, in button order.
+--
+-- Read off the buttons rather than out of Slots, because the buttons are
+-- what the timers read: a slot holding a spell this character has not
+-- learned has no button at all, and reporting it would be answering for an
+-- icon that is not on screen.
+function Row.AssignedSpells(row)
+    local spells = {}
+
+    for index = 1, ns.Slots.MAX do
+        local spell = row.buttons[index]:GetAttribute("spell")
+        if spell then
+            spells[#spells + 1] = spell
+        end
+    end
+
+    return spells
+end
+
 --- Write the remaining time of each button's own spell on this row's unit.
 --
 -- The unit's auras are gathered once and shared across the row's buttons.
 -- Asked per button instead, eight buttons on each of five rows refreshed
 -- five times a second would be thousands of calls into the client every
 -- second, nearly all of them repeats.
+--
+-- A number somebody else's cast put there is greyed rather than left out.
+-- It is worth having -- the buff is on them, and re-casting over it buys
+-- nothing -- but it is not yours, and two druids' Rejuvenations run on the
+-- same target independently, so a white 7s that turns out to be another
+-- druid's is a heal you thought you had.
 function Row.RefreshAuras(row)
-    local auras = ns.Spells.PlayerAuras(row.unit)
+    local auras = ns.Spells.HelpfulAuras(row.unit)
 
     for index = 1, ns.Slots.MAX do
         local button = row.buttons[index]
         local spell = button:GetAttribute("spell")
 
-        button.timer:SetText(Row.FormatDuration(
-            spell and ns.Spells.AuraRemaining(row.unit, spell, auras) or nil
-        ))
+        local remaining, mine
+        if spell then
+            -- Not folded into the SetText below: `spell and f()` keeps only
+            -- the first of the two returns, which is how the colour would
+            -- quietly become "always yours".
+            remaining, mine = ns.Spells.AuraRemaining(row.unit, spell, auras)
+        end
+
+        button.timer:SetText(Row.FormatDuration(remaining))
+
+        -- Compared against false rather than tested, the same way range is:
+        -- nil is the client declining to say who cast it, and an unattributed
+        -- buff on your own unit -- which is every buff on your own unit, on
+        -- this client -- must read as yours rather than greying the row.
+        if mine == false then
+            button.timer:SetTextColor(OTHERS_DIM, OTHERS_DIM, OTHERS_DIM)
+        else
+            button.timer:SetTextColor(1, 1, 1)
+        end
     end
 end
 
