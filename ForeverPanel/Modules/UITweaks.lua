@@ -164,18 +164,93 @@ ns.RegisterSetting({
 -- Sell prices on quest rewards
 --------------------------------------------------------------------------------
 
+local SELL_PRICE_LABEL = SELL_PRICE or "Sell Price"
+
+--- Whether the client already put its own price on this tooltip.
+-- The 1.60 client writes it as a text line with coin icons rather than a money
+-- frame, so look for that line as well as for money frames and the data.
+local function hasNativeSellPrice(tooltip, data)
+    if (tooltip.shownMoneyFrames or 0) > 0 then
+        return true
+    end
+
+    local sellPriceLine = Enum and Enum.TooltipDataLineType and Enum.TooltipDataLineType.SellPrice
+    if sellPriceLine and type(data) == "table" and type(data.lines) == "table" then
+        for _, line in ipairs(data.lines) do
+            if line.type == sellPriceLine then
+                return true
+            end
+        end
+    end
+
+    local name = tooltip.GetName and tooltip:GetName()
+    if name and tooltip.NumLines then
+        for index = 1, tooltip:NumLines() do
+            local line = _G[name .. "TextLeft" .. index]
+            local text = line and line.GetText and line:GetText()
+            if type(text) == "string" and text:find(SELL_PRICE_LABEL, 1, true) == 1 then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+--- How many items the tooltip is showing: the stack on the button it is for.
+local function stackCount(tooltip)
+    local owner = tooltip.GetOwner and tooltip:GetOwner()
+    local count = type(owner) == "table" and tonumber(owner.count) or nil
+    return count or 1
+end
+
+local COIN_ICONS = {
+    gold = "|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t",
+    silver = "|TInterface\\MoneyFrame\\UI-SilverIcon:0:0:2:0|t",
+    copper = "|TInterface\\MoneyFrame\\UI-CopperIcon:0:0:2:0|t",
+}
+
+--- A price as text with coin icons, the way the client writes its own.
+-- Text rather than SetTooltipMoney: called from addon code on the 1.60 client,
+-- the money frame measures its coins as secret numbers and then errors doing
+-- arithmetic on them. A text line has nothing to measure.
+local function moneyText(copper)
+    if GetMoneyString then
+        return GetMoneyString(copper)
+    end
+
+    local gold = math.floor(copper / 10000)
+    local silver = math.floor(copper / 100) % 100
+    copper = copper % 100
+
+    local parts = {}
+    if gold > 0 then
+        parts[#parts + 1] = gold .. COIN_ICONS.gold
+    end
+    if silver > 0 then
+        parts[#parts + 1] = silver .. COIN_ICONS.silver
+    end
+    if copper > 0 then
+        parts[#parts + 1] = copper .. COIN_ICONS.copper
+    end
+    return table.concat(parts, " ")
+end
+
 --- Add the vendor price to an item tooltip that left it out.
 -- The client shows it on items you carry but not on quest rewards, which is
--- exactly where it matters when picking one to sell. A tooltip that already
--- carries a price is left alone, so it never shows twice.
+-- exactly where it matters when picking one to sell. A single item the client
+-- already priced is left to the client. On a stack, the price of one item is
+-- added beside the client's, labelled as such.
 local function addSellPrice(tooltip, data)
     if not (ns.db and ns.db.ui.showSellPrice) then
         return
     end
-    if type(tooltip) ~= "table" or not tooltip.GetItem or not SetTooltipMoney then
+    if type(tooltip) ~= "table" or not tooltip.GetItem or not tooltip.AddLine then
         return
     end
-    if (tooltip.shownMoneyFrames or 0) > 0 then
+
+    local count = stackCount(tooltip)
+    if count <= 1 and hasNativeSellPrice(tooltip, data) then
         return
     end
 
@@ -203,7 +278,8 @@ local function addSellPrice(tooltip, data)
         return
     end
 
-    SetTooltipMoney(tooltip, sellPrice, nil, (SELL_PRICE or "Sell Price") .. ":")
+    local label = count > 1 and (SELL_PRICE_LABEL .. " (each):") or (SELL_PRICE_LABEL .. ":")
+    tooltip:AddLine(label .. " " .. moneyText(sellPrice), 1, 1, 1)
     if tooltip:IsShown() then
         -- Resize around the new line.
         tooltip:Show()

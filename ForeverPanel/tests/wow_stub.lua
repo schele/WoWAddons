@@ -112,6 +112,10 @@ local function makeWidget(kind, parent)
         end
     end
 
+    function widget:GetName()
+        return self.frameName
+    end
+
     function widget:RegisterEvent(event)
         self.registeredEvents[event] = true
     end

@@ -169,10 +169,25 @@ describe("health and mana numbers", function()
     end)
 end)
 
+-- A tooltip that records the lines added to it. SetTooltipMoney is made to
+-- fail loudly: on the 1.60 client calling it from addon code errors on secret
+-- coin widths, so the price has to go in as a plain text line.
+local function priceTooltip(env, name)
+    local tooltip = env.CreateFrame("GameTooltip", name)
+    tooltip.added = {}
+    function tooltip:AddLine(text)
+        table.insert(self.added, text)
+    end
+    env.SetTooltipMoney = function()
+        error("SetTooltipMoney must not be called")
+    end
+    return tooltip
+end
+
 describe("sell prices on quest rewards", function()
     -- A tooltip showing a quest reward, which the client gives no price.
     local function rewardTooltip(env, sellPrice)
-        local tooltip = env.CreateFrame("GameTooltip")
+        local tooltip = priceTooltip(env)
         function tooltip:GetItem()
             return "Footman Tunic", "item:1234"
         end
@@ -181,23 +196,28 @@ describe("sell prices on quest rewards", function()
             return "Footman Tunic", "item:1234", 2, 10, 5, "Armor", "Leather", 1,
                 "INVTYPE_CHEST", 0, sellPrice
         end
-        env.__moneyLines = {}
-        env.SetTooltipMoney = function(frame, money, kind, prefix)
-            table.insert(env.__moneyLines, { money = money, prefix = prefix })
-            frame.shownMoneyFrames = (frame.shownMoneyFrames or 0) + 1
-        end
 
         return tooltip
     end
 
-    it("adds the price, the setting defaulting on", function()
+    it("adds the price as a line of text, the setting defaulting on", function()
         local ns, env = loggedIn()
         local tooltip = rewardTooltip(env, 345)
 
         ns.AddSellPrice(tooltip)
 
-        assertEqual(1, #env.__moneyLines)
-        assertEqual(345, env.__moneyLines[1].money)
+        assertEqual(1, #tooltip.added)
+        assertMatch("^Sell Price: 3|T[^|]*SilverIcon[^|]*|t 45|T[^|]*CopperIcon", tooltip.added[1])
+    end)
+
+    it("writes gold too, and skips a denomination that is zero", function()
+        local ns, env = loggedIn()
+        local tooltip = rewardTooltip(env, 20005)
+
+        ns.AddSellPrice(tooltip)
+
+        assertMatch("^Sell Price: 2|T[^|]*GoldIcon[^|]*|t 5|T[^|]*CopperIcon", tooltip.added[1])
+        assertFalse(tooltip.added[1]:find("SilverIcon", 1, true) ~= nil, "no 0 silver")
     end)
 
     it("leaves a tooltip that already shows a price alone", function()
@@ -207,7 +227,7 @@ describe("sell prices on quest rewards", function()
 
         ns.AddSellPrice(tooltip)
 
-        assertEqual(0, #env.__moneyLines)
+        assertEqual(0, #tooltip.added)
     end)
 
     it("says nothing for an item that cannot be sold", function()
@@ -216,7 +236,7 @@ describe("sell prices on quest rewards", function()
 
         ns.AddSellPrice(tooltip)
 
-        assertEqual(0, #env.__moneyLines)
+        assertEqual(0, #tooltip.added)
     end)
 
     it("stops when turned off", function()
@@ -226,7 +246,7 @@ describe("sell prices on quest rewards", function()
         ns.SetSettingValue(settingFor(ns, "ui", "showSellPrice"), false)
         ns.AddSellPrice(tooltip)
 
-        assertEqual(0, #env.__moneyLines)
+        assertEqual(0, #tooltip.added)
     end)
 end)
 
@@ -235,7 +255,7 @@ describe("sell prices on a client with only C_Item", function()
     -- to TooltipDataProcessor callbacks.
     it("looks the item up through C_Item by the id it is given", function()
         local ns, env = loggedIn()
-        local tooltip = env.CreateFrame("GameTooltip")
+        local tooltip = priceTooltip(env)
         function tooltip:GetItem()
             return "Footman Tunic", "item:1234"
         end
@@ -249,14 +269,56 @@ describe("sell prices on a client with only C_Item", function()
                     "INVTYPE_CHEST", 0, 345
             end,
         }
-        local shown
-        env.SetTooltipMoney = function(frame, money)
-            shown = money
-        end
 
         ns.AddSellPrice(tooltip, { id = 1234 })
 
         assertEqual(1234, askedFor)
-        assertEqual(345, shown)
+        assertEqual(1, #tooltip.added)
+    end)
+end)
+
+describe("sell prices beside the client's own", function()
+    -- A bag item's tooltip: the client has already written its price as a
+    -- text line, the way the 1.60 client does.
+    local function bagTooltip(env, count)
+        local tooltip = priceTooltip(env, "TestTooltip")
+        function tooltip:GetItem()
+            return "Gritroot Staff", "item:5678"
+        end
+        function tooltip:NumLines()
+            return 2
+        end
+        function tooltip:GetOwner()
+            return { count = count }
+        end
+
+        env.TestTooltipTextLeft1 = { GetText = function() return "Gritroot Staff" end }
+        env.TestTooltipTextLeft2 = { GetText = function() return "Sell Price: 3 2" end }
+
+        env.GetItemInfo = function()
+            return "Gritroot Staff", "item:5678", 2, 10, 5, "Weapon", "Staff", count,
+                "INVTYPE_2HWEAPON", 0, 302
+        end
+
+        return tooltip
+    end
+
+    it("leaves a single item to the client", function()
+        local ns, env = loggedIn()
+        local tooltip = bagTooltip(env, 1)
+
+        ns.AddSellPrice(tooltip)
+
+        assertEqual(0, #tooltip.added)
+    end)
+
+    it("adds the price of one item to a stack", function()
+        local ns, env = loggedIn()
+        local tooltip = bagTooltip(env, 5)
+
+        ns.AddSellPrice(tooltip)
+
+        assertEqual(1, #tooltip.added)
+        assertMatch("^Sell Price %(each%): 3|T", tooltip.added[1])
     end)
 end)
