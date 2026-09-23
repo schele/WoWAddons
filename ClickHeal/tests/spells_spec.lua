@@ -286,6 +286,16 @@ describe("listing the spells a slot can be given", function()
         assertEqual(3, #known)
     end)
 
+    it("offers a druid both resurrections", function()
+        local ns, env = loggedIn()
+        env.__learnSpells({ "Rebirth", "Revive" })
+
+        local known = ns.Spells.Pickable()
+
+        assertEqual("Rebirth", known[1])
+        assertEqual("Revive", known[2])
+    end)
+
     it("sorts them, since a spellbook is in no order worth showing", function()
         local ns, env = loggedIn()
         env.__learnSpells({ "Rejuvenation", "Healing Touch", "Mark of the Wild" })

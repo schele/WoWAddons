@@ -81,6 +81,23 @@ local function nameFromBook(index, bookType)
     return nil
 end
 
+-- Spells that cannot target the caster: the resurrections. Nobody casts them
+-- on themselves, so a button for one on your own row only ever fails.
+-- Soulstone Resurrection is left off, since a warlock can stone themselves.
+local NOT_ON_SELF = {
+    ["Rebirth"] = true,
+    ["Revive"] = true,
+    ["Resurrection"] = true,
+    ["Redemption"] = true,
+    ["Ancestral Spirit"] = true,
+}
+
+--- Whether a spell can be cast on `unit` at all, by its nature rather than by
+-- range or state: false only for a resurrection aimed at the player.
+function Spells.CastableOn(spellName, unit)
+    return not (unit == "player" and NOT_ON_SELF[spellName])
+end
+
 --- Whether this client knows the spell by name, through whichever API it
 -- has -- the same defensive chain as everything else here, so there is one
 -- answer to "what spell APIs does this client have" rather than a caller
@@ -281,7 +298,7 @@ local CLASS_SPELLS = {
         "Rejuvenation", "Regrowth", "Healing Touch", "Tranquility",
         "Mark of the Wild", "Gift of the Wild", "Thorns",
         "Remove Curse", "Abolish Poison", "Cure Poison",
-        "Rebirth", "Innervate",
+        "Rebirth", "Revive", "Innervate",
     },
     PRIEST = {
         "Lesser Heal", "Heal", "Greater Heal", "Flash Heal", "Renew",

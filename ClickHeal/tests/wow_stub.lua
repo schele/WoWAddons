@@ -129,6 +129,8 @@ local function makeWidget(kind, parent, template, env)
     -- shows no mouseover highlight, and nothing else about it looks wrong.
     function widget:EnableMouse(value) self.mouseEnabled = value ~= false end
     function widget:EnableMouseWheel() end
+    function widget:SetScrollChild(child) self.scrollChild = child end
+    function widget:GetScrollChild() return self.scrollChild end
     -- Driven by a test: env.__mouseOver = someFrame. The real answer depends
     -- on where the cursor is, which a test has no way to arrange.
     function widget:IsMouseOver() return self.__env.__mouseOver == self end

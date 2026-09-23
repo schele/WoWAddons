@@ -230,6 +230,61 @@ describe("applying spells", function()
         )
     end)
 
+    it("leaves a resurrection off your own row, keeping its place", function()
+        -- Rebirth and Revive cannot target the caster. The gap stays so
+        -- Remove Curse sits in the same column as on every party row.
+        local ns, env = loggedIn()
+        env.__spells["Rebirth"] = true
+        env.__spellTextures["Rebirth"] = 136080
+        ns.db.bar.slots = 3
+        ns.Slots.Set(1, "Regrowth")
+        ns.Slots.Set(2, "Rebirth")
+        ns.Slots.Set(3, "Remove Curse")
+        local row = ns.Row.Create("player", env.UIParent)
+
+        ns.Row.ApplySpells(row)
+
+        assertFalse(row.buttons[2]:IsShown())
+        assertNil(helpers.attrs(row.buttons[2]).spell, "and it must not stay castable")
+
+        local _, firstX = row.buttons[1]:GetPoint()
+        local _, thirdX = row.buttons[3]:GetPoint()
+        assertEqual(
+            2 * (row.buttons[1]:GetWidth() + ns.Row.BUTTON_GAP),
+            thirdX - firstX,
+            "slot 3 stays in its own column"
+        )
+    end)
+
+    it("still offers a resurrection on a party member's row", function()
+        local ns, env = loggedIn()
+        env.__spells["Revive"] = true
+        env.__spellTextures["Revive"] = 132132
+        ns.Slots.Set(1, "Revive")
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        ns.Row.ApplySpells(row)
+
+        assertTrue(row.buttons[1]:IsShown())
+        assertEqual("Revive", helpers.attrs(row.buttons[1]).spell)
+    end)
+
+    it("does not size your row for a resurrection it left off the end", function()
+        local ns, env = loggedIn()
+        env.__spells["Revive"] = true
+        env.__spellTextures["Revive"] = 132132
+        ns.db.bar.slots = 2
+        ns.Slots.Set(1, "Regrowth")
+        ns.Slots.Set(2, "Revive")
+        local mine = ns.Row.Create("player", env.UIParent)
+        local theirs = ns.Row.Create("party1", env.UIParent)
+
+        ns.Row.ApplySpells(mine)
+        ns.Row.ApplySpells(theirs)
+
+        assertTrue(mine:GetWidth() < theirs:GetWidth(), "one button narrower")
+    end)
+
     it("keeps a known spell visible even when its icon cannot be looked up", function()
         -- Whether a button appears is decided by whether the player knows the
         -- spell, never by whether an icon lookup happened to succeed. On a

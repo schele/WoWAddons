@@ -23,10 +23,10 @@ ns.SettingsPanel = Panel
 Panel.controls = {}
 Panel.headings = {}
 
-local panel, category, built
+local panel, content, category, built
 
 local function addCheckbox(setting, y, x)
-    local button = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+    local button = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
     button:SetPoint("TOPLEFT", x, y)
 
     -- The label belongs to the template on some clients and not others, so
@@ -49,7 +49,7 @@ local function addCheckbox(setting, y, x)
 end
 
 local function addSlider(setting, y, x)
-    local slider = CreateFrame("Slider", nil, panel, "OptionsSliderTemplate")
+    local slider = CreateFrame("Slider", nil, content, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", x, y - SLIDER_EXTRA)
     slider:SetMinMaxValues(setting.min, setting.max)
     slider:SetValueStep(setting.step or 1)
@@ -343,10 +343,18 @@ local function ensurePicker()
     -- The cost is that a click outside the settings window no longer closes
     -- the list. There is nothing outside the settings window to click while
     -- it is open.
-    panel:EnableMouse(true)
-    panel:SetScript("OnMouseDown", function()
+    --
+    -- The scrolling content covers the panel, so a click there lands on it
+    -- rather than on the panel; both close the list.
+    local function closePicker()
         picker:Hide()
-    end)
+    end
+    panel:EnableMouse(true)
+    panel:SetScript("OnMouseDown", closePicker)
+    if content and content ~= panel then
+        content:EnableMouse(true)
+        content:SetScript("OnMouseDown", closePicker)
+    end
 
     picker:Hide()
     Panel.picker = picker
@@ -408,14 +416,14 @@ local function addSpellTable(setting, y, x)
         end
     end
 
-    local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    local heading = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     heading:SetPoint("TOPLEFT", x, y)
     heading:SetText(setting.name)
 
     for index = 1, rows do
         local top = y - ROW_HEIGHT - (index - 1) * BOX_HEIGHT
 
-        local number = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        local number = content:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
         number:SetPoint("TOPLEFT", x, top - 4)
         number:SetText(tostring(index))
         numbers[index] = number
@@ -424,7 +432,7 @@ local function addSpellTable(setting, y, x)
         -- only way into a slot now, so there is nothing left to type into --
         -- and an icon says which spell a slot holds faster than its name
         -- does, which is the same reason the buttons themselves show icons.
-        local slotRow = CreateFrame("Frame", nil, panel)
+        local slotRow = CreateFrame("Frame", nil, content)
         placeRow(slotRow, index)
         slotRow:SetSize(180, BOX_HEIGHT - 4)
 
@@ -456,7 +464,7 @@ local function addSpellTable(setting, y, x)
             -- Lifted: out of the strip and above the rows it passes over, so
             -- what the hand is holding is never behind what it is moving
             -- between.
-            self:SetFrameLevel(panel:GetFrameLevel() + 10)
+            self:SetFrameLevel(content:GetFrameLevel() + 10)
             self.label:SetTextColor(1, 0.82, 0)
             self:StartMoving()
         end)
@@ -487,7 +495,7 @@ local function addSpellTable(setting, y, x)
 
         slotRow:SetScript("OnDragStop", function(self)
             self:StopMovingOrSizing()
-            self:SetFrameLevel(panel:GetFrameLevel() + 1)
+            self:SetFrameLevel(content:GetFrameLevel() + 1)
             self.label:SetTextColor(1, 1, 1)
 
             local target = self.dropTarget
@@ -509,7 +517,7 @@ local function addSpellTable(setting, y, x)
             end
         end)
 
-        local pick = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+        local pick = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
         pick:SetSize(46, BOX_HEIGHT - 4)
         pick:SetPoint("LEFT", slotRow, "RIGHT", 6, 0)
         pick:SetText("Pick")
@@ -582,6 +590,39 @@ local function ensureBuilt()
     end
     built = true
 
+    -- Everything below goes on a scrolling child rather than on the panel,
+    -- because the settings outgrew the canvas the game gives us and the last
+    -- few fell off the bottom. The picker stays on the panel itself: a scroll
+    -- frame clips its children, and a list dropping down from a low row
+    -- would be cut off at the edge.
+    --
+    -- Guarded, because a template the client lacks raises rather than
+    -- returning nil. Without the scroll frame the panel still works; it is
+    -- just as tall as it was.
+    local ok, scroll = pcall(CreateFrame, "ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    if ok and scroll then
+        scroll:SetPoint("TOPLEFT", 0, -4)
+        -- Room on the right for the template's scroll bar, which it hangs
+        -- just outside the frame's own edge.
+        scroll:SetPoint("BOTTOMRIGHT", -28, 4)
+
+        content = CreateFrame("Frame", nil, scroll)
+        content:SetSize(PANEL_WIDTH, 1)
+        scroll:SetScrollChild(content)
+        Panel.scroll = scroll
+
+        -- The picker is anchored to a row, so it would ride along with the
+        -- scroll and end up floating over the wrong one. Closed instead.
+        scroll:HookScript("OnVerticalScroll", function()
+            if Panel.picker then
+                Panel.picker:Hide()
+            end
+        end)
+    else
+        content = panel
+    end
+    Panel.content = content
+
     -- logo, not icon. They are the same cross drawn twice: icon.tga has the
     -- tile behind it that the AddOns list needs, because every entry there
     -- is a square and one that is not looks broken. Here the opposite is
@@ -591,13 +632,13 @@ local function ensureBuilt()
     -- Built from addonName rather than spelled out: the .toc already names
     -- this folder, and a second copy of the path is the one that goes stale
     -- when it is renamed.
-    local logo = panel:CreateTexture(nil, "ARTWORK")
+    local logo = content:CreateTexture(nil, "ARTWORK")
     logo:SetSize(LOGO_SIZE, LOGO_SIZE)
     logo:SetPoint("TOPLEFT", PADDING, -PADDING)
     logo:SetTexture("Interface\\AddOns\\" .. addonName .. "\\logo")
     Panel.logo = logo
 
-    local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    local title = content:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     -- Centred against the icon rather than pinned to the panel, so the two
     -- read as one heading whatever size the icon is given.
     title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
@@ -606,11 +647,11 @@ local function ensureBuilt()
     -- From the addon's own metadata, not a constant here, which would drift
     -- from the .toc the first time either is bumped without the other.
     local metadata = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
-    local version = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    local version = content:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     version:SetPoint("LEFT", title, "RIGHT", 8, -2)
     version:SetText("Version " .. ((metadata and metadata(addonName, "Version")) or "unknown"))
 
-    local hint = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    local hint = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     hint:SetPoint("TOPLEFT", PADDING, -PADDING - ROW_HEIGHT)
     hint:SetWidth(PANEL_WIDTH - PADDING * 2)
     hint:SetJustifyH("LEFT")
@@ -635,7 +676,7 @@ local function ensureBuilt()
         -- column, so an untitled column costs nothing and a column nobody
         -- puts a setting in never appears at all.
         if ns.columns[column] and not Panel.headings[column] then
-            local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+            local heading = content:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
             heading:SetPoint("TOPLEFT", x, y[column])
             heading:SetText(ns.columns[column])
             Panel.headings[column] = heading
@@ -655,6 +696,12 @@ local function ensureBuilt()
         end
 
         table.insert(Panel.controls, control)
+    end
+
+    -- As tall as the longer column, so the scroll range ends just past the
+    -- last setting rather than at some guess.
+    if content ~= panel then
+        content:SetHeight(-math.min(y.left, y.right) + PADDING)
     end
 
     Panel.Refresh()

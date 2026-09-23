@@ -19,8 +19,8 @@ Slots.DEFAULT_COUNT = 6
 -- A starting set per class, so a configuration that was never saved is still
 -- usable. ForeverPanel seeds its chat keys for the same reason.
 local SEED = {
-    DRUID   = { "Rejuvenation", "Healing Touch", "Mark of the Wild", "Thorns" },
-    PRIEST  = { "Flash Heal", "Renew", "Dispel Magic", "Power Word: Fortitude" },
+    DRUID   = { "Rejuvenation", "Healing Touch", "Mark of the Wild", "Thorns", "Revive" },
+    PRIEST = { "Flash Heal", "Renew", "Dispel Magic", "Power Word: Fortitude" },
     PALADIN = { "Holy Light", "Flash of Light", "Cleanse", "Blessing of Might" },
     SHAMAN  = { "Healing Wave", "Lesser Healing Wave", "Cure Poison", "Lightning Shield" },
 }
@@ -34,7 +34,16 @@ ns.AddDefaults({
         spells = {},
     },
     seeded = false,
+    -- Spells from SEED_LATER already handed out, by name, so each goes out once.
+    seedAdded = {},
 })
+
+-- Spells added to a seed after it first shipped. A configuration seeded before
+-- they existed gets each one once, in its first empty slot; seeding still
+-- happens once, so these are the only thing that reaches it afterwards.
+local SEED_LATER = {
+    DRUID = { "Revive" },
+}
 
 function Slots.Count()
     local count = tonumber(ns.db and ns.db.bar.slots) or Slots.DEFAULT_COUNT
@@ -91,8 +100,40 @@ end
 --- Fill empty slots with a starting set, once ever.
 -- Once is the whole point: a slot the player deliberately empties must stay
 -- empty at the next login rather than being helpfully refilled.
+local function slotted(spell)
+    for index = 1, Slots.MAX do
+        if ns.db.bar.spells[index] == spell then
+            return true
+        end
+    end
+    return false
+end
+
+--- Hand out any SEED_LATER spells this configuration has not had yet.
+-- Marked as given even when there is no room or it is already slotted, so
+-- emptying the slot afterwards sticks, the same as it does for the seed.
+local function seedLater(class)
+    local added = ns.db.seedAdded
+
+    for _, spell in ipairs(SEED_LATER[class or ""] or {}) do
+        if not added[spell] then
+            added[spell] = true
+
+            if not slotted(spell) then
+                for index = 1, Slots.Count() do
+                    if ns.db.bar.spells[index] == nil then
+                        ns.db.bar.spells[index] = spell
+                        break
+                    end
+                end
+            end
+        end
+    end
+end
+
 function Slots.Seed(class)
     if ns.db.seeded then
+        seedLater(class)
         return
     end
 
@@ -111,6 +152,10 @@ function Slots.Seed(class)
             ns.db.bar.spells[index] = spell
         end
     end
+
+    -- The fresh seed already carries them; mark them so they are not handed
+    -- out a second time.
+    seedLater(class)
 end
 
 -- Declared next to the code that reads them. Settings.lua renders whatever has

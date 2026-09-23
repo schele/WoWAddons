@@ -465,6 +465,10 @@ function Row.ApplySpells(row)
         row.health:Show()
     end
 
+    -- How far along the row the last button that is really drawn sits, which
+    -- is what the row is sized to. It can trail `shown`: see the gap below.
+    local lastDrawn = 0
+
     for index = 1, ns.Slots.MAX do
         local button = row.buttons[index]
         local spell = index <= count and ns.Slots.Spell(index) or nil
@@ -486,7 +490,16 @@ function Row.ApplySpells(row)
         -- reports one it cannot check as having no icon. Deciding on the
         -- icon would empty the whole bar on a client with no texture API,
         -- which is the one outcome that leaves a healer nothing to click.
-        if hasButton(spell) and not Row.Suppressed(row.unit) then
+        if hasButton(spell) and not Row.Suppressed(row.unit)
+            and not ns.Spells.CastableOn(spell, row.unit) then
+            -- A resurrection on your own row. Left out, but its place is
+            -- kept, so every other button stays in the same column as on the
+            -- party rows and a click lands where muscle memory expects it.
+            shown = shown + 1
+            button:SetAttribute("spell", nil)
+            button.icon:Hide()
+            button:Hide()
+        elseif hasButton(spell) and not Row.Suppressed(row.unit) then
             button:SetAttribute("spell", spell)
 
             button.icon:SetTexture(ns.Spells.Texture(spell) or UNKNOWN_ICON)
@@ -506,6 +519,7 @@ function Row.ApplySpells(row)
                 0
             )
             shown = shown + 1
+            lastDrawn = shown
 
             button:Show()
         else
@@ -522,7 +536,7 @@ function Row.ApplySpells(row)
     -- where the last button does. Safe for the same reason every other
     -- write here is: ApplySpells only ever runs out of combat, and resizing
     -- a frame the client is watching is refused in it.
-    row:SetWidth(widthFor(shown))
+    row:SetWidth(widthFor(lastDrawn))
 end
 
 

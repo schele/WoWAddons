@@ -9,6 +9,7 @@ M.FILES = {
     "Slots.lua",
     "Row.lua",
     "Group.lua",
+    "ManaBar.lua",
     "Settings.lua",
 }
 

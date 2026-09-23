@@ -95,7 +95,42 @@ describe("seeding", function()
         assertEqual("Healing Touch", ns.Slots.Spell(2))
         assertEqual("Mark of the Wild", ns.Slots.Spell(3))
         assertEqual("Thorns", ns.Slots.Spell(4))
-        assertNil(ns.Slots.Spell(5), "the seed is four long; the rest stay empty")
+        assertEqual("Revive", ns.Slots.Spell(5))
+        assertNil(ns.Slots.Spell(6), "the seed is five long; the rest stay empty")
+    end)
+
+    it("gives Revive once to a druid seeded before it was in the seed", function()
+        local ns = loggedIn()
+        -- A configuration from before Revive: seeded, four spells, and no
+        -- record of having been given it.
+        ns.db.seeded = true
+        for index, spell in ipairs({ "Rejuvenation", "Healing Touch", "Mark of the Wild", "Thorns" }) do
+            ns.Slots.Set(index, spell)
+        end
+
+        ns.Slots.Seed("DRUID")
+
+        assertEqual("Revive", ns.Slots.Spell(5))
+    end)
+
+    it("does not give Revive back once it has been removed", function()
+        local ns = loggedIn()
+        ns.Slots.Seed("DRUID")
+        ns.Slots.Set(5, "")
+        ns.Slots.Seed("DRUID")
+
+        assertNil(ns.Slots.Spell(5))
+    end)
+
+    it("does not slot Revive twice when the player already has it", function()
+        local ns = loggedIn()
+        ns.db.seeded = true
+        ns.Slots.Set(2, "Revive")
+
+        ns.Slots.Seed("DRUID")
+
+        assertEqual("Revive", ns.Slots.Spell(2))
+        assertNil(ns.Slots.Spell(1), "not added again in the first empty slot")
     end)
 
     it("leaves a slot the player already chose", function()

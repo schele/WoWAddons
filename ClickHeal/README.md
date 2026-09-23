@@ -37,7 +37,10 @@ A slot holds any spell you can cast on a friendly unit, so a dispel is not a
 special case: Remove Curse, Cleanse and Abolish Poison go in a slot exactly
 like Regrowth does. So do buffs — Thorns, Mark of the Wild. Every row shows
 the same slots, so slot 3 is the same spell whether it is on your own row or
-party member 2's — only who it is cast on changes.
+party member 2's — only who it is cast on changes. The one exception is a
+resurrection (Rebirth, Revive, Resurrection, Redemption, Ancestral Spirit): it
+cannot target you, so your own row leaves a gap where it would be, and the
+buttons after it stay in their usual columns.
 
 A whole row fades when the person is dead or offline, because every spell on
 it is useless at once. Being out of range is judged per icon instead, since a
@@ -206,15 +209,18 @@ the two offsets in Settings nudge them from there.
 | Put my row at the bottom | Whether you sit above the party or below it. Only affects the bar — attached, the unit frames decide the order |
 | Spells | One row per slot. Type a spell's name, or assign it from a row's button instead — drag a spell onto one, or click it up in the spellbook and click the button (see "Icons, and assigning spells" above) |
 | Lock the frame | Stops the bar being dragged by accident. Only affects the bar |
+| Show my mana in Bear and Cat Form | On by default. A mana bar under your rage or energy bar, as wide as it, whenever that bar shows something other than mana, so you can see whether you can shift out and heal. Hidden in caster form, where Blizzard's own bar already shows mana |
 
 Slots are seeded with a starting set the first time you log in, for four
-classes: Druid (Rejuvenation, Healing Touch, Mark of the Wild, Thorns),
+classes: Druid (Rejuvenation, Healing Touch, Mark of the Wild, Thorns, Revive),
 Priest (Flash Heal, Renew, Dispel Magic, Power Word: Fortitude), Paladin (Holy
 Light, Flash of Light, Cleanse, Blessing of Might) and Shaman (Healing Wave,
 Lesser Healing Wave, Cure Poison, Lightning Shield). Any other class starts
 with every slot empty — fill them by typing or dragging, same as anyone else
 would to change a seeded slot. A slot you deliberately empty afterward stays
-empty; it is seeded once, not refilled at every login.
+empty; it is seeded once, not refilled at every login. A spell added to a
+starting set later, like Revive, is given once to setups seeded before it, in
+the first empty slot.
 
 ## Party only
 

@@ -872,3 +872,78 @@ describe("where the other rows go during a drag", function()
         assertEqual(3, positions[3])
     end)
 end)
+
+describe("scrolling the settings", function()
+    -- The settings outgrew the canvas the game gives the panel, and the last
+    -- few fell off the bottom of it.
+    it("puts every control in a scroll frame", function()
+        local ns = loggedIn()
+        local scroll = ns.SettingsPanel.scroll
+
+        assertEqual("UIPanelScrollFrameTemplate", scroll.template)
+        assertEqual(ns.SettingsPanel.content, scroll:GetScrollChild())
+        for _, control in ipairs(ns.SettingsPanel.controls) do
+            if control.widget then
+                assertEqual(ns.SettingsPanel.content, control.widget:GetParent())
+            end
+        end
+    end)
+
+    it("makes the scroll range reach past the lowest setting", function()
+        local ns = loggedIn()
+        local lowest = 0
+        for _, control in ipairs(ns.SettingsPanel.controls) do
+            if control.widget then
+                -- The vertical offset is last, whether the anchor named a
+                -- relative frame or not.
+                local point = { control.widget:GetPoint(1) }
+                local y = point[#point]
+                if type(y) == "number" then
+                    lowest = math.min(lowest, y)
+                end
+            end
+        end
+
+        assertTrue(ns.SettingsPanel.content:GetHeight() > -lowest)
+    end)
+
+    it("keeps the picker out of the scroll frame, so a low row's list is not cut off", function()
+        local ns = loggedIn()
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[1].scripts.OnClick(control.picks[1])
+
+        assertEqual(ns.SettingsPanel.panel, ns.SettingsPanel.picker:GetParent())
+    end)
+
+    it("closes the picker on a click on the scrolling content", function()
+        local ns = loggedIn()
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[1].scripts.OnClick(control.picks[1])
+
+        local content = ns.SettingsPanel.content
+        content.scripts.OnMouseDown(content)
+
+        assertFalse(ns.SettingsPanel.picker:IsShown())
+    end)
+
+    it("closes the picker when the panel scrolls out from under it", function()
+        local ns = loggedIn()
+        local control = controlFor(ns, "bar", "spells")
+        control.picks[1].scripts.OnClick(control.picks[1])
+
+        local scroll = ns.SettingsPanel.scroll
+        scroll.scripts.OnVerticalScroll(scroll, 40)
+
+        assertFalse(ns.SettingsPanel.picker:IsShown())
+    end)
+
+    it("still builds, unscrolled, on a client without the template", function()
+        local ns, env = helpers.loadAddon()
+        env.__missingTemplates.UIPanelScrollFrameTemplate = true
+        helpers.login(ns, env)
+        ns.SettingsPanel.EnsureBuilt()
+
+        assertEqual(ns.SettingsPanel.panel, ns.SettingsPanel.content)
+        assertTrue(#ns.SettingsPanel.controls > 0)
+    end)
+end)
