@@ -1,0 +1,9 @@
+## Interface: 11509, 16001
+## Title: FishScale
+## Notes: One key to cast, loot and recast while fishing.
+## Author: You
+## Version: 0.1.0
+## SavedVariables: FishScaleDB
+
+FishScale.lua
+Fishing.lua

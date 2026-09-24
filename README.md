@@ -8,6 +8,7 @@ World of Warcraft addons, one folder each.
 | [UrlCopy](UrlCopy/) | Makes URLs spoken in chat clickable, and opens the one you click in a box you can copy from |
 | [ClickHeal](ClickHeal/) | A row of spell buttons beside every party member, so healing or dispelling someone is one click |
 | [TrinketMenu](TrinketMenu/) | Every trinket you are carrying, on a bar: left-click to equip in slot 1, right-click for slot 2 |
+| [FishScale](FishScale/) | One key to cast, pick up the bobber and recast while fishing |
 
 ## Layout
 
