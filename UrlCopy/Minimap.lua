@@ -61,12 +61,12 @@ local function showTooltip(self)
     end
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:SetText("UrlCopy")
-    GameTooltip:AddLine("Click for settings, drag to move.", 1, 1, 1)
+    GameTooltip:AddLine("Click to open or close the settings, drag to move.", 1, 1, 1)
     GameTooltip:Show()
 end
 
 local function onClick()
-    ns.OpenSettings()
+    ns.ToggleSettings()
 end
 
 local function create()

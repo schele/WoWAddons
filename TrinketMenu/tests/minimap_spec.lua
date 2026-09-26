@@ -16,6 +16,18 @@ local function withMinimap()
     return ns, env
 end
 
+-- The game's options window, as far as a click needs it: closed to begin
+-- with, and opening a category shows the window with that category's page.
+local function withOptionsWindow()
+    local ns, env = withMinimap()
+    env.SettingsPanel:Hide()
+    env.Settings.OpenToCategory = function()
+        env.SettingsPanel:Show()
+        env.__settingsCategory.frame:Show()
+    end
+    return ns, env
+end
+
 describe("the minimap button's geometry", function()
     local ns = helpers.loadAddon()
 
@@ -44,13 +56,23 @@ describe("the minimap button", function()
         assertEqual("Interface\\AddOns\\TrinketMenu\\logo", button.icon:GetTexture())
     end)
 
-    it("opens the settings on a click", function()
-        local ns = withMinimap()
-        local opened = 0
-        ns.OpenSettings = function() opened = opened + 1 end
+    it("opens the settings on a click, and closes them on the next", function()
+        local ns, env = withOptionsWindow()
         local button = ns.MinimapButton.Button()
         button.scripts.OnClick(button, "LeftButton")
-        assertEqual(1, opened)
+        assertTrue(env.SettingsPanel:IsShown())
+        assertTrue(env.__settingsCategory.frame:IsShown(), "on this addon's own page")
+        button.scripts.OnClick(button, "LeftButton")
+        assertFalse(env.SettingsPanel:IsShown())
+    end)
+
+    it("turns the options window to its own page when another addon's is up", function()
+        local ns, env = withOptionsWindow()
+        env.SettingsPanel:Show()
+        local button = ns.MinimapButton.Button()
+        button.scripts.OnClick(button, "LeftButton")
+        assertTrue(env.SettingsPanel:IsShown())
+        assertTrue(env.__settingsCategory.frame:IsShown())
     end)
 
     it("hides and shows with /tm minimap, says so, and remembers", function()
