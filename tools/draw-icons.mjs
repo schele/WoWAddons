@@ -1,4 +1,4 @@
-// Draws the 64x64 icons for BossLoot, FishScale and BankBags in the style of
+// Draws the 64x64 icons for BossLoot, FishScale and BankBags, and their minimap icons, in the style of
 // the others: a dark rounded tile with a soft glow in the addon's colour, a
 // thin ring, and a light, glossy symbol with a darker outline and details.
 // A minimap icon is the symbol alone, filling the frame: the minimap button
@@ -172,7 +172,9 @@ const sackShine = ellipse(26, 35.5, 4.5, 2);
 
 const root = process.argv[2];
 writeTga(path.join(root, 'BossLoot', 'icon.tga'), draw(crimson, chest, chestDetails, chestShine));
+writeTga(path.join(root, 'BossLoot', 'minimap.tga'), draw(crimson, chest, chestDetails, chestShine, { tile: false, zoom: 1.4 }));
 writeTga(path.join(root, 'FishScale', 'icon.tga'), draw(orange, fish, fishDetails, fishShine));
+writeTga(path.join(root, 'FishScale', 'minimap.tga'), draw(orange, fish, fishDetails, fishShine, { tile: false, zoom: 1.3 }));
 writeTga(path.join(root, 'BankBags', 'icon.tga'), draw(teal, sack, sackDetails, sackShine));
 writeTga(path.join(root, 'BankBags', 'minimap.tga'), draw(teal, sack, sackDetails, sackShine, { tile: false, zoom: 1.4 }));
 console.log('written');

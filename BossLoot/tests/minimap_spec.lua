@@ -29,6 +29,11 @@ describe("the minimap button", function()
         assertTrue(x < 0 and y < 0, "the default angle is bottom-left")
     end)
 
+    it("shows BossLoot's own chest, not the game's bag", function()
+        local ns = helpers.loggedIn()
+        assertEqual("Interface\\AddOns\\BossLoot\\minimap", ns.MinimapButton.Button().icon:GetTexture())
+    end)
+
     it("opens and closes the window on a click", function()
         local ns = helpers.loggedIn()
         local button = ns.MinimapButton.Button()

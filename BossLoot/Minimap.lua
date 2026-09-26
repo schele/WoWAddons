@@ -16,7 +16,9 @@ ns.AddDefaults({
 local SIZE = 31
 -- How far past the minimap's edge the button's centre sits.
 local RIM_OFFSET = 10
-local ICON = "Interface\\Icons\\INV_Misc_Bag_10"
+-- BossLoot's own chest (tools/draw-icons.mjs), not the game's bag, which
+-- BankBags' button would be mistaken for.
+local ICON = "Interface\\AddOns\\BossLoot\\minimap"
 
 local button
 
