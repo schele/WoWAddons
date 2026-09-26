@@ -1,6 +1,8 @@
-// Draws BossLoot's and FishScale's 64x64 addon-list icons in the style of the
-// others: a dark rounded tile with a soft glow in the addon's colour, a thin
-// ring, and a light, glossy symbol with a darker outline and details.
+// Draws the 64x64 icons for BossLoot, FishScale and BankBags in the style of
+// the others: a dark rounded tile with a soft glow in the addon's colour, a
+// thin ring, and a light, glossy symbol with a darker outline and details.
+// A minimap icon is the symbol alone, filling the frame: the minimap button
+// supplies its own dark disc and gold ring.
 // Usage, from the repo root: node tools/draw-icons.mjs .
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,8 +34,7 @@ function triangle(ax, ay, bx, by, cx, cy) {
       const wx = x - x0, wy = y - y0;
       const t = clamp((wx * ex + wy * ey) / (ex * ex + ey * ey), 0, 1);
       d = Math.min(d, len(wx - ex * t, wy - ey * t));
-      const cross = ex * wy - ey * wx;
-      sign += cross > 0 ? 1 : -1;
+      sign += ex * wy - ey * wx > 0 ? 1 : -1;
     }
     return Math.abs(sign) === 3 ? -d : d;
   };
@@ -41,14 +42,15 @@ function triangle(ax, ay, bx, by, cx, cy) {
 const union = (...fs) => (x, y) => Math.min(...fs.map((f) => f(x, y)));
 const minus = (a, b) => (x, y) => Math.max(a(x, y), -b(x, y));
 
-// Colour of the tile at a point, given the theme.
 function tileColour(theme, x, y) {
   const r = len(x - 32, y - 32) / 32;
   const glow = clamp(1 - r * 0.92, 0, 1) ** 1.1;
   return mix(theme.dark, theme.glow, glow);
 }
 
-function draw(theme, symbol, details, highlight) {
+// An icon: the tile, ring and symbol; or with `tile` false, the symbol alone,
+// grown by `zoom` about the middle.
+function draw(theme, symbol, details, highlight, { tile: withTile = true, zoom = 1 } = {}) {
   const tile = roundBox(32, 32, 32, 32, 7);
   const ring = (x, y) => Math.abs(len(x - 32, y - 32) - 27) - 1.1;
   const out = new Uint8Array(N * N * 4);
@@ -59,22 +61,26 @@ function draw(theme, symbol, details, highlight) {
         for (let sx = 0; sx < S; sx++) {
           const x = px + (sx + 0.5) / S;
           const y = py + (sy + 0.5) / S;
+          const ux = (x - 32) / zoom + 32;
+          const uy = (y - 32) / zoom + 32;
           let colour = [0, 0, 0];
           let alpha = 0;
           const over = (c, a) => { colour = mix(colour, c, a); alpha = alpha + a * (1 - alpha); };
-          const dt = tile(x, y);
-          if (dt < 0) {
-            let c = tileColour(theme, x, y);
-            if (dt > -1.5) c = mix(c, [0, 0, 0], 0.55); // the tile's dark edge
-            over(c, 1);
+          if (withTile) {
+            const dt = tile(x, y);
+            if (dt < 0) {
+              let c = tileColour(theme, x, y);
+              if (dt > -1.5) c = mix(c, [0, 0, 0], 0.55); // the tile's dark edge
+              over(c, 1);
+            }
+            if (ring(x, y) < 0) over(theme.ring, 0.95);
           }
-          if (ring(x, y) < 0) over(theme.ring, 0.95);
-          const ds = symbol(x, y);
+          const ds = symbol(ux, uy) * zoom;
           if (ds < 0) {
-            const t = clamp((y - 14) / 38, 0, 1); // lighter at the top
+            const t = clamp((uy - 14) / 38, 0, 1); // lighter at the top
             let c = mix(theme.light, theme.mid, t);
-            if (highlight && highlight(x, y) < 0) c = mix(c, [255, 255, 255], 0.28);
-            if (details && details(x, y) < 0) c = theme.detail;
+            if (highlight && highlight(ux, uy) < 0) c = mix(c, [255, 255, 255], 0.28);
+            if (details && details(ux, uy) < 0) c = theme.detail;
             if (ds > -1.3) c = theme.outline; // outline
             over(c, 1);
           }
@@ -115,9 +121,7 @@ const crimson = {
   dark: [18, 7, 7], glow: [104, 32, 28], ring: [206, 80, 66],
   light: [255, 184, 168], mid: [228, 104, 88], outline: [74, 18, 14], detail: [104, 28, 22],
 };
-const lid = roundBox(32, 25, 17, 7.5, 6.5);
-const body = roundBox(32, 39, 17, 9, 2);
-const chest = union(lid, body);
+const chest = union(roundBox(32, 25, 17, 7.5, 6.5), roundBox(32, 39, 17, 9, 2));
 const chestDetails = union(
   roundBox(32, 31, 17, 1, 0.5), // the seam between lid and body
   roundBox(32, 33, 3.6, 4.6, 1.2), // the lock plate
@@ -131,17 +135,44 @@ const orange = {
   dark: [20, 11, 4], glow: [110, 62, 20], ring: [232, 148, 58],
   light: [255, 214, 146], mid: [240, 150, 64], outline: [84, 42, 10], detail: [110, 56, 16],
 };
-const fishBody = ellipse(26.5, 32, 17, 11);
-const tail = minus(triangle(38, 32, 54, 19, 54, 45), triangle(50, 32, 55, 27, 55, 37));
-const fin = triangle(21, 22.5, 33, 22.5, 28.5, 16);
-const fish = union(fishBody, tail, fin);
+const fish = union(
+  ellipse(26.5, 32, 17, 11),
+  minus(triangle(38, 32, 54, 19, 54, 45), triangle(50, 32, 55, 27, 55, 37)),
+  triangle(21, 22.5, 33, 22.5, 28.5, 16),
+);
 const fishDetails = union(
   circle(17.5, 30, 2.3), // the eye
   (x, y) => Math.abs(len(x - 35, y - 32) - 8) - 0.9 + (x < 31.5 ? 20 : 0), // the gill line
 );
 const fishShine = ellipse(24, 26.5, 8, 1.7);
 
+// BankBags: a money sack, in teal.
+const teal = {
+  dark: [4, 18, 17], glow: [20, 92, 86], ring: [64, 196, 182],
+  light: [168, 250, 238], mid: [56, 184, 168], outline: [8, 58, 52], detail: [16, 84, 76],
+};
+const segment = (ax, ay, bx, by, r) => (x, y) => {
+  const ex = bx - ax, ey = by - ay;
+  const t = clamp(((x - ax) * ex + (y - ay) * ey) / (ex * ex + ey * ey), 0, 1);
+  return len(x - ax - ex * t, y - ay - ey * t) - r;
+};
+const sack = union(
+  ellipse(32, 40.5, 16.5, 12.5), // the body, squat and full
+  roundBox(32, 28, 7.5, 4, 2), // the neck
+  circle(25.5, 21.5, 4.6), // the gathered top, puffed out
+  circle(32, 19.5, 5.2),
+  circle(38.5, 21.5, 4.6),
+);
+const sackDetails = union(
+  roundBox(32, 27.5, 9, 1.5, 0.7), // the tie
+  segment(29, 32, 24.5, 39, 0.8), // two creases in the cloth
+  segment(35, 32, 39.5, 39, 0.8),
+);
+const sackShine = ellipse(26, 35.5, 4.5, 2);
+
 const root = process.argv[2];
 writeTga(path.join(root, 'BossLoot', 'icon.tga'), draw(crimson, chest, chestDetails, chestShine));
 writeTga(path.join(root, 'FishScale', 'icon.tga'), draw(orange, fish, fishDetails, fishShine));
+writeTga(path.join(root, 'BankBags', 'icon.tga'), draw(teal, sack, sackDetails, sackShine));
+writeTga(path.join(root, 'BankBags', 'minimap.tga'), draw(teal, sack, sackDetails, sackShine, { tile: false, zoom: 1.4 }));
 console.log('written');
