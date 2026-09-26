@@ -1059,7 +1059,8 @@ local function create()
     frame.fullMap:SetSize(PAGE_WIDTH, columnHeight)
     frame.fullMap:SetFrameLevel(frame:GetFrameLevel() + 20)
     frame.fullMap.view = ns.MapView.Create(frame.fullMap, PAGE_WIDTH, columnHeight, {
-        pinSize = 20,
+        -- A ball big enough for a two-digit number.
+        pinSize = 26,
         labels = true,
         zoom = true,
         onPinClick = function(bossIndex)

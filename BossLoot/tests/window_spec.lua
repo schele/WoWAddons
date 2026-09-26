@@ -922,3 +922,11 @@ describe("the loading details, for testing", function()
             "four in the queue, and the empty one waiting to be asked again")
     end)
 end)
+
+describe("the big map's pins", function()
+    it("have a red ball big enough for a two-digit number", function()
+        local ns = opened()
+        local view = ns.Window.Frame().fullMap.view
+        assertTrue(view.options.pinSize * ns.MapView.BALL >= 16, "a 16-pixel ball at least")
+    end)
+end)

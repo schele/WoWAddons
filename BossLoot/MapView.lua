@@ -21,6 +21,9 @@ ns.MapView = MapView
 
 MapView.MIN_ZOOM = 0.5
 MapView.MAX_ZOOM = 4
+-- The red ball fills about this share of its pin's picture; the rest is
+-- empty corners.
+MapView.BALL = 0.65
 
 local BACKGROUND = { 0.06, 0.045, 0.03 }
 -- How strongly the floor shows over the background: faint, so the names and
@@ -344,13 +347,12 @@ local function pin(view, index)
         return button
     end
 
-    local size = view.options.pinSize or 16
+    local size = view.options.pinSize or 18
     button = CreateFrame("Button", nil, view.canvas)
     button:SetSize(size, size)
     button:SetFrameLevel(view.canvas:GetFrameLevel() + 2)
-    -- The red ball fills about two thirds of its picture; the ring shows a
-    -- few pixels round the ball.
-    local ringSize = math.floor(size * 0.65) + 6
+    -- The ring shows a few pixels round the ball.
+    local ringSize = math.floor(size * MapView.BALL) + 6
     button.ring = button:CreateTexture(nil, "BACKGROUND")
     button.ring:SetSize(ringSize, ringSize)
     button.ring:SetPoint("CENTER", button, "CENTER", 0, 0)
@@ -362,6 +364,8 @@ local function pin(view, index)
     button.icon:SetTexture(PIN)
     button.text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     button.text:SetPoint("CENTER", button, "CENTER", 0, 0)
+    button.text:SetJustifyH("CENTER")
+    button.text:SetWordWrap(false)
 
     if view.options.onPinClick then
         button:SetScript("OnClick", function(self)
@@ -431,7 +435,8 @@ end
 local function drawLabels(view, placedPins, selected)
     local canvas = view.canvas
     local placed = {}
-    local half = (view.options.pinSize or 16) / 2 + 2
+    -- From the pin's middle to where its name starts: just past the ball.
+    local half = (view.options.pinSize or 18) * MapView.BALL / 2 + 4
     view.tag:Hide()
     for index, spot in ipairs(placedPins) do
         local text = label(view, index)

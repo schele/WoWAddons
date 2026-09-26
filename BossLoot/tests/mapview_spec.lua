@@ -344,3 +344,33 @@ describe("the map's strength", function()
         assertEqual(0.95, view.labels[1].textColor[1], "names as bright as before")
     end)
 end)
+
+describe("a pin's number", function()
+    it("sits in the middle of the ball, on one line", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = ns.MapView.Create(env.UIParent, 300, 300, { pinSize = 26 })
+        ns.MapView.Show(view, {
+            name = "One", map = { cols = 1, rows = 1, runs = { 0, 0, 1 } },
+            bosses = { { name = "Boss", pin = { 0.5, 0.5 }, loot = {} } },
+        })
+        local text = view.pins[1].text
+        local point, relative, relativePoint, x, y = text:GetPoint(1)
+        assertEqual("CENTER", point)
+        assertEqual(view.pins[1], relative)
+        assertEqual("CENTER", relativePoint)
+        assertEqual(false, text.wordWrap)
+    end)
+
+    it("has its name start just past the ball, not past the pin's empty corners", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = ns.MapView.Create(env.UIParent, 300, 300, { pinSize = 26, labels = true })
+        ns.MapView.Show(view, {
+            name = "One", map = { cols = 1, rows = 1, runs = { 0, 0, 1 } },
+            bosses = { { name = "Boss", pin = { 0.2, 0.5 }, loot = {} } },
+        })
+        local _, _, _, labelX = view.labels[1]:GetPoint(1)
+        local gap = labelX - view.pins[1].x
+        assertTrue(gap < 26 / 2, "closer than the pin's edge")
+        assertTrue(gap >= 26 * ns.MapView.BALL / 2, "but clear of the ball")
+    end)
+end)
