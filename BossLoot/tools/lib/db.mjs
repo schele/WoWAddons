@@ -96,6 +96,50 @@ export function openDb(source) {
 
       return { discs, paths };
     },
+    // Where anything by this name -- creature or object -- is spawned on a
+    // map: the anchors a summoned boss is pinned beside.
+    namedSpawns(name, map) {
+      return [
+        ...prepare(`select c.position_x as x, c.position_y as y, c.position_z as z
+          from creature c join creature_template t on t.entry = c.id
+          where t.name = ? and c.map = ? and c.patch_min <= ${P} and ${P} <= c.patch_max`).all(name, map),
+        ...prepare(`select g.position_x as x, g.position_y as y, g.position_z as z
+          from gameobject g join gameobject_template t on t.entry = g.id
+          where t.name = ? and g.map = ? and g.patch_min <= ${P} and ${P} <= g.patch_max`).all(name, map),
+      ];
+    },
+
+    // Where a script summons one of these creatures (command 10 in any of
+    // the *_scripts tables), for bosses that are never spawned.
+    summonPoint(entries) {
+      if (!this.scriptTables) {
+        this.scriptTables = db.prepare("select name from sqlite_master where type = 'table' and name like '%scripts'")
+          .all().map((row) => row.name)
+          .filter((table) => {
+            const columns = db.prepare(`pragma table_info(${table})`).all().map((c) => c.name);
+            return ['command', 'datalong', 'x', 'y'].every((c) => columns.includes(c));
+          });
+      }
+      for (const table of this.scriptTables) {
+        for (const entry of entries) {
+          const point = prepare(`select x, y, z from ${table} where command = 10 and datalong = ? limit 1`).get(entry);
+          if (point) return point;
+        }
+      }
+      return undefined;
+    },
+
+    // Where the game drops a player entering the instance.
+    entrance(map) {
+      try {
+        return prepare(`select target_position_x as x, target_position_y as y, target_position_z as z
+          from areatrigger_teleport where target_map = ? and patch <= ${P}
+          order by (name like '%Entrance%') desc, id limit 1`).get(map);
+      } catch {
+        return undefined;
+      }
+    },
+
     creatureSpawn: (entry, map) => prepare(`select position_x as x, position_y as y, position_z as z from creature where id = ? and map = ? and ${SPAWNED} order by guid limit 1`).get(entry, map),
     objectSpawn: (entry, map) => prepare(`select position_x as x, position_y as y, position_z as z from gameobject where id = ? and map = ? and ${SPAWNED} order by guid limit 1`).get(entry, map),
 

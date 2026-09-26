@@ -99,3 +99,71 @@ describe("redrawing the same map", function()
         assertTrue(view.pins[2].selected, "the new selection still shows")
     end)
 end)
+
+describe("the map's finish", function()
+    local block = {
+        name = "Block", map = { cols = 3, rows = 3, runs = { 0, 0, 3, 1, 0, 3, 2, 0, 3 } },
+        entrance = { 0.1, 0.9 },
+        bosses = {
+            { name = "Left Boss", pin = { 0.2, 0.5 }, loot = {} },
+            { name = "Right Boss", pin = { 0.9, 0.5 }, loot = {} },
+        },
+        notable = { trash = {}, objects = {} },
+    }
+
+    it("shades the floor inside its rim darker, so the walls stand up", function()
+        local ns, env = helpers.loadAddon(FILES)
+        assertEqual("1,1,1", table.concat(ns.MapView.Inner(block.map), ","))
+        local view = ns.MapView.Create(env.UIParent, 300, 300)
+        ns.MapView.Show(view, block)
+        assertEqual(1, shown(view.inner))
+        assertTrue(view.inner[1].colorTexture[1] < view.floor[1].colorTexture[1])
+    end)
+
+    it("writes each boss's name beside its pin on a map that wants labels", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = ns.MapView.Create(env.UIParent, 300, 300, { labels = true })
+        ns.MapView.Show(view, block, 2)
+        assertEqual("Left Boss", view.labels[1]:GetText())
+        assertEqual("LEFT", view.labels[1].justifyH, "right of a pin on the left")
+        assertEqual("RIGHT", view.labels[2].justifyH, "left of a pin near the right edge")
+    end)
+
+    it("does not write names on the small map", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = ns.MapView.Create(env.UIParent, 150, 84)
+        ns.MapView.Show(view, block)
+        assertEqual(0, shown(view.labels))
+    end)
+
+    it("moves a name that would sit on top of another", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local crowded = {
+            name = "Crowd", map = block.map,
+            bosses = { { name = "One", pin = { 0.2, 0.5 }, loot = {} }, { name = "Two", pin = { 0.2, 0.51 }, loot = {} } },
+        }
+        local view = ns.MapView.Create(env.UIParent, 300, 300, { labels = true })
+        ns.MapView.Show(view, crowded)
+        local _, _, _, _, y1 = view.labels[1]:GetPoint(1)
+        local _, _, _, _, y2 = view.labels[2]:GetPoint(1)
+        assertTrue(math.abs(y1 - y2) >= 12, "one line apart at least")
+    end)
+
+    it("marks the entrance", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = ns.MapView.Create(env.UIParent, 300, 300, { labels = true })
+        ns.MapView.Show(view, block)
+        assertTrue(view.entrance:IsShown())
+        assertEqual("Entrance", view.entranceLabel:GetText())
+        ns.MapView.Show(view, { map = block.map, bosses = {} })
+        assertFalse(view.entrance:IsShown(), "gone for an instance without one")
+    end)
+
+    it("names the boss when the cursor is on its pin", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = ns.MapView.Create(env.UIParent, 300, 300, { labels = true, onPinClick = function() end })
+        ns.MapView.Show(view, block)
+        view.pins[2].scripts.OnEnter(view.pins[2])
+        assertEqual("2. Right Boss", env.GameTooltip.text)
+    end)
+end)

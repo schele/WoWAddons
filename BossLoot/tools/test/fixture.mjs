@@ -21,6 +21,9 @@ export function fixtureDb() {
     create table reference_loot_template (${LOOT_COLUMNS});
     create table gameobject_loot_template (${LOOT_COLUMNS});
     create table conditions (condition_entry int, type int, value1 int default 0);
+    create table event_scripts (id int, command int, datalong int, x real, y real, z real);
+    create table areatrigger_teleport (id int, patch int default 0, name text, target_map int,
+      target_position_x real, target_position_y real, target_position_z real);
   `);
 
   const add = (table, row) => {

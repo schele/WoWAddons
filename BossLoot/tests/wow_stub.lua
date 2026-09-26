@@ -77,6 +77,8 @@ local function makeWidget(kind, parent, template, env)
         if self.scripts.OnTextChanged then self.scripts.OnTextChanged(self, true) end
     end
     function widget:GetText() return self.text end
+    -- Six pixels a character: near enough for laying labels out.
+    function widget:GetStringWidth() return #(self.text or "") * 6 end
     function widget:SetTextColor(r, g, b) self.textColor = { r, g, b } end
     function widget:SetJustifyH(value) self.justifyH = value end
     function widget:SetWordWrap(value) self.wordWrap = value end

@@ -8,7 +8,8 @@ Open it with `/bl` or the minimap button. On the left, the instances
 (Dungeons and Raids tabs, with level ranges) and a search box. In the middle,
 the bosses in kill order, each with its portrait and a number. On the right,
 the boss itself: its model, and a map of the instance with every boss pinned
-by number; click the map for a big one, and a pin to jump to that boss.
+by number; click the map for a big one, with every boss named beside its pin
+and the entrance marked, and click a pin to jump to that boss.
 Under that, the loot in two columns. At the bottom of the boss list,
 **Notable drops** holds the trash and chest finds.
 

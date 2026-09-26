@@ -19,6 +19,9 @@ export function instanceFile(instance) {
     `    levels = { ${instance.levels[0]}, ${instance.levels[1]} },`,
   ];
 
+  if (instance.entrance) {
+    lines.push(`    entrance = { ${instance.entrance.x}, ${instance.entrance.y} },`);
+  }
   if (instance.map) {
     lines.push(`    map = { cols = ${instance.map.cols}, rows = ${instance.map.rows}, runs = {`);
     for (let i = 0; i < instance.map.runs.length; i += 30) {

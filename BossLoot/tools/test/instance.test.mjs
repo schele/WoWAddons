@@ -238,3 +238,62 @@ test('a boss far outside the drawn map gets no pin, and the build says so', () =
   assert.equal(instance.bosses[0].pin, undefined);
   assert.ok(warnings.some((w) => w.includes('Boss One') && w.includes('outside the map')), warnings.join('; '));
 });
+
+// A spread of spawns for the map to draw, so pins have somewhere to land.
+function spread(add) {
+  for (let i = 0; i < 20; i++) add('creature', { id: 2, map: MAP, position_x: (i % 5) * 20, position_y: -Math.floor(i / 5) * 20 });
+}
+
+test('pins a summoned boss beside the thing named as its anchor', () => {
+  const { db, add } = world();
+  spread(add);
+  db.exec('update gameobject set position_x = 40, position_y = -40 where id = 50');
+  add('creature_template', { entry: 3, name: 'Summoned Boss', loot_id: 1 });
+  const bosses = [{ name: 'Summoned Boss', pinAt: 'Old Chest' }];
+  const dbx = openDb(db);
+  const { instance } = buildInstance(dbx, { ...def, bosses });
+  const chest = buildInstance(dbx, { ...def, bosses: [{ name: 'Chest', creatures: [], objects: ['Old Chest'] }] });
+  assert.deepEqual(instance.bosses[0].pin, chest.instance.bosses[0].pin);
+});
+
+test('averages several anchors, and takes plain coordinates', () => {
+  const { db, add } = world();
+  spread(add);
+  add('creature_template', { entry: 3, name: 'Summoned Boss', loot_id: 1 });
+  add('creature_template', { entry: 6, name: 'Marker', loot_id: 0 });
+  add('creature', { id: 6, map: MAP, position_x: 0, position_y: 0 });
+  add('creature', { id: 6, map: MAP, position_x: 80, position_y: -60 });
+  const dbx = openDb(db);
+  const averaged = buildInstance(dbx, { ...def, bosses: [{ name: 'Summoned Boss', pinAt: ['Marker'] }] });
+  const plain = buildInstance(dbx, { ...def, bosses: [{ name: 'Summoned Boss', pinAt: { x: 40, y: -30 } }] });
+  assert.deepEqual(averaged.instance.bosses[0].pin, plain.instance.bosses[0].pin);
+});
+
+test('pins a summoned boss where a script summons it', () => {
+  const { db, add } = world();
+  spread(add);
+  add('creature_template', { entry: 3, name: 'Summoned Boss', loot_id: 1 });
+  add('event_scripts', { id: 1, command: 10, datalong: 3, x: 40, y: -30, z: 0 });
+  const dbx = openDb(db);
+  const scripted = buildInstance(dbx, { ...def, bosses: ['Summoned Boss'] });
+  const plain = buildInstance(dbx, { ...def, bosses: [{ name: 'Summoned Boss', pinAt: { x: 40, y: -30 } }] });
+  assert.ok(scripted.instance.bosses[0].pin);
+  assert.deepEqual(scripted.instance.bosses[0].pin, plain.instance.bosses[0].pin);
+});
+
+test('warns about an anchor the database does not have', () => {
+  const { db, add } = world();
+  spread(add);
+  add('creature_template', { entry: 3, name: 'Summoned Boss', loot_id: 1 });
+  const { warnings } = buildInstance(openDb(db), { ...def, bosses: [{ name: 'Summoned Boss', pinAt: 'Nowhere' }] });
+  assert.ok(warnings.some((w) => w.includes('Nowhere')), warnings.join('; '));
+});
+
+test('marks where the instance is entered', () => {
+  const { db, add } = world();
+  spread(add);
+  add('areatrigger_teleport', { id: 1, name: 'Test Depths - Entrance', target_map: MAP, target_position_x: 80, target_position_y: 0, target_position_z: 0 });
+  const { instance } = buildInstance(openDb(db), def);
+  assert.ok(instance.entrance, 'has an entrance');
+  assert.ok(instance.entrance.x >= 0 && instance.entrance.x <= 1);
+});

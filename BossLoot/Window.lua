@@ -442,6 +442,7 @@ function Window.Refresh()
     ns.MapView.Show(frame.inset, instance, pinned)
     if frame.fullMap:IsShown() then
         ns.MapView.Show(frame.fullMap.view, instance, pinned)
+        frame.fullMap.title:SetText(instance and instance.name or "")
     end
 
     for kind, tab in pairs(frame.tabs) do
@@ -709,12 +710,16 @@ local function create()
     frame.fullMap:SetFrameLevel(frame:GetFrameLevel() + 20)
     frame.fullMap.view = ns.MapView.Create(frame.fullMap, PAGE_WIDTH, columnHeight, {
         pinSize = 20,
+        labels = true,
         onPinClick = function(bossIndex)
             Window.SelectBoss(bossIndex)
             Window.CloseMap()
         end,
     })
     frame.fullMap.view:SetPoint("TOPLEFT", frame.fullMap, "TOPLEFT", 0, 0)
+    -- The instance's name in the corner, on the map itself so it draws over it.
+    frame.fullMap.title = frame.fullMap.view:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    frame.fullMap.title:SetPoint("TOPLEFT", frame.fullMap.view, "TOPLEFT", 10, -8)
     frame.fullMap.close = createFrame("Button", nil, frame.fullMap, "UIPanelCloseButton")
     frame.fullMap.close:SetPoint("TOPRIGHT", frame.fullMap, "TOPRIGHT", 0, 0)
     -- Above the pins, which can sit right under it (Blackrock Depths' 25).

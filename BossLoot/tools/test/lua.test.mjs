@@ -42,3 +42,11 @@ test('writes the map, and each boss model and pin', () => {
   assert.match(text, /display = 8807,/);
   assert.match(text, /pin = \{ 0\.25, 0\.5 \},/);
 });
+
+test('writes the entrance', () => {
+  const text = instanceFile({
+    key: 'Test', name: 'Test Depths', kind: 'dungeon', levels: [52, 60],
+    entrance: { x: 0.1, y: 0.9 }, bosses: [], notable: { trash: [], objects: [] },
+  });
+  assert.match(text, /entrance = \{ 0\.1, 0\.9 \},/);
+});

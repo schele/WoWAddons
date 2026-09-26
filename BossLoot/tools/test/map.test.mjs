@@ -121,3 +121,12 @@ test('has no pin without a point or a map', () => {
   assert.equal(pinFor(null, at(0, 0)), undefined);
   assert.equal(pinFor(buildMap({ discs: [disc(0, 0), disc(1, 1)], paths: [] }), undefined), undefined);
 });
+
+test('draws a patch of floor where a boss stands, though nothing else is there', () => {
+  // Nefarian's lair: its drakonids are summoned, so no spawn marks the room.
+  const discs = [];
+  for (let i = 0; i < 100; i++) discs.push(disc(i % 10, 0, 2));
+  const boss = at(14, 0);
+  const map = buildMap({ discs, paths: [] }, { trim: 0.05, minCell: 1, maxCells: 100, keep: [boss] });
+  assert.ok(isFloor(map, boss));
+});

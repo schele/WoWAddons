@@ -27,6 +27,7 @@ export function bossDefs(def) {
       creatures: boss.creatures ?? (boss.ids ? [] : [boss.name]),
       objects: boss.objects ?? [],
       ids: boss.ids ?? [],
+      pinAt: boss.pinAt,
     });
 
   if (def.wings) return def.wings.flatMap((wing) => wing.bosses.map((boss) => normalise(boss, wing.name)));
@@ -78,6 +79,20 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
   // Where each boss stands, by boss index, for its pin once the map is drawn.
   const spawns = [];
 
+  const anchor = (boss) => {
+    if (!boss.pinAt) return undefined;
+    if (typeof boss.pinAt === 'object' && !Array.isArray(boss.pinAt)) return { z: 0, ...boss.pinAt };
+    const names = Array.isArray(boss.pinAt) ? boss.pinAt : [boss.pinAt];
+    const points = names.flatMap((name) => {
+      const found = db.namedSpawns(name, def.map);
+      if (!found.length) warnings.push(`${def.name}: ${boss.name}'s anchor "${name}" is not on the map`);
+      return found;
+    });
+    if (!points.length) return undefined;
+    const mean = (axis) => points.reduce((sum, point) => sum + point[axis], 0) / points.length;
+    return { x: mean('x'), y: mean('y'), z: mean('z') };
+  };
+
   const bosses = [];
   for (const boss of bossDefs(def)) {
     const found = new Map();
@@ -124,14 +139,20 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
 
     // The pin: where the boss stands, or its chest for a chest-only boss. A
     // boss a script summons has no spawn, and so no pin.
+    // Failing a spawn, a summoned boss goes beside its anchor (instances.json
+    // `pinAt`: names of things spawned where it appears, or plain x and y),
+    // or where a script summons it.
     spawns.push(creatures.map((c) => db.creatureSpawn(c.entry, def.map)).find(Boolean)
-      ?? chestsUsed.map((o) => db.objectSpawn(o.entry, def.map)).find(Boolean));
+      ?? chestsUsed.map((o) => db.objectSpawn(o.entry, def.map)).find(Boolean)
+      ?? anchor(boss)
+      ?? db.summonPoint(creatures.map((c) => c.entry)));
     bosses.push(out);
   }
 
   // The map, made to take in every boss standing near its edge, then a pin
   // per boss that is on it.
-  const map = buildMap(db.mapShapes(def.map), { keep: spawns.filter(Boolean) });
+  const entrance = db.entrance(def.map);
+  const map = buildMap(db.mapShapes(def.map), { keep: [...spawns, entrance].filter(Boolean) });
   bosses.forEach((boss, index) => {
     const pin = pinFor(map, spawns[index]);
     if (pin) boss.pin = pin;
@@ -178,6 +199,7 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
       kind: def.kind,
       levels: def.levels,
       map: map ? { cols: map.cols, rows: map.rows, runs: map.runs } : undefined,
+      entrance: pinFor(map, entrance),
       bosses,
       notable: { trash: notable(trashSources), objects: notable(objectSources) },
     },

@@ -12,7 +12,8 @@ export const MAX_CELLS = 200;   // cells across the longer side, at most
 export const MIN_CELL = 4;      // yards; finer shows every stray step
 export const TRIM = 0.01;       // outermost share of points ignored for the bounds
 export const MARGIN = 10;       // yards of room around the bounds
-export const KEEP_MARGIN = 0.25; // how far past the edge a boss still widens the map
+export const KEEP_MARGIN = 0.6;  // how far past the edge a boss still widens the map
+export const KEEP_RADIUS = 12;  // yards of floor drawn round a boss, whose room may have no spawns
 export const MAX_WANDER = 20;   // yards; bigger radii are scripted, not rooms
 export const MAX_STEP = 80;     // yards; a longer patrol step is a jump, not a corridor
 export const MIN_ISLAND = 12;   // cells; smaller specks are dropped
@@ -139,10 +140,12 @@ export function buildMap({ discs = [], paths = [] }, options = {}) {
   };
 
   const reach = Math.max(bounds.x1 - bounds.x0, bounds.y1 - bounds.y0, 1) * KEEP_MARGIN;
+  const kept = [];
   for (const point of keep) {
     const near = point.x >= bounds.x0 - reach && point.x <= bounds.x1 + reach
       && point.y >= bounds.y0 - reach && point.y <= bounds.y1 + reach;
     if (near) {
+      kept.push({ x: point.x, y: point.y, r: KEEP_RADIUS });
       bounds.x0 = Math.min(bounds.x0, point.x);
       bounds.x1 = Math.max(bounds.x1, point.x);
       bounds.y0 = Math.min(bounds.y0, point.y);
@@ -168,7 +171,9 @@ export function buildMap({ discs = [], paths = [] }, options = {}) {
   };
 
   const step = cell / 2;
-  for (const { x, y, r } of discs) {
+  // A boss's room shows even when nothing is spawned in it (a lair whose
+  // guards are summoned): a patch of floor goes round every boss taken in.
+  for (const { x, y, r } of [...discs, ...kept]) {
     const radius = Math.max(Math.min(r ?? 0, MAX_WANDER), step);
     for (let dx = -radius; dx <= radius; dx += step) {
       for (let dy = -radius; dy <= radius; dy += step) {
