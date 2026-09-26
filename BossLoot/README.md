@@ -58,6 +58,7 @@ hide it; `/bl unhide` brings them all back.
 |---|---|
 | `/bl` | Open or close the window |
 | `/bl minimap` | Hide or show the minimap button |
+| `/bl settings` | Open the settings page in the game's options |
 | `/bl unhide` | Bring back every instance you hid |
 | `/bl help` | List the commands |
 

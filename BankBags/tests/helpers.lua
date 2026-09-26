@@ -2,7 +2,7 @@ local stub = require("wow_stub")
 
 local M = {}
 
-M.FILES = { "BankBags.lua", "Bank.lua", "Window.lua", "Minimap.lua" }
+M.FILES = { "BankBags.lua", "Bank.lua", "Window.lua", "Minimap.lua", "Settings.lua" }
 
 local function exists(path)
     local file = io.open(path)

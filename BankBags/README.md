@@ -16,6 +16,7 @@ the copy was made.
 - `/bb` or `/bankbags` - open or close the window
 - `/bb forget <name>` - forget a character's saved bank
 - `/bb minimap` - hide or show the minimap button
+- `/bb settings` - open the settings page in the game's options, which also lists the saved banks, each with a Forget button
 - `/bb help` - list the commands
 
 ## Install

@@ -49,3 +49,4 @@ Portrait.lua
 MapView.lua
 Window.lua
 Minimap.lua
+Settings.lua

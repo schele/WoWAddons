@@ -1221,21 +1221,40 @@ end
 
 ns.DefaultCommand = Window.Toggle
 
-ns.RegisterCommand("debug", "Show or hide the item loading details", function()
-    ns.db.debug = not ns.db.debug
+--- Show or hide the item loading details under the window.
+function Window.SetDebug(on)
+    ns.db.debug = on and true or false
     if frame then
         frame.debug:SetShown(ns.db.debug)
     end
+end
+
+--- How many instances the player has hidden from the list.
+function Window.HiddenCount()
+    local count = 0
+    for _ in pairs(ns.db.hidden) do
+        count = count + 1
+    end
+    return count
+end
+
+--- Put every hidden instance back on the list.
+function Window.UnhideAll()
+    for key in pairs(ns.db.hidden) do
+        ns.db.hidden[key] = nil
+    end
+    everyItemList = nil
+    Window.Refresh()
+end
+
+ns.RegisterCommand("debug", "Show or hide the item loading details", function()
+    Window.SetDebug(not ns.db.debug)
     ns.Print(ns.db.debug and "Item loading details on." or "Item loading details off.")
 end)
 
 ns.RegisterCommand("unhide", "Bring back every instance you hid", function()
-    for key in pairs(ns.db.hidden) do
-        ns.db.hidden[key] = nil
-    end
+    Window.UnhideAll()
     ns.Print("Every instance is back on the list.")
-    everyItemList = nil
-    Window.Refresh()
 end)
 
 -- Items arrive in bursts as an instance loads; redraw once per burst.

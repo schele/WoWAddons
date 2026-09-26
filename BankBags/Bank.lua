@@ -249,6 +249,17 @@ function Bank.Forget(name)
     return forgotten
 end
 
+--- Forget exactly the character kept under "<realm>-<name>".
+function Bank.ForgetKey(key)
+    ns.db.characters[key] = nil
+    if ns.Window and ns.Window.Refresh then
+        ns.Window.Refresh()
+    end
+    if ns.SettingsPanel then
+        ns.SettingsPanel.Refresh()
+    end
+end
+
 ns.RegisterCommand("forget", "Forget a character's saved bank: /bb forget <name>", function(rest)
     if rest == "" then
         ns.Print("Whose bank? /bb forget <name>")
@@ -261,6 +272,9 @@ ns.RegisterCommand("forget", "Forget a character's saved bank: /bb forget <name>
     end
     if ns.Window and ns.Window.Refresh then
         ns.Window.Refresh()
+    end
+    if ns.SettingsPanel then
+        ns.SettingsPanel.Refresh()
     end
 end)
 

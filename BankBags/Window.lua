@@ -86,6 +86,7 @@ local function characterLabel(key, character)
     end
     return name .. " |cff808080" .. realm .. "|r"
 end
+Window.CharacterLabel = characterLabel
 
 -- A frame with a template, or without when this client lacks the template.
 local function createFrame(kind, name, parent, template)

@@ -91,6 +91,8 @@ local function makeWidget(kind, parent, template, env)
     function widget:GetStringWidth() return #(self.text or "") * 6 end
     function widget:SetTextColor(r, g, b) self.textColor = { r, g, b } end
     function widget:SetTextInsets(...) self.textInsets = { ... } end
+    function widget:SetChecked(value) self.checked = value and true or false end
+    function widget:GetChecked() return self.checked end
     function widget:SetJustifyH(value) self.justifyH = value end
     function widget:SetWordWrap(value) self.wordWrap = value end
     function widget:SetAutoFocus() end
@@ -158,6 +160,27 @@ function stub.newEnv()
 
     -- The real client raises on a template it does not have. Tests stage a
     -- missing one by listing it here.
+    -- The game's options window and the game menu, both closed to begin with.
+    env.SettingsPanel = makeWidget("Frame", env.UIParent, nil, env)
+    env.SettingsPanel.shown = false
+    env.GameMenuFrame = makeWidget("Frame", env.UIParent, nil, env)
+    env.GameMenuFrame.shown = false
+    function env.HideUIPanel(frame)
+        if frame and frame.Hide then frame:Hide() end
+    end
+    env.Settings = {
+        RegisterCanvasLayoutCategory = function(frame, name)
+            return { name = name, frame = frame, GetID = function() return "category-id" end }
+        end,
+        RegisterAddOnCategory = function(category) env.__settingsCategory = category end,
+        OpenToCategory = function(id) env.__openedCategory = id end,
+    }
+    env.C_AddOns = {
+        GetAddOnMetadata = function(_, field)
+            return field == "Version" and "9.9.9" or nil
+        end,
+    }
+
     env.__missingTemplates = {}
     function env.CreateFrame(kind, name, parent, template)
         if template and env.__missingTemplates[template] then

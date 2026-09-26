@@ -18,6 +18,7 @@ M.FILES = {
     "MapView.lua",
     "Window.lua",
     "Minimap.lua",
+    "Settings.lua",
 }
 
 local function exists(path)

@@ -10,3 +10,4 @@ BankBags.lua
 Bank.lua
 Window.lua
 Minimap.lua
+Settings.lua
