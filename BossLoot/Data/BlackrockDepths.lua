@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Blackrock Depths",
     kind = "dungeon",
     levels = { 52, 60 },
+    mapID = 230,
     entrance = { 0.154, 0.853 },
     map = { cols = 175, rows = 200, runs = {
         1, 92, 20, 1, 115, 5, 2, 88, 35, 3, 88, 35, 4, 88, 35, 5, 89, 35, 5, 156, 3, 6, 89, 35, 6, 155, 10, 7, 89, 36,
@@ -63,6 +64,7 @@ ns.AddInstance({
         {
             name = "Lord Roccor",
             display = 5781,
+            npcs = { 9025 },
             pin = { 0.444, 0.719 },
             loot = {
                 { 11631, 25 },
@@ -78,6 +80,7 @@ ns.AddInstance({
         {
             name = "High Interrogator Gerstahn",
             display = 8761,
+            npcs = { 9018 },
             pin = { 0.328, 0.976 },
             loot = {
                 { 11624, 25 },
@@ -92,6 +95,7 @@ ns.AddInstance({
         {
             name = "Houndmaster Grebmar",
             display = 9212,
+            npcs = { 9319 },
             pin = { 0.355, 0.726 },
             loot = {
                 { 11623, 25 },
@@ -106,6 +110,7 @@ ns.AddInstance({
         {
             name = "Ring of Law: Anub'shiah",
             display = 3004,
+            npcs = { 9031 },
             pin = { 0.369, 0.736 },
             loot = {
                 { 11675, 33.33 },
@@ -120,6 +125,7 @@ ns.AddInstance({
         {
             name = "Ring of Law: Eviscerator",
             display = 523,
+            npcs = { 9029 },
             pin = { 0.369, 0.736 },
             loot = {
                 { 11679, 25 },
@@ -133,6 +139,7 @@ ns.AddInstance({
         {
             name = "Ring of Law: Gorosh the Dervish",
             display = 8760,
+            npcs = { 9027 },
             pin = { 0.369, 0.736 },
             loot = {
                 { 11726, 15 },
@@ -146,6 +153,7 @@ ns.AddInstance({
         {
             name = "Ring of Law: Grizzle",
             display = 7873,
+            npcs = { 9028 },
             pin = { 0.369, 0.736 },
             loot = {
                 { 11610, 100 },
@@ -160,6 +168,7 @@ ns.AddInstance({
         {
             name = "Ring of Law: Hedrum the Creeper",
             display = 8271,
+            npcs = { 9032 },
             pin = { 0.369, 0.736 },
             loot = {
                 { 11633, 25 },
@@ -173,6 +182,7 @@ ns.AddInstance({
         {
             name = "Ring of Law: Ok'thor the Breaker",
             display = 11538,
+            npcs = { 9030 },
             pin = { 0.369, 0.736 },
             loot = {
                 { 11662, 25 },
@@ -185,6 +195,7 @@ ns.AddInstance({
         },
         {
             name = "Ring of Law: Arena Spoils",
+            objects = { 181074 },
             pin = { 0.369, 0.736 },
             loot = {
                 { 22305, 38 },
@@ -196,6 +207,7 @@ ns.AddInstance({
         {
             name = "Pyromancer Loregrain",
             display = 8762,
+            npcs = { 9024 },
             pin = { 0.422, 0.791 },
             loot = {
                 { 11747, 25 },
@@ -210,6 +222,7 @@ ns.AddInstance({
         {
             name = "Lord Incendius",
             display = 1204,
+            npcs = { 9017 },
             pin = { 0.444, 0.485 },
             loot = {
                 { 11764, 25 },
@@ -224,6 +237,7 @@ ns.AddInstance({
         {
             name = "Warder Stilgiss",
             display = 9089,
+            npcs = { 9041 },
             pin = { 0.516, 0.544 },
             loot = {
                 { 11782, 25 },
@@ -238,6 +252,7 @@ ns.AddInstance({
         {
             name = "Fineous Darkvire",
             display = 8704,
+            npcs = { 9056 },
             pin = { 0.518, 0.427 },
             loot = {
                 { 11839, 25 },
@@ -253,6 +268,7 @@ ns.AddInstance({
         {
             name = "Bael'Gar",
             display = 12162,
+            npcs = { 9016 },
             pin = { 0.01, 0.646 },
             loot = {
                 { 11802, 25 },
@@ -266,6 +282,7 @@ ns.AddInstance({
         {
             name = "General Angerforge",
             display = 8756,
+            npcs = { 9033 },
             pin = { 0.167, 0.688 },
             loot = {
                 { 11810, 20 },
@@ -281,6 +298,7 @@ ns.AddInstance({
         {
             name = "Golem Lord Argelmach",
             display = 8759,
+            npcs = { 8983 },
             pin = { 0.171, 0.525 },
             loot = {
                 { 11669, 25 },
@@ -295,6 +313,7 @@ ns.AddInstance({
         {
             name = "Hurley Blackbreath",
             display = 8658,
+            npcs = { 9537 },
             pin = { 0.358, 0.49 },
             loot = {
                 { 11735, 25 },
@@ -309,6 +328,7 @@ ns.AddInstance({
         {
             name = "Phalanx",
             display = 8177,
+            npcs = { 9502 },
             pin = { 0.408, 0.524 },
             loot = {
                 { 11744, 33.33 },
@@ -321,6 +341,7 @@ ns.AddInstance({
         {
             name = "Ribbly Screwspigot",
             display = 8667,
+            npcs = { 9543 },
             pin = { 0.348, 0.498 },
             loot = {
                 { 11612, 25 },
@@ -334,6 +355,7 @@ ns.AddInstance({
         {
             name = "Plugger Spazzring",
             display = 8652,
+            npcs = { 9499 },
             pin = { 0.358, 0.49 },
             loot = {
                 { 12791, 18 },
@@ -346,6 +368,7 @@ ns.AddInstance({
         {
             name = "Ambassador Flamelash",
             display = 8329,
+            npcs = { 9156 },
             pin = { 0.417, 0.388 },
             loot = {
                 { 11808, 2 },
@@ -360,6 +383,8 @@ ns.AddInstance({
         {
             name = "The Seven",
             display = 8686,
+            npcs = { 9035, 9038, 9040, 9037, 9036, 9034, 9039 },
+            objects = { 169243 },
             pin = { 0.399, 0.215 },
             loot = {
                 { 11920, 25 },
@@ -375,6 +400,7 @@ ns.AddInstance({
         {
             name = "Magmus",
             display = 12162,
+            npcs = { 9938 },
             pin = { 0.821, 0.075 },
             loot = {
                 { 11746, 20 },
@@ -389,6 +415,7 @@ ns.AddInstance({
         {
             name = "Emperor Dagran Thaurissan",
             display = 8807,
+            npcs = { 9019 },
             pin = { 0.987, 0.076 },
             loot = {
                 { 11684, 1 },

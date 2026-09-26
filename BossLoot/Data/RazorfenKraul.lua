@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Razorfen Kraul",
     kind = "dungeon",
     levels = { 29, 38 },
+    mapID = 47,
     entrance = { 0.766, 0.954 },
     map = { cols = 157, rows = 71, runs = {
         1, 10, 3, 1, 30, 17, 1, 52, 4, 1, 91, 19, 1, 125, 4, 2, 10, 4, 2, 30, 26, 2, 59, 3, 2, 91, 19, 2, 123, 8,
@@ -48,6 +49,7 @@ ns.AddInstance({
         {
             name = "Roogug",
             display = 6110,
+            npcs = { 6168 },
             pin = { 0.707, 0.247 },
             loot = {
                 { 1727, 0.16 },
@@ -60,6 +62,7 @@ ns.AddInstance({
         {
             name = "Aggem Thorncurse",
             display = 6097,
+            npcs = { 4424 },
             pin = { 0.895, 0.461 },
             loot = {
                 { 6681, 100 },
@@ -68,6 +71,7 @@ ns.AddInstance({
         {
             name = "Death Speaker Jargba",
             display = 4644,
+            npcs = { 4428 },
             pin = { 0.978, 0.235 },
             loot = {
                 { 2816, 33.33 },
@@ -78,6 +82,7 @@ ns.AddInstance({
         {
             name = "Overlord Ramtusk",
             display = 4652,
+            npcs = { 4420 },
             pin = { 0.613, 0.035 },
             loot = {
                 { 6687, 50 },
@@ -87,6 +92,7 @@ ns.AddInstance({
         {
             name = "Agathelos the Raging",
             display = 2450,
+            npcs = { 4422 },
             pin = { 0.08, 0.777 },
             loot = {
                 { 6691, 50 },
@@ -98,6 +104,7 @@ ns.AddInstance({
         {
             name = "Charlga Razorflank",
             display = 4642,
+            npcs = { 4421 },
             pin = { 0.256, 0.08 },
             loot = {
                 { 6692, 33.33 },

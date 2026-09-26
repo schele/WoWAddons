@@ -18,6 +18,7 @@ export function instanceFile(instance) {
     `    kind = ${luaString(instance.kind)},`,
     `    levels = { ${instance.levels[0]}, ${instance.levels[1]} },`,
   ];
+  if (instance.mapID) lines.push(`    mapID = ${instance.mapID},`);
 
   if (instance.entrance) {
     lines.push(`    entrance = { ${instance.entrance.x}, ${instance.entrance.y} },`);
@@ -36,6 +37,8 @@ export function instanceFile(instance) {
     lines.push(`            name = ${luaString(boss.name)},`);
     if (boss.wing) lines.push(`            wing = ${luaString(boss.wing)},`);
     if (boss.display) lines.push(`            display = ${boss.display},`);
+    if (boss.npcs) lines.push(`            npcs = { ${boss.npcs.join(", ")} },`);
+    if (boss.objects) lines.push(`            objects = { ${boss.objects.join(", ")} },`);
     if (boss.pin) lines.push(`            pin = { ${boss.pin.x}, ${boss.pin.y} },`);
     lines.push('            loot = {');
     for (const entry of boss.loot) lines.push(`                { ${entry.id}, ${entry.chance} },`);

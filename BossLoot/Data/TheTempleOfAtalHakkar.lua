@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "The Temple of Atal'Hakkar",
     kind = "dungeon",
     levels = { 50, 56 },
+    mapID = 109,
     entrance = { 0.482, 0.082 },
     map = { cols = 102, rows = 100, runs = {
         1, 35, 23, 2, 34, 24, 3, 33, 25, 4, 32, 25, 5, 32, 5, 5, 40, 16, 6, 32, 4, 6, 41, 13, 7, 32, 4, 7, 41, 13,
@@ -45,6 +46,7 @@ ns.AddInstance({
         {
             name = "Atal'alarion",
             display = 7873,
+            npcs = { 8580 },
             pin = { 0.494, 0.459 },
             loot = {
                 { 10798, 33.33 },
@@ -56,6 +58,7 @@ ns.AddInstance({
         {
             name = "Dreamscythe",
             display = 7553,
+            npcs = { 5721 },
             pin = { 0.519, 0.564 },
             loot = {
                 { 10795, 5 },
@@ -71,6 +74,7 @@ ns.AddInstance({
         {
             name = "Weaver",
             display = 6375,
+            npcs = { 5720 },
             pin = { 0.468, 0.355 },
             loot = {
                 { 10795, 5 },
@@ -86,6 +90,7 @@ ns.AddInstance({
         {
             name = "Jammal'an the Prophet",
             display = 6708,
+            npcs = { 5710 },
             pin = { 0.938, 0.359 },
             loot = {
                 { 10806, 33.33 },
@@ -97,6 +102,7 @@ ns.AddInstance({
         {
             name = "Ogom the Wretched",
             display = 6709,
+            npcs = { 5711 },
             pin = { 0.949, 0.348 },
             loot = {
                 { 10803, 33.33 },
@@ -108,6 +114,7 @@ ns.AddInstance({
         {
             name = "Morphaz",
             display = 7975,
+            npcs = { 5719 },
             pin = { 0.548, 0.971 },
             loot = {
                 { 10795, 5 },
@@ -123,6 +130,7 @@ ns.AddInstance({
         {
             name = "Hazzas",
             display = 9584,
+            npcs = { 5722 },
             pin = { 0.559, 0.968 },
             loot = {
                 { 10795, 5 },
@@ -138,6 +146,7 @@ ns.AddInstance({
         {
             name = "Shade of Eranikus",
             display = 7806,
+            npcs = { 5709 },
             pin = { 0.811, 0.942 },
             loot = {
                 { 10847, 0.5 },
@@ -153,6 +162,7 @@ ns.AddInstance({
         {
             name = "Avatar of Hakkar",
             display = 8053,
+            npcs = { 8443 },
             pin = { 0.495, 0.345 },
             loot = {
                 { 12462, 2 },

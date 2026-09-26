@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Onyxia's Lair",
     kind = "raid",
     levels = { 60, 60 },
+    mapID = 249,
     entrance = { 0.041, 0.129 },
     map = { cols = 61, rows = 61, runs = {
         1, 10, 9, 2, 7, 13, 3, 1, 3, 3, 7, 13, 4, 1, 19, 4, 41, 3, 5, 1, 9, 5, 41, 4, 6, 1, 6, 6, 39, 7,
@@ -24,6 +25,7 @@ ns.AddInstance({
         {
             name = "Onyxia",
             display = 8570,
+            npcs = { 10184 },
             pin = { 0.709, 0.275 },
             loot = {
                 { 18422, 100 },

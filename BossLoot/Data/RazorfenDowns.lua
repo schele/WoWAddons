@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Razorfen Downs",
     kind = "dungeon",
     levels = { 37, 46 },
+    mapID = 129,
     entrance = { 0.021, 0.055 },
     map = { cols = 121, rows = 75, runs = {
         1, 1, 6, 1, 16, 4, 1, 88, 3, 1, 96, 11, 2, 1, 20, 2, 39, 3, 2, 87, 4, 2, 96, 11, 3, 1, 21, 3, 31, 15,
@@ -38,6 +39,7 @@ ns.AddInstance({
         {
             name = "Tuten'kash",
             display = 7845,
+            npcs = { 7355 },
             pin = { 0.546, 0.192 },
             loot = {
                 { 10775, 33.33 },
@@ -48,6 +50,7 @@ ns.AddInstance({
         {
             name = "Plaguemaw the Rotting",
             display = 6124,
+            npcs = { 7356 },
             loot = {
                 { 10766, 50 },
                 { 10760, 50 },
@@ -56,6 +59,7 @@ ns.AddInstance({
         {
             name = "Mordresh Fire Eye",
             display = 8055,
+            npcs = { 7357 },
             pin = { 0.929, 0.478 },
             loot = {
                 { 10769, 33.33 },
@@ -66,6 +70,7 @@ ns.AddInstance({
         {
             name = "Glutton",
             display = 7864,
+            npcs = { 8567 },
             pin = { 0.236, 0.471 },
             loot = {
                 { 10774, 50 },
@@ -75,6 +80,7 @@ ns.AddInstance({
         {
             name = "Amnennar the Coldbringer",
             display = 7971,
+            npcs = { 7358 },
             pin = { 0.331, 0.689 },
             loot = {
                 { 10761, 20 },

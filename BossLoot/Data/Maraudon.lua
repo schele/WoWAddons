@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Maraudon",
     kind = "dungeon",
     levels = { 46, 55 },
+    mapID = 349,
     entrance = { 0.882, 0.096 },
     map = { cols = 127, rows = 200, runs = {
         1, 68, 7, 2, 68, 9, 2, 80, 4, 3, 68, 16, 4, 70, 14, 5, 70, 14, 6, 70, 14, 7, 70, 18, 8, 70, 21, 9, 71, 21,
@@ -71,6 +72,7 @@ ns.AddInstance({
         {
             name = "Noxxion",
             display = 11172,
+            npcs = { 13282 },
             pin = { 0.557, 0.008 },
             loot = {
                 { 17744, 33.33 },
@@ -81,6 +83,7 @@ ns.AddInstance({
         {
             name = "Razorlash",
             display = 12389,
+            npcs = { 12258 },
             pin = { 0.336, 0.125 },
             loot = {
                 { 17748, 25 },
@@ -94,6 +97,7 @@ ns.AddInstance({
         {
             name = "Lord Vyletongue",
             display = 12334,
+            npcs = { 12236 },
             pin = { 0.591, 0.303 },
             loot = {
                 { 17752, 33.33 },
@@ -104,6 +108,7 @@ ns.AddInstance({
         {
             name = "Celebras the Cursed",
             display = 12350,
+            npcs = { 12225 },
             pin = { 0.229, 0.321 },
             loot = {
                 { 17738, 33.33 },
@@ -114,6 +119,7 @@ ns.AddInstance({
         {
             name = "Landslide",
             display = 12293,
+            npcs = { 12203 },
             pin = { 0.55, 0.606 },
             loot = {
                 { 17734, 25 },
@@ -125,6 +131,7 @@ ns.AddInstance({
         {
             name = "Tinkerer Gizlock",
             display = 7125,
+            npcs = { 13601 },
             pin = { 0.706, 0.778 },
             loot = {
                 { 17717, 33.33 },
@@ -136,6 +143,7 @@ ns.AddInstance({
         {
             name = "Rotgrip",
             display = 13589,
+            npcs = { 13596 },
             pin = { 0.404, 0.85 },
             loot = {
                 { 17728, 33.33 },
@@ -146,6 +154,7 @@ ns.AddInstance({
         {
             name = "Princess Theradras",
             display = 12292,
+            npcs = { 12201 },
             pin = { 0.222, 0.861 },
             loot = {
                 { 17780, 1 },

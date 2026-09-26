@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Zul'Gurub",
     kind = "raid",
     levels = { 60, 60 },
+    mapID = 309,
     entrance = { 0.016, 0.474 },
     map = { cols = 172, rows = 200, runs = {
         1, 81, 12, 2, 70, 3, 2, 81, 12, 3, 7, 6, 3, 69, 4, 3, 76, 22, 4, 6, 8, 4, 69, 30, 5, 6, 8, 5, 69, 35,
@@ -113,6 +114,7 @@ ns.AddInstance({
         {
             name = "High Priestess Jeklik",
             display = 15219,
+            npcs = { 14517 },
             pin = { 0.192, 0.888 },
             loot = {
                 { 19918, 14.29 },
@@ -148,6 +150,7 @@ ns.AddInstance({
         {
             name = "High Priest Venoxis",
             display = 15217,
+            npcs = { 14507 },
             pin = { 0.612, 0.599 },
             loot = {
                 { 19903, 16.67 },
@@ -181,6 +184,7 @@ ns.AddInstance({
         {
             name = "High Priestess Mar'li",
             display = 15220,
+            npcs = { 14510 },
             pin = { 0.444, 0.926 },
             loot = {
                 { 19927, 16.67 },
@@ -214,6 +218,7 @@ ns.AddInstance({
         {
             name = "Bloodlord Mandokir",
             display = 11288,
+            npcs = { 11382 },
             pin = { 0.894, 0.751 },
             loot = {
                 { 19716, 11.11 },
@@ -245,6 +250,7 @@ ns.AddInstance({
         {
             name = "Edge of Madness: Gri'lek",
             display = 8390,
+            npcs = { 15082 },
             pin = { 0.867, 0.457 },
             loot = {
                 { 19961, 43 },
@@ -255,6 +261,7 @@ ns.AddInstance({
         {
             name = "Edge of Madness: Hazza'rah",
             display = 15267,
+            npcs = { 15083 },
             pin = { 0.867, 0.457 },
             loot = {
                 { 19967, 45 },
@@ -265,6 +272,7 @@ ns.AddInstance({
         {
             name = "Edge of Madness: Renataki",
             display = 15268,
+            npcs = { 15084 },
             pin = { 0.867, 0.457 },
             loot = {
                 { 19963, 45 },
@@ -275,6 +283,7 @@ ns.AddInstance({
         {
             name = "Edge of Madness: Wushoolay",
             display = 15269,
+            npcs = { 15085 },
             pin = { 0.867, 0.457 },
             loot = {
                 { 19965, 45 },
@@ -285,6 +294,7 @@ ns.AddInstance({
         {
             name = "Gahz'ranka",
             display = 15288,
+            npcs = { 15114 },
             pin = { 0.639, 0.208 },
             loot = {
                 { 19944, 25 },
@@ -300,6 +310,7 @@ ns.AddInstance({
         {
             name = "High Priest Thekal",
             display = 15216,
+            npcs = { 14509 },
             pin = { 0.986, 0.236 },
             loot = {
                 { 19896, 14.29 },
@@ -336,6 +347,7 @@ ns.AddInstance({
         {
             name = "High Priestess Arlokk",
             display = 15218,
+            npcs = { 14515 },
             pin = { 0.509, 0.059 },
             loot = {
                 { 19909, 20 },
@@ -369,6 +381,7 @@ ns.AddInstance({
         {
             name = "Jin'do the Hexxer",
             display = 11311,
+            npcs = { 11380 },
             pin = { 0.057, 0.032 },
             loot = {
                 { 19716, 11.11 },
@@ -399,6 +412,7 @@ ns.AddInstance({
         {
             name = "Hakkar",
             display = 15295,
+            npcs = { 14834 },
             pin = { 0.537, 0.332 },
             loot = {
                 { 19802, 100 },

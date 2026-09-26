@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "The Deadmines",
     kind = "dungeon",
     levels = { 17, 26 },
+    mapID = 36,
     entrance = { 0.051, 0.032 },
     map = { cols = 128, rows = 79, runs = {
         1, 1, 10, 1, 89, 10, 1, 103, 10, 1, 116, 4, 2, 1, 10, 2, 89, 9, 2, 105, 16, 3, 1, 10, 3, 89, 8, 3, 105, 16,
@@ -36,6 +37,7 @@ ns.AddInstance({
         {
             name = "Rhahk'Zor",
             display = 14403,
+            npcs = { 644 },
             pin = { 0.184, 0.592 },
             loot = {
                 { 872, 5 },
@@ -45,6 +47,7 @@ ns.AddInstance({
         {
             name = "Sneed's Shredder",
             display = 1269,
+            npcs = { 642 },
             pin = { 0.3, 0.902 },
             loot = {
                 { 1937, 10 },
@@ -54,6 +57,7 @@ ns.AddInstance({
         {
             name = "Sneed",
             display = 7125,
+            npcs = { 643 },
             pin = { 0.3, 0.902 },
             loot = {
                 { 5194, 35 },
@@ -63,6 +67,7 @@ ns.AddInstance({
         {
             name = "Gilnid",
             display = 7124,
+            npcs = { 1763 },
             pin = { 0.42, 0.547 },
             loot = {
                 { 1156, 45 },
@@ -72,6 +77,7 @@ ns.AddInstance({
         {
             name = "Mr. Smite",
             display = 2026,
+            npcs = { 646 },
             pin = { 0.856, 0.058 },
             loot = {
                 { 7230, 20 },
@@ -82,6 +88,7 @@ ns.AddInstance({
         {
             name = "Captain Greenskin",
             display = 7113,
+            npcs = { 647 },
             pin = { 0.877, 0.204 },
             loot = {
                 { 5201, 40 },
@@ -92,6 +99,7 @@ ns.AddInstance({
         {
             name = "Edwin VanCleef",
             display = 2029,
+            npcs = { 639 },
             pin = { 0.9, 0.262 },
             loot = {
                 { 5193, 30 },
@@ -104,6 +112,7 @@ ns.AddInstance({
         {
             name = "Cookie",
             display = 1305,
+            npcs = { 645 },
             pin = { 0.949, 0.334 },
             loot = {
                 { 5198, 35 },

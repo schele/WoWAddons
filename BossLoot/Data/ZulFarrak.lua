@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Zul'Farrak",
     kind = "dungeon",
     levels = { 44, 54 },
+    mapID = 209,
     entrance = { 0.717, 0.982 },
     map = { cols = 163, rows = 181, runs = {
         1, 18, 4, 1, 25, 6, 1, 37, 10, 1, 69, 9, 2, 18, 13, 2, 37, 9, 2, 69, 9, 3, 18, 13, 3, 37, 9, 3, 69, 9,
@@ -68,6 +69,7 @@ ns.AddInstance({
         {
             name = "Antu'sul",
             display = 7353,
+            npcs = { 8127 },
             pin = { 0.98, 0.149 },
             loot = {
                 { 9379, 25 },
@@ -81,6 +83,7 @@ ns.AddInstance({
         {
             name = "Theka the Martyr",
             display = 6696,
+            npcs = { 7272 },
             pin = { 0.69, 0.201 },
             loot = {
                 { 862, 0.02 },
@@ -99,6 +102,7 @@ ns.AddInstance({
         {
             name = "Witch Doctor Zum'rah",
             display = 6434,
+            npcs = { 7271 },
             pin = { 0.45, 0.016 },
             loot = {
                 { 18082, 50 },
@@ -109,6 +113,7 @@ ns.AddInstance({
         {
             name = "Nekrum Gutchewer",
             display = 6690,
+            npcs = { 7796 },
             pin = { 0.015, 0.056 },
             loot = {
                 { 9480, 0.1 },
@@ -121,6 +126,7 @@ ns.AddInstance({
         {
             name = "Shadowpriest Sezz'ziz",
             display = 6441,
+            npcs = { 7275 },
             pin = { 0.015, 0.056 },
             loot = {
                 { 9470, 25 },
@@ -133,6 +139,7 @@ ns.AddInstance({
         {
             name = "Sergeant Bly",
             display = 6433,
+            npcs = { 7604 },
             pin = { 0.015, 0.056 },
             loot = {
                 { 5616, 0.02 },
@@ -143,6 +150,7 @@ ns.AddInstance({
         {
             name = "Hydromancer Velratha",
             display = 6685,
+            npcs = { 7795 },
             pin = { 0.151, 0.311 },
             loot = {
                 { 862, 0.02 },
@@ -157,6 +165,7 @@ ns.AddInstance({
         {
             name = "Gahz'rilla",
             display = 7271,
+            npcs = { 7273 },
             pin = { 0.187, 0.358 },
             loot = {
                 { 9469, 50 },
@@ -166,6 +175,7 @@ ns.AddInstance({
         {
             name = "Chief Ukorz Sandscalp",
             display = 6439,
+            npcs = { 7267 },
             pin = { 0.446, 0.272 },
             loot = {
                 { 9476, 20 },
@@ -180,6 +190,7 @@ ns.AddInstance({
         {
             name = "Ruuzlu",
             display = 6687,
+            npcs = { 7797 },
             pin = { 0.451, 0.267 },
             loot = {
                 { 9511, 0.08 },

@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Uldaman",
     kind = "dungeon",
     levels = { 41, 51 },
+    mapID = 70,
     entrance = { 0.845, 0.733 },
     map = { cols = 124, rows = 133, runs = {
         1, 38, 12, 1, 55, 4, 2, 38, 12, 2, 55, 4, 3, 38, 12, 3, 56, 4, 4, 38, 12, 4, 56, 4, 5, 38, 15, 5, 56, 6,
@@ -50,6 +51,7 @@ ns.AddInstance({
         {
             name = "Revelosh",
             display = 5945,
+            npcs = { 6910 },
             pin = { 0.613, 0.727 },
             loot = {
                 { 9387, 25 },
@@ -62,6 +64,7 @@ ns.AddInstance({
         {
             name = "The Lost Dwarves",
             display = 5710,
+            npcs = { 6906, 6907, 6908 },
             pin = { 0.702, 0.967 },
             loot = {
                 { 9394, 50 },
@@ -82,6 +85,7 @@ ns.AddInstance({
         {
             name = "Ironaya",
             display = 6089,
+            npcs = { 7228 },
             pin = { 0.309, 0.744 },
             loot = {
                 { 9407, 33.33 },
@@ -92,6 +96,7 @@ ns.AddInstance({
         {
             name = "Obsidian Sentinel",
             display = 5285,
+            npcs = { 7023 },
             pin = { 0.156, 0.611 },
             loot = {
                 { 9431, 0.07 },
@@ -110,6 +115,7 @@ ns.AddInstance({
         {
             name = "Ancient Stone Keeper",
             display = 10798,
+            npcs = { 7206 },
             pin = { 0.492, 0.375 },
             loot = {
                 { 9410, 50 },
@@ -119,6 +125,7 @@ ns.AddInstance({
         {
             name = "Galgann Firehammer",
             display = 6059,
+            npcs = { 7291 },
             pin = { 0.102, 0.323 },
             loot = {
                 { 9412, 25 },
@@ -130,6 +137,7 @@ ns.AddInstance({
         {
             name = "Grimlok",
             display = 11165,
+            npcs = { 4854 },
             pin = { 0.02, 0.196 },
             loot = {
                 { 9415, 33.33 },
@@ -140,6 +148,7 @@ ns.AddInstance({
         {
             name = "Archaedas",
             display = 5988,
+            npcs = { 2748 },
             pin = { 0.389, 0.107 },
             loot = {
                 { 9413, 33.33 },

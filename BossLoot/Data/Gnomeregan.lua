@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Gnomeregan",
     kind = "dungeon",
     levels = { 29, 38 },
+    mapID = 90,
     entrance = { 0.868, 0.017 },
     map = { cols = 192, rows = 135, runs = {
         1, 163, 7, 2, 163, 7, 3, 163, 7, 4, 163, 7, 5, 163, 7, 8, 132, 4, 8, 145, 4, 9, 132, 17, 10, 130, 20, 11, 130, 21,
@@ -71,6 +72,7 @@ ns.AddInstance({
         {
             name = "Grubbis",
             display = 6533,
+            npcs = { 7361 },
             pin = { 0.988, 0.332 },
             loot = {
                 { 9445, 10 },
@@ -80,6 +82,7 @@ ns.AddInstance({
         {
             name = "Viscous Fallout",
             display = 5497,
+            npcs = { 7079 },
             pin = { 0.814, 0.188 },
             loot = {
                 { 9452, 33.33 },
@@ -90,6 +93,7 @@ ns.AddInstance({
         {
             name = "Electrocutioner 6000",
             display = 6915,
+            npcs = { 6235 },
             pin = { 0.265, 0.395 },
             loot = {
                 { 9446, 33.33 },
@@ -102,6 +106,7 @@ ns.AddInstance({
         {
             name = "Crowd Pummeler 9-60",
             display = 6774,
+            npcs = { 6229 },
             pin = { 0.435, 0.966 },
             loot = {
                 { 9449, 50 },
@@ -112,6 +117,7 @@ ns.AddInstance({
         {
             name = "Dark Iron Ambassador",
             display = 6669,
+            npcs = { 6228 },
             pin = { 0.197, 0.643 },
             loot = {
                 { 9455, 33.33 },
@@ -123,6 +129,7 @@ ns.AddInstance({
         {
             name = "Mekgineer Thermaplugg",
             display = 6980,
+            npcs = { 7800 },
             pin = { 0.066, 0.36 },
             loot = {
                 { 9458, 25 },

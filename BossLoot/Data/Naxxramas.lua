@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Naxxramas",
     kind = "raid",
     levels = { 60, 60 },
+    mapID = 533,
     entrance = { 0.475, 0.508 },
     map = { cols = 200, rows = 187, runs = {
         1, 1, 4, 1, 181, 11, 2, 1, 4, 2, 181, 11, 3, 1, 4, 3, 181, 11, 4, 1, 4, 4, 181, 10, 6, 37, 4, 6, 74, 9,
@@ -128,6 +129,7 @@ ns.AddInstance({
             name = "Anub'Rekhan",
             wing = "Arachnid",
             display = 15931,
+            npcs = { 15956 },
             pin = { 0.513, 0.211 },
             loot = {
                 { 22726, 30 },
@@ -145,6 +147,7 @@ ns.AddInstance({
             name = "Grand Widow Faerlina",
             wing = "Arachnid",
             display = 15940,
+            npcs = { 15953 },
             pin = { 0.645, 0.167 },
             loot = {
                 { 22726, 30 },
@@ -162,6 +165,7 @@ ns.AddInstance({
             name = "Maexxna",
             wing = "Arachnid",
             display = 15928,
+            npcs = { 15952 },
             pin = { 0.921, 0.012 },
             loot = {
                 { 22726, 30 },
@@ -179,6 +183,7 @@ ns.AddInstance({
             name = "Noth the Plaguebringer",
             wing = "Plague",
             display = 16590,
+            npcs = { 15954 },
             pin = { 0.527, 0.831 },
             loot = {
                 { 22726, 30 },
@@ -198,6 +203,7 @@ ns.AddInstance({
             name = "Heigan the Unclean",
             wing = "Plague",
             display = 16309,
+            npcs = { 15936 },
             pin = { 0.725, 0.715 },
             loot = {
                 { 22726, 30 },
@@ -215,6 +221,7 @@ ns.AddInstance({
             name = "Loatheb",
             wing = "Plague",
             display = 16110,
+            npcs = { 16011 },
             pin = { 0.99, 0.603 },
             loot = {
                 { 22726, 30 },
@@ -232,6 +239,7 @@ ns.AddInstance({
             name = "Instructor Razuvious",
             wing = "Military",
             display = 16582,
+            npcs = { 16061 },
             pin = { 0.166, 0.753 },
             loot = {
                 { 22726, 30 },
@@ -250,6 +258,7 @@ ns.AddInstance({
             name = "Gothik the Harvester",
             wing = "Military",
             display = 16279,
+            npcs = { 16060 },
             pin = { 0.431, 0.864 },
             loot = {
                 { 22726, 30 },
@@ -267,6 +276,8 @@ ns.AddInstance({
             name = "The Four Horsemen",
             wing = "Military",
             display = 16155,
+            npcs = { 16064, 16065, 16062, 16063 },
+            objects = { 181366 },
             pin = { 0.039, 0.986 },
             loot = {
                 { 22726, 30 },
@@ -285,6 +296,7 @@ ns.AddInstance({
             name = "Patchwerk",
             wing = "Construct",
             display = 16174,
+            npcs = { 16028 },
             pin = { 0.289, 0.211 },
             loot = {
                 { 22726, 30 },
@@ -302,6 +314,7 @@ ns.AddInstance({
             name = "Grobbulus",
             wing = "Construct",
             display = 16035,
+            npcs = { 15931 },
             pin = { 0.39, 0.312 },
             loot = {
                 { 22726, 30 },
@@ -319,6 +332,7 @@ ns.AddInstance({
             name = "Gluth",
             wing = "Construct",
             display = 16064,
+            npcs = { 15932 },
             pin = { 0.22, 0.236 },
             loot = {
                 { 22726, 30 },
@@ -345,6 +359,7 @@ ns.AddInstance({
             name = "Thaddius",
             wing = "Construct",
             display = 16137,
+            npcs = { 15928 },
             pin = { 0.009, 0.01 },
             loot = {
                 { 22726, 30 },
@@ -362,6 +377,7 @@ ns.AddInstance({
             name = "Sapphiron",
             wing = "Frostwyrm Lair",
             display = 16033,
+            npcs = { 15989 },
             loot = {
                 { 23545, 50 },
                 { 23547, 50 },
@@ -383,6 +399,7 @@ ns.AddInstance({
             name = "Kel'Thuzad",
             wing = "Frostwyrm Lair",
             display = 15945,
+            npcs = { 15990 },
             loot = {
                 { 22520, 100 },
                 { 23059, 11.11 },

@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Ruins of Ahn'Qiraj",
     kind = "raid",
     levels = { 60, 60 },
+    mapID = 509,
     entrance = { 0.713, 0.008 },
     map = { cols = 165, rows = 199, runs = {
         1, 115, 6, 2, 115, 6, 3, 115, 6, 10, 114, 3, 11, 114, 7, 11, 134, 3, 12, 114, 8, 12, 134, 3, 13, 115, 26, 14, 116, 26,
@@ -66,6 +67,7 @@ ns.AddInstance({
         {
             name = "Kurinnaxx",
             display = 15742,
+            npcs = { 15348 },
             pin = { 0.614, 0.321 },
             loot = {
                 { 21498, 16.67 },
@@ -117,6 +119,7 @@ ns.AddInstance({
         {
             name = "General Rajaxx",
             display = 15376,
+            npcs = { 15341 },
             pin = { 0.637, 0.549 },
             loot = {
                 { 21492, 16.67 },
@@ -168,6 +171,7 @@ ns.AddInstance({
         {
             name = "Moam",
             display = 15392,
+            npcs = { 15340 },
             pin = { 0.009, 0.328 },
             loot = {
                 { 20886, 25 },
@@ -227,6 +231,7 @@ ns.AddInstance({
         {
             name = "Buru the Gorger",
             display = 15654,
+            npcs = { 15370 },
             pin = { 0.986, 0.633 },
             loot = {
                 { 20886, 16.67 },
@@ -281,6 +286,7 @@ ns.AddInstance({
         {
             name = "Ayamiss the Hunter",
             display = 15431,
+            npcs = { 15369 },
             pin = { 0.698, 0.992 },
             loot = {
                 { 20886, 16.67 },
@@ -336,6 +342,7 @@ ns.AddInstance({
         {
             name = "Ossirian the Unscarred",
             display = 15432,
+            npcs = { 15339 },
             pin = { 0.218, 0.839 },
             loot = {
                 { 21220, 100 },

@@ -133,6 +133,13 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
     const out = { name: boss.name, loot: sortLoot(entries, itemOf) };
     if (boss.wing) out.wing = boss.wing;
 
+    // Which creatures and chests are the boss, so loot recorded in game can
+    // be matched to it.
+    const npcs = [...new Set(creatures.map((c) => c.entry))];
+    if (npcs.length) out.npcs = npcs;
+    const objects = [...new Set(chestsUsed.map((o) => o.entry))];
+    if (objects.length) out.objects = objects;
+
     // The portrait: the first of the boss's creatures that has a model.
     const modelled = creatures.find((c) => c.display_id1 > 0);
     if (modelled) out.display = modelled.display_id1;
@@ -198,6 +205,7 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
       name: def.name,
       kind: def.kind,
       levels: def.levels,
+      mapID: def.map,
       map: map ? { cols: map.cols, rows: map.rows, runs: map.runs } : undefined,
       entrance: pinFor(map, entrance),
       bosses,

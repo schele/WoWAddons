@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Dire Maul",
     kind = "dungeon",
     levels = { 55, 60 },
+    mapID = 429,
     entrance = { 0.655, 0.788 },
     map = { cols = 200, rows = 121, runs = {
         1, 42, 3, 1, 50, 10, 1, 63, 4, 2, 42, 4, 2, 50, 10, 2, 63, 4, 3, 42, 4, 3, 50, 10, 3, 63, 4, 4, 42, 4,
@@ -56,6 +57,7 @@ ns.AddInstance({
             name = "Pusillin",
             wing = "East",
             display = 7552,
+            npcs = { 14354 },
             pin = { 0.682, 0.749 },
             loot = {
                 { 18401, 0.2 },
@@ -79,6 +81,7 @@ ns.AddInstance({
             name = "Zevrim Thornhoof",
             wing = "East",
             display = 11335,
+            npcs = { 11490 },
             pin = { 0.832, 0.87 },
             loot = {
                 { 18401, 0.2 },
@@ -104,6 +107,7 @@ ns.AddInstance({
             name = "Hydrospawn",
             wing = "East",
             display = 5489,
+            npcs = { 13280 },
             pin = { 0.82, 0.852 },
             loot = {
                 { 18401, 0.2 },
@@ -130,6 +134,7 @@ ns.AddInstance({
             name = "Lethtendris",
             wing = "East",
             display = 14378,
+            npcs = { 14327 },
             pin = { 0.83, 0.843 },
             loot = {
                 { 18401, 0.2 },
@@ -154,6 +159,7 @@ ns.AddInstance({
             name = "Alzzin the Wildshaper",
             wing = "East",
             display = 14416,
+            npcs = { 11492 },
             pin = { 0.826, 0.576 },
             loot = {
                 { 18401, 0.2 },
@@ -184,6 +190,7 @@ ns.AddInstance({
             name = "Tendris Warpwood",
             wing = "West",
             display = 14383,
+            npcs = { 11489 },
             pin = { 0.275, 0.822 },
             loot = {
                 { 18401, 0.2 },
@@ -210,6 +217,7 @@ ns.AddInstance({
             name = "Illyanna Ravenoak",
             wing = "West",
             display = 11270,
+            npcs = { 11488 },
             pin = { 0.237, 0.85 },
             loot = {
                 { 18401, 0.2 },
@@ -235,6 +243,7 @@ ns.AddInstance({
             name = "Magister Kalendris",
             wing = "West",
             display = 14384,
+            npcs = { 11487 },
             pin = { 0.215, 0.794 },
             loot = {
                 { 18401, 0.2 },
@@ -262,6 +271,7 @@ ns.AddInstance({
             name = "Immol'thar",
             wing = "West",
             display = 14173,
+            npcs = { 11496 },
             pin = { 0.074, 0.873 },
             loot = {
                 { 18401, 0.2 },
@@ -293,6 +303,7 @@ ns.AddInstance({
             name = "Prince Tortheldrin",
             wing = "West",
             display = 11256,
+            npcs = { 11486 },
             pin = { 0.186, 0.703 },
             loot = {
                 { 18373, 10 },
@@ -314,6 +325,7 @@ ns.AddInstance({
             name = "Guard Mol'dar",
             wing = "North",
             display = 11561,
+            npcs = { 14326 },
             pin = { 0.568, 0.441 },
             loot = {
                 { 18493, 7.69 },
@@ -341,6 +353,7 @@ ns.AddInstance({
             name = "Stomper Kreeg",
             wing = "North",
             display = 11545,
+            npcs = { 14322 },
             pin = { 0.504, 0.347 },
             loot = {
                 { 18425, 40 },
@@ -355,6 +368,7 @@ ns.AddInstance({
             name = "Guard Fengus",
             wing = "North",
             display = 11561,
+            npcs = { 14321 },
             pin = { 0.373, 0.452 },
             loot = {
                 { 18401, 0.2 },
@@ -386,6 +400,7 @@ ns.AddInstance({
             name = "Guard Slip'kik",
             wing = "North",
             display = 11561,
+            npcs = { 14323 },
             pin = { 0.232, 0.279 },
             loot = {
                 { 18401, 0.2 },
@@ -422,6 +437,7 @@ ns.AddInstance({
             name = "Captain Kromcrush",
             wing = "North",
             display = 11564,
+            npcs = { 14325 },
             pin = { 0.273, 0.211 },
             loot = {
                 { 18401, 0.2 },
@@ -449,6 +465,8 @@ ns.AddInstance({
             name = "King Gordok",
             wing = "North",
             display = 11583,
+            npcs = { 11501 },
+            objects = { 179564 },
             pin = { 0.273, 0.01 },
             loot = {
                 { 18401, 0.2 },

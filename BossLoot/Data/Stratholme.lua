@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Stratholme",
     kind = "dungeon",
     levels = { 58, 60 },
+    mapID = 329,
     entrance = { 0.895, 0.724 },
     map = { cols = 200, rows = 171, runs = {
         1, 110, 10, 1, 123, 7, 1, 150, 7, 2, 102, 4, 2, 110, 20, 2, 150, 7, 3, 102, 4, 3, 110, 20, 3, 150, 7, 3, 181, 4,
@@ -68,6 +69,7 @@ ns.AddInstance({
             name = "The Unforgiven",
             wing = "Live",
             display = 10771,
+            npcs = { 10516 },
             loot = {
                 { 13404, 20 },
                 { 13405, 20 },
@@ -80,6 +82,7 @@ ns.AddInstance({
             name = "Timmy the Cruel",
             wing = "Live",
             display = 571,
+            npcs = { 10808 },
             loot = {
                 { 13400, 20 },
                 { 13401, 20 },
@@ -92,6 +95,7 @@ ns.AddInstance({
             name = "Malor the Zealous",
             wing = "Live",
             display = 10458,
+            npcs = { 11032 },
             pin = { 0.249, 0.68 },
             loot = {
                 { 18742, 0.02 },
@@ -102,6 +106,7 @@ ns.AddInstance({
             name = "Cannon Master Willey",
             wing = "Live",
             display = 10674,
+            npcs = { 10997 },
             pin = { 0.013, 0.749 },
             loot = {
                 { 13377, 100 },
@@ -122,6 +127,7 @@ ns.AddInstance({
             name = "Archivist Galford",
             wing = "Live",
             display = 10544,
+            npcs = { 10811 },
             pin = { 0.22, 0.921 },
             loot = {
                 { 13385, 20 },
@@ -137,6 +143,7 @@ ns.AddInstance({
             name = "Balnazzar",
             wing = "Live",
             display = 10691,
+            npcs = { 10813 },
             pin = { 0.147, 0.98 },
             loot = {
                 { 14512, 6 },
@@ -158,6 +165,7 @@ ns.AddInstance({
             name = "Magistrate Barthilas",
             wing = "Undead",
             display = 10433,
+            npcs = { 10435 },
             pin = { 0.865, 0.618 },
             loot = {
                 { 13376, 16.67 },
@@ -173,6 +181,7 @@ ns.AddInstance({
             name = "Nerub'enkan",
             wing = "Undead",
             display = 9793,
+            npcs = { 10437 },
             pin = { 0.752, 0.344 },
             loot = {
                 { 13529, 20 },
@@ -192,6 +201,7 @@ ns.AddInstance({
             name = "Baroness Anastari",
             wing = "Undead",
             display = 10698,
+            npcs = { 10436 },
             pin = { 0.986, 0.343 },
             loot = {
                 { 13534, 20 },
@@ -210,6 +220,7 @@ ns.AddInstance({
             name = "Maleki the Pallid",
             wing = "Undead",
             display = 10546,
+            npcs = { 10438 },
             pin = { 0.901, 0.08 },
             loot = {
                 { 13524, 20 },
@@ -229,6 +240,7 @@ ns.AddInstance({
             name = "Ramstein the Gorger",
             wing = "Undead",
             display = 12818,
+            npcs = { 10439 },
             pin = { 0.582, 0.189 },
             loot = {
                 { 13372, 14.29 },
@@ -245,6 +257,7 @@ ns.AddInstance({
             name = "Baron Rivendare",
             wing = "Undead",
             display = 10729,
+            npcs = { 10440 },
             pin = { 0.511, 0.08 },
             loot = {
                 { 13505, 1 },

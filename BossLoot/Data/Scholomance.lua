@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Scholomance",
     kind = "dungeon",
     levels = { 58, 60 },
+    mapID = 289,
     entrance = { 0.242, 0.388 },
     map = { cols = 77, rows = 93, runs = {
         1, 22, 9, 2, 22, 9, 3, 22, 9, 4, 23, 8, 5, 23, 8, 6, 24, 6, 10, 6, 3, 10, 25, 4, 11, 5, 4, 11, 18, 3,
@@ -28,6 +29,7 @@ ns.AddInstance({
         {
             name = "Kirtonos the Herald",
             display = 7534,
+            npcs = { 10506 },
             pin = { 0.348, 0.027 },
             loot = {
                 { 13955, 11.11 },
@@ -44,6 +46,7 @@ ns.AddInstance({
         {
             name = "Jandice Barov",
             display = 11073,
+            npcs = { 10503 },
             pin = { 0.413, 0.18 },
             loot = {
                 { 14541, 14.29 },
@@ -58,6 +61,7 @@ ns.AddInstance({
         {
             name = "Rattlegore",
             display = 12073,
+            npcs = { 11622 },
             pin = { 0.095, 0.532 },
             loot = {
                 { 18782, 40 },
@@ -74,6 +78,7 @@ ns.AddInstance({
         {
             name = "Marduk Blackpool",
             display = 10248,
+            npcs = { 10433 },
             pin = { 0.275, 0.497 },
             loot = {
                 { 14576, 6.5 },
@@ -83,6 +88,7 @@ ns.AddInstance({
         {
             name = "Vectus",
             display = 2606,
+            npcs = { 10432 },
             pin = { 0.33, 0.515 },
             loot = {
                 { 14577, 7 },
@@ -92,6 +98,7 @@ ns.AddInstance({
         {
             name = "Ras Frostwhisper",
             display = 7919,
+            npcs = { 10508 },
             pin = { 0.194, 0.968 },
             loot = {
                 { 13314, 2 },
@@ -113,6 +120,7 @@ ns.AddInstance({
         {
             name = "Instructor Malicia",
             display = 11069,
+            npcs = { 10505 },
             pin = { 0.659, 0.668 },
             loot = {
                 { 16710, 3.5 },
@@ -150,6 +158,7 @@ ns.AddInstance({
         {
             name = "Doctor Theolen Krastinov",
             display = 10901,
+            npcs = { 11261 },
             pin = { 0.962, 0.411 },
             loot = {
                 { 16684, 14 },
@@ -186,6 +195,7 @@ ns.AddInstance({
         {
             name = "Lorekeeper Polkelt",
             display = 11492,
+            npcs = { 10901 },
             pin = { 0.648, 0.162 },
             loot = {
                 { 16705, 17 },
@@ -223,6 +233,7 @@ ns.AddInstance({
         {
             name = "The Ravenian",
             display = 10433,
+            npcs = { 10507 },
             pin = { 0.658, 0.623 },
             loot = {
                 { 16716, 3.5 },
@@ -260,6 +271,7 @@ ns.AddInstance({
         {
             name = "Lord Alexei Barov",
             display = 11072,
+            npcs = { 10504 },
             pin = { 0.948, 0.42 },
             loot = {
                 { 16722, 5 },
@@ -295,6 +307,7 @@ ns.AddInstance({
         {
             name = "Lady Illucia Barov",
             display = 11835,
+            npcs = { 10502 },
             pin = { 0.649, 0.186 },
             loot = {
                 { 14611, 1.11 },
@@ -331,6 +344,7 @@ ns.AddInstance({
         {
             name = "Darkmaster Gandling",
             display = 11070,
+            npcs = { 1853 },
             pin = { 0.754, 0.412 },
             loot = {
                 { 14514, 7 },

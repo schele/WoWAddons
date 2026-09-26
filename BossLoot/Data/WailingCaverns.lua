@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Wailing Caverns",
     kind = "dungeon",
     levels = { 17, 24 },
+    mapID = 43,
     entrance = { 0.463, 0.579 },
     map = { cols = 200, rows = 113, runs = {
         1, 63, 8, 2, 63, 8, 3, 63, 8, 4, 64, 7, 5, 64, 7, 6, 66, 6, 7, 66, 7, 8, 67, 8, 9, 68, 8, 10, 70, 6,
@@ -73,6 +74,7 @@ ns.AddInstance({
         {
             name = "Lady Anacondra",
             display = 4313,
+            npcs = { 3671 },
             pin = { 0.272, 0.224 },
             loot = {
                 { 10412, 33.33 },
@@ -83,6 +85,7 @@ ns.AddInstance({
         {
             name = "Lord Cobrahn",
             display = 4213,
+            npcs = { 3669 },
             pin = { 0.137, 0.564 },
             loot = {
                 { 6460, 33.33 },
@@ -93,6 +96,7 @@ ns.AddInstance({
         {
             name = "Kresh",
             display = 5126,
+            npcs = { 3653 },
             pin = { 0.247, 0.387 },
             loot = {
                 { 13245, 50 },
@@ -104,6 +108,7 @@ ns.AddInstance({
         {
             name = "Lord Pythas",
             display = 4214,
+            npcs = { 3670 },
             pin = { 0.892, 0.181 },
             loot = {
                 { 6472, 50 },
@@ -113,6 +118,7 @@ ns.AddInstance({
         {
             name = "Skum",
             display = 4203,
+            npcs = { 3674 },
             pin = { 0.976, 0.838 },
             loot = {
                 { 6449, 50 },
@@ -125,6 +131,7 @@ ns.AddInstance({
         {
             name = "Lord Serpentis",
             display = 4215,
+            npcs = { 3673 },
             pin = { 0.643, 0.501 },
             loot = {
                 { 6469, 25 },
@@ -136,6 +143,7 @@ ns.AddInstance({
         {
             name = "Verdan the Everliving",
             display = 4256,
+            npcs = { 5775 },
             pin = { 0.577, 0.423 },
             loot = {
                 { 6630, 33.33 },
@@ -155,6 +163,7 @@ ns.AddInstance({
         {
             name = "Mutanus the Devourer",
             display = 4088,
+            npcs = { 3654 },
             pin = { 0.338, 0.02 },
             loot = {
                 { 6461, 33.33 },

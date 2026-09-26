@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "The Stockade",
     kind = "dungeon",
     levels = { 24, 31 },
+    mapID = 34,
     entrance = { 0.495, 0.916 },
     map = { cols = 79, rows = 41, runs = {
         1, 14, 7, 2, 14, 7, 3, 13, 8, 4, 2, 7, 4, 13, 7, 5, 1, 9, 5, 13, 5, 5, 26, 3, 5, 37, 3, 6, 1, 9,
@@ -23,6 +24,7 @@ ns.AddInstance({
         {
             name = "Targorr the Dread",
             display = 517,
+            npcs = { 1696 },
             pin = { 0.493, 0.242 },
             loot = {
                 { 2589, 12 },
@@ -40,6 +42,7 @@ ns.AddInstance({
         {
             name = "Kam Deepfury",
             display = 825,
+            npcs = { 1666 },
             pin = { 0.724, 0.345 },
             loot = {
                 { 2280, 1 },
@@ -59,6 +62,7 @@ ns.AddInstance({
         {
             name = "Hamhock",
             display = 3250,
+            npcs = { 1717 },
             pin = { 0.831, 0.571 },
             loot = {
             },
@@ -66,6 +70,7 @@ ns.AddInstance({
         {
             name = "Bazil Thredd",
             display = 1621,
+            npcs = { 1716 },
             pin = { 0.895, 0.639 },
             loot = {
             },
@@ -73,6 +78,7 @@ ns.AddInstance({
         {
             name = "Dextren Ward",
             display = 2149,
+            npcs = { 1663 },
             pin = { 0.07, 0.198 },
             loot = {
                 { 2592, 18.5 },
@@ -87,6 +93,7 @@ ns.AddInstance({
         {
             name = "Bruegal Ironknuckle",
             display = 2142,
+            npcs = { 1720 },
             pin = { 0.352, 0.239 },
             loot = {
                 { 2941, 33.33 },

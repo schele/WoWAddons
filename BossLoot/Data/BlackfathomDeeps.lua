@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Blackfathom Deeps",
     kind = "dungeon",
     levels = { 24, 32 },
+    mapID = 48,
     entrance = { 0.381, 0.014 },
     map = { cols = 186, rows = 162, runs = {
         1, 67, 8, 2, 67, 8, 3, 67, 8, 4, 67, 8, 5, 68, 6, 6, 81, 4, 7, 81, 4, 8, 81, 4, 9, 81, 4, 10, 81, 4,
@@ -64,6 +65,7 @@ ns.AddInstance({
         {
             name = "Ghamoo-ra",
             display = 5027,
+            npcs = { 4887 },
             pin = { 0.253, 0.416 },
             loot = {
                 { 6907, 50 },
@@ -73,6 +75,7 @@ ns.AddInstance({
         {
             name = "Lady Sarevess",
             display = 4979,
+            npcs = { 4831 },
             pin = { 0.012, 0.225 },
             loot = {
                 { 888, 33.33 },
@@ -83,6 +86,7 @@ ns.AddInstance({
         {
             name = "Gelihast",
             display = 1773,
+            npcs = { 6243 },
             pin = { 0.461, 0.375 },
             loot = {
                 { 6906, 50 },
@@ -93,6 +97,7 @@ ns.AddInstance({
         {
             name = "Lorgus Jett",
             display = 12822,
+            npcs = { 12902 },
             pin = { 0.523, 0.668 },
             loot = {
                 { 3416, 0.24 },
@@ -108,6 +113,7 @@ ns.AddInstance({
         {
             name = "Baron Aquanis",
             display = 110,
+            npcs = { 12876 },
             pin = { 0.607, 0.889 },
             loot = {
                 { 1481, 0.08 },
@@ -122,6 +128,7 @@ ns.AddInstance({
         {
             name = "Twilight Lord Kelris",
             display = 4939,
+            npcs = { 4832 },
             pin = { 0.7, 0.942 },
             loot = {
                 { 1155, 50 },
@@ -131,6 +138,7 @@ ns.AddInstance({
         {
             name = "Old Serra'kis",
             display = 1816,
+            npcs = { 4830 },
             pin = { 0.717, 0.842 },
             loot = {
                 { 6901, 33.33 },
@@ -141,6 +149,7 @@ ns.AddInstance({
         {
             name = "Aku'mai",
             display = 2837,
+            npcs = { 4829 },
             pin = { 0.988, 0.984 },
             loot = {
                 { 6909, 33.33 },

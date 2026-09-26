@@ -297,3 +297,14 @@ test('marks where the instance is entered', () => {
   assert.ok(instance.entrance, 'has an entrance');
   assert.ok(instance.entrance.x >= 0 && instance.entrance.x <= 1);
 });
+
+test("records the instance's map id and each boss's creatures and chests", () => {
+  const { db } = world();
+  const withChest = { ...def, bosses: ['Boss One', { name: 'Chest Boss', objects: ['Old Chest'] }] };
+  const { instance } = buildInstance(openDb(db), withChest);
+  assert.equal(instance.mapID, MAP);
+  assert.deepEqual(instance.bosses[0].npcs, [1]);
+  assert.equal(instance.bosses[0].objects, undefined);
+  assert.deepEqual(instance.bosses[1].objects, [50]);
+  assert.equal(instance.bosses[1].npcs, undefined);
+});

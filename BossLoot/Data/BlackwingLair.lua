@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Blackwing Lair",
     kind = "raid",
     levels = { 60, 60 },
+    mapID = 469,
     entrance = { 0.701, 0.849 },
     map = { cols = 90, rows = 89, runs = {
         1, 29, 9, 2, 29, 9, 3, 23, 15, 4, 23, 15, 4, 52, 4, 5, 17, 21, 5, 52, 4, 6, 14, 31, 6, 52, 4, 7, 14, 20,
@@ -31,6 +32,7 @@ ns.AddInstance({
         {
             name = "Razorgore the Untamed",
             display = 10115,
+            npcs = { 12435 },
             pin = { 0.648, 0.567 },
             loot = {
                 { 19336, 20 },
@@ -53,6 +55,7 @@ ns.AddInstance({
         {
             name = "Vaelastrasz the Corrupt",
             display = 13992,
+            npcs = { 13020 },
             pin = { 0.448, 0.32 },
             loot = {
                 { 19339, 20 },
@@ -75,6 +78,7 @@ ns.AddInstance({
         {
             name = "Broodlord Lashlayer",
             display = 14308,
+            npcs = { 12017 },
             pin = { 0.501, 0.573 },
             loot = {
                 { 19341, 20 },
@@ -97,6 +101,7 @@ ns.AddInstance({
         {
             name = "Firemaw",
             display = 6377,
+            npcs = { 11983 },
             pin = { 0.258, 0.137 },
             loot = {
                 { 19343, 12.5 },
@@ -127,6 +132,7 @@ ns.AddInstance({
         {
             name = "Ebonroc",
             display = 6377,
+            npcs = { 14601 },
             pin = { 0.367, 0.028 },
             loot = {
                 { 19345, 18 },
@@ -155,6 +161,7 @@ ns.AddInstance({
         {
             name = "Flamegor",
             display = 6377,
+            npcs = { 11981 },
             pin = { 0.467, 0.113 },
             loot = {
                 { 19430, 20 },
@@ -183,6 +190,7 @@ ns.AddInstance({
         {
             name = "Chromaggus",
             display = 14367,
+            npcs = { 14020 },
             pin = { 0.482, 0.414 },
             loot = {
                 { 19385, 20 },
@@ -212,6 +220,7 @@ ns.AddInstance({
         {
             name = "Nefarian",
             display = 11380,
+            npcs = { 11583 },
             pin = { 0.964, 0.613 },
             loot = {
                 { 19002, 100 },

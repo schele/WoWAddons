@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Blackrock Spire",
     kind = "dungeon",
     levels = { 55, 60 },
+    mapID = 229,
     entrance = { 0.026, 0.348 },
     map = { cols = 95, rows = 111, runs = {
         1, 8, 6, 1, 18, 13, 1, 42, 14, 2, 8, 25, 2, 42, 14, 3, 8, 25, 3, 42, 14, 4, 14, 19, 4, 42, 15, 5, 14, 19,
@@ -44,6 +45,7 @@ ns.AddInstance({
             name = "Highlord Omokk",
             wing = "Lower",
             display = 11565,
+            npcs = { 9196 },
             pin = { 0.218, 0.575 },
             loot = {
                 { 13166, 16.67 },
@@ -62,6 +64,7 @@ ns.AddInstance({
             name = "Shadow Hunter Vosh'gajin",
             wing = "Lower",
             display = 9732,
+            npcs = { 9236 },
             pin = { 0.698, 0.797 },
             loot = {
                 { 12654, 100 },
@@ -79,6 +82,7 @@ ns.AddInstance({
             name = "War Master Voone",
             wing = "Lower",
             display = 9733,
+            npcs = { 9237 },
             pin = { 0.638, 0.563 },
             loot = {
                 { 13173, 100 },
@@ -96,6 +100,7 @@ ns.AddInstance({
             name = "Mother Smolderweb",
             wing = "Lower",
             display = 9929,
+            npcs = { 10596 },
             pin = { 0.918, 0.83 },
             loot = {
                 { 13183, 25 },
@@ -108,6 +113,7 @@ ns.AddInstance({
             name = "Urok Doomhowl",
             wing = "Lower",
             display = 11583,
+            npcs = { 10584 },
             loot = {
                 { 13178, 25 },
                 { 13258, 25 },
@@ -122,6 +128,7 @@ ns.AddInstance({
             name = "Quartermaster Zigris",
             wing = "Lower",
             display = 9738,
+            npcs = { 9736 },
             pin = { 0.637, 0.973 },
             loot = {
                 { 13252, 15 },
@@ -144,6 +151,7 @@ ns.AddInstance({
             name = "Halycon",
             wing = "Lower",
             display = 9567,
+            npcs = { 10220 },
             pin = { 0.319, 0.961 },
             loot = {
                 { 13210, 25 },
@@ -156,6 +164,7 @@ ns.AddInstance({
             name = "Gizrul the Slavener",
             wing = "Lower",
             display = 9564,
+            npcs = { 10268 },
             pin = { 0.319, 0.961 },
             loot = {
                 { 13205, 25 },
@@ -168,6 +177,7 @@ ns.AddInstance({
             name = "Overlord Wyrmthalak",
             wing = "Lower",
             display = 8711,
+            npcs = { 9568 },
             pin = { 0.709, 0.575 },
             loot = {
                 { 13143, 2 },
@@ -186,6 +196,7 @@ ns.AddInstance({
             name = "Pyroguard Emberseer",
             wing = "Upper",
             display = 2172,
+            npcs = { 9816 },
             pin = { 0.108, 0.199 },
             loot = {
                 { 12905, 20 },
@@ -200,6 +211,7 @@ ns.AddInstance({
             name = "Solakar Flamewreath",
             wing = "Upper",
             display = 9581,
+            npcs = { 10264 },
             pin = { 0.291, 0.271 },
             loot = {
                 { 12589, 20 },
@@ -214,6 +226,7 @@ ns.AddInstance({
             name = "Goraluk Anvilcrack",
             wing = "Upper",
             display = 10222,
+            npcs = { 10899 },
             pin = { 0.068, 0.192 },
             loot = {
                 { 12728, 14.29 },
@@ -230,6 +243,7 @@ ns.AddInstance({
             name = "Warchief Rend Blackhand",
             wing = "Upper",
             display = 9778,
+            npcs = { 10429 },
             pin = { 0.597, 0.166 },
             loot = {
                 { 12590, 1 },
@@ -250,6 +264,7 @@ ns.AddInstance({
             name = "Gyth",
             wing = "Upper",
             display = 9806,
+            npcs = { 10339 },
             pin = { 0.597, 0.166 },
             loot = {
                 { 12871, 4 },
@@ -265,6 +280,7 @@ ns.AddInstance({
             name = "The Beast",
             wing = "Upper",
             display = 10193,
+            npcs = { 10430 },
             pin = { 0.913, 0.245 },
             loot = {
                 { 24101, 13 },
@@ -285,6 +301,7 @@ ns.AddInstance({
             name = "General Drakkisath",
             wing = "Upper",
             display = 10115,
+            npcs = { 10363 },
             pin = { 0.182, 0.442 },
             loot = {
                 { 12592, 1 },

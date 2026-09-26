@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Temple of Ahn'Qiraj",
     kind = "raid",
     levels = { 60, 60 },
+    mapID = 531,
     entrance = { 0.15, 0.244 },
     map = { cols = 173, rows = 200, runs = {
         1, 103, 23, 2, 100, 27, 3, 98, 33, 4, 97, 35, 5, 97, 35, 6, 97, 15, 6, 115, 17, 7, 91, 20, 7, 120, 17, 8, 91, 16,
@@ -66,6 +67,7 @@ ns.AddInstance({
         {
             name = "The Prophet Skeram",
             display = 15345,
+            npcs = { 15263 },
             pin = { 0.092, 0.338 },
             loot = {
                 { 21698, 18 },
@@ -97,6 +99,7 @@ ns.AddInstance({
         {
             name = "Bug Trio",
             display = 15656,
+            npcs = { 15511, 15543, 15544 },
             pin = { 0.009, 0.503 },
             loot = {
                 { 21603, 25 },
@@ -133,6 +136,7 @@ ns.AddInstance({
         {
             name = "Battleguard Sartura",
             display = 15583,
+            npcs = { 15516 },
             pin = { 0.466, 0.33 },
             loot = {
                 { 21648, 18 },
@@ -163,6 +167,7 @@ ns.AddInstance({
         {
             name = "Fankriss the Unyielding",
             display = 15743,
+            npcs = { 15510 },
             pin = { 0.858, 0.142 },
             loot = {
                 { 21651, 18 },
@@ -193,6 +198,7 @@ ns.AddInstance({
         {
             name = "Viscidus",
             display = 15686,
+            npcs = { 15299 },
             pin = { 0.986, 0.078 },
             loot = {
                 { 20928, 100 },
@@ -219,6 +225,7 @@ ns.AddInstance({
         {
             name = "Princess Huhuran",
             display = 15739,
+            npcs = { 15509 },
             pin = { 0.397, 0.468 },
             loot = {
                 { 20928, 100 },
@@ -244,6 +251,7 @@ ns.AddInstance({
         {
             name = "Twin Emperors",
             display = 15778,
+            npcs = { 15276, 15275 },
             pin = { 0.85, 0.729 },
             loot = {
                 { 20926, 100 },
@@ -271,6 +279,7 @@ ns.AddInstance({
         {
             name = "Ouro",
             display = 15509,
+            npcs = { 15517 },
             pin = { 0.083, 0.969 },
             loot = {
                 { 20927, 100 },
@@ -296,6 +305,7 @@ ns.AddInstance({
         {
             name = "C'Thun",
             display = 15787,
+            npcs = { 15727 },
             pin = { 0.174, 0.512 },
             loot = {
                 { 20929, 100 },

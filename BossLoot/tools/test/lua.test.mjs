@@ -62,3 +62,14 @@ test('the items file hands every item to ns.AddItems: name, quality, class, subc
   assert.match(text, /\[9387\] = \{ "Revelosh's Boots", 2, 4, 4, 8 \},/);
   assert.match(text, /\[11684\] = \{ "Ironfoe", 4, 2, 4, 21 \},/);
 });
+
+test("writes the map id, and each boss's creatures and chests", () => {
+  const text = instanceFile({
+    key: 'Test', name: 'Test Depths', kind: 'dungeon', levels: [52, 60], mapID: 230,
+    bosses: [{ name: 'Boss One', npcs: [1, 2], loot: [] }, { name: 'Chest', objects: [50], loot: [] }],
+    notable: { trash: [], objects: [] },
+  });
+  assert.match(text, /mapID = 230,/);
+  assert.match(text, /npcs = \{ 1, 2 \},/);
+  assert.match(text, /objects = \{ 50 \},/);
+});

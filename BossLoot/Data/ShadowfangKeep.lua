@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Shadowfang Keep",
     kind = "dungeon",
     levels = { 22, 30 },
+    mapID = 33,
     entrance = { 0.872, 0.594 },
     map = { cols = 64, rows = 68, runs = {
         1, 41, 9, 2, 41, 9, 3, 41, 9, 4, 42, 11, 5, 42, 11, 6, 42, 11, 7, 42, 11, 8, 40, 13, 9, 39, 14, 10, 39, 14,
@@ -21,6 +22,7 @@ ns.AddInstance({
         {
             name = "Rethilgore",
             display = 524,
+            npcs = { 3914 },
             pin = { 0.832, 0.686 },
             loot = {
                 { 5254, 100 },
@@ -29,6 +31,7 @@ ns.AddInstance({
         {
             name = "Razorclaw the Butcher",
             display = 524,
+            npcs = { 3886 },
             pin = { 0.299, 0.499 },
             loot = {
                 { 1292, 33.33 },
@@ -39,6 +42,7 @@ ns.AddInstance({
         {
             name = "Baron Silverlaine",
             display = 3222,
+            npcs = { 3887 },
             pin = { 0.145, 0.767 },
             loot = {
                 { 6321, 50 },
@@ -48,6 +52,7 @@ ns.AddInstance({
         {
             name = "Commander Springvale",
             display = 3223,
+            npcs = { 4278 },
             pin = { 0.294, 0.573 },
             loot = {
                 { 6320, 50 },
@@ -57,6 +62,7 @@ ns.AddInstance({
         {
             name = "Odo the Blindwatcher",
             display = 522,
+            npcs = { 4279 },
             pin = { 0.736, 0.625 },
             loot = {
                 { 6318, 50 },
@@ -66,6 +72,7 @@ ns.AddInstance({
         {
             name = "Fenrus the Devourer",
             display = 2352,
+            npcs = { 4274 },
             pin = { 0.648, 0.253 },
             loot = {
                 { 3230, 50 },
@@ -75,6 +82,7 @@ ns.AddInstance({
         {
             name = "Wolf Master Nandos",
             display = 11179,
+            npcs = { 3927 },
             pin = { 0.674, 0.198 },
             loot = {
                 { 3748, 50 },
@@ -84,6 +92,7 @@ ns.AddInstance({
         {
             name = "Archmage Arugal",
             display = 2353,
+            npcs = { 4275 },
             pin = { 0.712, 0.037 },
             loot = {
                 { 6220, 33.33 },

@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Ragefire Chasm",
     kind = "dungeon",
     levels = { 13, 18 },
+    mapID = 389,
     entrance = { 0.739, 0.149 },
     map = { cols = 93, rows = 120, runs = {
         1, 43, 17, 2, 43, 17, 3, 43, 16, 4, 50, 9, 5, 51, 8, 6, 51, 8, 6, 62, 4, 7, 51, 4, 7, 62, 4, 8, 51, 4,
@@ -47,6 +48,7 @@ ns.AddInstance({
         {
             name = "Oggleflint",
             display = 11611,
+            npcs = { 11517 },
             pin = { 0.613, 0.458 },
             loot = {
                 { 3311, 0.07 },
@@ -55,6 +57,7 @@ ns.AddInstance({
         {
             name = "Taragaman the Hungerer",
             display = 7970,
+            npcs = { 11520 },
             pin = { 0.313, 0.661 },
             loot = {
                 { 14145, 33.33 },
@@ -65,6 +68,7 @@ ns.AddInstance({
         {
             name = "Jergosh the Invoker",
             display = 11429,
+            npcs = { 11518 },
             pin = { 0.154, 0.936 },
             loot = {
                 { 14147, 33.33 },
@@ -75,6 +79,7 @@ ns.AddInstance({
         {
             name = "Bazzalan",
             display = 2007,
+            npcs = { 11519 },
             pin = { 0.324, 0.953 },
             loot = {
                 { 3311, 0.21 },

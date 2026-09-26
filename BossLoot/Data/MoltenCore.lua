@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Molten Core",
     kind = "raid",
     levels = { 60, 60 },
+    mapID = 409,
     entrance = { 0.013, 0.18 },
     map = { cols = 187, rows = 161, runs = {
         1, 38, 19, 2, 38, 21, 3, 37, 8, 3, 48, 12, 4, 37, 7, 4, 48, 13, 5, 36, 6, 5, 48, 4, 5, 55, 7, 6, 35, 5,
@@ -87,6 +88,7 @@ ns.AddInstance({
         {
             name = "Lucifron",
             display = 13031,
+            npcs = { 12118 },
             pin = { 0.69, 0.285 },
             loot = {
                 { 16805, 30 },
@@ -122,6 +124,7 @@ ns.AddInstance({
         {
             name = "Magmadar",
             display = 10193,
+            npcs = { 11982 },
             pin = { 0.753, 0.098 },
             loot = {
                 { 16796, 20 },
@@ -163,6 +166,7 @@ ns.AddInstance({
         {
             name = "Gehennas",
             display = 13030,
+            npcs = { 12259 },
             pin = { 0.119, 0.481 },
             loot = {
                 { 16812, 25 },
@@ -196,6 +200,7 @@ ns.AddInstance({
         {
             name = "Garr",
             display = 12110,
+            npcs = { 12057 },
             pin = { 0.055, 0.802 },
             loot = {
                 { 18564, 3 },
@@ -239,6 +244,7 @@ ns.AddInstance({
         {
             name = "Shazzrah",
             display = 13032,
+            npcs = { 12264 },
             pin = { 0.458, 0.969 },
             loot = {
                 { 16801, 33.33 },
@@ -272,6 +278,7 @@ ns.AddInstance({
         {
             name = "Baron Geddon",
             display = 12129,
+            npcs = { 12056 },
             pin = { 0.467, 0.922 },
             loot = {
                 { 18563, 3 },
@@ -308,6 +315,7 @@ ns.AddInstance({
         {
             name = "Golemagg the Incinerator",
             display = 11986,
+            npcs = { 11988 },
             pin = { 0.724, 0.644 },
             loot = {
                 { 16798, 25 },
@@ -350,6 +358,7 @@ ns.AddInstance({
         {
             name = "Sulfuron Harbinger",
             display = 13030,
+            npcs = { 12098 },
             pin = { 0.965, 0.942 },
             loot = {
                 { 16816, 33.33 },
@@ -372,6 +381,8 @@ ns.AddInstance({
         {
             name = "Majordomo Executus",
             display = 12029,
+            npcs = { 12018 },
+            objects = { 179703 },
             pin = { 0.968, 0.7 },
             loot = {
                 { 18646, 50 },
@@ -391,6 +402,7 @@ ns.AddInstance({
         {
             name = "Ragnaros",
             display = 11121,
+            npcs = { 11502 },
             pin = { 0.498, 0.573 },
             loot = {
                 { 17204, 3 },

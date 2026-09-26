@@ -6,6 +6,7 @@ ns.AddInstance({
     name = "Scarlet Monastery",
     kind = "dungeon",
     levels = { 26, 45 },
+    mapID = 189,
     entrance = { 0.556, 0.357 },
     map = { cols = 78, rows = 84, runs = {
         1, 71, 6, 2, 71, 6, 3, 67, 10, 4, 67, 10, 5, 67, 10, 6, 67, 10, 7, 67, 9, 8, 67, 9, 9, 67, 9, 10, 69, 7,
@@ -29,6 +30,7 @@ ns.AddInstance({
             name = "Interrogator Vishas",
             wing = "Graveyard",
             display = 2044,
+            npcs = { 3983 },
             pin = { 0.457, 0.234 },
             loot = {
                 { 7682, 50 },
@@ -39,6 +41,7 @@ ns.AddInstance({
             name = "Bloodmage Thalnos",
             wing = "Graveyard",
             display = 11396,
+            npcs = { 4543 },
             pin = { 0.066, 0.192 },
             loot = {
                 { 7685, 50 },
@@ -49,6 +52,7 @@ ns.AddInstance({
             name = "Houndmaster Loksey",
             wing = "Library",
             display = 2040,
+            npcs = { 3974 },
             pin = { 0.743, 0.754 },
             loot = {
                 { 7710, 33.33 },
@@ -60,6 +64,7 @@ ns.AddInstance({
             name = "Arcanist Doan",
             wing = "Library",
             display = 5266,
+            npcs = { 6487 },
             pin = { 0.967, 0.719 },
             loot = {
                 { 7713, 25 },
@@ -72,6 +77,7 @@ ns.AddInstance({
             name = "Herod",
             wing = "Armory",
             display = 2041,
+            npcs = { 3975 },
             pin = { 0.971, 0.012 },
             loot = {
                 { 7717, 25 },
@@ -84,6 +90,7 @@ ns.AddInstance({
             name = "High Inquisitor Fairbanks",
             wing = "Cathedral",
             display = 2605,
+            npcs = { 4542 },
             pin = { 0.149, 0.536 },
             loot = {
                 { 19507, 33.33 },
@@ -95,6 +102,7 @@ ns.AddInstance({
             name = "Scarlet Commander Mograine",
             wing = "Cathedral",
             display = 2042,
+            npcs = { 3976 },
             pin = { 0.091, 0.543 },
             loot = {
                 { 7723, 25 },
@@ -107,6 +115,7 @@ ns.AddInstance({
             name = "High Inquisitor Whitemane",
             wing = "Cathedral",
             display = 2043,
+            npcs = { 3977 },
             pin = { 0.09, 0.483 },
             loot = {
                 { 7720, 33.33 },
