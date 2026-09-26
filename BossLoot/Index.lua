@@ -26,6 +26,11 @@ local function add(itemID, instanceKey, boss)
         sources[itemID] = {}
         table.insert(allItems, itemID)
     end
+    for _, place in ipairs(sources[itemID]) do
+        if place.instance == instanceKey and place.boss == boss then
+            return
+        end
+    end
     table.insert(sources[itemID], { instance = instanceKey, boss = boss })
 
     local list = itemsByInstance[instanceKey]
@@ -42,13 +47,20 @@ function Index.Build()
         itemsByInstance[instance.key] = { seen = {} }
 
         for bossIndex, boss in ipairs(instance.bosses) do
+            for _, entry in ipairs(boss.recorded or {}) do
+                add(entry[1], instance.key, bossIndex)
+            end
             for _, entry in ipairs(boss.loot) do
                 add(entry[1], instance.key, bossIndex)
             end
         end
 
         local notable = instance.notable or {}
+        local recordedNotable = instance.recordedNotable or {}
         for _, which in ipairs({ "trash", "objects" }) do
+            for _, entry in ipairs(recordedNotable[which] or {}) do
+                add(entry[1], instance.key, which)
+            end
             for _, entry in ipairs(notable[which] or {}) do
                 add(entry[1], instance.key, which)
             end
@@ -84,8 +96,13 @@ function Index.Instances(kind)
         end
     end
 
+    -- Known instances by level; recorded ones, which have no level range,
+    -- after them by name.
     table.sort(list, function(a, b)
-        if a.levels[1] ~= b.levels[1] then
+        if (a.levels == nil) ~= (b.levels == nil) then
+            return a.levels ~= nil
+        end
+        if a.levels and a.levels[1] ~= b.levels[1] then
             return a.levels[1] < b.levels[1]
         end
         return a.name < b.name

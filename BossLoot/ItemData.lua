@@ -76,9 +76,28 @@ local function subclassName(class, subclass)
     return own or (SUBCLASS_NAMES[class] or {})[subclass]
 end
 
+--- The game's name for an item class (9 recipes, 13 keys, ...).
+function ItemData.ClassName(class)
+    return className(class)
+end
+
 --- What the addon knows about an item, in the shape LootRow.ItemInfo gives,
 -- with `builtIn` set; nil for an item it does not know.
 function ItemData.Get(itemID)
+    -- Recorded in WoW Forever: the real item, over a vanilla one of the same id.
+    local recorded = ns.Recordings and ns.Recordings.Item(itemID)
+    if recorded then
+        local name, quality = recorded[1], recorded[2] or 1
+        return {
+            name = name,
+            quality = quality,
+            link = "|cff" .. ns.Format.QualityHex(quality) .. "|Hitem:" .. itemID .. "|h[" .. name .. "]|h|r",
+            itemType = recorded[3],
+            itemSubType = recorded[4],
+            equipLoc = recorded[5] or "",
+            builtIn = true,
+        }
+    end
     local entry = ns.builtInItems[itemID]
     if not entry then
         return nil
