@@ -1,0 +1,85 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { resolveLoot, inPatch } from '../lib/loot.mjs';
+
+// A loot row with the defaults vMaNGOS uses for an ordinary drop.
+const row = (item, chance, extra = {}) => ({
+  item, ChanceOrQuestChance: chance, groupid: 0, mincountOrRef: 1,
+  condition_id: 0, patch_min: 0, patch_max: 10, ...extra,
+});
+
+// fetch() over a plain object: { 'table:entry': [rows] }.
+const fetcher = (tables) => (table, entry) => tables[`${table}:${entry}`] ?? [];
+
+test('a plain row drops with its own chance', () => {
+  const fetch = fetcher({ 'creature_loot_template:1': [row(100, 25)] });
+  assert.deepEqual([...resolveLoot(fetch, 'creature_loot_template', 1)], [[100, 25]]);
+});
+
+test('grouped rows with chance 0 share what the explicit ones leave', () => {
+  // Emperor Thaurissan's first group: Ironfoe at 1%, five more sharing 99%.
+  const fetch = fetcher({
+    'creature_loot_template:1': [
+      row(11684, 1, { groupid: 1 }),
+      ...[11815, 11930, 11931, 11933, 22204].map((id) => row(id, 0, { groupid: 1 })),
+    ],
+  });
+  const loot = resolveLoot(fetch, 'creature_loot_template', 1);
+  assert.equal(loot.get(11684), 1);
+  assert.equal(loot.get(11815), 19.8);
+});
+
+test('a reference multiplies its items by its own chance', () => {
+  const fetch = fetcher({
+    'creature_loot_template:1': [row(0, 50, { mincountOrRef: -500 })],
+    'reference_loot_template:500': [row(200, 10), row(201, 0, { groupid: 1 }), row(202, 0, { groupid: 1 })],
+  });
+  const loot = resolveLoot(fetch, 'creature_loot_template', 1);
+  assert.equal(loot.get(200), 5);
+  assert.equal(loot.get(201), 25);
+  assert.equal(loot.get(202), 25);
+});
+
+test('a skipped reference contributes nothing', () => {
+  const fetch = fetcher({
+    'creature_loot_template:1': [row(0, 100, { mincountOrRef: -500 }), row(300, 10)],
+    'reference_loot_template:500': [row(200, 10)],
+  });
+  const loot = resolveLoot(fetch, 'creature_loot_template', 1, { skipRef: (ref) => ref === 500 });
+  assert.deepEqual([...loot.keys()], [300]);
+});
+
+test('quest-only and conditional rows are left out', () => {
+  const fetch = fetcher({
+    'creature_loot_template:1': [row(100, -80), row(101, 100, { condition_id: 110 }), row(102, 5)],
+  });
+  assert.deepEqual([...resolveLoot(fetch, 'creature_loot_template', 1).keys()], [102]);
+});
+
+test('rows outside the target patch are left out', () => {
+  const fetch = fetcher({
+    'creature_loot_template:1': [row(100, 5, { patch_max: 7 }), row(101, 5, { patch_min: 8 })],
+  });
+  assert.deepEqual([...resolveLoot(fetch, 'creature_loot_template', 1).keys()], [101]);
+});
+
+test('an item reachable twice keeps its best chance', () => {
+  const fetch = fetcher({
+    'creature_loot_template:1': [row(100, 5), row(0, 100, { mincountOrRef: -500 })],
+    'reference_loot_template:500': [row(100, 30)],
+  });
+  assert.equal(resolveLoot(fetch, 'creature_loot_template', 1).get(100), 30);
+});
+
+test('a reference that loops back on itself is followed once', () => {
+  const fetch = fetcher({
+    'creature_loot_template:1': [row(0, 100, { mincountOrRef: -500 })],
+    'reference_loot_template:500': [row(0, 100, { mincountOrRef: -500 }), row(100, 10)],
+  });
+  assert.equal(resolveLoot(fetch, 'creature_loot_template', 1).get(100), 10);
+});
+
+test('inPatch is inclusive at both ends', () => {
+  assert.equal(inPatch({ patch_min: 10, patch_max: 10 }), true);
+  assert.equal(inPatch({ patch_min: 0, patch_max: 9 }), false);
+});
