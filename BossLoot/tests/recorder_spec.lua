@@ -145,3 +145,93 @@ describe("recording loot", function()
         assertEqual(id, later.db.recorded.recorder)
     end)
 end)
+
+describe("recording quests, merchants and crafts", function()
+    it("records a quest's rewards and choices, with its title and the faction", function()
+        local ns, env = helpers.loggedIn()
+        function env.GetQuestID() return 2279 end
+        function env.GetTitleText() return "Passing Word of a Threat" end
+        function env.UnitFactionGroup() return "Alliance" end
+        function env.GetNumQuestRewards() return 1 end
+        function env.GetNumQuestChoices() return 2 end
+        function env.GetQuestItemLink(kind, index)
+            if kind == "reward" then return "|Hitem:9587::|h[A]|h" end
+            return index == 1 and "|Hitem:9588::|h[B]|h" or "|Hitem:9589::|h[C]|h"
+        end
+        helpers.fire(env, "QUEST_DETAIL")
+        local quest = ns.db.recorded.quests[2279]
+        assertEqual("Passing Word of a Threat", quest.title)
+        assertEqual("Alliance", quest.faction)
+        assertEqual("9587", table.concat(quest.rewards, ","))
+        assertEqual("9588,9589", table.concat(quest.choices, ","))
+    end)
+
+    it("records what a merchant sells, and for how much", function()
+        local ns, env = helpers.loggedIn()
+        function env.UnitGUID(unit) return unit == "npc" and "Creature-0-3110-0-47-1234-0000AA" or nil end
+        function env.UnitName(unit) return unit == "npc" and "Brave Sword" or nil end
+        function env.GetRealZoneText() return "Ironforge" end
+        function env.GetMerchantNumItems() return 2 end
+        function env.GetMerchantItemLink(i) return i == 1 and "|Hitem:2901::|h[Mining Pick]|h" or nil end
+        function env.GetMerchantItemInfo(i) return "Mining Pick", 134400, 81 end
+        helpers.fire(env, "MERCHANT_SHOW")
+        local merchant = ns.db.recorded.merchants["npc:1234"]
+        assertEqual("Brave Sword", merchant.name)
+        assertEqual("Ironforge", merchant.zone)
+        assertEqual(81, merchant.items[2901].price)
+    end)
+
+    it("records what a profession's recipes make, leaving out the headings", function()
+        local ns, env = helpers.loggedIn()
+        function env.GetTradeSkillLine() return "Blacksmithing", 120, 150 end
+        function env.GetNumTradeSkills() return 2 end
+        function env.GetTradeSkillInfo(i) return i == 1 and "Armor" or "Copper Chain Belt", i == 1 and "header" or "easy" end
+        function env.GetTradeSkillItemLink(i) return i == 2 and "|Hitem:2851::|h[Copper Chain Belt]|h" or nil end
+        helpers.fire(env, "TRADE_SKILL_SHOW")
+        assertTrue(ns.db.recorded.crafts["Blacksmithing"][2851])
+    end)
+
+    it("records nothing, and does not fail, without the quest, merchant or profession calls", function()
+        local ns, env = helpers.loggedIn()
+        helpers.fire(env, "QUEST_DETAIL")
+        helpers.fire(env, "QUEST_COMPLETE")
+        helpers.fire(env, "MERCHANT_SHOW")
+        helpers.fire(env, "TRADE_SKILL_SHOW")
+        assertNil(next(ns.db.recorded.quests))
+        assertNil(next(ns.db.recorded.merchants))
+        assertNil(next(ns.db.recorded.crafts))
+    end)
+end)
+
+describe("the recorder's commands", function()
+    it("say which calls this client is missing", function()
+        local ns, env = helpers.loggedIn()
+        helpers.command(env, "probe")
+        assertMatch("GetLootSourceInfo", helpers.printed(env))
+        function env.GetNumLootItems() end
+        function env.GetLootSlotLink() end
+        function env.GetLootSlotInfo() end
+        function env.GetLootSourceInfo() end
+        function env.GetInstanceInfo() end
+        function env.UnitGUID() end
+        function env.GetQuestID() end
+        function env.GetQuestItemLink() end
+        function env.GetMerchantItemLink() end
+        function env.GetMerchantItemInfo() end
+        function env.GetTradeSkillLine() end
+        function env.GetTradeSkillItemLink() end
+        function env.GetItemStats() end
+        env.__printed = {}
+        helpers.command(env, "probe")
+        assertMatch("Everything the recorder needs", helpers.printed(env))
+    end)
+
+    it("count what has been recorded", function()
+        local ns, env = helpers.loggedIn()
+        looting(env, { withSources(BOOTS, REVELOSH, 1) }, { guid = REVELOSH, name = "Revelosh" })
+        helpers.fire(env, "LOOT_OPENED")
+        helpers.command(env, "recorded")
+        assertMatch("1 creatures and objects", helpers.printed(env))
+        assertMatch("1 items", helpers.printed(env))
+    end)
+end)

@@ -171,6 +171,131 @@ function Recorder.LootOpened()
     end
 end
 
+--- A quest window (QUEST_DETAIL, QUEST_COMPLETE): its fixed and choice
+-- reward items, its title, and the faction of the one who saw it.
+function Recorder.QuestShown()
+    if not (recorded() and GetQuestID and GetQuestItemLink) then
+        return
+    end
+    local questID = GetQuestID()
+    if not questID or questID == 0 then
+        return
+    end
+    local quests = recorded().quests
+    local quest = quests[questID] or {}
+    quest.title = GetTitleText and GetTitleText() or quest.title
+    quest.faction = UnitFactionGroup and UnitFactionGroup("player") or quest.faction
+    local function collect(kind, count)
+        local ids = {}
+        for index = 1, count do
+            local itemID = itemIDOf(GetQuestItemLink(kind, index))
+            if itemID then
+                table.insert(ids, itemID)
+                remember(itemID)
+            end
+        end
+        return ids
+    end
+    local rewards = collect("reward", GetNumQuestRewards and GetNumQuestRewards() or 0)
+    local choices = collect("choice", GetNumQuestChoices and GetNumQuestChoices() or 0)
+    if #rewards > 0 then quest.rewards = rewards end
+    if #choices > 0 then quest.choices = choices end
+    quests[questID] = quest
+end
+
+--- A merchant window (MERCHANT_SHOW): what it sells, and for how much.
+function Recorder.MerchantShown()
+    if not (recorded() and GetMerchantNumItems and GetMerchantItemLink and UnitGUID) then
+        return
+    end
+    local kind, id = Recorder.ParseGUID(UnitGUID("npc"))
+    if kind ~= "npc" then
+        return
+    end
+    local merchants = recorded().merchants
+    local key = "npc:" .. id
+    local merchant = merchants[key] or { items = {} }
+    merchant.name = UnitName and UnitName("npc") or merchant.name
+    merchant.zone = GetRealZoneText and GetRealZoneText() or merchant.zone
+    for index = 1, GetMerchantNumItems() do
+        local itemID = itemIDOf(GetMerchantItemLink(index))
+        if itemID then
+            local price = GetMerchantItemInfo and select(3, GetMerchantItemInfo(index)) or nil
+            merchant.items[itemID] = { price = price }
+            remember(itemID)
+        end
+    end
+    merchants[key] = merchant
+end
+
+--- A profession window (TRADE_SKILL_SHOW, TRADE_SKILL_UPDATE): what each of
+-- its recipes makes.
+function Recorder.TradeSkillShown()
+    if not (recorded() and GetTradeSkillLine and GetNumTradeSkills and GetTradeSkillInfo and GetTradeSkillItemLink) then
+        return
+    end
+    local profession = GetTradeSkillLine()
+    if not profession or profession == "UNKNOWN" then
+        return
+    end
+    local crafts = recorded().crafts
+    local made = crafts[profession] or {}
+    for index = 1, GetNumTradeSkills() do
+        local _, skillType = GetTradeSkillInfo(index)
+        if skillType ~= "header" then
+            local itemID = itemIDOf(GetTradeSkillItemLink(index))
+            if itemID then
+                made[itemID] = true
+                remember(itemID)
+            end
+        end
+    end
+    crafts[profession] = made
+end
+
+--- How much the player has recorded.
+function Recorder.Counts()
+    local data = recorded()
+    local counts = { sources = 0, bosses = 0, items = 0, quests = 0, merchants = 0, professions = 0 }
+    for _, source in pairs(data.sources) do
+        counts.sources = counts.sources + 1
+        if source.encounter then counts.bosses = counts.bosses + 1 end
+    end
+    for _ in pairs(data.items) do counts.items = counts.items + 1 end
+    for _ in pairs(data.quests) do counts.quests = counts.quests + 1 end
+    for _ in pairs(data.merchants) do counts.merchants = counts.merchants + 1 end
+    for _ in pairs(data.crafts) do counts.professions = counts.professions + 1 end
+    return counts
+end
+
+-- The calls the recorder (and the gear finder after it) uses.
+local PROBED = {
+    "GetNumLootItems", "GetLootSlotLink", "GetLootSlotInfo", "GetLootSourceInfo", "GetInstanceInfo",
+    "UnitGUID", "GetQuestID", "GetQuestItemLink", "GetMerchantItemLink", "GetMerchantItemInfo",
+    "GetTradeSkillLine", "GetTradeSkillItemLink", "GetItemStats",
+}
+
+ns.RegisterCommand("probe", "Check this client has what the recorder needs", function()
+    local missing = {}
+    for _, name in ipairs(PROBED) do
+        if not (_G[name] or (C_Item and C_Item[name])) then
+            table.insert(missing, name)
+        end
+    end
+    if #missing == 0 then
+        ns.Print("Everything the recorder needs is here.")
+    else
+        ns.Print("This client is missing: " .. table.concat(missing, ", "))
+    end
+end)
+
+ns.RegisterCommand("recorded", "Show how much you have recorded", function()
+    local c = Recorder.Counts()
+    ns.Print(string.format(
+        "Recorded: %d creatures and objects (%d named bosses), %d items; %d quests, %d merchants, %d professions.",
+        c.sources, c.bosses, c.items, c.quests, c.merchants, c.professions))
+end)
+
 ns.OnLogin(function()
     local data = recorded()
     if not data.recorder then
@@ -182,6 +307,11 @@ end)
 local handlers = {
     LOOT_OPENED = function() Recorder.LootOpened() end,
     ENCOUNTER_END = function(_, name, _, _, success) Recorder.EncounterEnded(name, success) end,
+    QUEST_DETAIL = function() Recorder.QuestShown() end,
+    QUEST_COMPLETE = function() Recorder.QuestShown() end,
+    MERCHANT_SHOW = function() Recorder.MerchantShown() end,
+    TRADE_SKILL_SHOW = function() Recorder.TradeSkillShown() end,
+    TRADE_SKILL_UPDATE = function() Recorder.TradeSkillShown() end,
 }
 
 local events = CreateFrame("Frame")
