@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './lib/db.mjs';
-import { worldRefs } from './lib/world.mjs';
+import { worldLoot } from './lib/world.mjs';
 import { buildInstance } from './lib/instance.mjs';
 import { instanceFile, updateToc } from './lib/lua.mjs';
 
@@ -24,7 +24,7 @@ if (!dbPath) {
 
 const config = JSON.parse(readFileSync(join(here, 'instances.json'), 'utf8'));
 const db = openDb(dbPath);
-const world = worldRefs(db);
+const world = worldLoot(db);
 const cache = new Map();
 
 const dataDir = join(addon, 'Data');
@@ -40,7 +40,7 @@ for (const def of config.instances) {
     continue;
   }
 
-  const { instance, errors, warnings } = buildInstance(db, def, { worldRefs: world, cache });
+  const { instance, errors, warnings } = buildInstance(db, def, { world, cache });
   for (const warning of warnings) console.warn(`warn  ${warning}`);
   for (const error of errors) console.error(`error ${error}`);
   errorCount += errors.length;

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fixtureDb } from './fixture.mjs';
 import { openDb } from '../lib/db.mjs';
-import { worldRefs } from '../lib/world.mjs';
+import { worldLoot } from '../lib/world.mjs';
 import { buildInstance, bossDefs, keyFor } from '../lib/instance.mjs';
 
 const MAP = 230;
@@ -78,6 +78,16 @@ test('a boss summoned by script, never spawned, is still found by name', () => {
   assert.equal(instance.bosses[0].loot[0].id, 100);
 });
 
+test('a boss whose loot is all in a chest is not an error, spawned or not', () => {
+  // Majordomo Executus: summoned by script, no loot of his own, and his
+  // Cache of the Firelord holds it all.
+  const { db, add } = world();
+  add('creature_template', { entry: 5, name: 'Chest Boss', loot_id: 0 });
+  const { instance, errors } = buildInstance(openDb(db), { ...def, bosses: [{ name: 'Chest Boss', objects: ['Old Chest'] }] });
+  assert.deepEqual(errors, []);
+  assert.equal(instance.bosses[0].loot[0].id, 104);
+});
+
 test('a reference shared across four maps is a world drop and is left out', () => {
   const { db, add } = world();
   add('creature_loot_template', { entry: 1, item: 0, ChanceOrQuestChance: 100, mincountOrRef: -900 });
@@ -89,10 +99,62 @@ test('a reference shared across four maps is a world drop and is left out', () =
     add('creature_loot_template', { entry, item: 0, ChanceOrQuestChance: 100, mincountOrRef: -900 });
   }
   const dbx = openDb(db);
-  const refs = worldRefs(dbx);
-  assert.deepEqual([...refs], [900]);
-  const { instance } = buildInstance(dbx, def, { worldRefs: refs });
+  const found = worldLoot(dbx);
+  assert.deepEqual([...found.refs], [900]);
+  const { instance } = buildInstance(dbx, def, { world: found });
   assert.ok(!instance.bosses[0].loot.some((e) => e.id === 105));
+});
+
+test('an item copied straight into mobs on both continents is a world drop', () => {
+  // vMaNGOS writes the generic world loot directly into some rare mobs'
+  // tables (Oggleflint's gems and recipes), so no shared table gives it away.
+  const { db, add } = world();
+  add('creature_loot_template', { entry: 1, item: 105, ChanceOrQuestChance: 1 });
+  for (const [entry, map] of [[10, 0], [11, 1]]) {
+    add('creature_template', { entry, name: `Mob ${entry}`, loot_id: entry });
+    add('creature', { id: entry, map });
+    add('creature_loot_template', { entry, item: 105, ChanceOrQuestChance: 1 });
+  }
+  const dbx = openDb(db);
+  const found = worldLoot(dbx);
+  assert.ok(found.items.has(105));
+  const { instance } = buildInstance(dbx, def, { world: found });
+  assert.ok(!instance.bosses[0].loot.some((e) => e.id === 105));
+});
+
+test('rows gated only on faction are kept; other conditions are not', () => {
+  const { db, add } = world();
+  add('conditions', { condition_entry: 2, type: 6, value1: 67 });
+  add('conditions', { condition_entry: 110, type: 12, value1: 2 });
+  add('creature_loot_template', { entry: 1, item: 104, ChanceOrQuestChance: 30, condition_id: 2 });
+  add('creature_loot_template', { entry: 1, item: 105, ChanceOrQuestChance: 30, condition_id: 110 });
+  const { instance } = buildInstance(openDb(db), def);
+  const ids = instance.bosses[0].loot.map((e) => e.id);
+  assert.ok(ids.includes(104), 'faction row kept');
+  assert.ok(!ids.includes(105), 'holiday row left out');
+});
+
+test('a reference used on both continents is a world drop, however few maps', () => {
+  // Low-level world recipes and gems: shared by mobs in Eastern Kingdoms,
+  // Kalimdor and one instance, which is only three maps.
+  const { db, add } = world();
+  add('creature_loot_template', { entry: 1, item: 0, ChanceOrQuestChance: 100, mincountOrRef: -901 });
+  for (const [entry, map] of [[10, 0], [11, 1]]) {
+    add('creature_template', { entry, name: `Mob ${entry}`, loot_id: entry });
+    add('creature', { id: entry, map });
+    add('creature_loot_template', { entry, item: 0, ChanceOrQuestChance: 100, mincountOrRef: -901 });
+  }
+  assert.deepEqual([...worldLoot(openDb(db)).refs], [901]);
+});
+
+test('a reference shared by an instance and one continent is not a world drop', () => {
+  // Ruins of Ahn'Qiraj shares tables with Silithus, in Kalimdor.
+  const { db, add } = world();
+  add('creature_loot_template', { entry: 1, item: 0, ChanceOrQuestChance: 100, mincountOrRef: -902 });
+  add('creature_template', { entry: 11, name: 'Silithus Mob', loot_id: 11 });
+  add('creature', { id: 11, map: 1 });
+  add('creature_loot_template', { entry: 11, item: 0, ChanceOrQuestChance: 100, mincountOrRef: -902 });
+  assert.deepEqual([...worldLoot(openDb(db)).refs], []);
 });
 
 test('spawns and templates outside the target patch are ignored', () => {

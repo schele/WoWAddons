@@ -17,6 +17,7 @@ export function fixtureDb() {
     create table creature_loot_template (${LOOT_COLUMNS});
     create table reference_loot_template (${LOOT_COLUMNS});
     create table gameobject_loot_template (${LOOT_COLUMNS});
+    create table conditions (condition_entry int, type int, value1 int default 0);
   `);
 
   const add = (table, row) => {

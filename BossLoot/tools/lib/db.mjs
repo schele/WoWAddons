@@ -42,16 +42,22 @@ export function openDb(source) {
       return new Set(prepare(`select distinct id from gameobject where map = ? and ${SPAWNED}`).all(map).map((r) => r.id));
     },
 
-    // Every (reference, map) pair where a creature spawned on the map uses the
-    // reference directly in its own loot table.
-    refMaps() {
-      return prepare(`
-        select distinct -l.mincountOrRef as ref, c.map as map
-        from creature_loot_template l
-        join creature_template ct on ct.loot_id = l.entry
-        join creature c on c.id = ct.entry
-        where l.mincountOrRef < 0 and c.patch_min <= ${P} and ${P} <= c.patch_max
-      `).all();
+    // The raw material for spotting world drops (see world.mjs): where every
+    // creature is spawned, which loot table each uses, and what every loot
+    // and reference table holds, in force at the target patch.
+    spawns: () => prepare(`select id, id2, id3, id4, id5, map from creature where ${SPAWNED}`).all(),
+    creatureLootIds: () => latest('creature_template', 't.loot_id > 0'),
+    lootLinks: (table) => prepare(`select entry, item, mincountOrRef from ${table} where ${SPAWNED}`).all(),
+
+    // Conditions that only ask which faction the looter is on. Every player
+    // is on one, and the rows gated on them lead to the same items (Onyxia's
+    // tier 2 helms come as a Horde row and an Alliance row).
+    factionConditions() {
+      try {
+        return new Set(prepare('select condition_entry from conditions where type = 6').all().map((r) => r.condition_entry));
+      } catch {
+        return new Set();
+      }
     },
   };
 }

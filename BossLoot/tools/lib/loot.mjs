@@ -52,15 +52,18 @@ function rowChances(rows) {
  * items' chances are scaled by the reference row's own chance. An item
  * reachable more than one way keeps its best chance.
  *
- * Quest-only rows (negative chance) and conditional rows (holiday items,
- * quest-state drops) are left out: neither is loot a player can plan for.
+ * Quest-only rows (negative chance) are left out, and so are conditional rows
+ * (holiday items, quest-state drops) unless allowCondition(id) says the
+ * condition is one every player meets one way or another -- a faction.
  */
 export function resolveLoot(fetch, table, entry, options = {}, scale = 100, seen = new Set()) {
-  const { skipRef = () => false } = options;
+  const { skipRef = () => false, allowCondition = () => false } = options;
   const loot = new Map();
 
   const rows = fetch(table, entry).filter(
-    (row) => inPatch(row) && row.condition_id === 0 && row.ChanceOrQuestChance >= 0,
+    (row) => inPatch(row)
+      && (row.condition_id === 0 || allowCondition(row.condition_id))
+      && row.ChanceOrQuestChance >= 0,
   );
 
   for (const [row, percent] of rowChances(rows)) {

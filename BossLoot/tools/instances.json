@@ -1,10 +1,43 @@
 {
   "instances": [
-    {
-      "name": "Blackrock Depths", "map": 230, "kind": "dungeon", "levels": [52, 60],
+    { "name": "Ragefire Chasm", "map": 389, "kind": "dungeon", "levels": [13, 18],
+      "bosses": ["Oggleflint", "Taragaman the Hungerer", "Jergosh the Invoker", "Bazzalan"] },
+    { "name": "Wailing Caverns", "map": 43, "kind": "dungeon", "levels": [17, 24],
+      "bosses": ["Lady Anacondra", "Lord Cobrahn", "Kresh", "Lord Pythas", "Skum", "Lord Serpentis", "Verdan the Everliving", "Mutanus the Devourer"] },
+    { "name": "The Deadmines", "map": 36, "kind": "dungeon", "levels": [17, 26],
+      "bosses": ["Rhahk'Zor", "Sneed's Shredder", "Sneed", "Gilnid", "Mr. Smite", "Captain Greenskin", "Edwin VanCleef", "Cookie"] },
+    { "name": "Shadowfang Keep", "map": 33, "kind": "dungeon", "levels": [22, 30],
+      "bosses": ["Rethilgore", "Razorclaw the Butcher", "Baron Silverlaine", "Commander Springvale", "Odo the Blindwatcher", "Fenrus the Devourer", "Wolf Master Nandos", "Archmage Arugal"] },
+    { "name": "Blackfathom Deeps", "map": 48, "kind": "dungeon", "levels": [24, 32],
+      "bosses": ["Ghamoo-ra", "Lady Sarevess", "Gelihast", "Lorgus Jett", "Baron Aquanis", "Twilight Lord Kelris", "Old Serra'kis", "Aku'mai"] },
+    { "name": "The Stockade", "map": 34, "kind": "dungeon", "levels": [24, 31],
+      "bosses": ["Targorr the Dread", "Kam Deepfury", "Hamhock", "Bazil Thredd", "Dextren Ward", "Bruegal Ironknuckle"] },
+    { "name": "Gnomeregan", "map": 90, "kind": "dungeon", "levels": [29, 38],
+      "bosses": ["Grubbis", "Viscous Fallout", "Electrocutioner 6000", "Crowd Pummeler 9-60", "Dark Iron Ambassador", "Mekgineer Thermaplugg"] },
+    { "name": "Razorfen Kraul", "map": 47, "kind": "dungeon", "levels": [29, 38],
+      "bosses": ["Roogug", "Aggem Thorncurse", "Death Speaker Jargba", "Overlord Ramtusk", "Agathelos the Raging", "Charlga Razorflank"] },
+    { "name": "Scarlet Monastery", "map": 189, "kind": "dungeon", "levels": [26, 45],
+      "wings": [
+        { "name": "Graveyard", "bosses": ["Interrogator Vishas", "Bloodmage Thalnos"] },
+        { "name": "Library", "bosses": ["Houndmaster Loksey", "Arcanist Doan"] },
+        { "name": "Armory", "bosses": ["Herod"] },
+        { "name": "Cathedral", "bosses": ["High Inquisitor Fairbanks", "Scarlet Commander Mograine", "High Inquisitor Whitemane"] }
+      ] },
+    { "name": "Razorfen Downs", "map": 129, "kind": "dungeon", "levels": [37, 46],
+      "bosses": ["Tuten'kash", "Plaguemaw the Rotting", "Mordresh Fire Eye", "Glutton", "Amnennar the Coldbringer"] },
+    { "name": "Uldaman", "map": 70, "kind": "dungeon", "levels": [41, 51],
+      "bosses": ["Revelosh", { "name": "The Lost Dwarves", "creatures": ["Baelog", "Eric \"The Swift\"", "Olaf"] }, "Ironaya", "Obsidian Sentinel", "Ancient Stone Keeper", "Galgann Firehammer", "Grimlok", "Archaedas"] },
+    { "name": "Zul'Farrak", "map": 209, "kind": "dungeon", "levels": [44, 54],
+      "bosses": ["Antu'sul", "Theka the Martyr", "Witch Doctor Zum'rah", "Nekrum Gutchewer", "Shadowpriest Sezz'ziz", "Sergeant Bly", "Hydromancer Velratha", "Gahz'rilla", "Chief Ukorz Sandscalp", "Ruuzlu"] },
+    { "name": "Maraudon", "map": 349, "kind": "dungeon", "levels": [46, 55],
+      "bosses": ["Noxxion", "Razorlash", "Lord Vyletongue", "Celebras the Cursed", "Landslide", "Tinkerer Gizlock", "Rotgrip", "Princess Theradras"] },
+    { "name": "The Temple of Atal'Hakkar", "map": 109, "kind": "dungeon", "levels": [50, 56],
+      "bosses": ["Atal'alarion", "Dreamscythe", "Weaver", "Jammal'an the Prophet", "Ogom the Wretched", "Morphaz", "Hazzas", "Shade of Eranikus", "Avatar of Hakkar"] },
+    { "name": "Blackrock Depths", "map": 230, "kind": "dungeon", "levels": [52, 60],
       "bosses": [
         "Lord Roccor",
         "High Interrogator Gerstahn",
+        "Houndmaster Grebmar",
         { "name": "Ring of Law", "creatures": ["Anub'shiah", "Eviscerator", "Gorosh the Dervish", "Grizzle", "Hedrum the Creeper", "Ok'thor the Breaker"], "objects": ["Arena Spoils"] },
         "Pyromancer Loregrain",
         "Lord Incendius",
@@ -21,7 +54,53 @@
         { "name": "The Seven", "creatures": ["Anger'rel", "Seeth'rel", "Dope'rel", "Gloom'rel", "Vile'rel", "Hate'rel", "Doom'rel"], "objects": ["Chest of The Seven"] },
         "Magmus",
         "Emperor Dagran Thaurissan"
-      ]
-    }
+      ] },
+    { "name": "Blackrock Spire", "map": 229, "kind": "dungeon", "levels": [55, 60],
+      "wings": [
+        { "name": "Lower", "bosses": ["Highlord Omokk", "Shadow Hunter Vosh'gajin", "War Master Voone", "Mother Smolderweb", "Urok Doomhowl", "Quartermaster Zigris", "Halycon", "Gizrul the Slavener", "Overlord Wyrmthalak"] },
+        { "name": "Upper", "bosses": ["Pyroguard Emberseer", "Solakar Flamewreath", "Goraluk Anvilcrack", "Warchief Rend Blackhand", "Gyth", "The Beast", "General Drakkisath"] }
+      ] },
+    { "name": "Dire Maul", "map": 429, "kind": "dungeon", "levels": [55, 60],
+      "wings": [
+        { "name": "East", "bosses": ["Pusillin", "Zevrim Thornhoof", "Hydrospawn", "Lethtendris", "Alzzin the Wildshaper"] },
+        { "name": "West", "bosses": ["Tendris Warpwood", "Illyanna Ravenoak", "Magister Kalendris", "Immol'thar", "Prince Tortheldrin"] },
+        { "name": "North", "bosses": ["Guard Mol'dar", "Stomper Kreeg", "Guard Fengus", "Guard Slip'kik", "Captain Kromcrush", { "name": "King Gordok", "objects": ["Gordok Tribute"] }] }
+      ] },
+    { "name": "Scholomance", "map": 289, "kind": "dungeon", "levels": [58, 60],
+      "bosses": ["Kirtonos the Herald", "Jandice Barov", "Rattlegore", "Marduk Blackpool", "Vectus", "Ras Frostwhisper", "Instructor Malicia", "Doctor Theolen Krastinov", "Lorekeeper Polkelt", "The Ravenian", "Lord Alexei Barov", "Lady Illucia Barov", "Darkmaster Gandling"] },
+    { "name": "Stratholme", "map": 329, "kind": "dungeon", "levels": [58, 60],
+      "wings": [
+        { "name": "Live", "bosses": ["The Unforgiven", "Timmy the Cruel", "Malor the Zealous", "Cannon Master Willey", "Archivist Galford", "Balnazzar"] },
+        { "name": "Undead", "bosses": ["Magistrate Barthilas", "Nerub'enkan", "Baroness Anastari", "Maleki the Pallid", "Ramstein the Gorger", "Baron Rivendare"] }
+      ] },
+
+    { "name": "Zul'Gurub", "map": 309, "kind": "raid", "levels": [60, 60],
+      "bosses": ["High Priestess Jeklik", "High Priest Venoxis", "High Priestess Mar'li", "Bloodlord Mandokir",
+        { "name": "Edge of Madness", "creatures": ["Gri'lek", "Hazza'rah", "Renataki", "Wushoolay"] },
+        "Gahz'ranka", "High Priest Thekal", "High Priestess Arlokk", "Jin'do the Hexxer", "Hakkar"] },
+    { "name": "Onyxia's Lair", "map": 249, "kind": "raid", "levels": [60, 60],
+      "bosses": ["Onyxia"] },
+    { "name": "Molten Core", "map": 409, "kind": "raid", "levels": [60, 60],
+      "bosses": ["Lucifron", "Magmadar", "Gehennas", "Garr", "Shazzrah", "Baron Geddon", "Golemagg the Incinerator", "Sulfuron Harbinger",
+        { "name": "Majordomo Executus", "objects": ["Cache of the Firelord"] }, "Ragnaros"] },
+    { "name": "Blackwing Lair", "map": 469, "kind": "raid", "levels": [60, 60],
+      "bosses": ["Razorgore the Untamed", "Vaelastrasz the Corrupt", "Broodlord Lashlayer", "Firemaw", "Ebonroc", "Flamegor", "Chromaggus", "Nefarian"] },
+    { "name": "Ruins of Ahn'Qiraj", "map": 509, "kind": "raid", "levels": [60, 60],
+      "bosses": ["Kurinnaxx", "General Rajaxx", "Moam", "Buru the Gorger", "Ayamiss the Hunter", "Ossirian the Unscarred"] },
+    { "name": "Temple of Ahn'Qiraj", "map": 531, "kind": "raid", "levels": [60, 60],
+      "bosses": ["The Prophet Skeram",
+        { "name": "Bug Trio", "creatures": ["Lord Kri", "Princess Yauj", "Vem"] },
+        "Battleguard Sartura", "Fankriss the Unyielding", "Viscidus", "Princess Huhuran",
+        { "name": "Twin Emperors", "creatures": ["Emperor Vek'lor", "Emperor Vek'nilash"] },
+        "Ouro", "C'Thun"] },
+    { "name": "Naxxramas", "map": 533, "kind": "raid", "levels": [60, 60],
+      "wings": [
+        { "name": "Arachnid", "bosses": ["Anub'Rekhan", "Grand Widow Faerlina", "Maexxna"] },
+        { "name": "Plague", "bosses": ["Noth the Plaguebringer", "Heigan the Unclean", "Loatheb"] },
+        { "name": "Military", "bosses": ["Instructor Razuvious", "Gothik the Harvester",
+          { "name": "The Four Horsemen", "creatures": ["Thane Korth'azz", "Lady Blaumeux", "Highlord Mograine", "Sir Zeliek"], "objects": ["Four Horsemen Chest"] }] },
+        { "name": "Construct", "bosses": ["Patchwerk", "Grobbulus", "Gluth", "Thaddius"] },
+        { "name": "Frostwyrm Lair", "bosses": ["Sapphiron", "Kel'Thuzad"] }
+      ] }
   ]
 }

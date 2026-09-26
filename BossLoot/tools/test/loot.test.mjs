@@ -56,6 +56,15 @@ test('quest-only and conditional rows are left out', () => {
   assert.deepEqual([...resolveLoot(fetch, 'creature_loot_template', 1).keys()], [102]);
 });
 
+test('a conditional row is kept when the caller allows its condition', () => {
+  // Onyxia's tier 2 helms: one row per faction, each gated on the faction.
+  const fetch = fetcher({
+    'creature_loot_template:1': [row(100, 50, { condition_id: 2 }), row(101, 50, { condition_id: 110 })],
+  });
+  const loot = resolveLoot(fetch, 'creature_loot_template', 1, { allowCondition: (id) => id === 2 });
+  assert.deepEqual([...loot.keys()], [100]);
+});
+
 test('rows outside the target patch are left out', () => {
   const fetch = fetcher({
     'creature_loot_template:1': [row(100, 5, { patch_max: 7 }), row(101, 5, { patch_min: 8 })],

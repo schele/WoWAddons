@@ -34,16 +34,26 @@ export function bossDefs(def) {
 
 // Prefer the templates spawned on this map: a name can belong to several
 // creatures (event versions, look-alikes elsewhere). A boss a script
-// summons is never spawned, so fall back to any template with loot.
+// summons is never spawned, so fall back to the templates with loot, and
+// failing that to every template of the name -- a boss whose loot is all in
+// a chest (Majordomo Executus) has none of its own. Only a name the
+// database does not have at all comes back empty.
 function pick(candidates, spawned, hasLoot) {
   const onMap = candidates.filter((c) => spawned.has(c.entry));
-  return onMap.length ? onMap : candidates.filter(hasLoot);
+  if (onMap.length) return onMap;
+  const withLoot = candidates.filter(hasLoot);
+  return withLoot.length ? withLoot : candidates;
 }
 
-export function buildInstance(db, def, { worldRefs = new Set(), cache = new Map() } = {}) {
+const NO_WORLD = { refs: new Set(), items: new Set() };
+
+export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } = {}) {
   const errors = [];
   const warnings = [];
-  const skipRef = (ref) => worldRefs.has(ref);
+  const skipRef = (ref) => world.refs.has(ref);
+  const factions = db.factionConditions();
+  const allowCondition = (id) => factions.has(id);
+  const isWorldItem = (id) => world.items.has(id);
 
   const items = new Map();
   const itemOf = (id) => {
@@ -54,7 +64,7 @@ export function buildInstance(db, def, { worldRefs = new Set(), cache = new Map(
   // The same loot table is shared by many trash mobs; resolve each once.
   const loot = (table, entry) => {
     const key = `${table}:${entry}`;
-    if (!cache.has(key)) cache.set(key, resolveLoot(db.lootRows, table, entry, { skipRef }));
+    if (!cache.has(key)) cache.set(key, resolveLoot(db.lootRows, table, entry, { skipRef, allowCondition }));
     return cache.get(key);
   };
 
@@ -94,7 +104,7 @@ export function buildInstance(db, def, { worldRefs = new Set(), cache = new Map(
     }
 
     const entries = [...found]
-      .filter(([id]) => keepForBoss(itemOf(id)))
+      .filter(([id]) => keepForBoss(itemOf(id)) && !isWorldItem(id))
       .map(([id, chance]) => ({ id, chance }));
     if (!entries.length) warnings.push(`${def.name}: ${boss.name} has no loot`);
 
@@ -119,7 +129,7 @@ export function buildInstance(db, def, { worldRefs = new Set(), cache = new Map(
     const byItem = new Map();
     for (const source of sources) {
       for (const [id, chance] of loot(source.table, source.entry)) {
-        if (chance < NOTABLE_MIN_CHANCE || !isNotable(itemOf(id))) continue;
+        if (chance < NOTABLE_MIN_CHANCE || !isNotable(itemOf(id)) || isWorldItem(id)) continue;
         if (!byItem.has(id)) byItem.set(id, { id, chance: 0, sources: new Map() });
         const entry = byItem.get(id);
         entry.chance = Math.max(entry.chance, chance);

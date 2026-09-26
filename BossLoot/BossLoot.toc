@@ -8,7 +8,32 @@
 BossLoot.lua
 Format.lua
 # BEGIN GENERATED DATA
+Data\RagefireChasm.lua
+Data\WailingCaverns.lua
+Data\TheDeadmines.lua
+Data\ShadowfangKeep.lua
+Data\BlackfathomDeeps.lua
+Data\TheStockade.lua
+Data\Gnomeregan.lua
+Data\RazorfenKraul.lua
+Data\ScarletMonastery.lua
+Data\RazorfenDowns.lua
+Data\Uldaman.lua
+Data\ZulFarrak.lua
+Data\Maraudon.lua
+Data\TheTempleOfAtalHakkar.lua
 Data\BlackrockDepths.lua
+Data\BlackrockSpire.lua
+Data\DireMaul.lua
+Data\Scholomance.lua
+Data\Stratholme.lua
+Data\ZulGurub.lua
+Data\OnyxiasLair.lua
+Data\MoltenCore.lua
+Data\BlackwingLair.lua
+Data\RuinsOfAhnQiraj.lua
+Data\TempleOfAhnQiraj.lua
+Data\Naxxramas.lua
 # END GENERATED DATA
 Index.lua
 List.lua
