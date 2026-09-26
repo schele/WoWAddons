@@ -120,3 +120,40 @@ describe("saving the bank", function()
         assertMatch("No saved bank for nobody", helpers.printed(env))
     end)
 end)
+
+describe("which containers are the bank bags", function()
+    -- The ids saved, with every container from -1 to 13 holding one slot.
+    local function savedIds(setup)
+        local ns, env = helpers.loggedIn(function(e)
+            setup(e)
+            local containers = { [-1] = { false } }
+            for id = 0, 13 do containers[id] = { false } end
+            helpers.bank(e, containers, {})
+        end)
+        helpers.fire(env, "BANKFRAME_OPENED")
+        local ids = {}
+        for _, container in ipairs(ns.db.characters["Stormwind-Carl"].containers) do
+            table.insert(ids, container.id)
+        end
+        return table.concat(ids, ",")
+    end
+
+    it("follows the game's own bag count: bags 5 to 10 on Classic", function()
+        assertEqual("-1,5,6,7,8,9,10", savedIds(function(e)
+            e.NUM_BAG_SLOTS, e.NUM_BANKBAGSLOTS = 4, 6
+        end))
+    end)
+
+    it("counts a reagent bag when the client has one: bags 6 to 12", function()
+        assertEqual("-1,6,7,8,9,10,11,12", savedIds(function(e)
+            e.NUM_BAG_SLOTS, e.NUM_TOTAL_EQUIPPED_BAG_SLOTS, e.NUM_BANKBAGSLOTS = 4, 5, 7
+        end))
+    end)
+
+    it("is not thrown off by a bag enum laid out for another client", function()
+        assertEqual("-1,5,6,7,8,9,10", savedIds(function(e)
+            e.NUM_BAG_SLOTS, e.NUM_BANKBAGSLOTS = 4, 6
+            e.Enum = { BagIndex = { Bank = -1, BankBag_1 = 6 } }
+        end))
+    end)
+end)

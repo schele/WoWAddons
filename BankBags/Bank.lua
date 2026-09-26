@@ -13,11 +13,12 @@ ns.AddDefaults({
     characters = {},
 })
 
--- The containers: the main bank, then the bank bags, from the client's own
--- numbers where it has them.
-local BagIndex = Enum and Enum.BagIndex or {}
-local MAIN = BagIndex.Bank or BANK_CONTAINER or -1
-local FIRST_BAG = BagIndex.BankBag_1 or ((NUM_BAG_SLOTS or 4) + 1)
+-- The containers, numbered as the game's own bank frame numbers them: the
+-- main bank, then the bank bags after every bag the character wears (a
+-- reagent bag too, on clients that have one). Not from Enum.BagIndex: on a
+-- client whose enum is laid out for another, it would skip a bank bag.
+local MAIN = BANK_CONTAINER or -1
+local FIRST_BAG = (NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4) + 1
 local LAST_BAG = FIRST_BAG + (NUM_BANKBAGSLOTS or 6) - 1
 local SAVE_DELAY = 0.3 -- seconds of changes gathered into one save
 
