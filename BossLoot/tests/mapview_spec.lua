@@ -374,3 +374,81 @@ describe("a pin's number", function()
         assertTrue(gap >= 26 * ns.MapView.BALL / 2, "but clear of the ball")
     end)
 end)
+
+describe("bosses on one spot", function()
+    -- The Ring of Law: three fights where the arena is, and a boss apart.
+    local arena = {
+        name = "Arena", map = { cols = 3, rows = 3, runs = { 0, 0, 3, 1, 0, 3, 2, 0, 3 } },
+        bosses = {
+            { name = "Apart", pin = { 0.2, 0.2 }, loot = {} },
+            { name = "Fight One", pin = { 0.5, 0.4 }, loot = {} },
+            { name = "Fight Two", pin = { 0.5, 0.4 }, loot = {} },
+            { name = "Fight Three", pin = { 0.5, 0.4 }, loot = {} },
+        },
+        notable = { trash = {}, objects = {} },
+    }
+
+    local function big(env, ns)
+        return ns.MapView.Create(env.UIParent, 300, 300, { labels = true, pinSize = 26 })
+    end
+
+    it("line up in a column from the spot, each with its own pin and name", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = big(env, ns)
+        ns.MapView.Show(view, arena)
+        local one, two, three = view.pins[2], view.pins[3], view.pins[4]
+        assertEqual("2", one.text:GetText())
+        assertEqual("4", three.text:GetText())
+        assertTrue(math.abs(one.x - 150) < 1e-9 and math.abs(one.y - 120) < 1e-9, "the first where they stand")
+        assertEqual(one.x, three.x, "the rest under it")
+        assertTrue(two.y - one.y >= 26 * ns.MapView.BALL, "a ball apart, at least")
+        assertTrue(math.abs((two.y - one.y) - (three.y - two.y)) < 1e-9, "evenly")
+        for index = 2, 4 do
+            local _, _, _, _, labelY = view.labels[index]:GetPoint(1)
+            assertEqual(-view.pins[index].y, labelY, "each name beside its own pin")
+        end
+    end)
+
+    it("leave a boss that stands apart where it is", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = big(env, ns)
+        ns.MapView.Show(view, arena)
+        assertTrue(math.abs(view.pins[1].x - 60) < 1e-9 and math.abs(view.pins[1].y - 60) < 1e-9)
+    end)
+
+    it("line up upwards at the bottom of the map, to stay on it", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local low = {
+            name = "Low", map = arena.map,
+            bosses = { { name = "One", pin = { 0.5, 1 }, loot = {} }, { name = "Two", pin = { 0.5, 1 }, loot = {} } },
+        }
+        local view = big(env, ns)
+        ns.MapView.Show(view, low)
+        assertTrue(view.pins[2].y < view.pins[1].y)
+    end)
+
+    it("show one pin on the small map, the picked boss's if it is one of them", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = ns.MapView.Create(env.UIParent, 150, 84)
+        ns.MapView.Show(view, arena, 3)
+        assertEqual(2, view.pinCount)
+        assertEqual("3", view.pins[2].text:GetText())
+        ns.MapView.Show(view, arena, 1)
+        assertEqual("2", view.pins[2].text:GetText(), "the first, when none of them is picked")
+    end)
+
+    it("part as the map zooms in, when they are only close", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local close = {
+            name = "Close", map = arena.map,
+            bosses = { { name = "One", pin = { 0.5, 0.5 }, loot = {} }, { name = "Two", pin = { 0.52, 0.5 }, loot = {} } },
+        }
+        local view = ns.MapView.Create(env.UIParent, 300, 300, { labels = true, pinSize = 26, zoom = true })
+        view.left, view.top = 0, 300
+        env.__cursorX, env.__cursorY = 150, 150
+        ns.MapView.Show(view, close)
+        assertEqual(view.pins[1].x, view.pins[2].x, "in a column at first")
+        for _ = 1, 30 do view.scripts.OnMouseWheel(view, 1) end
+        assertTrue(view.pins[2].x > view.pins[1].x, "side by side, as they stand, zoomed in")
+    end)
+end)

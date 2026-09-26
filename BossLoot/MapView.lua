@@ -419,6 +419,57 @@ local function hideAll(pool)
     end
 end
 
+-- Bosses on one spot -- the Ring of Law's six fights and its chest -- would
+-- be one pin on top of another. With names shown they line up in a column
+-- from the spot, the first where they stand, each with its own pin and name;
+-- upwards, near the bottom, to stay on the map. Without names, the spot
+-- shows one pin: the picked boss's, if it is one of them. "One spot" is
+-- where balls would touch, so bosses only close together part as the map
+-- zooms in.
+local function gather(view, spots, selected, bottom)
+    local ball = (view.options.pinSize or 18) * MapView.BALL
+    local groups = {}
+    for _, spot in ipairs(spots) do
+        local joined = false
+        for _, group in ipairs(groups) do
+            local first = group[1]
+            if math.abs(first.x - spot.x) < ball and math.abs(first.y - spot.y) < ball then
+                table.insert(group, spot)
+                joined = true
+                break
+            end
+        end
+        if not joined then
+            table.insert(groups, { spot })
+        end
+    end
+
+    local gathered = {}
+    local step = ball + 3
+    for _, group in ipairs(groups) do
+        local first = group[1]
+        if #group == 1 then
+            table.insert(gathered, first)
+        elseif view.options.labels then
+            local direction = (first.y + (#group - 1) * step > bottom - ball) and -1 or 1
+            for k, spot in ipairs(group) do
+                spot.x, spot.y = first.x, first.y + (k - 1) * step * direction
+                spot.fraction, spot.stacked = first.fraction, true
+                table.insert(gathered, spot)
+            end
+        else
+            local shown = first
+            for _, spot in ipairs(group) do
+                if spot.boss == selected then
+                    shown = spot
+                end
+            end
+            table.insert(gathered, shown)
+        end
+    end
+    return gathered
+end
+
 -- Whether a label at (x0..x1, y) would sit on one already placed.
 local function collides(placed, x0, x1, y)
     for _, other in ipairs(placed) do
@@ -431,14 +482,24 @@ end
 
 -- Each pinned boss's name beside its pin: on the right, or on the left near
 -- the right edge, nudged down a line at a time off any name already there.
--- The picked boss's name is gold, on a dark tag.
+-- Names in a column of bosses on one spot are placed first, and stay beside
+-- their pins. The picked boss's name is gold, on a dark tag.
 local function drawLabels(view, placedPins, selected)
+    local order = {}
+    for index, spot in ipairs(placedPins) do
+        if spot.stacked then table.insert(order, index) end
+    end
+    for index, spot in ipairs(placedPins) do
+        if not spot.stacked then table.insert(order, index) end
+    end
+
     local canvas = view.canvas
     local placed = {}
     -- From the pin's middle to where its name starts: just past the ball.
     local half = (view.options.pinSize or 18) * MapView.BALL / 2 + 4
     view.tag:Hide()
-    for index, spot in ipairs(placedPins) do
+    for _, index in ipairs(order) do
+        local spot = placedPins[index]
         local text = label(view, index)
         text:SetText(spot.name)
         local width = text.GetStringWidth and text:GetStringWidth() or #spot.name * 6
@@ -446,7 +507,7 @@ local function drawLabels(view, placedPins, selected)
         local x0 = onLeft and (spot.x - half - width) or (spot.x + half)
         local y = spot.y
         for _ = 1, 6 do
-            if not collides(placed, x0, x0 + width, y) then
+            if spot.stacked or not collides(placed, x0, x0 + width, y) then
                 break
             end
             y = y + LABEL_HEIGHT
@@ -541,22 +602,26 @@ function MapView.Show(view, instance, selected)
         end
     end
 
-    local placedPins = {}
+    local spots = {}
     for bossIndex, boss in ipairs(instance.bosses or {}) do
         if boss.pin then
             local x, y = place(boss.pin)
-            local button = pin(view, #placedPins + 1)
-            button.boss = bossIndex
-            button.name = boss.name
-            button.selected = bossIndex == selected
-            button.x, button.y = x, y
-            button.text:SetText(tostring(bossIndex))
-            button.ring:SetShown(button.selected)
-            button:ClearAllPoints()
-            button:SetPoint("CENTER", canvas, "TOPLEFT", x, -y)
-            button:Show()
-            table.insert(placedPins, { boss = bossIndex, name = boss.name, x = x, y = y, fraction = boss.pin[1] })
+            table.insert(spots, { boss = bossIndex, name = boss.name, x = x, y = y, fraction = boss.pin[1] })
         end
+    end
+    local placedPins = gather(view, spots, selected, canvas:GetHeight())
+
+    for index, spot in ipairs(placedPins) do
+        local button = pin(view, index)
+        button.boss = spot.boss
+        button.name = spot.name
+        button.selected = spot.boss == selected
+        button.x, button.y = spot.x, spot.y
+        button.text:SetText(tostring(spot.boss))
+        button.ring:SetShown(button.selected)
+        button:ClearAllPoints()
+        button:SetPoint("CENTER", canvas, "TOPLEFT", spot.x, -spot.y)
+        button:Show()
     end
     view.pinCount = #placedPins
 
