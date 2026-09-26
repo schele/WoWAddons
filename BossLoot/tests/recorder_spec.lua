@@ -148,6 +148,31 @@ describe("recording loot", function()
         assertNil(temple.items[9387])
     end)
 
+    it("records nothing when a call fails partway, says so once, and records it on the next opening", function()
+        local ns, env = helpers.loggedIn()
+        looting(env, { withSources(BOOTS, REVELOSH, 1) })
+        function env.GetLootSlotInfo() error("secret value") end
+        helpers.fire(env, "LOOT_OPENED")
+        helpers.fire(env, "LOOT_OPENED")
+        assertNil(ns.db.recorded.sources["npc:6910@70"], "nothing half recorded")
+        local _, said = helpers.printed(env):gsub("could not read", "")
+        assertEqual(1, said, "said once")
+        looting(env, { withSources(BOOTS, REVELOSH, 1) })
+        helpers.fire(env, "LOOT_OPENED")
+        assertEqual(1, ns.db.recorded.sources["npc:6910@70"].kills)
+        assertEqual(1, ns.db.recorded.sources["npc:6910@70"].items[9387])
+    end)
+
+    it("records the loot without a name when the target cannot be read", function()
+        local ns, env = helpers.loggedIn()
+        looting(env, { withSources(BOOTS, REVELOSH, 1) }, { guid = REVELOSH, name = "Revelosh" })
+        function env.UnitGUID() error("secret value") end
+        helpers.fire(env, "LOOT_OPENED")
+        local source = ns.db.recorded.sources["npc:6910@70"]
+        assertEqual(1, source.kills)
+        assertNil(source.name)
+    end)
+
     it("does nothing, and does not fail, on a client without the loot calls", function()
         local ns, env = helpers.loggedIn()
         helpers.fire(env, "LOOT_OPENED")

@@ -44,12 +44,15 @@ local function itemIDOf(link)
     return type(link) == "string" and tonumber(link:match("item:(%d+)")) or nil
 end
 
--- An item's name, quality and kind, as the game describes it; failing that,
--- the name and quality the loot window gave. Never a vanilla built-in copy:
--- those are what WoW Forever changed.
-local function remember(itemID, name, quality)
+-- An item's name, quality and kind, as the game describes it (`info`, looked
+-- up here unless given; false for none); failing that, the name and quality
+-- the loot window gave. Never a vanilla built-in copy: those are what WoW
+-- Forever changed.
+local function remember(itemID, name, quality, info)
     local items = recorded().items
-    local info = ns.LootRow.ItemInfo(itemID)
+    if info == nil then
+        info = ns.LootRow.ItemInfo(itemID)
+    end
     if info and not info.builtIn then
         items[itemID] = { info.name, info.quality, info.itemType, info.itemSubType, info.equipLoc }
     elseif not items[itemID] and name then
@@ -81,25 +84,32 @@ local function sourceFor(kind, id, where)
     return source
 end
 
--- Whether a corpse was looted before; remembers it if not.
+-- The corpses looted before, and marking one that now has been.
 local seenSet
-local function alreadySeen(guid)
-    local list = recorded().seen
+local function seenIndex()
     if not seenSet then
         seenSet = {}
-        for _, seen in ipairs(list) do
+        for _, seen in ipairs(recorded().seen) do
             seenSet[seen] = true
         end
     end
-    if seenSet[guid] then
-        return true
+    return seenSet
+end
+
+local function seenBefore(guid)
+    return seenIndex()[guid] == true
+end
+
+local function markSeen(guid)
+    local set, list = seenIndex(), recorded().seen
+    if set[guid] then
+        return
     end
-    seenSet[guid] = true
+    set[guid] = true
     table.insert(list, guid)
     if #list > SEEN_LIMIT then
-        seenSet[table.remove(list, 1)] = nil
+        set[table.remove(list, 1)] = nil
     end
-    return false
 end
 
 local lastEncounter
@@ -120,55 +130,76 @@ local function encounterFor(name)
 end
 
 local function targetName(guid)
-    if UnitGUID and UnitName and UnitGUID("target") == guid then
-        return UnitName("target")
+    if not (UnitGUID and UnitName) then
+        return nil
+    end
+    local isTarget = ns.Guarded(function() return UnitGUID("target") == guid end, false)
+    if isTarget then
+        return ns.Guarded(function() return UnitName("target") end, nil)
     end
     return nil
 end
 
 --- A loot window opened (LOOT_OPENED): each corpse or chest it holds loot
 -- from counts one kill or opening, the first time only, and its items once.
+-- Everything is asked of the client first and recorded after, so a call that
+-- fails partway leaves nothing half recorded: the loot is recorded when the
+-- corpse is next opened.
 function Recorder.LootOpened()
     if not (recorded() and GetNumLootItems and GetLootSlotLink and GetLootSourceInfo) then
         return
     end
     local where = whereNow()
-    local counted, skipped = {}, {}
-    local changed = false
+
+    local found, order, described = {}, {}, {}
     for slot = 1, GetNumLootItems() do
         local itemID = itemIDOf(GetLootSlotLink(slot))
+        if itemID and not described[itemID] then
+            local name, quality
+            if GetLootSlotInfo then
+                local _
+                _, name, _, _, quality = GetLootSlotInfo(slot)
+            end
+            described[itemID] = { name = name, quality = quality, info = ns.LootRow.ItemInfo(itemID) or false }
+        end
         local from = { GetLootSourceInfo(slot) }
         for k = 1, #from, 2 do
             local guid = from[k]
-            local source = counted[guid]
-            if not source and not skipped[guid] then
+            local entry = found[guid]
+            if entry == nil then
                 local kind, id = Recorder.ParseGUID(guid)
-                if kind and not alreadySeen(guid) then
-                    source = sourceFor(kind, id, where)
-                    source.kills = source.kills + 1
-                    local name = targetName(guid)
-                    if name then
-                        source.name = name
-                        source.encounter = encounterFor(name) or source.encounter
-                    end
-                    counted[guid] = source
-                    changed = true
+                if kind and not seenBefore(guid) then
+                    entry = { kind = kind, id = id, name = targetName(guid), items = {} }
+                    table.insert(order, guid)
                 else
-                    skipped[guid] = true
+                    entry = false
                 end
+                found[guid] = entry
             end
-            if source and itemID then
-                source.items[itemID] = (source.items[itemID] or 0) + 1
-                local name, quality
-                if GetLootSlotInfo then
-                    local _
-                    _, name, _, _, quality = GetLootSlotInfo(slot)
-                end
-                remember(itemID, name, quality)
+            if entry and itemID then
+                table.insert(entry.items, itemID)
             end
         end
     end
-    if changed then
+
+    for _, guid in ipairs(order) do
+        local entry = found[guid]
+        local source = sourceFor(entry.kind, entry.id, where)
+        source.kills = source.kills + 1
+        if entry.name then
+            source.name = entry.name
+            source.encounter = encounterFor(entry.name) or source.encounter
+        end
+        for _, itemID in ipairs(entry.items) do
+            source.items[itemID] = (source.items[itemID] or 0) + 1
+        end
+        markSeen(guid)
+    end
+    for itemID, item in pairs(described) do
+        remember(itemID, item.name, item.quality, item.info)
+    end
+
+    if #order > 0 then
         ns.Recordings.Changed()
     end
 end
@@ -320,10 +351,16 @@ local events = CreateFrame("Frame")
 for event in pairs(handlers) do
     pcall(events.RegisterEvent, events, event)
 end
+local reported = false
 events:SetScript("OnEvent", function(_, event, ...)
     local handler = handlers[event]
-    if handler then
-        handler(...)
+    if not handler then
+        return
+    end
+    local ok, problem = pcall(handler, ...)
+    if not ok and not reported then
+        reported = true
+        ns.Print("The loot recorder skipped something it could not read: " .. tostring(problem))
     end
 end)
 
