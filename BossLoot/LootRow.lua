@@ -63,6 +63,8 @@ local tries = {}         -- id -> times asked for
 local failed = {}        -- id -> true once an answer came back empty
 local tokens = BATCH
 local ticking = false
+-- What the queue has done this session, for the loading details.
+local counts = { asked = 0, answered = 0, empty = 0, noAnswer = 0 }
 
 local function now()
     return GetTime and GetTime() or 0
@@ -78,6 +80,7 @@ end
 local function send(itemID)
     tries[itemID] = (tries[itemID] or 0) + 1
     inFlight[itemID] = now()
+    counts.asked = counts.asked + 1
     if C_Item and C_Item.RequestLoadItemDataByID then
         C_Item.RequestLoadItemDataByID(itemID)
     elseif GetItemInfo then
@@ -127,6 +130,7 @@ function tick()
     for itemID, asked in pairs(inFlight) do
         if time - asked >= TIMEOUT then
             inFlight[itemID] = nil
+            counts.noAnswer = counts.noAnswer + 1
             if (tries[itemID] or 0) < MAX_TRIES then
                 enqueue(itemID)
             else
@@ -188,15 +192,31 @@ end
 function LootRow.Arrived(itemID, success)
     inFlight[itemID] = nil
     if success == false then
+        counts.empty = counts.empty + 1
         failed[itemID] = true
         if (tries[itemID] or 0) < MAX_TRIES then
             notBefore[itemID] = now() + RETRY_DELAY
             enqueue(itemID)
         end
     else
+        counts.answered = counts.answered + 1
         failed[itemID] = nil
         LootRow.ItemInfo(itemID)
     end
+end
+
+--- What the queue has done this session: requests `asked`, answers with the
+-- item (`answered`), empty answers, requests that timed out (`noAnswer`);
+-- and now, items `waiting` their turn and requests out (`asking`).
+function LootRow.Activity()
+    local asking = 0
+    for _ in pairs(inFlight) do
+        asking = asking + 1
+    end
+    return {
+        asked = counts.asked, answered = counts.answered, empty = counts.empty,
+        noAnswer = counts.noAnswer, waiting = #queue, asking = asking,
+    }
 end
 
 -- Given up on: every try came back empty or not at all.

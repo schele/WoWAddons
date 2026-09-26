@@ -236,3 +236,23 @@ describe("a long wait for items", function()
         assertEqual(16, asked, "and still asks for the next few")
     end)
 end)
+
+describe("what the queue is doing", function()
+    it("counts what it asked for and what came back", function()
+        local ns, env = helpers.loadAddon(FILES)
+        env.__now = 100
+        function env.GetTime() return env.__now end
+        for id = 5001, 5010 do ns.LootRow.RequestLoad(id) end
+        ns.LootRow.Arrived(5001, true)
+        ns.LootRow.Arrived(5002, false)
+        env.__now = 111
+        env.__runTimers()
+        local activity = ns.LootRow.Activity()
+        assertEqual(1, activity.answered)
+        assertEqual(1, activity.empty)
+        assertEqual(6, activity.noAnswer, "the rest of the first eight, left unanswered")
+        assertEqual(16, activity.asked, "the first eight, then eight more")
+        assertEqual(8, activity.asking)
+        assertEqual(1, activity.waiting)
+    end)
+end)

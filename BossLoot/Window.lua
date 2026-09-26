@@ -11,6 +11,8 @@ ns.AddDefaults({
     -- What the window last showed, so it reopens there.
     view = { kind = "dungeon", instance = "", boss = 1 },
     window = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 0 },
+    -- The item loading details under the window, for testing: /bl debug.
+    debug = false,
 })
 
 local WIDTH = 860
@@ -42,8 +44,7 @@ local MODEL_NEAREST, MODEL_FARTHEST = 0.3, 3
 local PROGRESS_WIDTH = PAGE_WIDTH - 36
 local PROGRESS_HEIGHT = 14
 local PROGRESS_POLL = 0.5 -- seconds between counts while items load
--- The bar for every item, over the boss column.
-local ALL_PROGRESS_LEFT = PADDING + RAIL_WIDTH + GAP
+local DEBUG_HEIGHT = 64 -- the loading details under the window
 local MORE_HEIGHT = 16
 -- While the big map covers the boss page, the boss list keeps this many rows
 -- and the loot moves into the space under them.
@@ -379,7 +380,7 @@ end
 local function updateProgress(bar)
     local status = ns.LootRow.Status(bar.itemIDs or {})
     bar.status = status
-    if status.total == 0 or status.loaded == status.total then
+    if status.total == 0 or (status.loaded == status.total and not bar.keepWhenDone) then
         bar:Hide()
         return
     end
@@ -416,6 +417,23 @@ local function describeAll(status)
         text = text .. " (" .. status.failed .. " failed)"
     end
     return text
+end
+
+-- The loading details' two lines: what the queue has done, and what it is
+-- doing, with how many items arrived a second since last counted.
+local function updateDetails(panel, elapsed)
+    panel.progress.itemIDs = everyItem()
+    updateProgress(panel.progress)
+
+    local activity = ns.LootRow.Activity()
+    panel.asked:SetText(string.format("Asked %d times: %d answered, %d empty, %d no answer",
+        activity.asked, activity.answered, activity.empty, activity.noAnswer))
+    if elapsed > 0 then
+        panel.rate = math.floor((activity.answered - panel.lastAnswered) / elapsed + 0.5)
+        panel.lastAnswered = activity.answered
+    end
+    panel.waiting:SetText(string.format("Waiting %d, asking now %d, %d %s a second",
+        activity.waiting, activity.asking, panel.rate, panel.rate == 1 and "item" or "items"))
 end
 
 local function progressTooltip(bar)
@@ -623,8 +641,9 @@ function Window.Refresh()
     drawModelView(instance, selection)
     frame.progress.itemIDs = instance and ns.Index.ItemIDs(instance.key) or {}
     updateProgress(frame.progress)
-    frame.allProgress.itemIDs = everyItem()
-    updateProgress(frame.allProgress)
+    if frame.debug:IsShown() then
+        updateDetails(frame.debug, 0)
+    end
     local pinned = type(selection) == "number" and selection or nil
     ns.MapView.Show(frame.inset, instance, pinned)
     if frame.fullMap:IsShown() then
@@ -688,6 +707,23 @@ local function createCloseButton(parent, onClick)
     return close
 end
 
+-- A window's dressing: opaque, whatever the backdrop does -- the dialog
+-- background is translucent by design, and may not load at all -- inside
+-- the dialog border.
+local function dress(target)
+    target.background = target:CreateTexture(nil, "BACKGROUND", nil, -8)
+    target.background:SetPoint("TOPLEFT", target, "TOPLEFT", 4, -4)
+    target.background:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT", -4, 4)
+    target.background:SetColorTexture(0.06, 0.045, 0.03, 1)
+    if target.SetBackdrop then
+        target:SetBackdrop({
+            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+            edgeSize = 32,
+            insets = { left = 11, right = 12, top = 12, bottom = 11 },
+        })
+    end
+end
+
 local function savePosition(self)
     self:StopMovingOrSizing()
     local point, _, relativePoint, x, y = self:GetPoint(1)
@@ -741,6 +777,37 @@ local function renderBoss(row, entry)
     setPortrait(row.portrait, entry.display, entry.icon)
     row.portrait:Show()
     row.number:SetText(entry.number and tostring(entry.number) or "")
+end
+
+-- The item loading details, for testing, under the window: a bar for every
+-- item, and what the queue is doing, counted twice a second. /bl debug.
+local function createDebugPanel(parent)
+    local panel = createFrame("Frame", nil, parent, "BackdropTemplate")
+    panel:SetSize(WIDTH, DEBUG_HEIGHT)
+    panel:SetPoint("TOPLEFT", parent, "BOTTOMLEFT", 0, 2)
+    dress(panel)
+
+    panel.progress = createProgress(panel, PADDING + 4, WIDTH - 2 * PADDING - 8, "Every item in BossLoot", describeAll)
+    panel.progress.keepWhenDone = true
+    panel.asked = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    panel.asked:SetPoint("TOPLEFT", panel.progress, "BOTTOMLEFT", 0, -6)
+    panel.waiting = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    panel.waiting:SetPoint("TOPLEFT", panel.progress, "BOTTOMLEFT", WIDTH / 2, -6)
+
+    panel.rate, panel.lastAnswered, panel.sinceCount = 0, 0, 0
+    panel:SetScript("OnShow", function(self)
+        self.rate, self.lastAnswered, self.sinceCount = 0, ns.LootRow.Activity().answered, 0
+        updateDetails(self, 0)
+    end)
+    panel:SetScript("OnUpdate", function(self, elapsed)
+        self.sinceCount = self.sinceCount + (elapsed or 0)
+        if self.sinceCount >= PROGRESS_POLL then
+            updateDetails(self, self.sinceCount)
+            self.sinceCount = 0
+        end
+    end)
+    panel:SetShown(ns.db.debug)
+    return panel
 end
 
 -- A boss's model that turns slowly by itself, and with the cursor when
@@ -801,17 +868,7 @@ local function createModelView(parent)
     view:SetClampedToScreen(true)
     view:EnableMouse(true)
 
-    view.background = view:CreateTexture(nil, "BACKGROUND", nil, -8)
-    view.background:SetPoint("TOPLEFT", view, "TOPLEFT", 4, -4)
-    view.background:SetPoint("BOTTOMRIGHT", view, "BOTTOMRIGHT", -4, 4)
-    view.background:SetColorTexture(0.06, 0.045, 0.03, 1)
-    if view.SetBackdrop then
-        view:SetBackdrop({
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            edgeSize = 32,
-            insets = { left = 11, right = 12, top = 12, bottom = 11 },
-        })
-    end
+    dress(view)
     local stageHeight = HEIGHT - TOP - PADDING - MODEL_HINT_HEIGHT
     panel(view, PADDING, TOP, MODEL_VIEW_WIDTH - 2 * PADDING, stageHeight, 0.12)
 
@@ -896,19 +953,7 @@ local function create()
     local saved = ns.db.window
     frame:SetPoint(saved.point, UIParent, saved.relativePoint, saved.x, saved.y)
 
-    -- Opaque, whatever the backdrop does: the dialog background is
-    -- translucent by design, and may not load at all.
-    frame.background = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
-    frame.background:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -4)
-    frame.background:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 4)
-    frame.background:SetColorTexture(0.06, 0.045, 0.03, 1)
-    if frame.SetBackdrop then
-        frame:SetBackdrop({
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            edgeSize = 32,
-            insets = { left = 11, right = 12, top = 12, bottom = 11 },
-        })
-    end
+    dress(frame)
 
     local columnHeight = HEIGHT - TOP - PADDING
     panel(frame, PADDING, TOP, RAIL_WIDTH, columnHeight, 0.035)
@@ -928,7 +973,8 @@ local function create()
     frame.close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
 
     frame.progress = createProgress(frame, PAGE_LEFT, PROGRESS_WIDTH, "Items in this instance", describeInstance)
-    frame.allProgress = createProgress(frame, ALL_PROGRESS_LEFT, BOSS_WIDTH, "Every item in BossLoot", describeAll)
+    frame.debug = createDebugPanel(frame)
+    frame.allProgress = frame.debug.progress
 
     -- The rail: search, tabs, instances.
     local search = createFrame("EditBox", nil, frame, "InputBoxTemplate")
@@ -1066,6 +1112,14 @@ function Window.Toggle()
 end
 
 ns.DefaultCommand = Window.Toggle
+
+ns.RegisterCommand("debug", "Show or hide the item loading details", function()
+    ns.db.debug = not ns.db.debug
+    if frame then
+        frame.debug:SetShown(ns.db.debug)
+    end
+    ns.Print(ns.db.debug and "Item loading details on." or "Item loading details off.")
+end)
 
 ns.RegisterCommand("unhide", "Bring back every instance you hid", function()
     for key in pairs(ns.db.hidden) do

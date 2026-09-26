@@ -820,10 +820,12 @@ end)
 describe("loading every item", function()
     -- The samples hold seven items: five in Test Depths, two in Low Spire,
     -- and the raid's one is also Test Depths' first.
+    -- With the loading details on, where the bar for every item is.
     local function opened(loaded)
         local ns, env = helpers.loggedIn()
         for _, id in ipairs(loaded or {}) do env.__items[id] = { name = "Item " .. id, quality = 2 } end
         ns.Window.Open()
+        helpers.command(env, "debug")
         return ns, env, ns.Window.Frame().allProgress
     end
 
@@ -843,12 +845,13 @@ describe("loading every item", function()
         assertEqual(bar:GetWidth() * 2 / 7, bar.fill:GetWidth())
     end)
 
-    it("moves as items arrive, and is gone once all have", function()
+    it("moves as items arrive, and stays, full, once all have", function()
         local ns, env, bar = opened({ 1001, 1002, 1003, 1004, 2001, 3001 })
         assertEqual("All items 6 / 7", bar.text:GetText())
         env.__items[3002] = { name = "Last", quality = 2 }
         bar.scripts.OnUpdate(bar, 1)
-        assertFalse(bar:IsShown())
+        assertTrue(bar:IsShown())
+        assertEqual("All items 7 / 7", bar.text:GetText())
     end)
 
     it("leaves out the items of hidden instances", function()
@@ -874,5 +877,38 @@ describe("loading every item", function()
         bar.scripts.OnClick(bar, "LeftButton")
         assertEqual(asked + 1, env.__requestCount[3002])
         assertEqual("All items 1 / 7", bar.text:GetText())
+    end)
+end)
+
+describe("the loading details, for testing", function()
+    local function opened()
+        local ns, env = helpers.loggedIn()
+        ns.Window.Open()
+        return ns, env, ns.Window.Frame()
+    end
+
+    it("are off until /bl debug, and off again with it", function()
+        local ns, env, frame = opened()
+        assertFalse(frame.debug:IsShown())
+        helpers.command(env, "debug")
+        assertTrue(frame.debug:IsShown())
+        assertTrue(ns.db.debug, "remembered for next time")
+        helpers.command(env, "debug")
+        assertFalse(frame.debug:IsShown())
+    end)
+
+    it("hold the bar for every item, which leaves the window's top row", function()
+        local ns, env, frame = opened()
+        assertEqual(frame.debug, frame.allProgress:GetParent())
+    end)
+
+    it("count what was asked for and what came back, as it happens", function()
+        local ns, env, frame = opened()
+        helpers.command(env, "debug")
+        ns.LootRow.Arrived(1001, true)
+        ns.LootRow.Arrived(1002, false)
+        frame.debug.scripts.OnUpdate(frame.debug, 1)
+        assertEqual("Asked 7 times: 1 answered, 1 empty, 0 no answer", frame.debug.asked:GetText())
+        assertEqual("Waiting 1, asking now 5, 1 item a second", frame.debug.waiting:GetText(), "the empty one waits to be asked again")
     end)
 end)
