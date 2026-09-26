@@ -51,18 +51,21 @@ describe("the boss column", function()
 end)
 
 describe("the loot column", function()
-    it("lists a boss's loot", function()
+    it("shows the classic list, dimmed, under its heading when nothing is recorded", function()
         local ns = helpers.loggedIn()
         local entries = ns.Window.LootEntries(ns.instanceByKey.Depths, 1)
-        assertEqual(2, #entries)
-        assertEqual(1001, entries[1].id)
-        assertEqual(20, entries[1].chance)
+        assertEqual(4, #entries)
+        assertEqual("Classic loot", entries[1].heading)
+        assertTrue(entries[2].blank, "the heading on a line of its own")
+        assertEqual(1001, entries[3].id)
+        assertEqual(20, entries[3].chance)
+        assertTrue(entries[3].classic)
     end)
 
     it("lists notable drops with what drops them", function()
         local ns = helpers.loggedIn()
         local entries = ns.Window.LootEntries(ns.instanceByKey.Depths, "trash")
-        assertEqual("Anvilrage Overseer", entries[1].sources[1])
+        assertEqual("Anvilrage Overseer", entries[3].sources[1])
     end)
 
     it("says so when a boss drops nothing but world drops", function()
@@ -226,14 +229,14 @@ describe("the window", function()
         local ns = opened()
         local frame = ns.Window.Frame()
         assertEqual("East", frame.bosses.rows[1].text:GetText())
-        assertEqual(1001, frame.loot.rows[1].entry.id)
+        assertEqual(1001, frame.loot.rows[3].entry.id)
         frame.bosses.rows[3].scripts.OnClick(frame.bosses.rows[3], "LeftButton")
-        assertEqual(1003, frame.loot.rows[1].entry.id)
+        assertEqual(1003, frame.loot.rows[3].entry.id)
     end)
 
     it("redraws loot rows once their items arrive", function()
         local ns, env = opened()
-        local row = ns.Window.Frame().loot.rows[1]
+        local row = ns.Window.Frame().loot.rows[3]
         assertMatch("Loading", row.name:GetText())
         env.__items[1001] = { name = "Arrived", quality = 3 }
         helpers.fire(env, "GET_ITEM_INFO_RECEIVED", 1001, true)
@@ -298,7 +301,7 @@ end)
 describe("items the server cannot load", function()
     it("are marked unknown when the answer says so", function()
         local ns, env = opened()
-        local row = ns.Window.Frame().loot.rows[1]
+        local row = ns.Window.Frame().loot.rows[3]
         helpers.fire(env, "GET_ITEM_INFO_RECEIVED", 1001, false)
         env.__runTimers()
         assertMatch("not loaded", row.name:GetText())
@@ -545,14 +548,14 @@ describe("the loot while the big map is open", function()
         ns.Window.OpenMap()
         assertFalse(frame.loot:IsShown(), "gone from the page, under the map")
         assertTrue(frame.mapLoot:IsShown(), "under the bosses instead")
-        assertEqual(1001, frame.mapLoot.rows[1].entry.id)
+        assertEqual(1001, frame.mapLoot.rows[2].entry.id)
         assertTrue(frame.bosses.options.rows < fullRows, "the boss list makes room")
 
         ns.Window.CloseMap()
         assertTrue(frame.loot:IsShown())
         assertFalse(frame.mapLoot:IsShown())
         assertEqual(fullRows, frame.bosses.options.rows)
-        assertEqual(1001, frame.loot.rows[1].entry.id)
+        assertEqual(1001, frame.loot.rows[3].entry.id)
     end)
 
     it("follows a boss picked on the map", function()
@@ -560,7 +563,7 @@ describe("the loot while the big map is open", function()
         local frame = ns.Window.Frame()
         ns.Window.OpenMap()
         ns.Window.SelectBoss(2)
-        assertEqual(1003, frame.mapLoot.rows[1].entry.id)
+        assertEqual(1003, frame.mapLoot.rows[2].entry.id)
     end)
 end)
 
@@ -939,5 +942,90 @@ describe("items the addon knows without the server", function()
         helpers.login(ns, env)
         local entries = ns.Window.InstanceEntries({ kind = "dungeon", instance = "" }, "built in")
         assertEqual("|cff0070ddBuilt In Blade|r", entries[2].text)
+    end)
+end)
+
+describe("recorded loot in the lists", function()
+    local function recordedSample(sources)
+        local ns, env = helpers.loadAddon(nil, function(e)
+            e.BossLootDB = { recorded = { recorder = "me", sources = sources } }
+        end)
+        helpers.sampleInstances(ns)
+        ns.instanceByKey.Depths.mapID = 230
+        ns.instanceByKey.Depths.bosses[1].npcs = { 101 }
+        helpers.login(ns, env)
+        return ns, env
+    end
+    local function at(fields)
+        fields.map, fields.instanceType, fields.instance = fields.map or 230, "party", "Test Depths"
+        return fields
+    end
+
+    it("come first, with how often they were seen, then the classic list, dimmed, less what was seen", function()
+        local ns = recordedSample({ ["npc:101"] = at({ kind = "npc", id = 101, kills = 5, items = { [5555] = 3, [1001] = 1 } }) })
+        local entries = ns.Window.LootEntries(ns.instanceByKey.Depths, 1)
+        assertEqual(5555, entries[1].id)
+        assertEqual("3/5", entries[1].seen)
+        assertEqual(1001, entries[2].id)
+        assertEqual("1/5", entries[2].seen)
+        assertEqual("Classic loot", entries[3].heading)
+        assertTrue(entries[4].blank)
+        assertEqual(1002, entries[5].id)
+        assertTrue(entries[5].classic)
+        assertEqual(5, #entries, "1001 once, as recorded")
+    end)
+
+    it("line the heading up on a line of its own after an odd number of items", function()
+        local ns = recordedSample({ ["npc:101"] = at({ kind = "npc", id = 101, kills = 2, items = { [5555] = 1 } }) })
+        local entries = ns.Window.LootEntries(ns.instanceByKey.Depths, 1)
+        assertEqual(5555, entries[1].id)
+        assertTrue(entries[2].blank)
+        assertEqual("Classic loot", entries[3].heading)
+        local single = ns.Window.LootEntries(ns.instanceByKey.Depths, 1, 1)
+        assertEqual("Classic loot", single[2].heading, "no blanks in one column")
+    end)
+
+    it("show notable finds with how many and who dropped them", function()
+        local ns = recordedSample({ ["npc:300"] = at({ kind = "npc", id = 300, name = "Trash Mob", kills = 4, items = { [2001] = 2 } }) })
+        local entries = ns.Window.LootEntries(ns.instanceByKey.Depths, "trash")
+        assertEqual(2001, entries[1].id)
+        assertEqual("×2", entries[1].seen)
+        assertEqual("Trash Mob", entries[1].sources[1])
+    end)
+
+    it("put the notable lists in the boss column when only recordings have them", function()
+        local ns = recordedSample({ ["npc:300"] = at({ kind = "npc", id = 300, map = 409, name = "Core Hound", kills = 1, items = {} }) })
+        ns.instanceByKey.Core.mapID = 409
+        ns.db.recorded.sources["npc:300"].items[4444] = 1
+        ns.Recordings.Changed()
+        local names = {}
+        for _, entry in ipairs(ns.Window.BossEntries(ns.instanceByKey.Core, 1)) do table.insert(names, entry.text) end
+        assertMatch("From trash", table.concat(names, "|"))
+    end)
+
+    it("list a recorded instance in its tab", function()
+        local ns = recordedSample({ ["npc:8000"] = at({ kind = "npc", id = 8000, map = 9999, name = "Thane", encounter = "Thane", kills = 1, items = { [8001] = 1 } }) })
+        ns.db.recorded.sources["npc:8000"].instance = "Hall of Thanes"
+        ns.Recordings.Changed()
+        local texts = {}
+        for _, entry in ipairs(ns.Window.InstanceEntries({ kind = "dungeon", instance = "" }, "")) do table.insert(texts, entry.text) end
+        assertMatch("Hall of Thanes", table.concat(texts, "|"))
+    end)
+
+    it("open a recorded instance with no named boss on its trash", function()
+        local ns = recordedSample({ ["npc:8002"] = at({ kind = "npc", id = 8002, map = 9999, name = "Guard", kills = 3, items = { [8003] = 1 } }) })
+        ns.Window.Open()
+        ns.Window.SelectInstance("rec:9999")
+        local instance, selection = ns.Window.Current()
+        assertEqual("rec:9999", instance.key)
+        assertEqual("trash", selection)
+    end)
+
+    it("show a recorded item's count in search results", function()
+        local ns = recordedSample({ ["npc:101"] = at({ kind = "npc", id = 101, kills = 5, items = { [5555] = 3 } }) })
+        ns.db.recorded.items = { [5555] = { "Thane's Seal", 3 } }
+        ns.Recordings.Changed()
+        local entries = ns.Window.InstanceEntries({ kind = "dungeon", instance = "" }, "thane")
+        assertEqual("3/5", entries[3].right)
     end)
 end)

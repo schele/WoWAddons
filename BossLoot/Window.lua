@@ -54,6 +54,10 @@ local SEARCH_MIN = 2
 
 local EMPTY_TEXT = "Nothing but world drops and quest items."
 
+-- Above the vanilla list, once recordings come first.
+local CLASSIC_HEADING = "Classic loot"
+local CLASSIC_NOTE = "Not seen on WoW Forever yet"
+
 -- What the boss column calls the two notable lists.
 local NOTABLE_NAMES = { trash = "From trash", objects = "Chests & objects" }
 
@@ -72,12 +76,45 @@ local highlightItem
 --------------------------------------------------------------------------------
 
 local function instanceEntry(instance, selectedKey)
-    return {
-        kind = "instance",
-        value = instance.key,
-        selected = instance.key == selectedKey,
-        text = string.format("%s |cff808080%d-%d|r", instance.name, instance.levels[1], instance.levels[2]),
-    }
+    local text = instance.name
+    if instance.levels then
+        text = string.format("%s |cff808080%d-%d|r", instance.name, instance.levels[1], instance.levels[2])
+    elseif instance.recorded then
+        text = instance.name .. " |cff808080recorded|r"
+    end
+    return { kind = "instance", value = instance.key, selected = instance.key == selectedKey, text = text }
+end
+
+local function lootSource(instance, selection)
+    if not instance then
+        return nil
+    end
+    if type(selection) == "number" then
+        local boss = instance.bosses[selection]
+        return boss and boss.loot
+    end
+    return instance.notable and instance.notable[selection]
+end
+
+-- The recorded loot of a boss or notable list, and for a boss its kills.
+local function recordedSource(instance, selection)
+    if not instance then
+        return nil
+    end
+    if type(selection) == "number" then
+        local boss = instance.bosses[selection]
+        return boss and boss.recorded, boss and boss.recordedKills
+    end
+    return instance.recordedNotable and instance.recordedNotable[selection], nil
+end
+
+-- How often a recorded item was seen: of the kills for a boss, a count for
+-- a notable list.
+local function seenText(entry, kills)
+    if kills then
+        return entry[2] .. "/" .. kills
+    end
+    return "×" .. entry[2]
 end
 
 -- One place an item drops, as a search result under the item: where, and how
@@ -92,11 +129,20 @@ local function placeEntry(itemID, source, view)
         label, list = NOTABLE_NAMES[source.boss], instance.notable[source.boss]
     end
 
-    local chance = 0
-    for _, entry in ipairs(list) do
+    local right
+    for _, entry in ipairs(list or {}) do
         if entry[1] == itemID then
-            chance = entry[2]
+            right = ns.Format.Chance(entry[2])
             break
+        end
+    end
+    if not right then
+        local recorded, kills = recordedSource(instance, source.boss)
+        for _, entry in ipairs(recorded or {}) do
+            if entry[1] == itemID then
+                right = seenText(entry, kills)
+                break
+            end
         end
     end
 
@@ -104,7 +150,7 @@ local function placeEntry(itemID, source, view)
         kind = "place",
         value = { instance = source.instance, boss = source.boss, item = itemID },
         text = string.format("    %s: %s", instance.name, label),
-        right = ns.Format.Chance(chance),
+        right = right or "",
         selected = itemID == highlightItem and source.instance == view.instance and source.boss == view.boss,
     }
 end
@@ -172,44 +218,70 @@ function Window.BossEntries(instance, selection)
     end
 
     local notable = instance.notable or {}
-    local trash, objects = notable.trash or {}, notable.objects or {}
-    if #trash > 0 or #objects > 0 then
+    local recordedNotable = instance.recordedNotable or {}
+    local function has(which)
+        return #(notable[which] or {}) > 0 or #(recordedNotable[which] or {}) > 0
+    end
+    if has("trash") or has("objects") then
         table.insert(entries, { kind = "heading", text = "Notable drops" })
-        if #trash > 0 then
+        if has("trash") then
             table.insert(entries, {
                 kind = "boss", value = "trash", text = NOTABLE_NAMES.trash, selected = selection == "trash",
                 icon = ns.Portrait.ICONS.trash,
             })
         end
-        if #objects > 0 then
+        if has("objects") then
             table.insert(entries, {
                 kind = "boss", value = "objects", text = NOTABLE_NAMES.objects, selected = selection == "objects",
                 icon = ns.Portrait.ICONS.objects,
             })
         end
     end
-
     return entries
 end
 
-local function lootSource(instance, selection)
-    if not instance then
-        return nil
-    end
-    if type(selection) == "number" then
-        local boss = instance.bosses[selection]
-        return boss and boss.loot
-    end
-    return instance.notable and instance.notable[selection]
-end
-
-function Window.LootEntries(instance, selection)
+--- A boss's or notable list's loot: what was recorded, most seen first, with
+-- how often; then, under a heading on a line of its own in a grid of
+-- `perLine` columns, the vanilla list, dimmed, less what was recorded.
+function Window.LootEntries(instance, selection, perLine)
+    perLine = perLine or 2
     local entries = {}
-    for _, entry in ipairs(lootSource(instance, selection) or {}) do
+    if not instance then
+        return entries
+    end
+
+    local recorded, kills = recordedSource(instance, selection)
+    local seen = {}
+    for _, entry in ipairs(recorded or {}) do
+        seen[entry[1]] = true
         table.insert(entries, {
-            id = entry[1], chance = entry[2], sources = entry[3],
+            id = entry[1],
+            seen = seenText(entry, kills),
+            sources = #entry[3] > 0 and entry[3] or nil,
             selected = entry[1] == highlightItem,
         })
+    end
+
+    local classic = {}
+    for _, entry in ipairs(lootSource(instance, selection) or {}) do
+        if not seen[entry[1]] then
+            table.insert(classic, {
+                id = entry[1], chance = entry[2], sources = entry[3], classic = true,
+                selected = entry[1] == highlightItem,
+            })
+        end
+    end
+    if #classic > 0 then
+        while #entries % perLine ~= 0 do
+            table.insert(entries, { blank = true })
+        end
+        table.insert(entries, { heading = CLASSIC_HEADING, note = CLASSIC_NOTE })
+        while #entries % perLine ~= 0 do
+            table.insert(entries, { blank = true })
+        end
+        for _, entry in ipairs(classic) do
+            table.insert(entries, entry)
+        end
     end
     return entries
 end
@@ -226,7 +298,19 @@ local function validSelection(instance, selection)
         return instance.bosses[selection] ~= nil
     end
     local list = lootSource(instance, selection)
-    return list ~= nil and #list > 0
+    local recorded = recordedSource(instance, selection)
+    return (list ~= nil and #list > 0) or (recorded ~= nil and #recorded > 0)
+end
+
+-- The first thing to show: the first boss, or failing one (a recorded
+-- instance with no named boss), a notable list.
+local function firstSelection(instance)
+    for _, selection in ipairs({ 1, "trash", "objects" }) do
+        if validSelection(instance, selection) then
+            return selection
+        end
+    end
+    return 1
 end
 
 --- The instance and boss the window shows, repaired when what was saved has
@@ -243,7 +327,7 @@ function Window.Current()
     end
 
     if instance and not validSelection(instance, view.boss) then
-        view.boss = 1
+        view.boss = firstSelection(instance)
     end
 
     return instance, view.boss
@@ -297,7 +381,7 @@ function Window.SelectInstance(key)
     local view = ns.db.view
     view.kind = instance.kind
     view.instance = key
-    view.boss = 1
+    view.boss = firstSelection(instance)
     Window.CloseMap()
     Window.Refresh()
 end
@@ -603,7 +687,7 @@ function Window.Refresh()
         frame.mapLoot:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + RAIL_WIDTH + GAP, -top)
         ns.List.SetVisibleRows(frame.mapLoot, math.floor((HEIGHT - top - PADDING - MORE_HEIGHT) / LOOT_ROW))
     end
-    local loot = Window.LootEntries(instance, selection)
+    local loot = Window.LootEntries(instance, selection, mapOpen and 1 or 2)
     local key = tostring(view.instance) .. ":" .. tostring(selection) .. (mapOpen and ":map" or "")
     ns.List.SetEntries(lootList, loot, key == lastSelection)
     lastSelection = key

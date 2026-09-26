@@ -34,6 +34,16 @@ client's language starts the saved list afresh. `/bl debug` shows, under
 the window, how many items the server has sent and counts of what was asked
 for and what came back, for testing.
 
+WoW Forever reworked dungeon loot, so BossLoot records what really drops as
+you play: each boss's and mob's loot (with how many kills), chests, quest
+rewards, merchant goods and what your professions make. A boss's recorded
+drops come first, with how often they were seen (`3/5` is three drops in five
+kills), and the vanilla list follows, dimmed, under "Classic loot". Instances
+BossLoot does not know are listed once recorded, with the bosses the game
+named. `/bl probe` checks the client has what the recorder needs; `/bl
+recorded` counts what you have recorded. To bake recordings into a release,
+put saved-variables files in `tools/recordings/` and rebuild the data.
+
 The search box finds instances and items, and lists every place an item
 drops with its chance; click one to go there.
 

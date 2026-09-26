@@ -12,6 +12,7 @@ LootRow.HEIGHT = 30
 
 local ICON_SIZE = 26
 local CHANCE_WIDTH = 48
+local CLASSIC_ALPHA = 0.45 -- a vanilla row, not seen on WoW Forever yet
 local UNKNOWN_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 -- What the client itself knows about an item, or nil if it has not loaded it.
@@ -302,7 +303,7 @@ local function iconFor(itemID, info)
 end
 
 local function showTooltip(row)
-    if not (row.entry and GameTooltip) then
+    if not (row.entry and row.entry.id and GameTooltip) then
         return
     end
 
@@ -375,6 +376,19 @@ end
 
 function LootRow.Render(row, entry)
     row.entry = entry
+    row:SetAlpha(entry.classic and CLASSIC_ALPHA or 1)
+    if entry.heading or entry.blank then
+        row.link = nil
+        row.icon:Hide()
+        row.selectedTexture:Hide()
+        row.name:SetText(entry.heading and ("|cffffd100" .. entry.heading .. "|r") or "")
+        row.detail:SetText(entry.note or "")
+        row.chance:SetText("")
+        row:EnableMouse(false)
+        return
+    end
+    row.icon:Show()
+    row:EnableMouse(true)
     local info = LootRow.ItemInfo(entry.id)
 
     row.icon:SetTexture(iconFor(entry.id, info))
@@ -405,6 +419,6 @@ function LootRow.Render(row, entry)
         row.detail:SetText("")
     end
 
-    row.chance:SetText(ns.Format.Chance(entry.chance))
+    row.chance:SetText(entry.seen or ns.Format.Chance(entry.chance))
     row.selectedTexture:SetShown(entry.selected and true or false)
 end
