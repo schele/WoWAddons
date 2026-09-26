@@ -1,16 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMap, pinFor, removeIslands, fillHoles, toRuns } from '../lib/map.mjs';
+import {
+  buildMap, pinFor, removeIslands, fillHoles, toRuns, squeezeAxis, cellOf, MAX_GAP,
+} from '../lib/map.mjs';
 
 const disc = (x, y, r = 0) => ({ x, y, z: 0, r });
 const at = (x, y) => ({ x, y, z: 0 });
 
 // Where a world point falls, and whether that cell is floor.
 function cellAt(map, point) {
-  return {
-    row: Math.floor((map.bounds.x1 - point.x) / map.cell),
-    col: Math.floor((map.bounds.y1 - point.y) / map.cell),
-  };
+  const { col, row } = cellOf(map, point);
+  return { row: Math.floor(row), col: Math.floor(col) };
 }
 function isFloor(map, point) {
   const { row, col } = cellAt(map, point);
@@ -129,4 +129,88 @@ test('draws a patch of floor where a boss stands, though nothing else is there',
   const boss = at(14, 0);
   const map = buildMap({ discs, paths: [] }, { trim: 0.05, minCell: 1, maxCells: 100, keep: [boss] });
   assert.ok(isFloor(map, boss));
+});
+
+test('squeezes an empty band on one axis to a few cells, keeping what is used in place', () => {
+  const used = [1, ...new Array(10).fill(0), 1];
+  const axis = squeezeAxis(used, 3);
+  assert.equal(axis.length, 5);
+  assert.equal(axis.map(0), 0);
+  assert.equal(axis.map(11), 4, 'the far side moves up to the squeezed gap');
+  assert.equal(axis.map(6), 2.5, 'a point in the gap keeps its share of it');
+});
+
+test('leaves an empty band no wider than the limit as it is', () => {
+  const axis = squeezeAxis([1, 0, 0, 1], 3);
+  assert.equal(axis.length, 4);
+  assert.equal(axis.map(3), 3);
+});
+
+// Scarlet Monastery: four wings in one map, far apart, with nothing between.
+function emptyColumnsBetween(map, left, right) {
+  const from = Math.floor(cellOf(map, left).col);
+  const to = Math.floor(cellOf(map, right).col);
+  let empty = 0;
+  for (let col = from + 1; col < to; col++) {
+    let floor = false;
+    for (let i = 0; i < map.runs.length; i += 3) {
+      if (col >= map.runs[i + 1] && col < map.runs[i + 1] + map.runs[i + 2]) floor = true;
+    }
+    if (!floor) empty++;
+  }
+  return empty;
+}
+
+test('draws separate parts of an instance close together, not across a sea of nothing', () => {
+  const west = at(0, 0);
+  const east = at(0, -400);
+  const map = buildMap({ discs: [disc(0, 0, 10), disc(0, -400, 10)], paths: [] }, bounded);
+  assert.equal(emptyColumnsBetween(map, west, east), MAX_GAP);
+  assert.ok(isFloor(map, west) && isFloor(map, east), 'both parts still drawn');
+  assert.ok(pinFor(map, east).x > 0.8, "the east part's pin is where the east part now is");
+});
+
+test('leaves an instance in one piece its full size', () => {
+  const paths = [[at(0, 0), at(0, -60), at(0, -120), at(0, -180)]];
+  const map = buildMap({ discs: [disc(0, 0, 5), disc(0, -180, 5)], paths }, bounded);
+  assert.equal(map.cols, Math.ceil((map.bounds.y1 - map.bounds.y0) / map.cell - 1e-9));
+});
+
+// Cells that are not floor on the straight line between two points.
+function gapAlong(map, from, to) {
+  const a = cellAt(map, from);
+  const b = cellAt(map, to);
+  const floor = (row, col) => {
+    for (let i = 0; i < map.runs.length; i += 3) {
+      if (map.runs[i] === row && col >= map.runs[i + 1] && col < map.runs[i + 1] + map.runs[i + 2]) return true;
+    }
+    return false;
+  };
+  let gap = 0;
+  if (Math.abs(b.row - a.row) > Math.abs(b.col - a.col)) {
+    for (let row = Math.min(a.row, b.row) + 1; row < Math.max(a.row, b.row); row++) if (!floor(row, a.col)) gap++;
+  } else {
+    for (let col = Math.min(a.col, b.col) + 1; col < Math.max(a.col, b.col); col++) if (!floor(a.row, col)) gap++;
+  }
+  return gap;
+}
+
+test('packs each column of parts on its own, so a part in one does not hold the other apart', () => {
+  // Scarlet Monastery: Graveyard over Cathedral in the west, Armory over
+  // Library in the east, the Library far lower than the Cathedral.
+  const armory = at(0, -400);
+  const library = at(-400, -400);
+  const discs = [disc(0, 0, 10), disc(-200, 0, 10), disc(0, -400, 10), disc(-400, -400, 10)];
+  const map = buildMap({ discs, paths: [] }, bounded);
+  assert.equal(gapAlong(map, armory, library), MAX_GAP);
+  assert.ok(isFloor(map, armory) && isFloor(map, library));
+});
+
+test('or each row of parts, when that packs tighter', () => {
+  const west = at(-400, 0);
+  const east = at(-400, -400);
+  const discs = [disc(0, 0, 10), disc(0, -200, 10), disc(-400, 0, 10), disc(-400, -400, 10)];
+  const map = buildMap({ discs, paths: [] }, bounded);
+  assert.equal(gapAlong(map, west, east), MAX_GAP);
+  assert.ok(isFloor(map, west) && isFloor(map, east));
 });

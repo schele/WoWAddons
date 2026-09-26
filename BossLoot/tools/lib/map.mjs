@@ -18,6 +18,7 @@ export const MAX_WANDER = 20;   // yards; bigger radii are scripted, not rooms
 export const MAX_STEP = 80;     // yards; a longer patrol step is a jump, not a corridor
 export const MIN_ISLAND = 12;   // cells; smaller specks are dropped
 export const MAX_HOLE = 10;     // cells; smaller holes inside the floor are filled
+export const MAX_GAP = 6;       // cells; a wider empty band right across the map is squeezed to this
 
 function quantile(sorted, q) {
   const index = Math.min(sorted.length - 1, Math.max(0, Math.round(q * (sorted.length - 1))));
@@ -116,6 +117,35 @@ export function toRuns(grid, cols, rows) {
 }
 
 /**
+ * One axis of the map with its wide empty bands squeezed: `used` says which
+ * lines (rows or columns) hold any floor. Used lines keep their size and
+ * order; a band of empty ones wider than `maxGap` shrinks to `maxGap`, and a
+ * point inside it keeps its share of the band. Returns the new length and
+ * the map from an old position, in cells, to the new one.
+ */
+export function squeezeAxis(used, maxGap = MAX_GAP) {
+  const pieces = []; // old start, old end, new start, new end
+  let length = 0;
+  for (let start = 0; start < used.length;) {
+    let end = start;
+    while (end < used.length && Boolean(used[end]) === Boolean(used[start])) end++;
+    const size = used[start] ? end - start : Math.min(end - start, maxGap);
+    pieces.push([start, end, length, length + size]);
+    length += size;
+    start = end;
+  }
+
+  const map = (old) => {
+    if (old <= 0) return old;
+    for (const [start, end, newStart, newEnd] of pieces) {
+      if (old <= end) return newStart + ((old - start) * (newEnd - newStart)) / (end - start);
+    }
+    return length + (old - used.length);
+  };
+  return { length, map };
+}
+
+/**
  * A floor plan from `discs` ({x, y, r}: where a mob stands and how far it
  * wanders) and `paths` (patrols, as lists of {x, y}). North is up and east is
  * right: screen right is world -y, screen down is world -x. The bounds skip
@@ -200,7 +230,120 @@ export function buildMap({ discs = [], paths = [] }, options = {}) {
   removeIslands(grid, cols, rows);
   fillHoles(grid, cols, rows);
 
-  return { cols, rows, cell, bounds, runs: toRuns(grid, cols, rows) };
+  const layout = pack(grid, cols, rows);
+  const packed = new Uint8Array(layout.cols * layout.rows);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (!grid[r * cols + c]) continue;
+      const [col, row] = layout.place(c, r);
+      packed[row * layout.cols + col] = 1;
+    }
+  }
+
+  return {
+    cols: layout.cols, rows: layout.rows, cell, bounds, runs: toRuns(packed, layout.cols, layout.rows),
+    gridCols: cols, gridRows: rows, place: layout.place,
+  };
+}
+
+// Runs of used lines, split where an empty band between them is wider than
+// `maxGap`: [first, afterLast] each.
+function strips(used, maxGap) {
+  const found = [];
+  let first = -1;
+  let last = -1;
+  for (let i = 0; i < used.length; i++) {
+    if (!used[i]) continue;
+    if (first < 0) first = i;
+    else if (i - last - 1 > maxGap) {
+      found.push([first, last + 1]);
+      first = i;
+    }
+    last = i;
+  }
+  if (first >= 0) found.push([first, last + 1]);
+  return found;
+}
+
+// Wide empty column bands squeezed, then the gaps inside each strip of
+// columns between them squeezed on its own. Each strip's top stays where
+// squeezing the whole map puts it, so a part south of another stays south of
+// it. `place` takes a position on the grid, in cells, to the packed map.
+function packColumns(grid, cols, rows, maxGap) {
+  const usedCols = new Uint8Array(cols);
+  const usedRows = new Uint8Array(rows);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) if (grid[r * cols + c]) usedCols[c] = usedRows[r] = 1;
+  }
+  const allRows = squeezeAxis(usedRows, maxGap);
+  const bands = strips(usedCols, maxGap).map(([first, afterLast]) => {
+    const used = new Uint8Array(rows);
+    for (let r = 0; r < rows; r++) {
+      for (let c = first; c < afterLast; c++) if (grid[r * cols + c]) used[r] = 1;
+    }
+    const own = squeezeAxis(used, maxGap);
+    const top = used.indexOf(1);
+    const shift = allRows.map(top) - own.map(top);
+    return { first, afterLast, length: own.length + shift, rows: { map: (row) => own.map(row) + shift } };
+  });
+  if (!bands.length) return { cols, rows, place: (c, r) => [c, r] };
+
+  // A point between two strips goes with the nearer.
+  const bandAt = (col) => {
+    for (let i = 0; i < bands.length; i++) {
+      if (col < bands[i].afterLast) {
+        if (i > 0 && col < bands[i].first && bands[i].first - col > col - bands[i - 1].afterLast) return bands[i - 1];
+        return bands[i];
+      }
+    }
+    return bands[bands.length - 1];
+  };
+  const colAxis = squeezeAxis(usedCols, maxGap);
+  return {
+    cols: colAxis.length,
+    rows: Math.max(...bands.map((band) => band.length)),
+    place: (col, row) => [colAxis.map(col), bandAt(col).rows.map(row)],
+  };
+}
+
+/**
+ * The floor packed tight. Some instances are several parts in one map, far
+ * apart -- Scarlet Monastery's four wings. Drawn as they lie, each is a speck
+ * in a sea of nothing. So the parts are packed: columns of parts closed up,
+ * then each column closed up on its own -- or rows, then each row, if that
+ * comes out smaller. Parts keep their order across and within each column
+ * (or row); a map in one piece comes out as it went in.
+ */
+export function pack(grid, cols, rows, maxGap = MAX_GAP) {
+  const byColumns = packColumns(grid, cols, rows, maxGap);
+
+  const turned = new Uint8Array(cols * rows);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) turned[c * rows + r] = grid[r * cols + c];
+  }
+  const t = packColumns(turned, rows, cols, maxGap);
+  const byRows = {
+    cols: t.rows,
+    rows: t.cols,
+    place: (col, row) => {
+      const [turnedCol, turnedRow] = t.place(row, col);
+      return [turnedRow, turnedCol];
+    },
+  };
+
+  return byRows.cols * byRows.rows < byColumns.cols * byColumns.rows ? byRows : byColumns;
+}
+
+// Where a world point falls on the grid as first laid out, in cells.
+function gridPosition(map, point) {
+  return { col: (map.bounds.y1 - point.y) / map.cell, row: (map.bounds.x1 - point.x) / map.cell };
+}
+
+/** Where a world point falls on the finished map, in cells from its top left. */
+export function cellOf(map, point) {
+  const grid = gridPosition(map, point);
+  const [col, row] = map.place(grid.col, grid.row);
+  return { col, row };
 }
 
 /**
@@ -210,12 +353,14 @@ export function buildMap({ discs = [], paths = [] }, options = {}) {
  */
 export function pinFor(map, point) {
   if (!map || !point) return undefined;
-  const x = (map.bounds.y1 - point.y) / (map.cols * map.cell);
-  const y = (map.bounds.x1 - point.x) / (map.rows * map.cell);
-  const slack = 0.5 / Math.max(map.cols, map.rows);
-  if (x < -slack || x > 1 + slack || y < -slack || y > 1 + slack) return undefined;
+  const grid = gridPosition(map, point);
+  const slack = 0.5;
+  if (grid.col < -slack || grid.col > map.gridCols + slack || grid.row < -slack || grid.row > map.gridRows + slack) {
+    return undefined;
+  }
 
+  const { col, row } = cellOf(map, point);
   const clamp = (value) => Math.min(1, Math.max(0, value));
   const round = (value) => Math.round(value * 1000) / 1000;
-  return { x: round(clamp(x)), y: round(clamp(y)) };
+  return { x: round(clamp(col / map.cols)), y: round(clamp(row / map.rows)) };
 }
