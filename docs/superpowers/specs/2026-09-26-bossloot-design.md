@@ -80,9 +80,17 @@ instance it gives:
 - the wings, for instances that have them (Dire Maul East/West/North,
   Stratholme Live/Undead, Scarlet Monastery's four wings, Blackrock Spire
   Lower/Upper),
-- the bosses in kill order, each as a creature ID, grouped by wing.
+- the bosses in kill order, grouped by wing, each by name. A boss can also
+  name several creatures (The Seven, the Twin Emperors) and the chest its
+  loot is in (Cache of the Firelord, Chest of The Seven, Four Horsemen
+  Chest). Names are easier to maintain than creature IDs; the build fails
+  naming any it cannot find,
+- whether the instance is available (`"available": false` leaves it out).
+  **WoW Forever does not have every vanilla instance**, and which ones are
+  missing is not yet known, so every instance can be switched off here, and
+  the window also lets the player hide instances (see below).
 
-About 40 instances and 200 bosses. Nothing else in the data is written by
+About 26 instances and 200 bosses. Nothing else in the data is written by
 hand.
 
 A boss that is summoned by a script rather than spawned on the map still
@@ -119,8 +127,12 @@ rules:
   are multiplied by the reference row's own chance.
 - **Quest drops** (`ChanceOrQuestChance` negative): only drop for players on
   the quest. Left out: a quest objective is not loot.
+- **Conditional rows** (`condition_id` not 0): holiday items (Emperor
+  Thaurissan has a Winter Veil hat at 100%) and drops gated on quest state.
+  Left out.
 
-An item reachable by more than one route keeps its highest chance.
+An item reachable by more than one route keeps its highest chance. A chance
+that rounds to 0.00% is dropped.
 
 ### Deciding what to keep
 
@@ -136,7 +148,7 @@ are one of these four kinds:
 
 | Kind | Test on `item_template` |
 |---|---|
-| Rare and epic gear | `quality` 3 or 4 |
+| Rare, epic and legendary gear | `quality` 3 or higher |
 | Recipes, plans, formulas, patterns | `class` 9 |
 | Quest-starting items | `start_quest` above 0 |
 | Keys and attunement items | `class` 13 |
@@ -147,10 +159,13 @@ is exactly the kind of thing worth knowing about.
 
 **World drops** are the BoE items that can drop from any mob of the right
 level, anywhere. The emulator keeps them in shared reference tables. A
-reference table counts as a world-drop table if creatures on more than one
-map use it. Its items are left out of both boss loot and notable drops. The
-rule is a starting point and will be checked against a few instances in the
-first implementation step.
+reference table counts as a world-drop table if creatures spawned on **four
+or more** maps use it. Its items are left out of both boss loot and notable
+drops. Measured on the 2026-09-06 snapshot: tables made for one instance span
+1 to 3 maps (Ruins of Ahn'Qiraj shares some with Silithus, and the Ahn'Qiraj
+enchanting formulas span both Ahn'Qiraj instances and Silithus), while
+world-drop tables span 4 to 16. "More than one map" would have wrongly dropped
+the Ahn'Qiraj tables.
 
 **World drops will be added later**, in a view of their own, not mixed into
 each instance. The build script already identifies the world-drop tables, so
@@ -213,7 +228,9 @@ viewed.
 ```
 
 **Instances column.** Dungeons and Raids tabs. Instances in rough level
-order, each with its level range in grey.
+order, each with its level range in grey. Right-clicking an instance hides
+it (saved, account-wide) for instances WoW Forever does not have;
+`/bl unhide` brings them all back.
 
 **Bosses column.** Bosses in kill order, under wing headings where the
 instance has wings. At the bottom, a "Notable drops" heading with two
@@ -263,6 +280,7 @@ Built by hand, as no addon in this repo uses a shared library.
 |---|---|
 | `/bl` | Toggle the window |
 | `/bl minimap` | Hide or show the minimap button |
+| `/bl unhide` | Bring back every instance hidden from the list |
 | `/bl help` | List the commands |
 
 ## Code layout
