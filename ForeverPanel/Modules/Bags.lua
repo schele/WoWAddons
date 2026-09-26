@@ -8,15 +8,21 @@ ns.AddDefaults({
     },
 })
 
---- Free bag slots, as a bag icon followed by the count, and optionally the
--- total after it. Pure, so it is unit tested directly.
+--- Bag space as a bag icon followed by a count. Pure, so it is unit tested
+-- directly.
+--
+-- With the total, the count is slots used out of the total -- 30/38 -- which
+-- reads like a gauge filling up; 8/38 for eight free read backwards. On its
+-- own it stays the free count, since a bare "30" says nothing about how much
+-- room is left.
 local function formatBagSpace(free, iconSize, total)
     free = math.max(0, math.floor(tonumber(free) or 0))
     iconSize = math.max(1, math.floor(tonumber(iconSize) or 12))
 
     local count = tostring(free)
     if total then
-        count = string.format("%d/%d", free, math.max(0, math.floor(total)))
+        total = math.max(0, math.floor(total))
+        count = string.format("%d/%d", math.max(0, total - free), total)
     end
 
     return string.format("|T%s:%d:%d:0:0|t %s", BAG_ICON, iconSize, iconSize, count)
@@ -81,7 +87,7 @@ ns.RegisterSetting({
     -- block is on the bar at all.
     parent = "modules.bags",
     name = "Show total bag slots",
-    tooltip = "Reads 12/40 rather than 12.",
+    tooltip = "Reads 28/40 slots used, rather than 12 slots free.",
     onChange = function()
         local module = ns.Bar:GetModule("bags")
         if module then

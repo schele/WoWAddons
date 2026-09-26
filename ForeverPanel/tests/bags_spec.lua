@@ -20,6 +20,15 @@ describe("FormatBagSpace", function()
         assertMatch("INV_Misc_Bag", ns.FormatBagSpace(12, 12))
     end)
 
+    it("counts slots used out of the total when the total is shown", function()
+        -- 8 free of 38 is 30 used: the count rises as the bags fill.
+        assertEqual("30/38", plain(ns.FormatBagSpace(8, 12, 38)))
+    end)
+
+    it("never counts below zero used, whatever the client reports", function()
+        assertEqual("0/16", plain(ns.FormatBagSpace(20, 12, 16)))
+    end)
+
     it("renders the icon at the size asked for", function()
         assertMatch(":16:16:", ns.FormatBagSpace(1, 16))
     end)
@@ -107,7 +116,7 @@ describe("bag space settings", function()
         assertEqual("12", plain(ns.Bar:GetModule("bags").text:GetText()), "redrawn without it")
 
         ns.SetSettingValue(setting, true)
-        assertEqual("12/40", plain(ns.Bar:GetModule("bags").text:GetText()), "and back again")
+        assertEqual("28/40", plain(ns.Bar:GetModule("bags").text:GetText()), "and back again")
     end)
 end)
 
@@ -125,10 +134,10 @@ describe("the bar's left side", function()
 end)
 
 describe("the bags module", function()
-    it("shows the free count on the bar", function()
+    it("shows slots used out of the total on the bar", function()
         local ns, env = loggedIn()
 
-        assertEqual("12/40", plain(ns.Bar:GetModule("bags").text:GetText()))
+        assertEqual("28/40", plain(ns.Bar:GetModule("bags").text:GetText()))
     end)
 
     it("follows a bag change", function()
@@ -138,7 +147,7 @@ describe("the bags module", function()
         env.bagSlots[1] = { free = 0, total = 16, kind = 0 }
         helpers.fire(env, "BAG_UPDATE_DELAYED")
 
-        assertEqual("6/40", plain(ns.Bar:GetModule("bags").text:GetText()))
+        assertEqual("34/40", plain(ns.Bar:GetModule("bags").text:GetText()))
     end)
 
     it("opens the bags when clicked", function()
