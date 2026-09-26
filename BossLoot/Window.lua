@@ -1035,9 +1035,18 @@ local function create()
     -- Escape closes it, like every other window.
     table.insert(UISpecialFrames, "BossLootFrame")
 
+    -- The chest alone, as the minimap button shows it, before the name: the
+    -- AddOns list icon carries a square tile that reads as a sticker here.
+    local logo = frame:CreateTexture(nil, "OVERLAY")
+    logo:SetSize(24, 24)
+    logo:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + 6, -PADDING)
+    logo:SetTexture("Interface\\AddOns\\BossLoot\\minimap")
+    frame.logo = logo
+
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + 6, -PADDING - 4)
+    title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
     title:SetText("BossLoot")
+    frame.title = title
 
     frame.close = createCloseButton(frame, function()
         frame:Hide()

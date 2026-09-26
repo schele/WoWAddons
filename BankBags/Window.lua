@@ -286,9 +286,18 @@ local function create()
     end
     table.insert(UISpecialFrames, "BankBagsFrame")
 
+    -- The sack alone, as the minimap button shows it, before the name: the
+    -- AddOns list icon carries a square tile that reads as a sticker here.
+    local logo = frame:CreateTexture(nil, "OVERLAY")
+    logo:SetSize(24, 24)
+    logo:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + 4, -PADDING)
+    logo:SetTexture("Interface\\AddOns\\BankBags\\minimap")
+    frame.logo = logo
+
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + 4, -PADDING - 4)
+    title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
     title:SetText("BankBags")
+    frame.title = title
 
     frame.close = createFrame("Button", nil, frame, "UIPanelCloseButton")
     frame.close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
