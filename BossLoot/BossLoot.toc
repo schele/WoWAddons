@@ -1,0 +1,17 @@
+## Interface: 11509, 16001
+## Title: BossLoot
+## Notes: Every dungeon and raid, its bosses and their loot.
+## Author: You
+## Version: 0.1.0
+## SavedVariables: BossLootDB
+
+BossLoot.lua
+Format.lua
+# BEGIN GENERATED DATA
+Data\BlackrockDepths.lua
+# END GENERATED DATA
+Index.lua
+List.lua
+LootRow.lua
+Window.lua
+Minimap.lua

@@ -1,0 +1,27 @@
+{
+  "instances": [
+    {
+      "name": "Blackrock Depths", "map": 230, "kind": "dungeon", "levels": [52, 60],
+      "bosses": [
+        "Lord Roccor",
+        "High Interrogator Gerstahn",
+        { "name": "Ring of Law", "creatures": ["Anub'shiah", "Eviscerator", "Gorosh the Dervish", "Grizzle", "Hedrum the Creeper", "Ok'thor the Breaker"], "objects": ["Arena Spoils"] },
+        "Pyromancer Loregrain",
+        "Lord Incendius",
+        "Warder Stilgiss",
+        "Fineous Darkvire",
+        "Bael'Gar",
+        "General Angerforge",
+        "Golem Lord Argelmach",
+        "Hurley Blackbreath",
+        "Phalanx",
+        "Ribbly Screwspigot",
+        "Plugger Spazzring",
+        "Ambassador Flamelash",
+        { "name": "The Seven", "creatures": ["Anger'rel", "Seeth'rel", "Dope'rel", "Gloom'rel", "Vile'rel", "Hate'rel", "Doom'rel"], "objects": ["Chest of The Seven"] },
+        "Magmus",
+        "Emperor Dagran Thaurissan"
+      ]
+    }
+  ]
+}
