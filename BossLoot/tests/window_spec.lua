@@ -272,3 +272,13 @@ describe("searching from the window", function()
         assertEqual("Test Depths |cff80808052-60|r", frame.instances.rows[1].text:GetText())
     end)
 end)
+
+describe("items the server cannot load", function()
+    it("are marked unknown when the answer says so", function()
+        local ns, env = opened()
+        local row = ns.Window.Frame().loot.rows[1]
+        helpers.fire(env, "GET_ITEM_INFO_RECEIVED", 1001, false)
+        env.__runTimers()
+        assertMatch("Unknown item 1001", row.name:GetText())
+    end)
+end)

@@ -32,14 +32,32 @@ function LootRow.ItemInfo(itemID)
     }
 end
 
---- Ask the client to load an item. GET_ITEM_INFO_RECEIVED says when it has.
+-- Items already asked for, and items the server answered it does not have.
+-- Asked once each: a row redraws whenever any item arrives, and asking again
+-- on every draw would turn an item the server lacks -- WoW Forever does not
+-- have every instance -- into a request, answer and redraw loop.
+local requested = {}
+local failed = {}
+
+--- Ask the client to load an item, once. GET_ITEM_INFO_RECEIVED says when it
+-- has, or that it could not.
 function LootRow.RequestLoad(itemID)
+    if requested[itemID] then
+        return
+    end
+    requested[itemID] = true
+
     if C_Item and C_Item.RequestLoadItemDataByID then
         C_Item.RequestLoadItemDataByID(itemID)
     elseif GetItemInfo then
         -- Older clients start loading on any lookup.
         GetItemInfo(itemID)
     end
+end
+
+--- The server has no such item: stop showing it as loading.
+function LootRow.MarkFailed(itemID)
+    failed[itemID] = true
 end
 
 -- The icon lookup by ID works before the item itself has loaded, so even a
@@ -128,6 +146,9 @@ function LootRow.Render(row, entry)
     if info then
         row.name:SetText(ns.Format.Colored(info.name, info.quality))
         row.link = info.link
+    elseif failed[entry.id] then
+        row.name:SetText("|cff808080Unknown item " .. entry.id .. "|r")
+        row.link = nil
     else
         row.name:SetText("|cff808080Loading item " .. entry.id .. "...|r")
         row.link = nil

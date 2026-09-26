@@ -156,6 +156,7 @@ function stub.newEnv()
     -- else comes back nil, as an item the client has not seen does.
     env.__items = {}
     env.__requested = {}
+    env.__requestCount = {}
     env.C_Item = {
         GetItemInfo = function(id)
             local item = env.__items[id]
@@ -164,7 +165,10 @@ function stub.newEnv()
                 60, 58, item.type or "Armor", item.subType or "Cloth", 1, item.equipLoc or "", item.icon or 134400
         end,
         GetItemIconByID = function(id) return 100000 + id end,
-        RequestLoadItemDataByID = function(id) env.__requested[id] = true end,
+        RequestLoadItemDataByID = function(id)
+            env.__requested[id] = true
+            env.__requestCount[id] = (env.__requestCount[id] or 0) + 1
+        end,
     }
     env.INVTYPE_2HWEAPON = "Two-Hand"
     env.INVTYPE_CHEST = "Chest"
