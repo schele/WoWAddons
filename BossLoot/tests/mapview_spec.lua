@@ -167,3 +167,138 @@ describe("the map's finish", function()
         assertEqual("2. Right Boss", env.GameTooltip.text)
     end)
 end)
+
+describe("zooming the big map", function()
+    local block = {
+        name = "Block", map = { cols = 3, rows = 2, runs = { 0, 0, 3, 1, 0, 3 } },
+        bosses = {
+            { name = "West", pin = { 0.1, 0.5 }, loot = {} },
+            { name = "East", pin = { 0.9, 0.5 }, loot = {} },
+        },
+        notable = { trash = {}, objects = {} },
+    }
+
+    -- A 300 by 200 map with the cursor at (x, y) from its top left.
+    local function zoomable(env, ns, x, y)
+        local view = ns.MapView.Create(env.UIParent, 300, 200, { zoom = true, labels = true })
+        view.left, view.top = 0, 200
+        env.__cursorX, env.__cursorY = x, 200 - y
+        ns.MapView.Show(view, block)
+        return view
+    end
+
+    it("zooms in with the mouse wheel, keeping the spot under the cursor where it is", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = zoomable(env, ns, 90, 60)
+        local width = view.floor[1]:GetWidth()
+        view.scripts.OnMouseWheel(view, 1)
+        assertTrue(view.zoom > 1)
+        assertEqual(width * view.zoom, view.floor[1]:GetWidth(), "the floor drawn bigger")
+        assertEqual(90 * view.zoom - 90, view:GetHorizontalScroll())
+        assertEqual(60 * view.zoom - 60, view:GetVerticalScroll())
+    end)
+
+    it("zooms out no further than the whole map, and in only so far", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = zoomable(env, ns, 150, 100)
+        view.scripts.OnMouseWheel(view, -1)
+        assertEqual(1, view.zoom)
+        for _ = 1, 30 do view.scripts.OnMouseWheel(view, 1) end
+        assertEqual(ns.MapView.MAX_ZOOM, view.zoom)
+    end)
+
+    it("moves the zoomed map when dragged", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = zoomable(env, ns, 150, 100)
+        view.scripts.OnMouseWheel(view, 1)
+        local x, y = view:GetHorizontalScroll(), view:GetVerticalScroll()
+        view.scripts.OnDragStart(view)
+        env.__cursorX, env.__cursorY = 130, 110 -- 20 left, 10 up
+        view.scripts.OnUpdate(view, 0)
+        assertEqual(x + 20, view:GetHorizontalScroll(), "the map follows the cursor left")
+        assertEqual(y + 10, view:GetVerticalScroll(), "and up")
+        view.scripts.OnDragStop(view)
+        env.__cursorX = 0
+        view.scripts.OnUpdate(view, 0)
+        assertEqual(x + 20, view:GetHorizontalScroll(), "and stops when let go")
+    end)
+
+    it("keeps the map in the frame however far it is dragged", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = zoomable(env, ns, 150, 100)
+        view.scripts.OnMouseWheel(view, 1)
+        view.scripts.OnDragStart(view)
+        env.__cursorX, env.__cursorY = 5000, 5000 -- far right, far up
+        view.scripts.OnUpdate(view, 0)
+        assertEqual(0, view:GetHorizontalScroll(), "its left edge at the frame's left")
+        assertEqual(200 * view.zoom - 200, view:GetVerticalScroll(), "its bottom edge at the frame's bottom")
+    end)
+
+    it("goes back to the whole map on a right-click, and for another instance", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = zoomable(env, ns, 150, 100)
+        view.scripts.OnMouseWheel(view, 1)
+        view.scripts.OnMouseUp(view, "RightButton")
+        assertEqual(1, view.zoom)
+        assertEqual(0, view:GetHorizontalScroll())
+
+        view.scripts.OnMouseWheel(view, 1)
+        ns.MapView.Show(view, block, 2)
+        assertTrue(view.zoom > 1, "still zoomed for another boss of the same instance")
+        ns.MapView.Show(view, { name = "Other", map = block.map, bosses = {} })
+        assertEqual(1, view.zoom)
+    end)
+
+    it("hides a pin zoomed out of sight, so it cannot be hovered there", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = zoomable(env, ns, 0, 100)
+        for _ = 1, 30 do view.scripts.OnMouseWheel(view, 1) end
+        assertTrue(view.pins[1]:IsShown(), "the west pin, under the cursor")
+        assertFalse(view.pins[2]:IsShown(), "the east pin, far off to the right")
+    end)
+
+    it("says how to zoom", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = zoomable(env, ns, 0, 0)
+        assertMatch("zoom", view.hint:GetText())
+    end)
+
+    it("leaves the small map as it is: no zoom", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = ns.MapView.Create(env.UIParent, 150, 84)
+        assertNil(view.scripts.OnMouseWheel)
+    end)
+end)
+
+describe("the picked boss on the map", function()
+    local pair = {
+        name = "Pair", map = { cols = 3, rows = 3, runs = { 0, 0, 3, 1, 0, 3, 2, 0, 3 } },
+        bosses = {
+            { name = "One", pin = { 0.2, 0.3 }, loot = {} },
+            { name = "Two", pin = { 0.2, 0.7 }, loot = {} },
+        },
+        notable = { trash = {}, objects = {} },
+    }
+
+    it("keeps its red pin, ringed in gold, with its name in gold on a dark tag", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = ns.MapView.Create(env.UIParent, 300, 300, { labels = true })
+        ns.MapView.Show(view, pair, 2)
+        local picked, other = view.pins[2], view.pins[1]
+        assertEqual(other.icon:GetTexture(), picked.icon:GetTexture(), "the same red pin")
+        assertTrue(picked.ring:IsShown())
+        assertFalse(other.ring:IsShown())
+        assertEqual(1, view.labels[2].textColor[1])
+        assertEqual(0.82, view.labels[2].textColor[2])
+        assertTrue(view.tag:IsShown())
+    end)
+
+    it("has no tag when no boss on the map is picked", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = ns.MapView.Create(env.UIParent, 300, 300, { labels = true })
+        ns.MapView.Show(view, pair, 2)
+        ns.MapView.Show(view, pair, "trash")
+        assertFalse(view.tag:IsShown())
+        assertFalse(view.pins[2].ring:IsShown())
+    end)
+end)

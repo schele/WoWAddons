@@ -7,16 +7,19 @@ recipes, quest starters, keys, and what is in the chests.
 Open it with `/bl` or the minimap button. On the left, the instances
 (Dungeons and Raids tabs, with level ranges) and a search box. In the middle,
 the bosses in kill order, each with its portrait and a number. On the right,
-the boss itself: its model, and a map of the instance with every boss pinned
-by number; click the map for a big one, with every boss named beside its pin
-and the entrance marked, and click a pin to jump to that boss.
+the boss itself: its model (drag it to turn it), and a map of the instance
+with every boss pinned by number; click the map for a big one, with every
+boss named beside its pin and the entrance marked, and click a pin to jump to
+that boss. On the big map, scroll to zoom in on the cursor, drag to move
+around, and right-click to see the whole map again.
 Under that, the loot in two columns. At the bottom of the boss list,
 **Notable drops** holds the trash and chest finds.
 
 The map is a floor plan worked out from where the instance's mobs stand,
 how far they wander and where they patrol, so it shows the rooms and
-corridors they use rather than every wall. A boss that only appears when a
-script summons it has no pin.
+corridors they use rather than every wall. An instance in several parts far
+apart, like Scarlet Monastery's four wings, has its parts packed close
+together. A boss that only appears when a script summons it has no pin.
 
 A loot row works like an item anywhere else: hover for the tooltip,
 shift-click to link it in chat, ctrl-click to preview it on your character.

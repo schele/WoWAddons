@@ -71,6 +71,16 @@ local function makeWidget(kind, parent, template, env)
     function widget:GetParent() return self.parent end
     function widget:GetCenter() return self.centerX or 0, self.centerY or 0 end
     function widget:GetEffectiveScale() return 1 end
+    -- Screen position: a test sets left and top to put a frame somewhere.
+    function widget:GetLeft() return self.left or 0 end
+    function widget:GetTop() return self.top or self.height end
+    -- Scroll frames.
+    function widget:SetScrollChild(child) self.scrollChild = child end
+    function widget:SetHorizontalScroll(value) self.horizontalScroll = value end
+    function widget:GetHorizontalScroll() return self.horizontalScroll or 0 end
+    function widget:SetVerticalScroll(value) self.verticalScroll = value end
+    function widget:GetVerticalScroll() return self.verticalScroll or 0 end
+    function widget:UpdateScrollChildRect() end
 
     function widget:SetText(value)
         self.text = value or ""

@@ -30,6 +30,7 @@ local RAIL_ROW = 18
 local BOSS_ROW = 34
 local LOOT_ROW = ns.LootRow.HEIGHT + 2
 local INSET_WIDTH, INSET_HEIGHT = 150, 84
+local TURN_PER_PIXEL = 0.02 -- radians the boss's model turns per pixel dragged
 local MORE_HEIGHT = 16
 -- While the big map covers the boss page, the boss list keeps this many rows
 -- and the loot moves into the space under them.
@@ -376,6 +377,7 @@ local function drawHeader(instance, selection)
         end
         if ns.Portrait.SetModel(header.model, boss.display) then
             header.model.shownDisplay = boss.display
+            header.model.turnedByHand = false
             header.portrait:Hide()
             return
         end
@@ -550,13 +552,31 @@ local function createHeader(parent)
     header:SetPoint("TOPLEFT", parent, "TOPLEFT", PAGE_LEFT, -TOP)
     header:SetSize(PAGE_WIDTH, HEADER_HEIGHT)
 
-    -- The boss, turning slowly.
+    -- The boss, turning slowly. Dragged, it turns with the cursor, and stays
+    -- where it is left until another boss is picked.
     header.model = CreateFrame("PlayerModel", nil, header)
     header.model:SetSize(84, 84)
     header.model:SetPoint("LEFT", header, "LEFT", 4, 0)
     header.model.facing = 0
+    header.model:EnableMouse(true)
+    header.model:SetScript("OnMouseDown", function(self, button)
+        if button == "LeftButton" then
+            self.dragX = GetCursorPosition() / self:GetEffectiveScale()
+            self.turnedByHand = true
+        end
+    end)
+    header.model:SetScript("OnMouseUp", function(self)
+        self.dragX = nil
+    end)
     header.model:SetScript("OnUpdate", function(self, elapsed)
-        self.facing = (self.facing + (elapsed or 0) * 0.4) % (math.pi * 2)
+        if self.dragX then
+            local x = GetCursorPosition() / self:GetEffectiveScale()
+            self.facing = self.facing + (x - self.dragX) * TURN_PER_PIXEL
+            self.dragX = x
+        elseif not self.turnedByHand then
+            self.facing = self.facing + (elapsed or 0) * 0.4
+        end
+        self.facing = self.facing % (math.pi * 2)
         if self.SetFacing then
             self:SetFacing(self.facing)
         end
@@ -711,14 +731,15 @@ local function create()
     frame.fullMap.view = ns.MapView.Create(frame.fullMap, PAGE_WIDTH, columnHeight, {
         pinSize = 20,
         labels = true,
+        zoom = true,
         onPinClick = function(bossIndex)
             Window.SelectBoss(bossIndex)
             Window.CloseMap()
         end,
     })
     frame.fullMap.view:SetPoint("TOPLEFT", frame.fullMap, "TOPLEFT", 0, 0)
-    -- The instance's name in the corner, on the map itself so it draws over it.
-    frame.fullMap.title = frame.fullMap.view:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    -- The instance's name in the corner, above the map so it draws over it.
+    frame.fullMap.title = frame.fullMap.view.overlay:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     frame.fullMap.title:SetPoint("TOPLEFT", frame.fullMap.view, "TOPLEFT", 10, -8)
     frame.fullMap.close = createFrame("Button", nil, frame.fullMap, "UIPanelCloseButton")
     frame.fullMap.close:SetPoint("TOPRIGHT", frame.fullMap, "TOPRIGHT", 0, 0)

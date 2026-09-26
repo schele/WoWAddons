@@ -608,3 +608,42 @@ describe("the big map's title", function()
         assertEqual("Test Depths", ns.Window.Frame().fullMap.title:GetText())
     end)
 end)
+
+describe("turning the boss's model by hand", function()
+    local function withModels()
+        local ns, env = helpers.loadAddon()
+        helpers.sampleInstances(ns)
+        ns.instanceByKey.Depths.bosses[1].display = 8807
+        ns.instanceByKey.Depths.bosses[2].display = 8808
+        helpers.login(ns, env)
+        ns.Window.Open()
+        return ns, env, ns.Window.Frame().header.model
+    end
+
+    it("turns the boss as the cursor drags across it", function()
+        local ns, env, model = withModels()
+        local start = model.facing
+        env.__cursorX = 100
+        model.scripts.OnMouseDown(model, "LeftButton")
+        env.__cursorX = 150
+        model.scripts.OnUpdate(model, 0)
+        assertTrue(math.abs(model.facing - (start + 1)) < 1e-9, "50 pixels, a little under a third of a turn")
+        model.scripts.OnMouseUp(model, "LeftButton")
+        env.__cursorX = 300
+        model.scripts.OnUpdate(model, 0)
+        assertTrue(math.abs(model.facing - (start + 1)) < 1e-9, "not once let go")
+    end)
+
+    it("stays where it was turned to, until another boss is picked", function()
+        local ns, env, model = withModels()
+        env.__cursorX = 100
+        model.scripts.OnMouseDown(model, "LeftButton")
+        model.scripts.OnMouseUp(model, "LeftButton")
+        local facing = model.facing
+        model.scripts.OnUpdate(model, 1)
+        assertEqual(facing, model.facing, "no longer turning by itself")
+        ns.Window.SelectBoss(2)
+        model.scripts.OnUpdate(model, 1)
+        assertTrue(model.facing ~= facing, "the next boss turns by itself again")
+    end)
+end)

@@ -3,27 +3,38 @@ local addonName, ns = ...
 -- Draws an instance's generated floor plan into a frame of any size, with a
 -- numbered pin per boss that has a place and a marker at the entrance. The
 -- same view serves the header's inset and the full map; the full map also
--- writes each boss's name beside its pin.
+-- writes each boss's name beside its pin, and zooms: the mouse wheel zooms
+-- in on the cursor, a drag moves the map, a right-click shows it whole.
 --
 -- The floor comes as runs: row, first column, length. Each run is one strip
 -- of texture, so a whole instance is a few hundred strips rather than
 -- thousands of squares. Three layers give the walls some depth: the floor
 -- grown by a cell (a light rim), the floor itself, and the floor shrunk by a
 -- cell (a darker fill), so every room reads as sunk between raised edges.
+--
+-- Everything that moves with the map is drawn on the view's canvas. On the
+-- inset the canvas is the view itself; on the full map it is the child of a
+-- scroll frame, drawn as big as the zoom asks, of which the view shows part.
 
 local MapView = {}
 ns.MapView = MapView
+
+MapView.MAX_ZOOM = 4
 
 local EDGE = { 0.80, 0.68, 0.46 }
 local FLOOR = { 0.44, 0.35, 0.22 }
 local INNER = { 0.30, 0.24, 0.15 }
 local BACKGROUND = { 0.06, 0.045, 0.03 }
+local GOLD = { 1, 0.82, 0 }
 local PIN = "Interface\\COMMON\\Indicator-Red"
-local PIN_SELECTED = "Interface\\COMMON\\Indicator-Yellow"
 local ENTRANCE = "Interface\\COMMON\\Indicator-Green"
+-- A white disc: tinted gold behind a pin, it rings the picked boss.
+local RING = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local LABEL_HEIGHT = 12
 -- A pin this far right gets its name on its left, so it stays on the map.
 local LABEL_FLIP = 0.7
+local ZOOM_STEP = 1.25
+local HINT = "Scroll to zoom, drag to move, right-click for the whole map"
 
 --- How a map of cols by rows cells fits a width by height view: the size of
 -- a cell, and the margins that centre the map.
@@ -146,11 +157,127 @@ function MapView.Inner(map)
     return inner
 end
 
+-- Zooming ---------------------------------------------------------------
+
+-- The cursor's place on the view, from its top left.
+local function cursorOn(view)
+    local x, y = GetCursorPosition()
+    local scale = view:GetEffectiveScale()
+    return x / scale - (view:GetLeft() or 0), (view:GetTop() or 0) - y / scale
+end
+
+-- Only pins in sight show: one scrolled out of sight could still be hovered.
+local function showPinsInSight(view)
+    if not view.options.zoom then
+        return
+    end
+    local left, top = view:GetHorizontalScroll(), view:GetVerticalScroll()
+    local right, bottom = left + view:GetWidth(), top + view:GetHeight()
+    for i = 1, view.pinCount or 0 do
+        local button = view.pins[i]
+        button:SetShown(button.x >= left and button.x <= right and button.y >= top and button.y <= bottom)
+    end
+end
+
+-- Scroll the canvas to show from (x, y), kept so the map fills the view.
+local function scrollTo(view, x, y)
+    local maxX = view.canvas:GetWidth() - view:GetWidth()
+    local maxY = view.canvas:GetHeight() - view:GetHeight()
+    view:SetHorizontalScroll(math.max(0, math.min(maxX, x)))
+    view:SetVerticalScroll(math.max(0, math.min(maxY, y)))
+    showPinsInSight(view)
+end
+
+local function setZoom(view, zoom)
+    view.zoom = zoom
+    if view.canvas ~= view then
+        view.canvas:SetSize(view:GetWidth() * zoom, view:GetHeight() * zoom)
+        if view.UpdateScrollChildRect then
+            view:UpdateScrollChildRect()
+        end
+    end
+end
+
+--- Zoom by `factor`, between the whole map and MAX_ZOOM, keeping the spot at
+-- (x, y) from the view's top left where it is.
+function MapView.Zoom(view, factor, x, y)
+    local zoom = math.max(1, math.min(MapView.MAX_ZOOM, view.zoom * factor))
+    if zoom == view.zoom then
+        return
+    end
+    local ratio = zoom / view.zoom
+    local left = (view:GetHorizontalScroll() + x) * ratio - x
+    local top = (view:GetVerticalScroll() + y) * ratio - y
+    setZoom(view, zoom)
+    MapView.Show(view, view.instance, view.selected)
+    scrollTo(view, left, top)
+end
+
+--- Back to the whole map.
+function MapView.ResetZoom(view)
+    setZoom(view, 1)
+    MapView.Show(view, view.instance, view.selected)
+    scrollTo(view, 0, 0)
+end
+
+local function enableZoom(view)
+    view:EnableMouse(true)
+    view:EnableMouseWheel(true)
+    view:RegisterForDrag("LeftButton")
+
+    view:SetScript("OnMouseWheel", function(self, delta)
+        local x, y = cursorOn(self)
+        MapView.Zoom(self, delta > 0 and ZOOM_STEP or 1 / ZOOM_STEP, x, y)
+    end)
+    view:SetScript("OnDragStart", function(self)
+        self.dragFrom = { cursorOn(self) }
+    end)
+    view:SetScript("OnDragStop", function(self)
+        self.dragFrom = nil
+    end)
+    -- While dragged, the map follows the cursor.
+    view:SetScript("OnUpdate", function(self)
+        if not self.dragFrom then
+            return
+        end
+        local x, y = cursorOn(self)
+        scrollTo(self, self:GetHorizontalScroll() - (x - self.dragFrom[1]),
+            self:GetVerticalScroll() - (y - self.dragFrom[2]))
+        self.dragFrom = { x, y }
+    end)
+    view:SetScript("OnMouseUp", function(self, button)
+        if button == "RightButton" then
+            MapView.ResetZoom(self)
+        end
+    end)
+
+    view.hint = view.overlay:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    view.hint:SetPoint("BOTTOMLEFT", view, "BOTTOMLEFT", 8, 6)
+    view.hint:SetText(HINT)
+end
+
+-- Drawing ---------------------------------------------------------------
+
 function MapView.Create(parent, width, height, options)
     options = options or {}
-    local view = CreateFrame("Button", nil, parent)
+    local view
+    if options.zoom then
+        view = CreateFrame("ScrollFrame", nil, parent)
+        view.canvas = CreateFrame("Frame", nil, view)
+        view.canvas:SetSize(width, height)
+        view:SetScrollChild(view.canvas)
+        -- Above the map and its pins, for what stays put: the hint, a title.
+        view.overlay = CreateFrame("Frame", nil, view)
+        view.overlay:SetAllPoints(view)
+        view.overlay:SetFrameLevel(view.canvas:GetFrameLevel() + 5)
+    else
+        view = CreateFrame("Button", nil, parent)
+        view.canvas = view
+        view.overlay = view
+    end
     view:SetSize(width, height)
     view.options = options
+    view.zoom = 1
     view.edges = {}
     view.floor = {}
     view.inner = {}
@@ -161,14 +288,23 @@ function MapView.Create(parent, width, height, options)
     view.background:SetAllPoints()
     view.background:SetColorTexture(BACKGROUND[1], BACKGROUND[2], BACKGROUND[3], 1)
 
-    view.entrance = view:CreateTexture(nil, "OVERLAY")
+    local canvas = view.canvas
+    view.entrance = canvas:CreateTexture(nil, "OVERLAY")
     view.entrance:SetSize(12, 12)
     view.entrance:SetTexture(ENTRANCE)
     view.entrance:Hide()
-    view.entranceLabel = view:CreateFontString(nil, "OVERLAY", "GameFontGreenSmall")
+    view.entranceLabel = canvas:CreateFontString(nil, "OVERLAY", "GameFontGreenSmall")
     view.entranceLabel:SetText("Entrance")
     view.entranceLabel:Hide()
 
+    -- The dark tag behind the picked boss's name: over the floor, under the text.
+    view.tag = canvas:CreateTexture(nil, "ARTWORK", nil, 7)
+    view.tag:SetColorTexture(0, 0, 0, 0.65)
+    view.tag:Hide()
+
+    if options.zoom then
+        enableZoom(view)
+    end
     return view
 end
 
@@ -194,11 +330,18 @@ local function pin(view, index)
     end
 
     local size = view.options.pinSize or 16
-    button = CreateFrame("Button", nil, view)
+    button = CreateFrame("Button", nil, view.canvas)
     button:SetSize(size, size)
-    button:SetFrameLevel(view:GetFrameLevel() + 2)
+    button:SetFrameLevel(view.canvas:GetFrameLevel() + 2)
+    button.ring = button:CreateTexture(nil, "BACKGROUND")
+    button.ring:SetSize(size + 8, size + 8)
+    button.ring:SetPoint("CENTER", button, "CENTER", 0, 0)
+    button.ring:SetTexture(RING)
+    button.ring:SetVertexColor(GOLD[1], GOLD[2], GOLD[3], 1)
+    button.ring:Hide()
     button.icon = button:CreateTexture(nil, "ARTWORK")
     button.icon:SetAllPoints()
+    button.icon:SetTexture(PIN)
     button.text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     button.text:SetPoint("CENTER", button, "CENTER", 0, 0)
 
@@ -220,7 +363,7 @@ end
 local function label(view, index)
     local text = view.labels[index]
     if not text then
-        text = view:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        text = view.canvas:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         view.labels[index] = text
     end
     return text
@@ -228,16 +371,17 @@ end
 
 -- One layer of strips from a run list, reusing the pool's textures.
 local function drawStrips(view, pool, runs, sublevel, colour, scale, offsetX, offsetY)
+    local canvas = view.canvas
     local count = 0
     for i = 1, #runs, 3 do
         count = count + 1
         local strip = pool[count]
         if not strip then
-            strip = view:CreateTexture(nil, "ARTWORK", nil, sublevel)
+            strip = canvas:CreateTexture(nil, "ARTWORK", nil, sublevel)
             pool[count] = strip
         end
         strip:ClearAllPoints()
-        strip:SetPoint("TOPLEFT", view, "TOPLEFT", offsetX + runs[i + 1] * scale, -(offsetY + runs[i] * scale))
+        strip:SetPoint("TOPLEFT", canvas, "TOPLEFT", offsetX + runs[i + 1] * scale, -(offsetY + runs[i] * scale))
         strip:SetSize(runs[i + 2] * scale, scale)
         strip:SetColorTexture(colour[1], colour[2], colour[3], 1)
         strip:Show()
@@ -265,9 +409,12 @@ end
 
 -- Each pinned boss's name beside its pin: on the right, or on the left near
 -- the right edge, nudged down a line at a time off any name already there.
+-- The picked boss's name is gold, on a dark tag.
 local function drawLabels(view, placedPins, selected)
+    local canvas = view.canvas
     local placed = {}
     local half = (view.options.pinSize or 16) / 2 + 2
+    view.tag:Hide()
     for index, spot in ipairs(placedPins) do
         local text = label(view, index)
         text:SetText(spot.name)
@@ -285,14 +432,18 @@ local function drawLabels(view, placedPins, selected)
 
         text:ClearAllPoints()
         if onLeft then
-            text:SetPoint("RIGHT", view, "TOPLEFT", spot.x - half, -y)
+            text:SetPoint("RIGHT", canvas, "TOPLEFT", spot.x - half, -y)
             text:SetJustifyH("RIGHT")
         else
-            text:SetPoint("LEFT", view, "TOPLEFT", spot.x + half, -y)
+            text:SetPoint("LEFT", canvas, "TOPLEFT", spot.x + half, -y)
             text:SetJustifyH("LEFT")
         end
         if spot.boss == selected then
-            text:SetTextColor(1, 0.82, 0)
+            text:SetTextColor(GOLD[1], GOLD[2], GOLD[3])
+            view.tag:ClearAllPoints()
+            view.tag:SetPoint("CENTER", canvas, "TOPLEFT", x0 + width / 2, -y)
+            view.tag:SetSize(width + 10, LABEL_HEIGHT + 5)
+            view.tag:Show()
         else
             text:SetTextColor(0.95, 0.92, 0.85)
         end
@@ -304,8 +455,21 @@ local function drawLabels(view, placedPins, selected)
 end
 
 function MapView.Show(view, instance, selected)
+    -- Another instance starts at its whole map; another boss keeps the zoom.
+    if instance ~= view.instance then
+        view.instance = instance
+        setZoom(view, 1)
+        if view.options.zoom then
+            view:SetHorizontalScroll(0)
+            view:SetVerticalScroll(0)
+        end
+    end
+    view.selected = selected
+
     hideAll(view.pins)
     hideAll(view.labels)
+    view.pinCount = 0
+    view.tag:Hide()
     view.entrance:Hide()
     view.entranceLabel:Hide()
 
@@ -318,14 +482,15 @@ function MapView.Show(view, instance, selected)
         return
     end
 
-    local width, height = view:GetWidth(), view:GetHeight()
+    local canvas = view.canvas
+    local width, height = canvas:GetWidth(), canvas:GetHeight()
     local scale, offsetX, offsetY = MapView.Layout(map, width, height)
     local function place(fraction)
         return offsetX + fraction[1] * map.cols * scale, offsetY + fraction[2] * map.rows * scale
     end
 
-    -- The strips only change with the map or the view's size; a redraw of the
-    -- same map (a new boss picked, an item arrived) touches just the pins.
+    -- The strips only change with the map or the canvas's size; a redraw of
+    -- the same map (a new boss picked, an item arrived) touches just the pins.
     if view.shownMap ~= map or view.shownWidth ~= width or view.shownHeight ~= height then
         drawStrips(view, view.edges, MapView.Outline(map), 0, EDGE, scale, offsetX, offsetY)
         drawStrips(view, view.floor, map.runs, 1, FLOOR, scale, offsetX, offsetY)
@@ -336,7 +501,7 @@ function MapView.Show(view, instance, selected)
     if instance.entrance then
         local x, y = place(instance.entrance)
         view.entrance:ClearAllPoints()
-        view.entrance:SetPoint("CENTER", view, "TOPLEFT", x, -y)
+        view.entrance:SetPoint("CENTER", canvas, "TOPLEFT", x, -y)
         view.entrance:Show()
         if view.options.labels then
             view.entranceLabel:ClearAllPoints()
@@ -353,16 +518,19 @@ function MapView.Show(view, instance, selected)
             button.boss = bossIndex
             button.name = boss.name
             button.selected = bossIndex == selected
+            button.x, button.y = x, y
             button.text:SetText(tostring(bossIndex))
-            button.icon:SetTexture(button.selected and PIN_SELECTED or PIN)
+            button.ring:SetShown(button.selected)
             button:ClearAllPoints()
-            button:SetPoint("CENTER", view, "TOPLEFT", x, -y)
+            button:SetPoint("CENTER", canvas, "TOPLEFT", x, -y)
             button:Show()
             table.insert(placedPins, { boss = bossIndex, name = boss.name, x = x, y = y, fraction = boss.pin[1] })
         end
     end
+    view.pinCount = #placedPins
 
     if view.options.labels then
         drawLabels(view, placedPins, selected)
     end
+    showPinsInSight(view)
 end
