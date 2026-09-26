@@ -10,7 +10,7 @@ the bosses in kill order, each with its portrait and a number. On the right,
 the boss itself: its model (drag it to turn it), and a map of the instance
 with every boss pinned by number; click the map for a big one, with every
 boss named beside its pin and the entrance marked, and click a pin to jump to
-that boss. On the big map, scroll to zoom in on the cursor, drag to move
+that boss. On the big map, scroll to zoom in on the cursor or out, drag to move
 around, and right-click to see the whole map again.
 Under that, the loot in two columns. At the bottom of the boss list,
 **Notable drops** holds the trash and chest finds.

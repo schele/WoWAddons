@@ -19,12 +19,24 @@ local addonName, ns = ...
 local MapView = {}
 ns.MapView = MapView
 
+MapView.MIN_ZOOM = 0.5
 MapView.MAX_ZOOM = 4
 
-local EDGE = { 0.80, 0.68, 0.46 }
-local FLOOR = { 0.44, 0.35, 0.22 }
-local INNER = { 0.30, 0.24, 0.15 }
 local BACKGROUND = { 0.06, 0.045, 0.03 }
+-- How strongly the floor shows over the background: faint, so the names and
+-- pins, at full strength, stand out. Mixed into the colours rather than set
+-- as alpha, since the three layers overlap and would show through each other.
+local MAP_STRENGTH = 0.6
+local function faint(colour)
+    local mixed = {}
+    for i = 1, 3 do
+        mixed[i] = BACKGROUND[i] + (colour[i] - BACKGROUND[i]) * MAP_STRENGTH
+    end
+    return mixed
+end
+local EDGE = faint({ 0.80, 0.68, 0.46 })
+local FLOOR = faint({ 0.44, 0.35, 0.22 })
+local INNER = faint({ 0.30, 0.24, 0.15 })
 local GOLD = { 1, 0.82, 0 }
 local PIN = "Interface\\COMMON\\Indicator-Red"
 local ENTRANCE = "Interface\\COMMON\\Indicator-Green"
@@ -188,20 +200,23 @@ local function scrollTo(view, x, y)
     showPinsInSight(view)
 end
 
+-- Zoomed in, the canvas grows past the view; zoomed out, it stays the
+-- view's size and the map is drawn smaller in its middle.
 local function setZoom(view, zoom)
     view.zoom = zoom
     if view.canvas ~= view then
-        view.canvas:SetSize(view:GetWidth() * zoom, view:GetHeight() * zoom)
+        local grown = math.max(1, zoom)
+        view.canvas:SetSize(view:GetWidth() * grown, view:GetHeight() * grown)
         if view.UpdateScrollChildRect then
             view:UpdateScrollChildRect()
         end
     end
 end
 
---- Zoom by `factor`, between the whole map and MAX_ZOOM, keeping the spot at
--- (x, y) from the view's top left where it is.
+--- Zoom by `factor`, between MIN_ZOOM and MAX_ZOOM (1 fits the whole map),
+-- keeping the spot at (x, y) from the view's top left where it is.
 function MapView.Zoom(view, factor, x, y)
-    local zoom = math.max(1, math.min(MapView.MAX_ZOOM, view.zoom * factor))
+    local zoom = math.max(MapView.MIN_ZOOM, math.min(MapView.MAX_ZOOM, view.zoom * factor))
     if zoom == view.zoom then
         return
     end
@@ -485,9 +500,17 @@ function MapView.Show(view, instance, selected)
         return
     end
 
+    -- The map is laid out in the view's size times the zoom, in the middle of
+    -- the canvas: the same thing zoomed in, where the canvas is that size,
+    -- and a smaller map in the middle zoomed out, where the canvas is not.
     local canvas = view.canvas
     local width, height = canvas:GetWidth(), canvas:GetHeight()
+    if canvas ~= view then
+        width, height = view:GetWidth() * view.zoom, view:GetHeight() * view.zoom
+    end
     local scale, offsetX, offsetY = MapView.Layout(map, width, height)
+    offsetX = offsetX + (canvas:GetWidth() - width) / 2
+    offsetY = offsetY + (canvas:GetHeight() - height) / 2
     local function place(fraction)
         return offsetX + fraction[1] * map.cols * scale, offsetY + fraction[2] * map.rows * scale
     end

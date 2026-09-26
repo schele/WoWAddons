@@ -198,13 +198,26 @@ describe("zooming the big map", function()
         assertEqual(60 * view.zoom - 60, view:GetVerticalScroll())
     end)
 
-    it("zooms out no further than the whole map, and in only so far", function()
+    it("zooms out, and in, only so far", function()
         local ns, env = helpers.loadAddon(FILES)
         local view = zoomable(env, ns, 150, 100)
-        view.scripts.OnMouseWheel(view, -1)
-        assertEqual(1, view.zoom)
+        for _ = 1, 30 do view.scripts.OnMouseWheel(view, -1) end
+        assertEqual(ns.MapView.MIN_ZOOM, view.zoom)
         for _ = 1, 30 do view.scripts.OnMouseWheel(view, 1) end
         assertEqual(ns.MapView.MAX_ZOOM, view.zoom)
+    end)
+
+    it("zoomed out, draws the map smaller in the middle of the frame", function()
+        -- The 3 by 2 map fills the 300 by 200 frame at 100 a cell.
+        local ns, env = helpers.loadAddon(FILES)
+        local view = zoomable(env, ns, 0, 0)
+        view.scripts.OnMouseWheel(view, -1)
+        assertTrue(view.zoom < 1)
+        assertEqual(300 * view.zoom, view.floor[1]:GetWidth(), "the top row, drawn smaller")
+        local _, _, _, x, y = view.floor[1]:GetPoint(1)
+        assertEqual((300 - 300 * view.zoom) / 2, x, "centred across")
+        assertEqual(-(200 - 200 * view.zoom) / 2, y, "and down")
+        assertEqual(0, view:GetHorizontalScroll())
     end)
 
     it("moves the zoomed map when dragged", function()
@@ -313,5 +326,21 @@ describe("the ring round the picked boss's pin", function()
         }, 1)
         assertTrue(view.pins[1].ring:GetWidth() <= 20, "no wider than the pin")
         assertTrue(view.pins[1].ring:GetWidth() > 14, "but still round the ball")
+    end)
+end)
+
+describe("the map's strength", function()
+    it("draws the floor faintly, and the names and pins at full strength", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = ns.MapView.Create(env.UIParent, 300, 300, { labels = true })
+        ns.MapView.Show(view, {
+            name = "One", map = { cols = 3, rows = 3, runs = { 0, 0, 3, 1, 0, 3, 2, 0, 3 } },
+            bosses = { { name = "Boss", pin = { 0.5, 0.5 }, loot = {} } },
+        })
+        local rim, floor = view.edges[1].colorTexture, view.floor[1].colorTexture
+        assertTrue(rim[1] < 0.6, "the rim no longer glares")
+        assertTrue(floor[1] < 0.35, "the floor darker")
+        assertTrue(floor[1] > view.background.colorTexture[1], "but still there")
+        assertEqual(0.95, view.labels[1].textColor[1], "names as bright as before")
     end)
 end)
