@@ -60,6 +60,21 @@ function Index.IsHidden(key)
     return ns.db ~= nil and ns.db.hidden[key] == true
 end
 
+--- Every item of the instances on the list, once each, in first-seen order:
+-- one dropped only in hidden instances is left out.
+function Index.AllItemIDs()
+    local ids = {}
+    for _, itemID in ipairs(allItems) do
+        for _, source in ipairs(sources[itemID]) do
+            if not Index.IsHidden(source.instance) then
+                table.insert(ids, itemID)
+                break
+            end
+        end
+    end
+    return ids
+end
+
 --- The visible instances of one kind, lowest level first.
 function Index.Instances(kind)
     local list = {}

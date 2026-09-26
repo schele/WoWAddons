@@ -184,8 +184,10 @@ function stub.newEnv()
     env.__items = {}
     env.__requested = {}
     env.__requestCount = {}
+    env.__requestOrder = {}
     env.C_Item = {
         GetItemInfo = function(id)
+            env.__infoCalls = (env.__infoCalls or 0) + 1
             local item = env.__items[id]
             if not item then return nil end
             return item.name, "|Hitem:" .. id .. "|h[" .. item.name .. "]|h", item.quality or 1,
@@ -194,6 +196,7 @@ function stub.newEnv()
         GetItemIconByID = function(id) return 100000 + id end,
         RequestLoadItemDataByID = function(id)
             env.__requested[id] = true
+            table.insert(env.__requestOrder, id)
             env.__requestCount[id] = (env.__requestCount[id] or 0) + 1
         end,
     }

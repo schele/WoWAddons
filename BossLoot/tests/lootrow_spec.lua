@@ -221,3 +221,18 @@ describe("how far a list of items has loaded", function()
         assertEqual(0, ns.LootRow.Status({ 5003 }).failed, "loading again")
     end)
 end)
+
+describe("a long wait for items", function()
+    it("looks at only as many waiting items each moment as it can ask for", function()
+        -- Every item in the game waiting: going over them all four times a
+        -- second would stall the game.
+        local ns, env = helpers.loadAddon(FILES)
+        for id = 10001, 12000 do ns.LootRow.RequestLoad(id) end
+        env.__infoCalls = 0
+        env.__runTimers()
+        assertTrue(env.__infoCalls < 100, "looked at " .. env.__infoCalls)
+        local asked = 0
+        for _ in pairs(env.__requestCount) do asked = asked + 1 end
+        assertEqual(16, asked, "and still asks for the next few")
+    end)
+end)

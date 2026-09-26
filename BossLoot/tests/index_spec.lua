@@ -80,3 +80,14 @@ describe("search", function()
         assertEqual(0, #result.items)
     end)
 end)
+
+describe("every item", function()
+    it("lists each item of the instances on the list once, leaving out hidden ones", function()
+        local ns = helpers.loggedIn()
+        assertEqual("1001,1002,1003,1004,2001,3001,3002", table.concat(ns.Index.AllItemIDs(), ","))
+        ns.db.hidden.Spire = true
+        assertEqual("1001,1002,1003,1004,2001", table.concat(ns.Index.AllItemIDs(), ","))
+        ns.db.hidden.Depths = true
+        assertEqual("1001", table.concat(ns.Index.AllItemIDs(), ","), "the raid still has one")
+    end)
+end)

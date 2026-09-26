@@ -135,17 +135,26 @@ function tick()
         end
     end
 
+    -- Only as far along the queue as there is room to ask: with every item
+    -- in the game waiting, looking them all over each tick would stall the
+    -- game. The rest are looked at when they reach the front.
     local keep = {}
-    for _, itemID in ipairs(queue) do
+    local index = 1
+    while index <= #queue and tokens > 0 do
+        local itemID = queue[index]
         if loaded(itemID) then
             waiting[itemID] = nil
-        elseif tokens > 0 and (notBefore[itemID] or 0) <= time then
+        elseif (notBefore[itemID] or 0) <= time then
             waiting[itemID] = nil
             tokens = tokens - 1
             send(itemID)
         else
             table.insert(keep, itemID)
         end
+        index = index + 1
+    end
+    for rest = index, #queue do
+        table.insert(keep, queue[rest])
     end
     queue = keep
 
@@ -196,12 +205,17 @@ local function givenUp(itemID)
         and not inFlight[itemID] and not waiting[itemID]
 end
 
+-- Items seen loaded this session. Items do not unload, and a count of every
+-- item in the game, twice a second, should not look each one up again.
+local seenLoaded = {}
+
 --- How far a list of items has loaded: counts of the items that are loaded
 -- (the client's or a saved copy), still loading, and given up on.
 function LootRow.Status(itemIDs)
     local status = { total = #itemIDs, loaded = 0, loading = 0, failed = 0 }
     for _, itemID in ipairs(itemIDs) do
-        if LootRow.ItemInfo(itemID) then
+        if seenLoaded[itemID] or LootRow.ItemInfo(itemID) then
+            seenLoaded[itemID] = true
             status.loaded = status.loaded + 1
         elseif givenUp(itemID) then
             status.failed = status.failed + 1

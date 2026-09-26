@@ -27,7 +27,9 @@ shift-click to link it in chat, ctrl-click to preview it on your character.
 Items your client has not seen before show as "Loading item..." for a moment
 and fill in by themselves; a bar in the top row, over the boss page, counts the
 instance's items as they load. Items the server never sends are counted as
-failed on the bar, and a click on it asks for them again. BossLoot saves every item it loads, so the next
+failed on the bar, and a click on it asks for them again. With the window
+open, every item is loaded in the background, the open instance's first,
+and a second bar over the boss list counts them all. BossLoot saves every item it loads, so the next
 session shows them at once without asking the server. After a game patch the
 saved items still show, and each is checked with the server again the next
 time it is on screen. Changing the client's language starts the saved list

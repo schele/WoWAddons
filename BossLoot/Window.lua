@@ -42,6 +42,8 @@ local MODEL_NEAREST, MODEL_FARTHEST = 0.3, 3
 local PROGRESS_WIDTH = PAGE_WIDTH - 36
 local PROGRESS_HEIGHT = 14
 local PROGRESS_POLL = 0.5 -- seconds between counts while items load
+-- The bar for every item, over the boss column.
+local ALL_PROGRESS_LEFT = PADDING + RAIL_WIDTH + GAP
 local MORE_HEIGHT = 16
 -- While the big map covers the boss page, the boss list keeps this many rows
 -- and the loot moves into the space under them.
@@ -246,6 +248,22 @@ function Window.Current()
     return instance, view.boss
 end
 
+-- Every item of the instances on the list, worked out again when one is
+-- hidden or brought back.
+local everyItemList
+local function everyItem()
+    everyItemList = everyItemList or ns.Index.AllItemIDs()
+    return everyItemList
+end
+
+-- Ask for every item, behind whatever is already waiting: the open
+-- instance's, and the rows on screen, go first.
+local function loadEverything()
+    for _, itemID in ipairs(everyItem()) do
+        ns.LootRow.RequestLoad(itemID)
+    end
+end
+
 local function preload(instance)
     for _, itemID in ipairs(ns.Index.ItemIDs(instance.key)) do
         if not ns.LootRow.ItemInfo(itemID) then
@@ -325,6 +343,7 @@ function Window.HideInstance(key)
         return
     end
     ns.db.hidden[key] = true
+    everyItemList = nil
     ns.Print(string.format("Hid %s. Type /bl unhide to bring hidden instances back.", instance.name))
     Window.Refresh()
 end
@@ -366,24 +385,37 @@ local function updateProgress(bar)
     end
 
     local function widthFor(count)
-        return math.max(0.001, PROGRESS_WIDTH * count / status.total)
+        return math.max(0.001, bar:GetWidth() * count / status.total)
     end
     bar.fill:SetWidth(widthFor(status.loaded))
     bar.fill:SetShown(status.loaded > 0)
     bar.failedFill:SetWidth(widthFor(status.failed))
     bar.failedFill:SetShown(status.failed > 0)
 
-    local count = status.loaded .. " / " .. status.total
-    if status.loading > 0 then
-        local text = "Loading items " .. count
-        if status.failed > 0 then
-            text = text .. ", " .. status.failed .. " failed"
-        end
-        bar.text:SetText(text)
-    else
-        bar.text:SetText(count .. " items, " .. status.failed .. " failed: click to retry")
-    end
+    bar.text:SetText(bar.describe(status))
     bar:Show()
+end
+
+-- What the instance's bar says.
+local function describeInstance(status)
+    local count = status.loaded .. " / " .. status.total
+    if status.loading == 0 then
+        return count .. " items, " .. status.failed .. " failed: click to retry"
+    end
+    local text = "Loading items " .. count
+    if status.failed > 0 then
+        text = text .. ", " .. status.failed .. " failed"
+    end
+    return text
+end
+
+-- What the bar for every item says: short, over the narrower boss column.
+local function describeAll(status)
+    local text = "All items " .. status.loaded .. " / " .. status.total
+    if status.failed > 0 then
+        text = text .. " (" .. status.failed .. " failed)"
+    end
+    return text
 end
 
 local function progressTooltip(bar)
@@ -392,7 +424,7 @@ local function progressTooltip(bar)
         return
     end
     GameTooltip:SetOwner(bar, "ANCHOR_BOTTOM")
-    GameTooltip:SetText("Loot items")
+    GameTooltip:SetText(bar.title)
     GameTooltip:AddLine(status.loaded .. " loaded", 0.4, 0.9, 0.4)
     GameTooltip:AddLine(status.loading .. " loading", 1, 1, 1)
     if status.failed > 0 then
@@ -402,10 +434,12 @@ local function progressTooltip(bar)
     GameTooltip:Show()
 end
 
-local function createProgress(parent)
+-- A loading bar in the window's top row, `left` across and `width` wide.
+local function createProgress(parent, left, width, title, describe)
     local bar = CreateFrame("Button", nil, parent)
-    bar:SetSize(PROGRESS_WIDTH, PROGRESS_HEIGHT)
-    bar:SetPoint("TOPLEFT", parent, "TOPLEFT", PAGE_LEFT, -(PADDING + 7))
+    bar:SetSize(width, PROGRESS_HEIGHT)
+    bar:SetPoint("TOPLEFT", parent, "TOPLEFT", left, -(PADDING + 7))
+    bar.title, bar.describe = title, describe
     bar:RegisterForClicks("LeftButtonUp")
 
     bar.background = bar:CreateTexture(nil, "BACKGROUND")
@@ -589,6 +623,8 @@ function Window.Refresh()
     drawModelView(instance, selection)
     frame.progress.itemIDs = instance and ns.Index.ItemIDs(instance.key) or {}
     updateProgress(frame.progress)
+    frame.allProgress.itemIDs = everyItem()
+    updateProgress(frame.allProgress)
     local pinned = type(selection) == "number" and selection or nil
     ns.MapView.Show(frame.inset, instance, pinned)
     if frame.fullMap:IsShown() then
@@ -891,7 +927,8 @@ local function create()
     end)
     frame.close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
 
-    frame.progress = createProgress(frame)
+    frame.progress = createProgress(frame, PAGE_LEFT, PROGRESS_WIDTH, "Items in this instance", describeInstance)
+    frame.allProgress = createProgress(frame, ALL_PROGRESS_LEFT, BOSS_WIDTH, "Every item in BossLoot", describeAll)
 
     -- The rail: search, tabs, instances.
     local search = createFrame("EditBox", nil, frame, "InputBoxTemplate")
@@ -1001,6 +1038,7 @@ local function create()
         if instance then
             preload(instance)
         end
+        loadEverything()
         Window.Refresh()
     end)
 
@@ -1034,6 +1072,10 @@ ns.RegisterCommand("unhide", "Bring back every instance you hid", function()
         ns.db.hidden[key] = nil
     end
     ns.Print("Every instance is back on the list.")
+    everyItemList = nil
+    if frame and frame:IsShown() then
+        loadEverything()
+    end
     Window.Refresh()
 end)
 

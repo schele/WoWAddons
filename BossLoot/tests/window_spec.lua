@@ -816,3 +816,63 @@ describe("the item loading bar's place", function()
         assertEqual(2, #text.points, "held at both ends of the bar")
     end)
 end)
+
+describe("loading every item", function()
+    -- The samples hold seven items: five in Test Depths, two in Low Spire,
+    -- and the raid's one is also Test Depths' first.
+    local function opened(loaded)
+        local ns, env = helpers.loggedIn()
+        for _, id in ipairs(loaded or {}) do env.__items[id] = { name = "Item " .. id, quality = 2 } end
+        ns.Window.Open()
+        return ns, env, ns.Window.Frame().allProgress
+    end
+
+    it("asks for every item once the window opens, behind the open instance's", function()
+        local ns, env = opened()
+        env.__runTimers()
+        local position = {}
+        for index, id in ipairs(env.__requestOrder) do position[id] = position[id] or index end
+        assertTrue(position[3001] and position[3002], "Low Spire's too, though Test Depths is open")
+        assertTrue(position[2001] < position[3001], "after Test Depths' own")
+    end)
+
+    it("counts every item on a bar of its own", function()
+        local ns, env, bar = opened({ 1001, 3001 })
+        assertTrue(bar:IsShown())
+        assertEqual("All items 2 / 7", bar.text:GetText())
+        assertEqual(bar:GetWidth() * 2 / 7, bar.fill:GetWidth())
+    end)
+
+    it("moves as items arrive, and is gone once all have", function()
+        local ns, env, bar = opened({ 1001, 1002, 1003, 1004, 2001, 3001 })
+        assertEqual("All items 6 / 7", bar.text:GetText())
+        env.__items[3002] = { name = "Last", quality = 2 }
+        bar.scripts.OnUpdate(bar, 1)
+        assertFalse(bar:IsShown())
+    end)
+
+    it("leaves out the items of hidden instances", function()
+        local ns, env, bar = opened({ 1001 })
+        ns.Window.HideInstance("Spire")
+        assertEqual("All items 1 / 5", bar.text:GetText())
+        helpers.command(env, "unhide")
+        assertEqual("All items 1 / 7", bar.text:GetText())
+    end)
+
+    it("says how many failed, and asks for them again on a click", function()
+        local ns, env, bar = opened({ 1001 })
+        env.__now = 100
+        function env.GetTime() return env.__now end
+        for _ = 1, 10 do
+            env.__now = env.__now + 11
+            env.__runTimers()
+            env.__runTimers()
+        end
+        bar.scripts.OnUpdate(bar, 1)
+        assertEqual("All items 1 / 7 (6 failed)", bar.text:GetText())
+        local asked = env.__requestCount[3002]
+        bar.scripts.OnClick(bar, "LeftButton")
+        assertEqual(asked + 1, env.__requestCount[3002])
+        assertEqual("All items 1 / 7", bar.text:GetText())
+    end)
+end)
