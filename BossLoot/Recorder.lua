@@ -336,8 +336,11 @@ end
 -- The calls the recorder (and the gear finder after it) uses.
 local PROBED = {
     "GetNumLootItems", "GetLootSlotLink", "GetLootSlotInfo", "GetLootSourceInfo", "GetInstanceInfo",
-    "UnitGUID", "GetQuestID", "GetQuestItemLink", "GetMerchantItemLink", "GetMerchantItemInfo",
-    "GetTradeSkillLine", "GetTradeSkillItemLink", "GetItemStats",
+    "GetRealZoneText", "UnitGUID", "UnitName", "UnitIsDead", "IsFishingLoot",
+    "GetQuestID", "GetTitleText", "GetNumQuestRewards", "GetNumQuestChoices", "GetQuestItemLink",
+    "UnitFactionGroup", "GetMerchantNumItems", "GetMerchantItemLink", "GetMerchantItemInfo",
+    "GetTradeSkillLine", "GetNumTradeSkills", "GetTradeSkillInfo", "GetTradeSkillItemLink",
+    "GetItemStats",
 }
 
 ns.RegisterCommand("probe", "Check this client has what the recorder needs", function()

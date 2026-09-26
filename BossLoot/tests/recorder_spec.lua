@@ -288,9 +288,30 @@ describe("the recorder's commands", function()
         function env.GetTradeSkillLine() end
         function env.GetTradeSkillItemLink() end
         function env.GetItemStats() end
+        function env.GetMerchantNumItems() end
+        function env.GetNumTradeSkills() end
+        function env.GetTradeSkillInfo() end
+        function env.GetNumQuestRewards() end
+        function env.GetNumQuestChoices() end
+        function env.GetTitleText() end
+        function env.UnitName() end
+        function env.UnitFactionGroup() end
+        function env.UnitIsDead() end
+        function env.GetRealZoneText() end
+        function env.IsFishingLoot() end
         env.__printed = {}
         helpers.command(env, "probe")
         assertMatch("Everything the recorder needs", helpers.printed(env))
+    end)
+
+    it("check every call that gates recording, merchant and profession ones too", function()
+        local ns, env = helpers.loggedIn()
+        helpers.command(env, "probe")
+        local said = helpers.printed(env)
+        assertMatch("GetMerchantNumItems", said)
+        assertMatch("GetNumTradeSkills", said)
+        assertMatch("GetTradeSkillInfo", said)
+        assertMatch("GetNumQuestRewards", said)
     end)
 
     it("count what has been recorded", function()
