@@ -14,8 +14,9 @@ shift-click to link it in chat, ctrl-click to preview it on your character.
 Items your client has not seen before show as "Loading item..." for a moment
 and fill in by themselves.
 
-The search box finds instances and items. It can only find items your client
-has already loaded; opening an instance loads all of its items, so search
+The search box finds instances and items, and lists every place an item
+drops with its chance; click one to go there. It can only find items your
+client has already loaded; opening an instance loads all of its items, so search
 gets better as you browse.
 
 ## WoW Forever
@@ -66,7 +67,8 @@ The script rewrites `BossLoot/Data/` and the data lines in `BossLoot.toc`.
 The one file edited by hand is `tools/instances.json`: the instances, their
 level ranges and wings, and each instance's bosses in kill order. Set
 `"available": false` on an instance to leave it out of the build. A boss name
-the database does not know stops the build with an error naming it.
+the database does not know fails the build with an error naming it; fix it
+and run again before committing.
 
 ## Install
 

@@ -77,7 +77,7 @@ describe("the instance column", function()
         local ns, env = helpers.loggedIn()
         env.__items[1002] = { name = "Hand of Justice", quality = 3 }
         local entries = ns.Window.InstanceEntries({ kind = "dungeon", instance = "" }, "justice")
-        assertEqual("Items|" .. "|cff0070ddHand of Justice|r", texts(entries))
+        assertEqual("Items|" .. "|cff0070ddHand of Justice|r|" .. "    Test Depths: First Boss |cff8080801.5%|r", texts(entries))
     end)
 
     it("says so when a search finds nothing", function()
@@ -280,5 +280,34 @@ describe("items the server cannot load", function()
         helpers.fire(env, "GET_ITEM_INFO_RECEIVED", 1001, false)
         env.__runTimers()
         assertMatch("Unknown item 1001", row.name:GetText())
+    end)
+end)
+
+describe("the places an item drops, in search results", function()
+    it("are listed under the item, each with its chance", function()
+        local ns, env = helpers.loggedIn()
+        env.__items[1001] = { name = "Shared Blade", quality = 3 }
+        local entries = ns.Window.InstanceEntries({ kind = "dungeon", instance = "" }, "blade")
+        assertEqual("Items|" .. "|cff0070ddShared Blade|r|"
+            .. "    Test Depths: First Boss |cff80808020%|r|"
+            .. "    Molten Test: Raid Boss |cff80808012%|r", texts(entries))
+    end)
+
+    it("name the notable lists the way the boss column does", function()
+        local ns, env = helpers.loggedIn()
+        env.__items[3002] = { name = "Chest Prize", quality = 3 }
+        local entries = ns.Window.InstanceEntries({ kind = "dungeon", instance = "" }, "prize")
+        assertEqual("    Low Spire: Chests & objects |cff808080100%|r", entries[3].text)
+    end)
+
+    it("each jump to their own instance and boss when clicked", function()
+        local ns, env = opened()
+        env.__items[1001] = { name = "Shared Blade", quality = 3 }
+        local frame = ns.Window.Frame()
+        frame.search:SetText("blade")
+        local row = frame.instances.rows[4]
+        row.scripts.OnClick(row, "LeftButton")
+        assertEqual("Core", ns.db.view.instance)
+        assertEqual(1, ns.db.view.boss)
     end)
 end)

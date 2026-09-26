@@ -45,6 +45,36 @@ local function instanceEntry(instance, selectedKey)
     }
 end
 
+-- What the boss column calls the two notable lists.
+local NOTABLE_NAMES = { trash = "From trash", objects = "Chests & objects" }
+
+-- One place an item drops, as a search result under the item: where, and how
+-- likely. Choosing it jumps there.
+local function placeEntry(itemID, source)
+    local instance = ns.instanceByKey[source.instance]
+    local label, list
+    if type(source.boss) == "number" then
+        local boss = instance.bosses[source.boss]
+        label, list = boss.name, boss.loot
+    else
+        label, list = NOTABLE_NAMES[source.boss], instance.notable[source.boss]
+    end
+
+    local chance = 0
+    for _, entry in ipairs(list) do
+        if entry[1] == itemID then
+            chance = entry[2]
+            break
+        end
+    end
+
+    return {
+        kind = "place",
+        value = source,
+        text = string.format("    %s: %s |cff808080%s|r", instance.name, label, ns.Format.Chance(chance)),
+    }
+end
+
 local function itemName(itemID)
     local info = ns.LootRow.ItemInfo(itemID)
     return info and info.name
@@ -69,6 +99,9 @@ function Window.InstanceEntries(view, searchText)
                     value = item.id,
                     text = ns.Format.Colored(item.name, info and info.quality),
                 })
+                for _, source in ipairs(item.sources) do
+                    table.insert(entries, placeEntry(item.id, source))
+                end
             end
         end
 
@@ -104,10 +137,10 @@ function Window.BossEntries(instance, selection)
     if #trash > 0 or #objects > 0 then
         table.insert(entries, { kind = "heading", text = "Notable drops" })
         if #trash > 0 then
-            table.insert(entries, { kind = "boss", value = "trash", text = "From trash", selected = selection == "trash" })
+            table.insert(entries, { kind = "boss", value = "trash", text = NOTABLE_NAMES.trash, selected = selection == "trash" })
         end
         if #objects > 0 then
-            table.insert(entries, { kind = "boss", value = "objects", text = "Chests & objects", selected = selection == "objects" })
+            table.insert(entries, { kind = "boss", value = "objects", text = NOTABLE_NAMES.objects, selected = selection == "objects" })
         end
     end
 
@@ -259,6 +292,9 @@ end
 local function onInstanceClick(entry, mouseButton)
     if entry.kind == "item" then
         Window.SelectItem(entry.value)
+    elseif entry.kind == "place" then
+        Window.SelectInstance(entry.value.instance)
+        Window.SelectBoss(entry.value.boss)
     elseif mouseButton == "RightButton" then
         Window.HideInstance(entry.value)
     else
