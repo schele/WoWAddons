@@ -176,12 +176,13 @@ describe("selecting", function()
         assertEqual("Core", ns.Window.Current().key)
     end)
 
-    it("asks the client to load an instance's items when it is opened", function()
+    it("asks the server only about the items on screen", function()
+        -- Asked for every item, the server answered none of thousands.
         local ns, env = opened()
         ns.Window.SelectInstance("Spire")
         serve(ns, env)
-        assertTrue(env.__requested[3001])
-        assertTrue(env.__requested[3002])
+        assertTrue(env.__requested[3001], "the boss's loot, on screen")
+        assertNil(env.__requested[3002], "not the chest's, a page away")
     end)
 end)
 
@@ -706,8 +707,8 @@ describe("the item loading bar", function()
         local ns, env, bar = opened({ 1001 })
         giveUpOnAll(env)
         bar.scripts.OnUpdate(bar, 1)
-        assertEqual("1 / 5 items, 4 failed: click to retry", bar.text:GetText())
-        assertEqual(bar:GetWidth() * 4 / 5, bar.failedFill:GetWidth())
+        assertEqual("Loading items 1 / 5, 1 failed", bar.text:GetText(), "the one on screen")
+        assertEqual(bar:GetWidth() * 1 / 5, bar.failedFill:GetWidth())
 
         local asked = env.__requestCount[1002]
         bar.scripts.OnClick(bar, "LeftButton")
@@ -841,48 +842,48 @@ describe("loading every item", function()
         return ns, env, ns.Window.Frame().allProgress
     end
 
-    it("asks for every item once the window opens, behind the open instance's", function()
-        local ns, env = opened()
-        serve(ns, env)
-        local position = {}
-        for index, id in ipairs(env.__requestOrder) do position[id] = position[id] or index end
-        assertTrue(position[3001] and position[3002], "Low Spire's too, though Test Depths is open")
-        assertTrue(position[2001] < position[3001], "after Test Depths' own")
+    it("counts only what the server sent, not what the addon knows by itself", function()
+        local ns, env = helpers.loggedIn()
+        ns.AddItems({ [1002] = { "Built In", 2, 4, 1, 5 } })
+        env.__items[1001] = { name = "Sent", quality = 2 }
+        ns.Window.Open()
+        helpers.command(env, "debug")
+        assertEqual("Server item data 1 / 7", ns.Window.Frame().allProgress.text:GetText())
     end)
 
     it("counts every item on a bar of its own", function()
         local ns, env, bar = opened({ 1001, 3001 })
         assertTrue(bar:IsShown())
-        assertEqual("All items 2 / 7", bar.text:GetText())
+        assertEqual("Server item data 2 / 7", bar.text:GetText())
         assertEqual(bar:GetWidth() * 2 / 7, bar.fill:GetWidth())
     end)
 
     it("moves as items arrive, and stays, full, once all have", function()
         local ns, env, bar = opened({ 1001, 1002, 1003, 1004, 2001, 3001 })
-        assertEqual("All items 6 / 7", bar.text:GetText())
+        assertEqual("Server item data 6 / 7", bar.text:GetText())
         env.__items[3002] = { name = "Last", quality = 2 }
         bar.scripts.OnUpdate(bar, 1)
         assertTrue(bar:IsShown())
-        assertEqual("All items 7 / 7", bar.text:GetText())
+        assertEqual("Server item data 7 / 7", bar.text:GetText())
     end)
 
     it("leaves out the items of hidden instances", function()
         local ns, env, bar = opened({ 1001 })
         ns.Window.HideInstance("Spire")
-        assertEqual("All items 1 / 5", bar.text:GetText())
+        assertEqual("Server item data 1 / 5", bar.text:GetText())
         helpers.command(env, "unhide")
-        assertEqual("All items 1 / 7", bar.text:GetText())
+        assertEqual("Server item data 1 / 7", bar.text:GetText())
     end)
 
     it("says how many failed, and asks for them again on a click", function()
         local ns, env, bar = opened({ 1001 })
         neverAnswer(env)
         bar.scripts.OnUpdate(bar, 1)
-        assertEqual("All items 1 / 7 (6 failed)", bar.text:GetText())
+        assertEqual("Server item data 1 / 7 (1 failed)", bar.text:GetText(), "the one on screen")
         local asked = env.__requestCount[1002]
         bar.scripts.OnClick(bar, "LeftButton")
         assertEqual(asked + 1, env.__requestCount[1002], "the first of them straight away, the rest in turn")
-        assertEqual("All items 1 / 7", bar.text:GetText())
+        assertEqual("Server item data 1 / 7", bar.text:GetText())
     end)
 end)
 
@@ -911,15 +912,14 @@ describe("the loading details, for testing", function()
     it("count what was asked for and what came back, as it happens", function()
         local ns, env, frame = opened()
         helpers.command(env, "debug")
-        -- 1001 went on opening; two moments more, 1002 and 1003.
-        env.__runTimers()
+        -- The first boss's two items, on screen: 1001 on opening, 1002 a moment on.
         env.__runTimers()
         ns.LootRow.Arrived(1001, true)
         ns.LootRow.Arrived(1002, false)
         frame.debug.scripts.OnUpdate(frame.debug, 1)
-        assertEqual("Asked 3 times: 1 answered, 1 empty, 0 no answer", frame.debug.asked:GetText())
-        assertEqual("Waiting 5, asking now 1, 1 item a second", frame.debug.waiting:GetText(),
-            "four in the queue, and the empty one waiting to be asked again")
+        assertEqual("Asked 2 times: 1 answered, 1 empty, 0 no answer", frame.debug.asked:GetText())
+        assertEqual("Waiting 1, asking now 0, 1 item a second", frame.debug.waiting:GetText(),
+            "the empty one waiting to be asked again")
     end)
 end)
 
@@ -928,5 +928,16 @@ describe("the big map's pins", function()
         local ns = opened()
         local view = ns.Window.Frame().fullMap.view
         assertTrue(view.options.pinSize * ns.MapView.BALL >= 16, "a 16-pixel ball at least")
+    end)
+end)
+
+describe("items the addon knows without the server", function()
+    it("are found by a search on their names", function()
+        local ns, env = helpers.loadAddon()
+        helpers.sampleInstances(ns)
+        ns.AddItems({ [1003] = { "Built In Blade", 3, 2, 7, 13 } })
+        helpers.login(ns, env)
+        local entries = ns.Window.InstanceEntries({ kind = "dungeon", instance = "" }, "built in")
+        assertEqual("|cff0070ddBuilt In Blade|r", entries[2].text)
     end)
 end)

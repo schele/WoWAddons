@@ -17,9 +17,26 @@ describe("the generated data", function()
     for _, file in ipairs(files) do table.insert(all, file) end
     local ns = helpers.loadAddon(all)
 
-    it("has at least one instance listed in the .toc", function()
-        assertTrue(#files > 0)
-        assertEqual(#files, #ns.instances)
+    it("has one instance for each data file listed in the .toc, besides the items", function()
+        assertTrue(#files > 1)
+        assertEqual(#files - 1, #ns.instances)
+    end)
+
+    it("knows the name and quality of every item the instances list", function()
+        for _, instance in ipairs(ns.instances) do
+            local lists = {}
+            for _, boss in ipairs(instance.bosses) do table.insert(lists, boss.loot) end
+            table.insert(lists, instance.notable.trash)
+            table.insert(lists, instance.notable.objects)
+            for _, list in ipairs(lists) do
+                for _, entry in ipairs(list) do
+                    local item = ns.builtInItems[entry[1]]
+                    assertTrue(item ~= nil, instance.key .. ": item " .. entry[1])
+                    assertTrue(type(item[1]) == "string" and item[1] ~= "", "a name for " .. entry[1])
+                    assertTrue(type(item[2]) == "number", "a quality for " .. entry[1])
+                end
+            end
+        end
     end)
 
     it("gives every instance a key, name, kind and level range", function()

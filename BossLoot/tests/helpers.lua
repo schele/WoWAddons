@@ -10,6 +10,7 @@ M.FILES = {
     "Index.lua",
     "List.lua",
     "ItemCache.lua",
+    "ItemData.lua",
     "LootRow.lua",
     "Portrait.lua",
     "MapView.lua",

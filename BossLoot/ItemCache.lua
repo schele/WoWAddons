@@ -83,6 +83,11 @@ function ItemCache.Get(itemID)
     }
 end
 
+--- Whether an item was ever saved, before or since the last patch.
+function ItemCache.Has(itemID)
+    return cache ~= nil and (cache.items[itemID] ~= nil or cache.previous[itemID] ~= nil)
+end
+
 --- Save what the client says about an item. Called on every lookup, so an
 -- unchanged item costs a comparison, not a new table.
 function ItemCache.Put(itemID, info)

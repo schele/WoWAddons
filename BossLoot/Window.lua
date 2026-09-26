@@ -257,21 +257,6 @@ local function everyItem()
     return everyItemList
 end
 
--- Ask for every item, behind whatever is already waiting: the open
--- instance's, and the rows on screen, go first.
-local function loadEverything()
-    for _, itemID in ipairs(everyItem()) do
-        ns.LootRow.RequestLoad(itemID)
-    end
-end
-
-local function preload(instance)
-    for _, itemID in ipairs(ns.Index.ItemIDs(instance.key)) do
-        if not ns.LootRow.ItemInfo(itemID) then
-            ns.LootRow.RequestLoad(itemID)
-        end
-    end
-end
 
 -- The big map covers the boss page, loot and all, so while it is open the
 -- loot moves under the boss list, which gives up its lower half.
@@ -300,10 +285,6 @@ end
 function Window.SelectKind(kind)
     ns.db.view.kind = kind
     Window.CloseMap()
-    local instance = Window.Current()
-    if instance then
-        preload(instance)
-    end
     Window.Refresh()
 end
 
@@ -318,7 +299,6 @@ function Window.SelectInstance(key)
     view.instance = key
     view.boss = 1
     Window.CloseMap()
-    preload(instance)
     Window.Refresh()
 end
 
@@ -378,7 +358,7 @@ end
 -- The item loading bar: how many of the instance's items have loaded, in
 -- green, and how many were given up on, in red. Gone once all have loaded.
 local function updateProgress(bar)
-    local status = ns.LootRow.Status(bar.itemIDs or {})
+    local status = ns.LootRow.Status(bar.itemIDs or {}, bar.serverOnly)
     bar.status = status
     if status.total == 0 or (status.loaded == status.total and not bar.keepWhenDone) then
         bar:Hide()
@@ -410,9 +390,9 @@ local function describeInstance(status)
     return text
 end
 
--- What the bar for every item says: short, over the narrower boss column.
+-- What the test panel's bar says: how many items the server has sent.
 local function describeAll(status)
-    local text = "All items " .. status.loaded .. " / " .. status.total
+    local text = "Server item data " .. status.loaded .. " / " .. status.total
     if status.failed > 0 then
         text = text .. " (" .. status.failed .. " failed)"
     end
@@ -787,8 +767,9 @@ local function createDebugPanel(parent)
     panel:SetPoint("TOPLEFT", parent, "BOTTOMLEFT", 0, 2)
     dress(panel)
 
-    panel.progress = createProgress(panel, PADDING + 4, WIDTH - 2 * PADDING - 8, "Every item in BossLoot", describeAll)
+    panel.progress = createProgress(panel, PADDING + 4, WIDTH - 2 * PADDING - 8, "Item data the server has sent", describeAll)
     panel.progress.keepWhenDone = true
+    panel.progress.serverOnly = true
     panel.asked = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     panel.asked:SetPoint("TOPLEFT", panel.progress, "BOTTOMLEFT", 0, -6)
     panel.waiting = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -1080,12 +1061,10 @@ local function create()
     frame.fullMap.close:SetFrameLevel(frame.fullMap.view:GetFrameLevel() + 10)
     frame.fullMap:Hide()
 
+    -- Items are asked for only as their rows come on screen: every row
+    -- shows from the built-in names meanwhile, and a server asked for every
+    -- item at once answered none of them.
     frame:SetScript("OnShow", function()
-        local instance = Window.Current()
-        if instance then
-            preload(instance)
-        end
-        loadEverything()
         Window.Refresh()
     end)
 
@@ -1128,9 +1107,6 @@ ns.RegisterCommand("unhide", "Bring back every instance you hid", function()
     end
     ns.Print("Every instance is back on the list.")
     everyItemList = nil
-    if frame and frame:IsShown() then
-        loadEverything()
-    end
     Window.Refresh()
 end)
 

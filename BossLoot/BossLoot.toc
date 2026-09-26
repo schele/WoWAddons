@@ -8,6 +8,7 @@
 BossLoot.lua
 Format.lua
 # BEGIN GENERATED DATA
+Data\Items.lua
 Data\RagefireChasm.lua
 Data\WailingCaverns.lua
 Data\TheDeadmines.lua
@@ -38,6 +39,7 @@ Data\Naxxramas.lua
 Index.lua
 List.lua
 ItemCache.lua
+ItemData.lua
 LootRow.lua
 Portrait.lua
 MapView.lua

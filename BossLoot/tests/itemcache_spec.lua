@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local FILES = { "BossLoot.lua", "Format.lua", "List.lua", "ItemCache.lua", "LootRow.lua" }
+local FILES = { "BossLoot.lua", "Format.lua", "List.lua", "ItemCache.lua", "ItemData.lua", "LootRow.lua" }
 
 local IRONFOE = { name = "Ironfoe", quality = 4, type = "Weapon", subType = "Maces", equipLoc = "INVTYPE_2HWEAPON", icon = 5555 }
 

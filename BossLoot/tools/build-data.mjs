@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { openDb } from './lib/db.mjs';
 import { worldLoot } from './lib/world.mjs';
 import { buildInstance } from './lib/instance.mjs';
-import { instanceFile, updateToc } from './lib/lua.mjs';
+import { instanceFile, itemsFile, updateToc } from './lib/lua.mjs';
+import { itemIdsOf } from './lib/items.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const addon = join(here, '..');
@@ -32,6 +33,7 @@ rmSync(dataDir, { recursive: true, force: true });
 mkdirSync(dataDir);
 
 const files = [];
+const built = [];
 let errorCount = 0;
 
 for (const def of config.instances) {
@@ -48,11 +50,18 @@ for (const def of config.instances) {
   const file = `${instance.key}.lua`;
   writeFileSync(join(dataDir, file), instanceFile(instance));
   files.push(file);
+  built.push(instance);
 
   const bossItems = instance.bosses.reduce((sum, boss) => sum + boss.loot.length, 0);
   const notable = instance.notable.trash.length + instance.notable.objects.length;
   console.log(`ok    ${instance.name}: ${instance.bosses.length} bosses, ${bossItems} boss items, ${notable} notable`);
 }
+
+// Every item's name, quality and kind, loaded before the instances.
+const items = itemIdsOf(built).map((id) => db.item(id)).filter(Boolean);
+writeFileSync(join(dataDir, 'Items.lua'), itemsFile(items));
+files.unshift('Items.lua');
+console.log(`ok    ${items.length} items`);
 
 const tocPath = join(addon, 'BossLoot.toc');
 writeFileSync(tocPath, updateToc(readFileSync(tocPath, 'utf8'), files));
@@ -61,4 +70,4 @@ if (errorCount) {
   console.error(`${errorCount} error(s): fix tools/instances.json and run again.`);
   process.exit(1);
 }
-console.log(`${files.length} instances written to Data/.`);
+console.log(`${built.length} instances written to Data/.`);

@@ -24,23 +24,18 @@ together. A boss that only appears when a script summons it has no pin.
 
 A loot row works like an item anywhere else: hover for the tooltip,
 shift-click to link it in chat, ctrl-click to preview it on your character.
-Items your client has not seen before show as "Loading item..." for a moment
-and fill in by themselves; a bar in the top row, over the boss page, counts the
-instance's items as they load. Items the server never sends are counted as
-failed on the bar, and a click on it asks for them again. With the window
-open, every item is loaded in the background, the open instance's first,
-and `/bl debug` shows the loading details under the window, for testing: a
-bar for every item, and counts of what was asked for and what came back.
-BossLoot saves every item it loads, so the next
-session shows them at once without asking the server. After a game patch the
-saved items still show, and each is checked with the server again the next
-time it is on screen. Changing the client's language starts the saved list
-afresh.
+Every item shows at once: its name, quality, kind and slot are built into
+the addon, from the same database as the loot tables, and the icon comes from
+the game. The server is asked about the items on screen too, and its copy
+takes over when it comes: in the game's language, and with what the tooltip
+needs. BossLoot saves every item the server sends, and after a game patch
+asks about each saved one again the next time it is on screen. Changing the
+client's language starts the saved list afresh. `/bl debug` shows, under
+the window, how many items the server has sent and counts of what was asked
+for and what came back, for testing.
 
 The search box finds instances and items, and lists every place an item
-drops with its chance; click one to go there. It can only find items BossLoot
-has loaded, in this session or an earlier one; opening an instance loads all
-of its items, so search gets better as you browse.
+drops with its chance; click one to go there.
 
 ## WoW Forever
 

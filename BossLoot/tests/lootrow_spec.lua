@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local FILES = { "BossLoot.lua", "Format.lua", "List.lua", "ItemCache.lua", "LootRow.lua" }
+local FILES = { "BossLoot.lua", "Format.lua", "List.lua", "ItemCache.lua", "ItemData.lua", "LootRow.lua" }
 
 local function row(ns, env)
     local list = ns.List.Create(env.UIParent, {
@@ -288,5 +288,57 @@ describe("what the queue is doing", function()
         assertEqual(5, activity.asked, "four, then 5005")
         assertEqual(1, activity.asking)
         assertEqual(8, activity.waiting, "5006 to 5010, then 5003, 5004 and 5002 again")
+    end)
+end)
+
+describe("an item the addon knows without the server", function()
+    -- A robe (armor, cloth, chest) and a maul (weapon, two-handed mace, two-hand).
+    local function withBuiltIn()
+        local ns, env = helpers.loadAddon(FILES)
+        ns.AddItems({ [7001] = { "Test Robe", 3, 4, 1, 5 }, [7002] = { "Test Maul", 4, 2, 5, 17 } })
+        return ns, env
+    end
+
+    it("shows at once, named and coloured, with its slot and kind", function()
+        local ns, env = withBuiltIn()
+        local r = row(ns, env)
+        ns.LootRow.Render(r, { id = 7001, chance = 5 })
+        assertEqual("|cff0070ddTest Robe|r", r.name:GetText())
+        assertEqual("Chest, Cloth", r.detail:GetText())
+        assertEqual(107001, r.icon:GetTexture(), "the icon from the client, which has it")
+    end)
+
+    it("names a weapon's kind as the game does", function()
+        local ns, env = withBuiltIn()
+        local r = row(ns, env)
+        ns.LootRow.Render(r, { id = 7002, chance = 5 })
+        assertEqual("Two-Hand, Two-Handed Maces", r.detail:GetText())
+    end)
+
+    it("still asks the server, and takes its copy when it comes", function()
+        local ns, env = withBuiltIn()
+        local r = row(ns, env)
+        ns.LootRow.Render(r, { id = 7001, chance = 5 })
+        assertEqual(1, env.__requestCount[7001])
+        env.__items[7001] = { name = "Server Robe", quality = 3 }
+        ns.LootRow.Render(r, { id = 7001, chance = 5 })
+        assertEqual("|cff0070ddServer Robe|r", r.name:GetText())
+    end)
+
+    it("links in chat by its built-in name", function()
+        local ns, env = withBuiltIn()
+        local r = row(ns, env)
+        ns.LootRow.Render(r, { id = 7001, chance = 5 })
+        r.scripts.OnClick(r, "LeftButton")
+        assertMatch("item:7001", env.__modifiedClicks[1])
+        assertMatch("%[Test Robe%]", env.__modifiedClicks[1])
+    end)
+
+    it("uses the client's own names for kinds, when it has them", function()
+        local ns, env = withBuiltIn()
+        function env.GetItemSubClassInfo(class, subclass) return class == 4 and subclass == 1 and "Stoff" or nil end
+        local r = row(ns, env)
+        ns.LootRow.Render(r, { id = 7001, chance = 5 })
+        assertEqual("Chest, Stoff", r.detail:GetText())
     end)
 end)

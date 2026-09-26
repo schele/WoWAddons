@@ -51,6 +51,16 @@ function ns.AddInstance(instance)
     ns.instanceByKey[instance.key] = instance
 end
 
+-- Every item the instances list, from the generated Data\Items.lua:
+-- id -> { name, quality, class, subclass, slot }. See ItemData.lua.
+ns.builtInItems = {}
+
+function ns.AddItems(items)
+    for itemID, entry in pairs(items) do
+        ns.builtInItems[itemID] = entry
+    end
+end
+
 local function ensureDatabase()
     if type(BossLootDB) ~= "table" then
         BossLootDB = {}

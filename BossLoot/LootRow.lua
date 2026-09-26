@@ -33,15 +33,23 @@ local function clientInfo(itemID)
 end
 
 --- What is known about an item: the client's copy when it has one (saved for
--- next time), else the copy saved in an earlier session, else nil. A copy
--- saved before the last patch comes back with `stale` set.
+-- next time), else the copy saved in an earlier session, else the one built
+-- into the addon, else nil. A copy saved before the last patch comes back
+-- with `stale` set, a built-in one with `builtIn`.
 function LootRow.ItemInfo(itemID)
     local info = clientInfo(itemID)
     if info then
         ns.ItemCache.Put(itemID, info)
         return info
     end
-    return ns.ItemCache.Get(itemID)
+    return ns.ItemCache.Get(itemID) or ns.ItemData.Get(itemID)
+end
+
+-- Whether the server has ever said what the item is: the client has it, or
+-- a copy was saved. Cheap: no copy is made.
+local function fromServer(itemID)
+    local get = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+    return (get ~= nil and get(itemID) ~= nil) or ns.ItemCache.Has(itemID)
 end
 
 -- Asking the server for items. The server has no patience: asked eight at
@@ -82,10 +90,11 @@ local function count(set)
 end
 
 -- Nothing to ask for: the client has the item, or it was saved under this
--- build of the game.
+-- build of the game. A built-in copy is still asked about: the server's is
+-- in the client's language, and has what the tooltip needs.
 local function loaded(itemID)
     local info = LootRow.ItemInfo(itemID)
-    return info ~= nil and not info.stale
+    return info ~= nil and not info.stale and not info.builtIn
 end
 
 -- Room to ask now: nothing asked yet this moment, and a place free.
@@ -234,17 +243,29 @@ local function givenUp(itemID)
         and not inFlight[itemID] and not waiting[itemID] and not later[itemID]
 end
 
--- Items seen loaded this session. Items do not unload, and a count of every
--- item in the game, twice a second, should not look each one up again.
+-- Items seen loaded this session, and seen from the server. Items do not
+-- unload, and a count of every item in the game, twice a second, should not
+-- look each one up again.
 local seenLoaded = {}
+local seenFromServer = {}
 
 --- How far a list of items has loaded: counts of the items that are loaded
--- (the client's or a saved copy), still loading, and given up on.
-function LootRow.Status(itemIDs)
+-- (any copy: the client's, a saved one, the built-in one; or with
+-- `serverOnly`, only those the server has sent), still loading, and given up on.
+function LootRow.Status(itemIDs, serverOnly)
+    local seen = serverOnly and seenFromServer or seenLoaded
     local status = { total = #itemIDs, loaded = 0, loading = 0, failed = 0 }
     for _, itemID in ipairs(itemIDs) do
-        if seenLoaded[itemID] or LootRow.ItemInfo(itemID) then
-            seenLoaded[itemID] = true
+        local known = seen[itemID]
+        if not known then
+            if serverOnly then
+                known = fromServer(itemID)
+            else
+                known = LootRow.ItemInfo(itemID) ~= nil
+            end
+        end
+        if known then
+            seen[itemID] = true
             status.loaded = status.loaded + 1
         elseif givenUp(itemID) then
             status.failed = status.failed + 1
@@ -361,9 +382,9 @@ function LootRow.Render(row, entry)
     if info then
         row.name:SetText(ns.Format.Colored(info.name, info.quality))
         row.link = info.link
-        if info.stale then
-            -- Saved before a patch: shown as it was, checked behind the rows
-            -- that have nothing to show yet.
+        if info.stale or info.builtIn then
+            -- Saved before a patch, or built in: shown as it is, and asked
+            -- about behind the rows that have nothing to show yet.
             LootRow.RequestLoad(entry.id)
         end
     elseif failed[entry.id] then
