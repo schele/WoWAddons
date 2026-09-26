@@ -60,3 +60,20 @@ describe("whole-number chances and empty types", function()
         assertEqual("Other", ns.Format.TypeLabel("", "Other", ""))
     end)
 end)
+
+describe("items that are not worn, as this client reports them", function()
+    -- The client gives them a slot, INVTYPE_NON_EQUIP_IGNORE, whose text is
+    -- empty: named as the slot, it left ", Quest" and ", Other".
+    local ns, env = helpers.loadAddon({ "BossLoot.lua", "Format.lua" })
+    env.INVTYPE_NON_EQUIP_IGNORE = ""
+
+    it("names the type, not an empty slot", function()
+        assertEqual("Quest", ns.Format.TypeLabel("Quest", "Quest", "INVTYPE_NON_EQUIP_IGNORE"))
+        assertEqual("Miscellaneous, Other", ns.Format.TypeLabel("Miscellaneous", "Other", "INVTYPE_NON_EQUIP_IGNORE"))
+    end)
+
+    it("treats text of only spaces as empty too", function()
+        env.INVTYPE_BLANK = " "
+        assertEqual("Other", ns.Format.TypeLabel(" ", "Other", "INVTYPE_BLANK"))
+    end)
+end)

@@ -50,16 +50,17 @@ end
 -- ("Two-Hand, Maces"), the type and kind for anything else ("Recipe,
 -- Tailoring"), collapsing a repeat ("Key", not "Key, Key").
 function Format.TypeLabel(itemType, itemSubType, equipLoc)
-    -- Some items come back with an empty type; treat it as none, or the
-    -- label reads ", Other".
+    -- Blank text counts as none, or the label reads ", Other". Items that are
+    -- not worn come back with a slot, INVTYPE_NON_EQUIP_IGNORE, whose text
+    -- is empty; some items come back with an empty type.
     local function named(value)
-        return value ~= "" and value or nil
+        return type(value) == "string" and value:match("%S") and value or nil
     end
-    local slot = named(equipLoc) and _G[equipLoc] or nil
+    local slot = named(equipLoc) and named(_G[equipLoc])
     local first = slot or named(itemType)
     local second = named(itemSubType)
 
-    if first and second and second ~= "" and second ~= first then
+    if first and second and second ~= first then
         return first .. ", " .. second
     end
 
