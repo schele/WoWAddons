@@ -76,8 +76,8 @@ is a floor plan.
 
 **Shapes.** Every creature spawn as a disc of its wander radius (capped at 20
 yards), every game object as a point, and every patrol joined point to point
-into a line ( per spawn,  per
-creature,  for escorts; a step over 80 yards is a jump and
+into a line (`creature_movement` per spawn, `creature_movement_template` per
+creature, `script_waypoint` for escorts; a step over 80 yards is a jump and
 is not joined).
 
 **Bounds.** The box around the shapes, ignoring the outermost 1% on each axis,
@@ -98,8 +98,9 @@ than half a cell gets no pin (and the build warns): a pin clamped to the edge
 would sit beside a room that is not drawn. Summoned bosses have no spawn and
 no pin.
 
-**Data.** Each instance gains  (0-based): each row's floor as runs. Each boss gains
- and  when it has them.
+**Data.** Each instance gains `map = { cols = C, rows = R, runs = { row, col,
+length, ... } }` (0-based): each row's floor as runs. Each boss gains
+`display` and `pin = { x, y }` when it has them.
 
 **Drawing.** The map view draws each run as one strip of texture in the floor
 colour, over the floor grown by one cell each way (worked out in the addon)
