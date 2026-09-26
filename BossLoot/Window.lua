@@ -636,6 +636,17 @@ local function createFrame(kind, name, parent, template)
     return created
 end
 
+-- A close button like every other window's, at the template's own size, or
+-- a plain "X" if the template has no picture.
+local function createCloseButton(parent, onClick)
+    local close = createFrame("Button", nil, parent, "UIPanelCloseButton")
+    if not (close.GetNormalTexture and close:GetNormalTexture()) then
+        close:SetText("X")
+    end
+    close:SetScript("OnClick", onClick)
+    return close
+end
+
 local function savePosition(self)
     self:StopMovingOrSizing()
     local point, _, relativePoint, x, y = self:GetPoint(1)
@@ -769,12 +780,10 @@ local function createModelView(parent)
     view.title:SetJustifyH("LEFT")
     view.title:SetWordWrap(false)
 
-    view.close = createFrame("Button", nil, view, "UIPanelCloseButton")
-    view.close:SetSize(32, 32)
-    view.close:SetPoint("TOPRIGHT", view, "TOPRIGHT", -4, -4)
-    view.close:SetScript("OnClick", function()
+    view.close = createCloseButton(view, function()
         view:Hide()
     end)
+    view.close:SetPoint("TOPRIGHT", view, "TOPRIGHT", -4, -4)
 
     view.model = CreateFrame("PlayerModel", nil, view)
     view.model:SetPoint("TOPLEFT", view, "TOPLEFT", PADDING, -TOP)
@@ -874,14 +883,10 @@ local function create()
     title:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + 6, -PADDING - 4)
     title:SetText("BossLoot")
 
-    local close = createFrame("Button", nil, frame, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
-    if not (close.GetNormalTexture and close:GetNormalTexture()) then
-        close:SetText("X")
-    end
-    close:SetScript("OnClick", function()
+    frame.close = createCloseButton(frame, function()
         frame:Hide()
     end)
+    frame.close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
 
     -- The rail: search, tabs, instances.
     local search = createFrame("EditBox", nil, frame, "InputBoxTemplate")
@@ -978,13 +983,12 @@ local function create()
     -- The instance's name in the corner, above the map so it draws over it.
     frame.fullMap.title = frame.fullMap.view.overlay:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     frame.fullMap.title:SetPoint("TOPLEFT", frame.fullMap.view, "TOPLEFT", 10, -8)
-    frame.fullMap.close = createFrame("Button", nil, frame.fullMap, "UIPanelCloseButton")
+    frame.fullMap.close = createCloseButton(frame.fullMap, function()
+        Window.CloseMap()
+    end)
     frame.fullMap.close:SetPoint("TOPRIGHT", frame.fullMap, "TOPRIGHT", 0, 0)
     -- Above the pins, which can sit right under it (Blackrock Depths' 25).
     frame.fullMap.close:SetFrameLevel(frame.fullMap.view:GetFrameLevel() + 10)
-    frame.fullMap.close:SetScript("OnClick", function()
-        Window.CloseMap()
-    end)
     frame.fullMap:Hide()
 
     frame:SetScript("OnShow", function()

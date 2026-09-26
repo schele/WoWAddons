@@ -786,3 +786,14 @@ describe("the big model", function()
         assertFalse(view:IsShown())
     end)
 end)
+
+describe("close buttons", function()
+    it("are all the same size: the game's own", function()
+        local ns = opened()
+        local frame = ns.Window.Frame()
+        for _, close in ipairs({ frame.fullMap.close, frame.modelView.close }) do
+            assertEqual(frame.close:GetWidth(), close:GetWidth())
+            assertEqual(frame.close:GetHeight(), close:GetHeight())
+        end
+    end)
+end)
