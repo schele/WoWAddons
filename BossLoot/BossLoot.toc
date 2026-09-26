@@ -1,6 +1,7 @@
 ## Interface: 11509, 16001
 ## Title: BossLoot
 ## Notes: Every dungeon and raid, its bosses and their loot.
+## IconTexture: Interface\AddOns\BossLoot\icon
 ## Author: You
 ## Version: 0.1.0
 ## SavedVariables: BossLootDB
