@@ -1,7 +1,8 @@
 local addonName, ns = ...
 
--- A round button on the minimap's rim: click to turn FishScale on or off; drag to
--- slide it round the rim. Built by hand, as BossLoot's is.
+-- A round button on the minimap's rim: click for the settings, right-click to
+-- turn FishScale on or off, drag to slide it round the rim. Built by hand, as
+-- BossLoot's is.
 
 local MinimapButton = {}
 ns.MinimapButton = MinimapButton
@@ -61,15 +62,24 @@ local function showTooltip(self)
     end
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:SetText("FishScale: " .. (ns.db.fishing.enabled and "|cff40ff40on|r" or "|cffff4040off|r"))
-    GameTooltip:AddLine("Click to turn on or off, drag to move.", 1, 1, 1)
+    GameTooltip:AddLine("Click to open or close the settings.", 1, 1, 1)
+    GameTooltip:AddLine("Right-click to turn on or off, drag to move.", 1, 1, 1)
     GameTooltip:Show()
 end
 
-local function onClick()
-    local fishing = ns.db.fishing
-    fishing.enabled = not fishing.enabled
-    ns.Fishing.Refresh()
-    ns.Print(fishing.enabled and "On." or "Off.")
+-- Left for the settings, as every other addon's button; right for the one
+-- switch worth reaching without opening them.
+local function onClick(self, mouseButton)
+    if mouseButton == "RightButton" then
+        ns.Fishing.SetEnabled(not ns.db.fishing.enabled)
+        ns.Print(ns.db.fishing.enabled and "On." or "Off.")
+        -- The line on the tooltip still under the cursor says on or off.
+        if GameTooltip and GameTooltip:GetOwner() == self then
+            showTooltip(self)
+        end
+        return
+    end
+    ns.ToggleSettings()
 end
 
 local function create()
@@ -77,7 +87,7 @@ local function create()
     button:SetSize(SIZE, SIZE)
     button:SetFrameStrata("MEDIUM")
     button:SetFrameLevel(8)
-    button:RegisterForClicks("LeftButtonUp")
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
     button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 

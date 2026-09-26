@@ -5,6 +5,7 @@ local M = {}
 M.FILES = {
     "FishScale.lua",
     "Fishing.lua",
+    "Settings.lua",
     "Minimap.lua",
 }
 

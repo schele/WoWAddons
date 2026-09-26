@@ -32,15 +32,46 @@ local function makeWidget(kind, parent, template)
     function widget:SetHighlightTexture(value) self.highlightTexture = value end
     function widget:SetTexture(value) self.texture = value end
     function widget:GetTexture() return self.texture end
-    function widget:Show() self.shown = true end
-    function widget:Hide() self.shown = false end
-    function widget:SetShown(value) self.shown = value and true or false end
+    -- Showing and hiding fire their scripts, and only on a real transition,
+    -- the way the client does.
+    function widget:Show()
+        if self.shown then return end
+        self.shown = true
+        if self.scripts.OnShow then self.scripts.OnShow(self) end
+    end
+    function widget:Hide()
+        if not self.shown then return end
+        self.shown = false
+        if self.scripts.OnHide then self.scripts.OnHide(self) end
+    end
+    function widget:SetShown(value)
+        if value then self:Show() else self:Hide() end
+    end
     function widget:IsShown() return self.shown end
     function widget:GetCenter() return self.centerX or 0, self.centerY or 0 end
     function widget:GetEffectiveScale() return 1 end
     function widget:CreateTexture() return makeWidget("Texture", self) end
     function widget:SetOwner(owner, anchor) self.owner, self.anchor = owner, anchor end
+    function widget:GetOwner() return self.owner end
     function widget:SetText(value) self.text = value end
+    -- For the settings page.
+    function widget:GetText() return self.text end
+    function widget:GetScript(name) return self.scripts[name] end
+    function widget:HookScript(name, fn)
+        local existing = self.scripts[name]
+        self.scripts[name] = function(...)
+            if existing then existing(...) end
+            fn(...)
+        end
+    end
+    function widget:CreateFontString() return makeWidget("FontString", self) end
+    function widget:SetWidth(value) self.width = value end
+    function widget:SetJustifyH(value) self.justifyH = value end
+    function widget:SetAllPoints() end
+    function widget:SetChecked(value) self.checked = value and true or false end
+    function widget:GetChecked() return self.checked end
+    function widget:EnableKeyboard(value) self.keyboard = value and true or false end
+    function widget:SetPropagateKeyboardInput(value) self.propagate = value and true or false end
     function widget:AddLine(value) self.lines = self.lines or {}; table.insert(self.lines, value) end
     function widget:RegisterEvent(event) self.registeredEvents[event] = true end
     function widget:UnregisterEvent(event) self.registeredEvents[event] = nil end
@@ -71,6 +102,45 @@ function stub.newEnv()
     env.UIParent = makeWidget("Frame")
     env.GameTooltip = makeWidget("GameTooltip", env.UIParent)
     env.SlashCmdList = {}
+
+    -- The game's options window and the game menu, both closed to begin with.
+    env.SettingsPanel = makeWidget("Frame", env.UIParent)
+    env.SettingsPanel.shown = false
+    env.GameMenuFrame = makeWidget("Frame", env.UIParent)
+    env.GameMenuFrame.shown = false
+    function env.HideUIPanel(frame)
+        if frame and frame.Hide then frame:Hide() end
+    end
+    env.Settings = {
+        RegisterCanvasLayoutCategory = function(frame, name)
+            return { name = name, frame = frame, GetID = function() return "category-id" end }
+        end,
+        RegisterAddOnCategory = function(category) env.__settingsCategory = category end,
+        OpenToCategory = function(id) env.__openedCategory = id end,
+    }
+    env.C_AddOns = {
+        GetAddOnMetadata = function(_, field)
+            return field == "Version" and "9.9.9" or nil
+        end,
+    }
+
+    -- Modifier keys held down, by name: shift, ctrl, alt.
+    env.__modifiers = {}
+    function env.IsShiftKeyDown() return env.__modifiers.shift end
+    function env.IsControlKeyDown() return env.__modifiers.ctrl end
+    function env.IsAltKeyDown() return env.__modifiers.alt end
+
+    -- The client runs a timer after the current chain of calls, not inside
+    -- it: queued here, and run by __runTimers.
+    env.__timers = {}
+    env.C_Timer = {
+        After = function(_, fn) table.insert(env.__timers, fn) end,
+    }
+    function env.__runTimers()
+        local pending = env.__timers
+        env.__timers = {}
+        for _, fn in ipairs(pending) do fn() end
+    end
 
     function env.print(...)
         local pieces = {}

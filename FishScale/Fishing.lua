@@ -259,6 +259,14 @@ owner:SetScript("OnEvent", function(_, event, unit, _, spellID)
     Fishing.Refresh()
 end)
 
+-- The settings page, told of every change however it was made, so a box it
+-- shows never disagrees with what a command has just set.
+local function changed()
+    if ns.SettingsPanel then
+        ns.SettingsPanel.Refresh()
+    end
+end
+
 --- Change the key. Anything the client accepts as a binding: F, SHIFT-F,
 -- BUTTON4, and so on.
 function Fishing.SetKey(key)
@@ -273,7 +281,32 @@ function Fishing.SetKey(key)
     end
     ns.db.fishing.key = key
     Fishing.Refresh()
+    changed()
     return true
+end
+
+--- Turn FishScale on, or off and give the key back.
+function Fishing.SetEnabled(value)
+    ns.db.fishing.enabled = value and true or false
+    Fishing.Refresh()
+    changed()
+end
+
+function Fishing.SetWithoutPole(value)
+    ns.db.fishing.withoutPole = value and true or false
+    Fishing.Refresh()
+    changed()
+end
+
+function Fishing.SetAutoLoot(value)
+    ns.db.fishing.autoLoot = value and true or false
+    -- Put auto loot back as it was before choosing again, so turning this
+    -- off really does give the player their own setting back.
+    if not InCombatLockdown() then
+        restoreCVars()
+    end
+    Fishing.Refresh()
+    changed()
 end
 
 local function onOff(value)
@@ -289,31 +322,22 @@ ns.RegisterCommand("key", "Set the fishing key, e.g. /fs key F", function(rest)
 end)
 
 ns.RegisterCommand("on", "Turn FishScale on", function()
-    ns.db.fishing.enabled = true
-    Fishing.Refresh()
+    Fishing.SetEnabled(true)
     ns.Print("On.")
 end)
 
 ns.RegisterCommand("off", "Turn FishScale off and give the key back", function()
-    ns.db.fishing.enabled = false
-    Fishing.Refresh()
+    Fishing.SetEnabled(false)
     ns.Print("Off.")
 end)
 
 ns.RegisterCommand("nopole", "Take the key even without a fishing pole equipped", function()
-    ns.db.fishing.withoutPole = not ns.db.fishing.withoutPole
-    Fishing.Refresh()
+    Fishing.SetWithoutPole(not ns.db.fishing.withoutPole)
     ns.Print("Without a pole: " .. onOff(ns.db.fishing.withoutPole) .. ".")
 end)
 
 ns.RegisterCommand("autoloot", "Turn auto loot on while fishing", function()
-    ns.db.fishing.autoLoot = not ns.db.fishing.autoLoot
-    -- Put auto loot back as it was before choosing again, so turning this
-    -- off really does give the player their own setting back.
-    if not InCombatLockdown() then
-        restoreCVars()
-    end
-    Fishing.Refresh()
+    Fishing.SetAutoLoot(not ns.db.fishing.autoLoot)
     ns.Print("Auto loot while fishing: " .. onOff(ns.db.fishing.autoLoot) .. ".")
 end)
 

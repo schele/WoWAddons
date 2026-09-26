@@ -8,4 +8,5 @@
 
 FishScale.lua
 Fishing.lua
+Settings.lua
 Minimap.lua
