@@ -187,3 +187,37 @@ describe("asking the server for items", function()
         assertNil(env.__requestCount[5001])
     end)
 end)
+
+describe("how far a list of items has loaded", function()
+    -- Ask for an item until the server is given up on.
+    local function giveUp(ns, env, itemID)
+        env.__now = env.__now or 100
+        function env.GetTime() return env.__now end
+        ns.LootRow.RequestLoad(itemID)
+        for _ = 1, 10 do
+            env.__now = env.__now + 11
+            env.__runTimers()
+            env.__runTimers()
+        end
+    end
+
+    it("counts the items loaded, still loading, and given up on", function()
+        local ns, env = helpers.loadAddon(FILES)
+        env.__items[5001] = { name = "Here", quality = 2 }
+        giveUp(ns, env, 5003)
+        local status = ns.LootRow.Status({ 5001, 5002, 5003 })
+        assertEqual(3, status.total)
+        assertEqual(1, status.loaded)
+        assertEqual(1, status.loading)
+        assertEqual(1, status.failed)
+    end)
+
+    it("asks again for the items given up on", function()
+        local ns, env = helpers.loadAddon(FILES)
+        giveUp(ns, env, 5003)
+        local asked = env.__requestCount[5003]
+        ns.LootRow.Retry({ 5001, 5003 })
+        assertEqual(asked + 1, env.__requestCount[5003])
+        assertEqual(0, ns.LootRow.Status({ 5003 }).failed, "loading again")
+    end)
+end)

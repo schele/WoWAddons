@@ -24,7 +24,9 @@ together. A boss that only appears when a script summons it has no pin.
 A loot row works like an item anywhere else: hover for the tooltip,
 shift-click to link it in chat, ctrl-click to preview it on your character.
 Items your client has not seen before show as "Loading item..." for a moment
-and fill in by themselves. BossLoot saves every item it loads, so the next
+and fill in by themselves; a bar under the boss's name counts the
+instance's items as they load. Items the server never sends are counted as
+failed on the bar, and a click on it asks for them again. BossLoot saves every item it loads, so the next
 session shows them at once without asking the server. After a game patch the
 saved items still show, and each is checked with the server again the next
 time it is on screen. Changing the client's language starts the saved list

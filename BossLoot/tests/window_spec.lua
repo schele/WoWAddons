@@ -647,3 +647,64 @@ describe("turning the boss's model by hand", function()
         assertTrue(model.facing ~= facing, "the next boss turns by itself again")
     end)
 end)
+
+describe("the item loading bar", function()
+    -- The sample Test Depths has five items: four from bosses, one from trash.
+    local function opened(loaded)
+        local ns, env = helpers.loggedIn()
+        for _, id in ipairs(loaded or {}) do env.__items[id] = { name = "Item " .. id, quality = 2 } end
+        ns.Window.Open()
+        return ns, env, ns.Window.Frame().header.progress
+    end
+
+    -- Ask for every item until the server is given up on.
+    local function giveUpOnAll(env)
+        env.__now = 100
+        function env.GetTime() return env.__now end
+        for _ = 1, 10 do
+            env.__now = env.__now + 11
+            env.__runTimers()
+            env.__runTimers()
+        end
+    end
+
+    it("shows how many of the instance's items have loaded", function()
+        local ns, env, bar = opened({ 1001, 1002 })
+        assertTrue(bar:IsShown())
+        assertEqual("Loading items 2 / 5", bar.text:GetText())
+        assertEqual(bar:GetWidth() * 2 / 5, bar.fill:GetWidth())
+    end)
+
+    it("is gone once every item has loaded", function()
+        local ns, env, bar = opened({ 1001, 1002, 1003, 1004, 2001 })
+        assertFalse(bar:IsShown())
+    end)
+
+    it("fills in as items arrive, with nothing else redrawn", function()
+        local ns, env, bar = opened()
+        assertEqual("Loading items 0 / 5", bar.text:GetText())
+        env.__items[1001] = { name = "Late", quality = 2 }
+        bar.scripts.OnUpdate(bar, 1)
+        assertEqual("Loading items 1 / 5", bar.text:GetText())
+    end)
+
+    it("says how many could not be loaded, and asks for them again on a click", function()
+        local ns, env, bar = opened({ 1001 })
+        giveUpOnAll(env)
+        bar.scripts.OnUpdate(bar, 1)
+        assertEqual("1 / 5 items, 4 failed: click to retry", bar.text:GetText())
+        assertEqual(bar:GetWidth() * 4 / 5, bar.failedFill:GetWidth())
+
+        local asked = env.__requestCount[1002]
+        bar.scripts.OnClick(bar, "LeftButton")
+        assertEqual(asked + 1, env.__requestCount[1002])
+        assertEqual("Loading items 1 / 5", bar.text:GetText())
+    end)
+
+    it("breaks the count down on hover", function()
+        local ns, env, bar = opened({ 1001 })
+        bar.scripts.OnEnter(bar)
+        assertMatch("1 loaded", table.concat(env.GameTooltip.lines, "\n"))
+        assertMatch("4 loading", table.concat(env.GameTooltip.lines, "\n"))
+    end)
+end)

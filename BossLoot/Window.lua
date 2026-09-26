@@ -31,6 +31,10 @@ local BOSS_ROW = 34
 local LOOT_ROW = ns.LootRow.HEIGHT + 2
 local INSET_WIDTH, INSET_HEIGHT = 150, 84
 local TURN_PER_PIXEL = 0.02 -- radians the boss's model turns per pixel dragged
+-- The item loading bar, under the boss's name, as wide as the name may be.
+local PROGRESS_WIDTH = PAGE_WIDTH - 100 - (INSET_WIDTH + 12)
+local PROGRESS_HEIGHT = 14
+local PROGRESS_POLL = 0.5 -- seconds between counts while items load
 local MORE_HEIGHT = 16
 -- While the big map covers the boss page, the boss list keeps this many rows
 -- and the loot moves into the space under them.
@@ -344,6 +348,104 @@ local function showPortrait(header, display, icon)
     header.portrait:Show()
 end
 
+-- The item loading bar: how many of the instance's items have loaded, in
+-- green, and how many were given up on, in red. Gone once all have loaded.
+local function updateProgress(bar)
+    local status = ns.LootRow.Status(bar.itemIDs or {})
+    bar.status = status
+    if status.total == 0 or status.loaded == status.total then
+        bar:Hide()
+        return
+    end
+
+    local function widthFor(count)
+        return math.max(0.001, PROGRESS_WIDTH * count / status.total)
+    end
+    bar.fill:SetWidth(widthFor(status.loaded))
+    bar.fill:SetShown(status.loaded > 0)
+    bar.failedFill:SetWidth(widthFor(status.failed))
+    bar.failedFill:SetShown(status.failed > 0)
+
+    local count = status.loaded .. " / " .. status.total
+    if status.loading > 0 then
+        local text = "Loading items " .. count
+        if status.failed > 0 then
+            text = text .. ", " .. status.failed .. " failed"
+        end
+        bar.text:SetText(text)
+    else
+        bar.text:SetText(count .. " items, " .. status.failed .. " failed: click to retry")
+    end
+    bar:Show()
+end
+
+local function progressTooltip(bar)
+    local status = bar.status
+    if not (GameTooltip and status) then
+        return
+    end
+    GameTooltip:SetOwner(bar, "ANCHOR_BOTTOM")
+    GameTooltip:SetText("Loot items")
+    GameTooltip:AddLine(status.loaded .. " loaded", 0.4, 0.9, 0.4)
+    GameTooltip:AddLine(status.loading .. " loading", 1, 1, 1)
+    if status.failed > 0 then
+        GameTooltip:AddLine(status.failed .. " could not be loaded", 1, 0.4, 0.3)
+        GameTooltip:AddLine("Click to try those again.", 0.6, 0.6, 0.6)
+    end
+    GameTooltip:Show()
+end
+
+local function createProgress(header)
+    local bar = CreateFrame("Button", nil, header)
+    bar:SetSize(PROGRESS_WIDTH, PROGRESS_HEIGHT)
+    bar:SetPoint("TOPLEFT", header.subtitle, "BOTTOMLEFT", 0, -8)
+    bar:RegisterForClicks("LeftButtonUp")
+
+    bar.background = bar:CreateTexture(nil, "BACKGROUND")
+    bar.background:SetAllPoints()
+    bar.background:SetColorTexture(0, 0, 0, 0.6)
+
+    bar.fill = bar:CreateTexture(nil, "ARTWORK")
+    bar.fill:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
+    bar.fill:SetHeight(PROGRESS_HEIGHT)
+    bar.fill:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    bar.fill:SetVertexColor(0.2, 0.6, 0.2)
+
+    bar.failedFill = bar:CreateTexture(nil, "ARTWORK")
+    bar.failedFill:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
+    bar.failedFill:SetHeight(PROGRESS_HEIGHT)
+    bar.failedFill:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    bar.failedFill:SetVertexColor(0.7, 0.15, 0.1)
+
+    bar.text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    bar.text:SetPoint("CENTER", bar, "CENTER", 0, 0)
+
+    -- Items arrive, and are given up on, without a redraw: count again
+    -- every so often while the bar shows.
+    bar.sinceCount = 0
+    bar:SetScript("OnUpdate", function(self, elapsed)
+        self.sinceCount = self.sinceCount + (elapsed or 0)
+        if self.sinceCount >= PROGRESS_POLL then
+            self.sinceCount = 0
+            updateProgress(self)
+        end
+    end)
+    bar:SetScript("OnClick", function(self)
+        if self.status and self.status.failed > 0 then
+            ns.LootRow.Retry(self.itemIDs)
+            updateProgress(self)
+        end
+    end)
+    bar:SetScript("OnEnter", progressTooltip)
+    bar:SetScript("OnLeave", function()
+        if GameTooltip then
+            GameTooltip:Hide()
+        end
+    end)
+    bar:Hide()
+    return bar
+end
+
 local function drawHeader(instance, selection)
     local header = frame.header
 
@@ -440,6 +542,8 @@ function Window.Refresh()
     frame.empty:SetShown(instance ~= nil and #loot == 0)
 
     drawHeader(instance, selection)
+    frame.header.progress.itemIDs = instance and ns.Index.ItemIDs(instance.key) or {}
+    updateProgress(frame.header.progress)
     local pinned = type(selection) == "number" and selection or nil
     ns.MapView.Show(frame.inset, instance, pinned)
     if frame.fullMap:IsShown() then
@@ -594,6 +698,8 @@ local function createHeader(parent)
     header.subtitle = header:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     header.subtitle:SetPoint("TOPLEFT", header.title, "BOTTOMLEFT", 0, -4)
     header.subtitle:SetJustifyH("LEFT")
+
+    header.progress = createProgress(header)
 
     return header
 end

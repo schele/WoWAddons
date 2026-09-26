@@ -190,6 +190,38 @@ function LootRow.Arrived(itemID, success)
     end
 end
 
+-- Given up on: every try came back empty or not at all.
+local function givenUp(itemID)
+    return failed[itemID] and (tries[itemID] or 0) >= MAX_TRIES
+        and not inFlight[itemID] and not waiting[itemID]
+end
+
+--- How far a list of items has loaded: counts of the items that are loaded
+-- (the client's or a saved copy), still loading, and given up on.
+function LootRow.Status(itemIDs)
+    local status = { total = #itemIDs, loaded = 0, loading = 0, failed = 0 }
+    for _, itemID in ipairs(itemIDs) do
+        if LootRow.ItemInfo(itemID) then
+            status.loaded = status.loaded + 1
+        elseif givenUp(itemID) then
+            status.failed = status.failed + 1
+        else
+            status.loading = status.loading + 1
+        end
+    end
+    return status
+end
+
+--- Ask again, from scratch, for those of the items given up on.
+function LootRow.Retry(itemIDs)
+    for _, itemID in ipairs(itemIDs) do
+        if givenUp(itemID) and not loaded(itemID) then
+            tries[itemID], failed[itemID], notBefore[itemID] = 0, nil, nil
+            LootRow.RequestLoad(itemID, true)
+        end
+    end
+end
+
 -- The icon lookup by ID works before the item itself has loaded, so even a
 -- placeholder row shows the right picture.
 local function iconFor(itemID, info)
