@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local FILES = { "BossLoot.lua", "Format.lua", "List.lua", "LootRow.lua" }
+local FILES = { "BossLoot.lua", "Format.lua", "List.lua", "ItemCache.lua", "LootRow.lua" }
 
 local function row(ns, env)
     local list = ns.List.Create(env.UIParent, {

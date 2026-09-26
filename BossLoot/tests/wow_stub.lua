@@ -186,6 +186,13 @@ function stub.newEnv()
             env.__requestCount[id] = (env.__requestCount[id] or 0) + 1
         end,
     }
+    -- The client's language and build. A test changes these to stage a new
+    -- language or a patch between sessions.
+    env.__locale = "enUS"
+    env.__build = "60000"
+    function env.GetLocale() return env.__locale end
+    function env.GetBuildInfo() return "1.60.0", env.__build, "Sep 1 2026", 16001 end
+
     env.INVTYPE_2HWEAPON = "Two-Hand"
     env.INVTYPE_CHEST = "Chest"
 

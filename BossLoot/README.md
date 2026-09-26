@@ -21,12 +21,16 @@ script summons it has no pin.
 A loot row works like an item anywhere else: hover for the tooltip,
 shift-click to link it in chat, ctrl-click to preview it on your character.
 Items your client has not seen before show as "Loading item..." for a moment
-and fill in by themselves.
+and fill in by themselves. BossLoot saves every item it loads, so the next
+session shows them at once without asking the server. After a game patch the
+saved items still show, and each is checked with the server again the next
+time it is on screen. Changing the client's language starts the saved list
+afresh.
 
 The search box finds instances and items, and lists every place an item
-drops with its chance; click one to go there. It can only find items your
-client has already loaded; opening an instance loads all of its items, so search
-gets better as you browse.
+drops with its chance; click one to go there. It can only find items BossLoot
+has loaded, in this session or an earlier one; opening an instance loads all
+of its items, so search gets better as you browse.
 
 ## WoW Forever
 

@@ -14,8 +14,8 @@ local ICON_SIZE = 26
 local CHANCE_WIDTH = 48
 local UNKNOWN_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
---- What the client knows about an item, or nil if it has not loaded it yet.
-function LootRow.ItemInfo(itemID)
+-- What the client itself knows about an item, or nil if it has not loaded it.
+local function clientInfo(itemID)
     local get = (C_Item and C_Item.GetItemInfo) or GetItemInfo
     if not get then
         return nil
@@ -30,6 +30,18 @@ function LootRow.ItemInfo(itemID)
         name = name, link = link, quality = quality, itemType = itemType,
         itemSubType = itemSubType, equipLoc = equipLoc, icon = icon,
     }
+end
+
+--- What is known about an item: the client's copy when it has one (saved for
+-- next time), else the copy saved in an earlier session, else nil. A copy
+-- saved before the last patch comes back with `stale` set.
+function LootRow.ItemInfo(itemID)
+    local info = clientInfo(itemID)
+    if info then
+        ns.ItemCache.Put(itemID, info)
+        return info
+    end
+    return ns.ItemCache.Get(itemID)
 end
 
 -- Asking the server for items. Asked for a whole instance at once -- two
@@ -56,8 +68,11 @@ local function now()
     return GetTime and GetTime() or 0
 end
 
+-- Nothing to ask for: the client has the item, or it was saved under this
+-- build of the game.
 local function loaded(itemID)
-    return LootRow.ItemInfo(itemID) ~= nil
+    local info = LootRow.ItemInfo(itemID)
+    return info ~= nil and not info.stale
 end
 
 local function send(itemID)
@@ -159,7 +174,8 @@ end
 
 --- The server's answer about an item (GET_ITEM_INFO_RECEIVED). An empty one
 -- is asked about again in a few seconds, up to the limit; meanwhile the row
--- says the item is not loaded yet.
+-- says the item is not loaded yet, or keeps showing its saved copy. A full
+-- one is saved, whether or not its row is on screen.
 function LootRow.Arrived(itemID, success)
     inFlight[itemID] = nil
     if success == false then
@@ -170,6 +186,7 @@ function LootRow.Arrived(itemID, success)
         end
     else
         failed[itemID] = nil
+        LootRow.ItemInfo(itemID)
     end
 end
 
@@ -269,6 +286,11 @@ function LootRow.Render(row, entry)
     if info then
         row.name:SetText(ns.Format.Colored(info.name, info.quality))
         row.link = info.link
+        if info.stale then
+            -- Saved before a patch: shown as it was, checked behind the rows
+            -- that have nothing to show yet.
+            LootRow.RequestLoad(entry.id)
+        end
     elseif failed[entry.id] then
         row.name:SetText("|cff808080Item " .. entry.id .. " (not loaded yet)|r")
         row.link = nil
