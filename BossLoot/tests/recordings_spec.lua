@@ -36,6 +36,15 @@ describe("recorded loot on the instances", function()
         assertEqual(1001, boss.recorded[2][1])
     end)
 
+    it("leaves grey junk out of a boss's recorded loot, as the vanilla lists do", function()
+        local ns, env, depths = withRecordings({ recorder = "me",
+            items = { [9999] = { "Broken Tooth", 0 }, [1001] = { "Real Drop", 3 } },
+            sources = { ["npc:101"] = source({ kind = "npc", id = 101, kills = 2, items = { [9999] = 5, [1001] = 1 } }) } })
+        local boss = depths.bosses[1]
+        assertEqual(1, #boss.recorded)
+        assertEqual(1001, boss.recorded[1][1])
+    end)
+
     it("matches a boss by its name when its creature is not known", function()
         local ns, env, depths = withRecordings({ recorder = "me", sources = {
             ["npc:999"] = source({ kind = "npc", id = 999, name = "Second Boss", kills = 1, items = { [1003] = 1 } }),

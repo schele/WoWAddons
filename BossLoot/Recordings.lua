@@ -99,6 +99,13 @@ local function notable(itemID)
         or info.itemType == ns.ItemData.ClassName(13)
 end
 
+-- Grey junk, which the vanilla boss lists leave out too. An item not
+-- described yet stays.
+local function junk(itemID)
+    local info = ns.LootRow.ItemInfo(itemID)
+    return info ~= nil and info.quality == 0
+end
+
 local function byCount(a, b)
     if a[2] ~= b[2] then
         return a[2] > b[2]
@@ -192,7 +199,9 @@ function Recordings.Apply()
                 boss.recordedKills = math.max(boss.recordedKills or 0, source.kills)
                 local entries, index = list(boss.recorded)
                 for itemID, count in pairs(source.items) do
-                    addTo(entries, index, itemID, count)
+                    if not junk(itemID) then
+                        addTo(entries, index, itemID, count)
+                    end
                 end
             else
                 instance.recordedNotable = instance.recordedNotable or { trash = {}, objects = {} }
