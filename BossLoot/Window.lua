@@ -1,6 +1,8 @@
 local addonName, ns = ...
 
--- The loot window: instances, bosses and loot in three columns.
+-- The loot window: an instance rail on the left, the boss list with portraits
+-- in the middle, and the boss page on the right -- the boss's model, a map of
+-- the instance, and the loot in two columns.
 
 local Window = {}
 ns.Window = Window
@@ -11,21 +13,31 @@ ns.AddDefaults({
     window = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 0 },
 })
 
-local WIDTH = 780
-local HEIGHT = 470
+local WIDTH = 860
+local HEIGHT = 520
 local PADDING = 12
 local TITLE_HEIGHT = 28
-local ROW_HEIGHT = 18
+local TOP = PADDING + TITLE_HEIGHT
+local GAP = 8
+local RAIL_WIDTH = 170
+local BOSS_WIDTH = 230
+local PAGE_LEFT = PADDING + RAIL_WIDTH + GAP + BOSS_WIDTH + GAP
+local PAGE_WIDTH = WIDTH - PAGE_LEFT - PADDING
+local HEADER_HEIGHT = 96
 local SEARCH_HEIGHT = 20
 local TAB_HEIGHT = 22
-local INSTANCE_WIDTH = 210
-local BOSS_WIDTH = 200
-local GAP = 10
-local LOOT_WIDTH = WIDTH - PADDING * 2 - INSTANCE_WIDTH - BOSS_WIDTH - GAP * 2
-local LIST_TOP = PADDING + TITLE_HEIGHT
-local LIST_HEIGHT = HEIGHT - LIST_TOP - PADDING
+local RAIL_ROW = 18
+local BOSS_ROW = 34
+local LOOT_ROW = ns.LootRow.HEIGHT + 2
+local INSET_WIDTH, INSET_HEIGHT = 150, 84
+local MORE_HEIGHT = 16
+-- A search needs this many characters; fewer would match nearly everything.
+local SEARCH_MIN = 2
 
 local EMPTY_TEXT = "Nothing but world drops and quest items."
+
+-- What the boss column calls the two notable lists.
+local NOTABLE_NAMES = { trash = "From trash", objects = "Chests & objects" }
 
 local frame
 -- The selection the loot column last showed: a new one scrolls it to the top,
@@ -44,9 +56,6 @@ local function instanceEntry(instance, selectedKey)
         text = string.format("%s |cff808080%d-%d|r", instance.name, instance.levels[1], instance.levels[2]),
     }
 end
-
--- What the boss column calls the two notable lists.
-local NOTABLE_NAMES = { trash = "From trash", objects = "Chests & objects" }
 
 -- One place an item drops, as a search result under the item: where, and how
 -- likely. Choosing it jumps there.
@@ -82,9 +91,10 @@ end
 
 function Window.InstanceEntries(view, searchText)
     local entries = {}
+    local text = searchText and searchText:match("^%s*(.-)%s*$") or ""
 
-    if searchText and searchText:match("%S") then
-        local result = ns.Index.Search(searchText, itemName)
+    if #text >= SEARCH_MIN then
+        local result = ns.Index.Search(text, itemName)
 
         for _, instance in ipairs(result.instances) do
             table.insert(entries, instanceEntry(instance, view.instance))
@@ -129,7 +139,10 @@ function Window.BossEntries(instance, selection)
             table.insert(entries, { kind = "heading", text = boss.wing })
         end
         wing = boss.wing
-        table.insert(entries, { kind = "boss", value = index, text = boss.name, selected = selection == index })
+        table.insert(entries, {
+            kind = "boss", value = index, text = boss.name, selected = selection == index,
+            number = index, display = boss.display,
+        })
     end
 
     local notable = instance.notable or {}
@@ -137,10 +150,16 @@ function Window.BossEntries(instance, selection)
     if #trash > 0 or #objects > 0 then
         table.insert(entries, { kind = "heading", text = "Notable drops" })
         if #trash > 0 then
-            table.insert(entries, { kind = "boss", value = "trash", text = NOTABLE_NAMES.trash, selected = selection == "trash" })
+            table.insert(entries, {
+                kind = "boss", value = "trash", text = NOTABLE_NAMES.trash, selected = selection == "trash",
+                icon = ns.Portrait.ICONS.trash,
+            })
         end
         if #objects > 0 then
-            table.insert(entries, { kind = "boss", value = "objects", text = NOTABLE_NAMES.objects, selected = selection == "objects" })
+            table.insert(entries, {
+                kind = "boss", value = "objects", text = NOTABLE_NAMES.objects, selected = selection == "objects",
+                icon = ns.Portrait.ICONS.objects,
+            })
         end
     end
 
@@ -209,8 +228,23 @@ local function preload(instance)
     end
 end
 
+function Window.CloseMap()
+    if frame then
+        frame.fullMap:Hide()
+    end
+end
+
+function Window.OpenMap()
+    if not frame then
+        return
+    end
+    frame.fullMap:Show()
+    Window.Refresh()
+end
+
 function Window.SelectKind(kind)
     ns.db.view.kind = kind
+    Window.CloseMap()
     local instance = Window.Current()
     if instance then
         preload(instance)
@@ -228,6 +262,7 @@ function Window.SelectInstance(key)
     view.kind = instance.kind
     view.instance = key
     view.boss = 1
+    Window.CloseMap()
     preload(instance)
     Window.Refresh()
 end
@@ -262,6 +297,35 @@ end
 -- Drawing
 --------------------------------------------------------------------------------
 
+local function drawHeader(instance, selection)
+    local header = frame.header
+    header.model:Hide()
+    header.portrait:Hide()
+
+    if not instance then
+        header.title:SetText("")
+        header.subtitle:SetText("")
+        return
+    end
+
+    if type(selection) == "number" then
+        local boss = instance.bosses[selection]
+        header.title:SetText(boss.name)
+        header.subtitle:SetText(boss.wing and (instance.name .. ", " .. boss.wing) or instance.name)
+        if ns.Portrait.SetModel(header.model, boss.display) then
+            header.model:Show()
+        else
+            ns.Portrait.Set(header.portrait, boss.display)
+            header.portrait:Show()
+        end
+    else
+        header.title:SetText(NOTABLE_NAMES[selection])
+        header.subtitle:SetText(instance.name)
+        header.portrait:SetTexture(ns.Portrait.ICONS[selection])
+        header.portrait:Show()
+    end
+end
+
 function Window.Refresh()
     if not frame then
         return
@@ -277,8 +341,14 @@ function Window.Refresh()
     local key = tostring(view.instance) .. ":" .. tostring(selection)
     ns.List.SetEntries(frame.loot, loot, key == lastSelection)
     lastSelection = key
-
     frame.empty:SetShown(instance ~= nil and #loot == 0)
+
+    drawHeader(instance, selection)
+    local pinned = type(selection) == "number" and selection or nil
+    ns.MapView.Show(frame.inset, instance, pinned)
+    if frame.fullMap:IsShown() then
+        ns.MapView.Show(frame.fullMap.view, instance, pinned)
+    end
 
     for kind, tab in pairs(frame.tabs) do
         if kind == view.kind then
@@ -307,13 +377,20 @@ local function onBossClick(entry)
 end
 
 -- A template this client lacks raises rather than returning nil, so every
--- templated frame is asked for through here, with a plain fallback.
+-- templated frame is asked for through here. The plain fallback gets a font,
+-- or its label would be blank and an edit box would refuse text.
 local function createFrame(kind, name, parent, template)
     local ok, created = pcall(CreateFrame, kind, name, parent, template)
     if ok and created then
         return created
     end
-    return CreateFrame(kind, name, parent)
+    created = CreateFrame(kind, name, parent)
+    if kind == "Button" and created.SetNormalFontObject then
+        created:SetNormalFontObject("GameFontNormal")
+    elseif kind == "EditBox" and created.SetFontObject then
+        created:SetFontObject("ChatFontNormal")
+    end
+    return created
 end
 
 local function savePosition(self)
@@ -323,15 +400,89 @@ local function savePosition(self)
     saved.point, saved.relativePoint, saved.x, saved.y = point, relativePoint, x, y
 end
 
+-- A darker or lighter band behind one region of the window.
+local function panel(parent, left, top, width, height, shade)
+    local texture = parent:CreateTexture(nil, "BACKGROUND", nil, 1)
+    texture:SetPoint("TOPLEFT", parent, "TOPLEFT", left, -top)
+    texture:SetSize(width, height)
+    texture:SetColorTexture(shade, shade * 0.8, shade * 0.6, 1)
+    return texture
+end
+
 local function createTab(parent, kind, label, x)
     local tab = createFrame("Button", nil, parent, "UIPanelButtonTemplate")
     tab:SetSize(80, TAB_HEIGHT)
-    tab:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -(LIST_TOP + SEARCH_HEIGHT + 4))
+    tab:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -(TOP + SEARCH_HEIGHT + 6))
     tab:SetText(label)
     tab:SetScript("OnClick", function()
         Window.SelectKind(kind)
     end)
     return tab
+end
+
+-- A boss row: portrait, number, name. Headings keep just their text.
+local function bossRow(list)
+    local row = ns.List.TextRow(onBossClick)(list)
+    row.portrait = row:CreateTexture(nil, "ARTWORK")
+    row.portrait:SetSize(BOSS_ROW - 4, BOSS_ROW - 4)
+    row.portrait:SetPoint("LEFT", row, "LEFT", 2, 0)
+    row.number = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    row.number:SetPoint("LEFT", row.portrait, "RIGHT", 4, 0)
+    row.number:SetWidth(18)
+    row.number:SetJustifyH("RIGHT")
+    row.text:ClearAllPoints()
+    row.text:SetPoint("LEFT", row.number, "RIGHT", 6, 0)
+    row.text:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+    return row
+end
+
+local function renderBoss(row, entry)
+    ns.List.RenderText(row, entry)
+    if entry.kind == "heading" then
+        row.portrait:Hide()
+        row.number:SetText("")
+        return
+    end
+    if entry.icon then
+        row.portrait:SetTexture(entry.icon)
+    else
+        ns.Portrait.Set(row.portrait, entry.display)
+    end
+    row.portrait:Show()
+    row.number:SetText(entry.number and tostring(entry.number) or "")
+end
+
+local function createHeader(parent)
+    local header = CreateFrame("Frame", nil, parent)
+    header:SetPoint("TOPLEFT", parent, "TOPLEFT", PAGE_LEFT, -TOP)
+    header:SetSize(PAGE_WIDTH, HEADER_HEIGHT)
+
+    -- The boss, turning slowly.
+    header.model = CreateFrame("PlayerModel", nil, header)
+    header.model:SetSize(84, 84)
+    header.model:SetPoint("LEFT", header, "LEFT", 4, 0)
+    header.model.facing = 0
+    header.model:SetScript("OnUpdate", function(self, elapsed)
+        self.facing = (self.facing + (elapsed or 0) * 0.4) % (math.pi * 2)
+        if self.SetFacing then
+            self:SetFacing(self.facing)
+        end
+    end)
+
+    header.portrait = header:CreateTexture(nil, "ARTWORK")
+    header.portrait:SetSize(64, 64)
+    header.portrait:SetPoint("LEFT", header, "LEFT", 14, 0)
+
+    header.title = header:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    header.title:SetPoint("TOPLEFT", header, "TOPLEFT", 100, -22)
+    header.title:SetPoint("RIGHT", header, "RIGHT", -(INSET_WIDTH + 12), 0)
+    header.title:SetJustifyH("LEFT")
+
+    header.subtitle = header:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    header.subtitle:SetPoint("TOPLEFT", header.title, "BOTTOMLEFT", 0, -4)
+    header.subtitle:SetJustifyH("LEFT")
+
+    return header
 end
 
 local function create()
@@ -348,14 +499,24 @@ local function create()
     local saved = ns.db.window
     frame:SetPoint(saved.point, UIParent, saved.relativePoint, saved.x, saved.y)
 
+    -- Opaque, whatever the backdrop does: the dialog background is
+    -- translucent by design, and may not load at all.
+    frame.background = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
+    frame.background:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -4)
+    frame.background:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 4)
+    frame.background:SetColorTexture(0.06, 0.045, 0.03, 1)
     if frame.SetBackdrop then
         frame:SetBackdrop({
-            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
             edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            tile = true, tileSize = 32, edgeSize = 32,
+            edgeSize = 32,
             insets = { left = 11, right = 12, top = 12, bottom = 11 },
         })
     end
+
+    local columnHeight = HEIGHT - TOP - PADDING
+    panel(frame, PADDING, TOP, RAIL_WIDTH, columnHeight, 0.035)
+    panel(frame, PADDING + RAIL_WIDTH + GAP, TOP, BOSS_WIDTH, columnHeight, 0.05)
+    panel(frame, PAGE_LEFT, TOP, PAGE_WIDTH, HEADER_HEIGHT, 0.12)
 
     -- Escape closes it, like every other window.
     table.insert(UISpecialFrames, "BossLootFrame")
@@ -366,16 +527,24 @@ local function create()
 
     local close = createFrame("Button", nil, frame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
+    if not (close.GetNormalTexture and close:GetNormalTexture()) then
+        close:SetText("X")
+    end
     close:SetScript("OnClick", function()
         frame:Hide()
     end)
 
+    -- The rail: search, tabs, instances.
     local search = createFrame("EditBox", nil, frame, "InputBoxTemplate")
-    search:SetSize(INSTANCE_WIDTH - 8, SEARCH_HEIGHT)
-    search:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + 6, -LIST_TOP)
+    search:SetSize(RAIL_WIDTH - 14, SEARCH_HEIGHT)
+    search:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + 8, -TOP - 2)
     search:SetAutoFocus(false)
     search:SetMaxLetters(40)
-    search:SetScript("OnTextChanged", function()
+    frame.searchHint = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    frame.searchHint:SetPoint("LEFT", search, "LEFT", 4, 0)
+    frame.searchHint:SetText("Search...")
+    search:SetScript("OnTextChanged", function(self)
+        frame.searchHint:SetShown(self:GetText() == "")
         Window.Refresh()
     end)
     search:SetScript("OnEscapePressed", function(self)
@@ -384,39 +553,69 @@ local function create()
     frame.search = search
 
     frame.tabs = {
-        dungeon = createTab(frame, "dungeon", "Dungeons", PADDING),
-        raid = createTab(frame, "raid", "Raids", PADDING + 84),
+        dungeon = createTab(frame, "dungeon", "Dungeons", PADDING + 4),
+        raid = createTab(frame, "raid", "Raids", PADDING + 86),
     }
 
-    local instanceTop = LIST_TOP + SEARCH_HEIGHT + TAB_HEIGHT + 10
+    local railTop = TOP + SEARCH_HEIGHT + TAB_HEIGHT + 12
     frame.instances = ns.List.Create(frame, {
-        width = INSTANCE_WIDTH, rowHeight = ROW_HEIGHT,
-        rows = math.floor((HEIGHT - instanceTop - PADDING) / ROW_HEIGHT),
+        width = RAIL_WIDTH, rowHeight = RAIL_ROW,
+        rows = math.floor((HEIGHT - railTop - PADDING) / RAIL_ROW),
         createRow = ns.List.TextRow(onInstanceClick), renderRow = ns.List.RenderText,
     })
-    frame.instances:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING, -instanceTop)
+    frame.instances:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING, -railTop)
 
+    -- The boss list.
     frame.bosses = ns.List.Create(frame, {
-        width = BOSS_WIDTH, rowHeight = ROW_HEIGHT,
-        rows = math.floor(LIST_HEIGHT / ROW_HEIGHT),
-        createRow = ns.List.TextRow(onBossClick), renderRow = ns.List.RenderText,
+        width = BOSS_WIDTH, rowHeight = BOSS_ROW,
+        rows = math.floor((columnHeight - MORE_HEIGHT) / BOSS_ROW),
+        createRow = bossRow, renderRow = renderBoss,
     })
-    frame.bosses:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + INSTANCE_WIDTH + GAP, -LIST_TOP)
+    frame.bosses:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + RAIL_WIDTH + GAP, -TOP)
 
-    local lootLeft = PADDING + INSTANCE_WIDTH + BOSS_WIDTH + GAP * 2
+    -- The boss page: header with model and map inset, then the loot grid.
+    frame.header = createHeader(frame)
+
+    frame.inset = ns.MapView.Create(frame.header, INSET_WIDTH, INSET_HEIGHT)
+    frame.inset:SetPoint("RIGHT", frame.header, "RIGHT", -6, 0)
+    frame.inset:SetScript("OnClick", function()
+        Window.OpenMap()
+    end)
+
+    local lootTop = TOP + HEADER_HEIGHT + 6
     frame.loot = ns.List.Create(frame, {
-        width = LOOT_WIDTH, rowHeight = ns.LootRow.HEIGHT,
-        rows = math.floor(LIST_HEIGHT / ns.LootRow.HEIGHT),
+        width = PAGE_WIDTH, columnWidth = PAGE_WIDTH / 2, columns = 2, rowHeight = LOOT_ROW,
+        rows = math.floor((HEIGHT - lootTop - PADDING - MORE_HEIGHT) / LOOT_ROW),
         createRow = ns.LootRow.Create, renderRow = ns.LootRow.Render,
     })
-    frame.loot:SetPoint("TOPLEFT", frame, "TOPLEFT", lootLeft, -LIST_TOP)
+    frame.loot:SetPoint("TOPLEFT", frame, "TOPLEFT", PAGE_LEFT, -lootTop)
 
     -- Some bosses drop nothing but world drops and quest items, which are
     -- left out; say so rather than show a column that looks broken.
     frame.empty = frame:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-    frame.empty:SetPoint("TOPLEFT", frame, "TOPLEFT", lootLeft + 4, -LIST_TOP - 6)
+    frame.empty:SetPoint("TOPLEFT", frame, "TOPLEFT", PAGE_LEFT + 6, -lootTop - 6)
     frame.empty:SetText(EMPTY_TEXT)
     frame.empty:Hide()
+
+    -- The full map, over the boss page.
+    frame.fullMap = CreateFrame("Frame", nil, frame)
+    frame.fullMap:SetPoint("TOPLEFT", frame, "TOPLEFT", PAGE_LEFT, -TOP)
+    frame.fullMap:SetSize(PAGE_WIDTH, columnHeight)
+    frame.fullMap:SetFrameLevel(frame:GetFrameLevel() + 20)
+    frame.fullMap.view = ns.MapView.Create(frame.fullMap, PAGE_WIDTH, columnHeight, {
+        pinSize = 20,
+        onPinClick = function(bossIndex)
+            Window.SelectBoss(bossIndex)
+            Window.CloseMap()
+        end,
+    })
+    frame.fullMap.view:SetPoint("TOPLEFT", frame.fullMap, "TOPLEFT", 0, 0)
+    frame.fullMap.close = createFrame("Button", nil, frame.fullMap, "UIPanelCloseButton")
+    frame.fullMap.close:SetPoint("TOPRIGHT", frame.fullMap, "TOPRIGHT", 0, 0)
+    frame.fullMap.close:SetScript("OnClick", function()
+        Window.CloseMap()
+    end)
+    frame.fullMap:Hide()
 
     frame:SetScript("OnShow", function()
         local instance = Window.Current()

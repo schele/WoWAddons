@@ -311,3 +311,120 @@ describe("the places an item drops, in search results", function()
         assertEqual(1, ns.db.view.boss)
     end)
 end)
+
+describe("the redesigned window", function()
+    it("is opaque", function()
+        local ns = opened()
+        assertEqual(1, ns.Window.Frame().background.colorTexture[4])
+    end)
+
+    it("numbers each boss and gives it a portrait", function()
+        local ns, env = helpers.loadAddon()
+        helpers.sampleInstances(ns)
+        ns.instanceByKey.Depths.bosses[1].display = 8807
+        helpers.login(ns, env)
+        ns.Window.Open()
+        local row = ns.Window.Frame().bosses.rows[2]
+        assertEqual("First Boss", row.text:GetText())
+        assertEqual("1", row.number:GetText())
+        assertEqual(8807, row.portrait.portraitDisplay)
+    end)
+
+    it("gives the notable lists a bag and a chest", function()
+        local ns = opened()
+        local entries = ns.Window.BossEntries(ns.instanceByKey.Depths, 1)
+        assertEqual(ns.Portrait.ICONS.trash, entries[#entries].icon)
+    end)
+
+    it("heads the page with the boss's model, name and instance", function()
+        local ns, env = helpers.loadAddon()
+        helpers.sampleInstances(ns)
+        ns.instanceByKey.Depths.bosses[1].display = 8807
+        helpers.login(ns, env)
+        ns.Window.Open()
+        local header = ns.Window.Frame().header
+        assertEqual("First Boss", header.title:GetText())
+        assertEqual("Test Depths, East", header.subtitle:GetText())
+        assertEqual(8807, header.model.display)
+        assertTrue(header.model:IsShown())
+        assertFalse(header.portrait:IsShown())
+    end)
+
+    it("falls back to an icon in the header for a boss without a model", function()
+        local ns = opened()
+        local header = ns.Window.Frame().header
+        assertFalse(header.model:IsShown())
+        assertTrue(header.portrait:IsShown())
+    end)
+
+    it("heads a notable list with its icon and name", function()
+        local ns = opened()
+        ns.Window.SelectBoss("trash")
+        local header = ns.Window.Frame().header
+        assertEqual("From trash", header.title:GetText())
+        assertEqual(ns.Portrait.ICONS.trash, header.portrait:GetTexture())
+    end)
+
+    it("shows the instance map in the header, the selected boss's pin lit", function()
+        local ns, env = helpers.loadAddon()
+        helpers.sampleInstances(ns)
+        ns.instanceByKey.Depths.map = { cols = 2, rows = 2, cells = { 0, 12 } }
+        ns.instanceByKey.Depths.bosses[2].pin = { 0.5, 0.5 }
+        helpers.login(ns, env)
+        ns.Window.Open()
+        ns.Window.SelectBoss(2)
+        local inset = ns.Window.Frame().inset
+        assertTrue(inset.pins[1]:IsShown())
+        assertTrue(inset.pins[1].selected)
+    end)
+
+    it("opens the full map from the inset, and a pin there picks that boss", function()
+        local ns, env = helpers.loadAddon()
+        helpers.sampleInstances(ns)
+        ns.instanceByKey.Depths.map = { cols = 2, rows = 2, cells = { 0, 12 } }
+        ns.instanceByKey.Depths.bosses[3].pin = { 0.5, 0.5 }
+        helpers.login(ns, env)
+        ns.Window.Open()
+        local frame = ns.Window.Frame()
+        frame.inset.scripts.OnClick(frame.inset, "LeftButton")
+        assertTrue(frame.fullMap:IsShown())
+        local pin = frame.fullMap.view.pins[1]
+        pin.scripts.OnClick(pin, "LeftButton")
+        assertEqual(3, ns.db.view.boss)
+        assertFalse(frame.fullMap:IsShown())
+    end)
+
+    it("closes the full map when the instance changes", function()
+        local ns = opened()
+        ns.Window.OpenMap()
+        ns.Window.SelectInstance("Spire")
+        assertFalse(ns.Window.Frame().fullMap:IsShown())
+    end)
+
+    it("lays the loot out in two columns", function()
+        local ns = opened()
+        assertEqual(2, ns.Window.Frame().loot.options.columns)
+    end)
+
+    it("shows placeholder text in an empty search box", function()
+        local ns = opened()
+        local frame = ns.Window.Frame()
+        assertTrue(frame.searchHint:IsShown())
+        frame.search:SetText("sp")
+        assertFalse(frame.searchHint:IsShown())
+    end)
+
+    it("shows the normal list for a single letter", function()
+        local ns = helpers.loggedIn()
+        local entries = ns.Window.InstanceEntries({ kind = "dungeon", instance = "" }, "z")
+        assertEqual(2, #entries)
+    end)
+
+    it("gives a plain fallback button a font, so its label shows", function()
+        local ns, env = helpers.loadAddon(nil, function(env) env.__missingTemplates.UIPanelButtonTemplate = true end)
+        helpers.sampleInstances(ns)
+        helpers.login(ns, env)
+        ns.Window.Open()
+        assertEqual("GameFontNormal", ns.Window.Frame().tabs.dungeon.normalFont)
+    end)
+end)
