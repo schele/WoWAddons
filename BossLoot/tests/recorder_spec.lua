@@ -302,3 +302,26 @@ describe("the recorder's commands", function()
         assertMatch("1 items", helpers.printed(env))
     end)
 end)
+
+describe("keeping the lists up to date", function()
+    it("brings them up to date once for a burst of instance loot, and not for loot in the open world", function()
+        local ns, env = helpers.loggedIn()
+        local applied = 0
+        local apply = ns.Recordings.Apply
+        ns.Recordings.Apply = function() applied = applied + 1 return apply() end
+
+        looting(env, { withSources(BOOTS, "Creature-0-3110-0-47-40-0000A", 1) })
+        function env.GetInstanceInfo() return "Elwynn Forest", "none", 0, "", 5, 0, false, 0 end
+        helpers.fire(env, "LOOT_OPENED")
+        env.__runTimers()
+        assertEqual(0, applied, "nothing in an instance changed")
+
+        looting(env, { withSources(BOOTS, REVELOSH, 1) })
+        helpers.fire(env, "LOOT_OPENED")
+        looting(env, { withSources(GLOVES, OTHER, 1) })
+        helpers.fire(env, "LOOT_OPENED")
+        assertEqual(0, applied, "not straight away")
+        env.__runTimers()
+        assertEqual(1, applied, "once for both")
+    end)
+end)

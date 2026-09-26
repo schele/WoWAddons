@@ -17,6 +17,7 @@ ns.AddDefaults({
 local SEEN_LIMIT = 500        -- corpses remembered, so a reopened one does not count again
 local ENCOUNTER_WINDOW = 60   -- seconds after a fight that a looted creature can be its boss
 local KINDS = { Creature = "npc", Vehicle = "npc", GameObject = "object" }
+local REFRESH_DELAY = 0.5     -- seconds of loot gathered into one update of the lists
 
 local function recorded()
     return ns.db and ns.db.recorded
@@ -140,6 +141,23 @@ local function targetName(guid)
     return nil
 end
 
+-- Bring the lists up to date after instance loot, once for a burst of it.
+local refreshPending = false
+local function listsChanged()
+    if refreshPending then
+        return
+    end
+    if not (C_Timer and C_Timer.After) then
+        ns.Recordings.Changed()
+        return
+    end
+    refreshPending = true
+    C_Timer.After(REFRESH_DELAY, function()
+        refreshPending = false
+        ns.Recordings.Changed()
+    end)
+end
+
 -- A live creature's loot window is its pocket (Pick Pocket), not its loot.
 local function livingTarget(guid)
     if not (UnitGUID and UnitIsDead) then
@@ -211,8 +229,10 @@ function Recorder.LootOpened()
         remember(itemID, item.name, item.quality, item.info)
     end
 
-    if #order > 0 then
-        ns.Recordings.Changed()
+    -- Loot in the open world changes no list.
+    local inInstance = where.instanceType == "party" or where.instanceType == "raid"
+    if #order > 0 and inInstance then
+        listsChanged()
     end
 end
 
