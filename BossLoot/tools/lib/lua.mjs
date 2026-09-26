@@ -17,13 +17,23 @@ export function instanceFile(instance) {
     `    name = ${luaString(instance.name)},`,
     `    kind = ${luaString(instance.kind)},`,
     `    levels = { ${instance.levels[0]}, ${instance.levels[1]} },`,
-    '    bosses = {',
   ];
+
+  if (instance.map) {
+    lines.push(`    map = { cols = ${instance.map.cols}, rows = ${instance.map.rows}, cells = {`);
+    for (let i = 0; i < instance.map.cells.length; i += 20) {
+      lines.push(`        ${instance.map.cells.slice(i, i + 20).join(', ')},`);
+    }
+    lines.push('    } },');
+  }
+  lines.push('    bosses = {');
 
   for (const boss of instance.bosses) {
     lines.push('        {');
     lines.push(`            name = ${luaString(boss.name)},`);
     if (boss.wing) lines.push(`            wing = ${luaString(boss.wing)},`);
+    if (boss.display) lines.push(`            display = ${boss.display},`);
+    if (boss.pin) lines.push(`            pin = { ${boss.pin.x}, ${boss.pin.y} },`);
     lines.push('            loot = {');
     for (const entry of boss.loot) lines.push(`                { ${entry.id}, ${entry.chance} },`);
     lines.push('            },');

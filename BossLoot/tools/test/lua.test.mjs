@@ -30,3 +30,15 @@ test('the TOC gets the data files between its markers, and nothing else changes'
 test('a TOC without markers is refused', () => {
   assert.throws(() => updateToc('BossLoot.lua', ['A.lua']), /markers/);
 });
+
+test('writes the map, and each boss model and pin', () => {
+  const text = instanceFile({
+    key: 'Test', name: 'Test Depths', kind: 'dungeon', levels: [52, 60],
+    map: { cols: 96, rows: 71, cells: [0, 5, 9] },
+    bosses: [{ name: 'Boss One', display: 8807, pin: { x: 0.25, y: 0.5 }, loot: [] }],
+    notable: { trash: [], objects: [] },
+  });
+  assert.match(text, /map = \{ cols = 96, rows = 71, cells = \{\n\s+0, 5, 9,\n\s+\} \},/);
+  assert.match(text, /display = 8807,/);
+  assert.match(text, /pin = \{ 0\.25, 0\.5 \},/);
+});

@@ -49,6 +49,27 @@ export function openDb(source) {
     creatureLootIds: () => latest('creature_template', 't.loot_id > 0'),
     lootLinks: (table) => prepare(`select entry, item, mincountOrRef from ${table} where ${SPAWNED}`).all(),
 
+    // Everything that marks out an instance's shape: where creatures and
+    // objects are spawned, and every waypoint of the creatures' patrols.
+    mapPoints(map) {
+      const points = [
+        ...prepare(`select position_x as x, position_y as y, position_z as z from creature where map = ? and ${SPAWNED}`).all(map),
+        ...prepare(`select position_x as x, position_y as y, position_z as z from gameobject where map = ? and ${SPAWNED}`).all(map),
+      ];
+      try {
+        points.push(...prepare(`
+          select m.position_x as x, m.position_y as y, m.position_z as z
+          from creature_movement m join creature c on c.guid = m.id
+          where c.map = ? and c.patch_min <= ${P} and ${P} <= c.patch_max
+        `).all(map));
+      } catch {
+        // A dump without patrol paths still has its spawns.
+      }
+      return points;
+    },
+    creatureSpawn: (entry, map) => prepare(`select position_x as x, position_y as y, position_z as z from creature where id = ? and map = ? and ${SPAWNED} order by guid limit 1`).get(entry, map),
+    objectSpawn: (entry, map) => prepare(`select position_x as x, position_y as y, position_z as z from gameobject where id = ? and map = ? and ${SPAWNED} order by guid limit 1`).get(entry, map),
+
     // Conditions that only ask which faction the looter is on. Every player
     // is on one, and the rows gated on them lead to the same items (Onyxia's
     // tier 2 helms come as a Horde row and an Alliance row).

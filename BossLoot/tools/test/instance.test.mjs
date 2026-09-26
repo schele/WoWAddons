@@ -193,3 +193,37 @@ test('keys are the name without punctuation', () => {
   assert.equal(keyFor("Ahn'Qiraj Temple"), 'AhnQirajTemple');
   assert.equal(keyFor('Blackrock Depths'), 'BlackrockDepths');
 });
+
+test('draws a map of where mobs stand and walk, with the boss pinned where it stands', () => {
+  const { db, add } = world();
+  db.exec('update creature set position_x = 100, position_y = 0 where id = 1');
+  db.exec('update creature set position_x = 0, position_y = -100 where id = 2');
+  add('creature_movement', { id: 2, point: 1, position_x: 50, position_y: -50, position_z: 0 });
+  const { instance } = buildInstance(openDb(db), def);
+  assert.ok(instance.map.cells.length >= 3, 'two spawns, a chest and a waypoint');
+  assert.deepEqual(instance.bosses[0].pin, { x: 0, y: 0 });
+});
+
+test('pins a chest-only boss at its chest, and gives a summoned boss no pin', () => {
+  const { db, add } = world();
+  db.exec('update creature set position_x = 100, position_y = 0 where id = 1');
+  db.exec('update gameobject set position_x = 0, position_y = -100 where id = 50');
+  add('creature_template', { entry: 3, name: 'Summoned Boss', loot_id: 1 });
+  const bosses = [{ name: 'Chest Only', creatures: [], objects: ['Old Chest'] }, 'Summoned Boss'];
+  const { instance } = buildInstance(openDb(db), { ...def, bosses });
+  assert.deepEqual(instance.bosses[0].pin, { x: 1, y: 1 });
+  assert.equal(instance.bosses[1].pin, undefined);
+});
+
+test("records the boss's model, for its portrait", () => {
+  const { db } = world();
+  db.exec('update creature_template set display_id1 = 8807 where entry = 1');
+  const { instance } = buildInstance(openDb(db), def);
+  assert.equal(instance.bosses[0].display, 8807);
+});
+
+test('an instance with nothing on its map has no map', () => {
+  const { db } = world();
+  const { instance } = buildInstance(openDb(db), { ...def, map: 999 });
+  assert.equal(instance.map, undefined);
+});

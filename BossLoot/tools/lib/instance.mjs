@@ -1,6 +1,7 @@
 // One instance's data: its bosses' loot and its notable drops.
 import { resolveLoot } from './loot.mjs';
 import { isNotable, keepForBoss, sortLoot, NOTABLE_MIN_CHANCE } from './filters.mjs';
+import { buildMap, pinFor } from './map.mjs';
 
 const CHEST = 3;
 const MAX_SOURCES = 3;
@@ -74,6 +75,7 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
   const spawnedObjects = db.spawnedObjects(def.map);
   const claimedCreatures = new Set();
   const claimedObjects = new Set();
+  const map = buildMap(db.mapPoints(def.map));
 
   const bosses = [];
   for (const boss of bossDefs(def)) {
@@ -95,12 +97,14 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
       if (creature.loot_id > 0) take('creature_loot_template', creature.loot_id);
     }
 
+    const chestsUsed = [];
     for (const name of boss.objects) {
       const chests = db.objectsNamed(name).filter((o) => o.type === CHEST && o.data1 > 0);
       const matches = pick(chests, spawnedObjects, () => true);
       if (!matches.length) errors.push(`${def.name}: no chest named "${name}"`);
       for (const chest of matches) {
         claimedObjects.add(chest.entry);
+        chestsUsed.push(chest);
         take('gameobject_loot_template', chest.data1);
       }
     }
@@ -112,6 +116,17 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
 
     const out = { name: boss.name, loot: sortLoot(entries, itemOf) };
     if (boss.wing) out.wing = boss.wing;
+
+    // The portrait: the first of the boss's creatures that has a model.
+    const modelled = creatures.find((c) => c.display_id1 > 0);
+    if (modelled) out.display = modelled.display_id1;
+
+    // The pin: where the boss stands, or its chest for a chest-only boss. A
+    // boss a script summons has no spawn, and so no pin.
+    const spawn = creatures.map((c) => db.creatureSpawn(c.entry, def.map)).find(Boolean)
+      ?? chestsUsed.map((o) => db.objectSpawn(o.entry, def.map)).find(Boolean);
+    const pin = pinFor(map, spawn);
+    if (pin) out.pin = pin;
     bosses.push(out);
   }
 
@@ -154,6 +169,7 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
       name: def.name,
       kind: def.kind,
       levels: def.levels,
+      map: map ? { cols: map.cols, rows: map.rows, cells: map.cells } : undefined,
       bosses,
       notable: { trash: notable(trashSources), objects: notable(objectSources) },
     },
