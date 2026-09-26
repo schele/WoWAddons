@@ -31,6 +31,9 @@ local BOSS_ROW = 34
 local LOOT_ROW = ns.LootRow.HEIGHT + 2
 local INSET_WIDTH, INSET_HEIGHT = 150, 84
 local MORE_HEIGHT = 16
+-- While the big map covers the boss page, the boss list keeps this many rows
+-- and the loot moves into the space under them.
+local BOSS_ROWS_WITH_MAP = 6
 -- A search needs this many characters; fewer would match nearly everything.
 local SEARCH_MIN = 2
 
@@ -230,10 +233,17 @@ local function preload(instance)
     end
 end
 
+-- The big map covers the boss page, loot and all, so while it is open the
+-- loot moves under the boss list, which gives up its lower half.
 function Window.CloseMap()
-    if frame then
-        frame.fullMap:Hide()
+    if not (frame and frame.fullMap:IsShown()) then
+        return
     end
+    frame.fullMap:Hide()
+    frame.mapLoot:Hide()
+    frame.loot:Show()
+    ns.List.SetVisibleRows(frame.bosses, frame.bossRows)
+    Window.Refresh()
 end
 
 function Window.OpenMap()
@@ -241,6 +251,9 @@ function Window.OpenMap()
         return
     end
     frame.fullMap:Show()
+    frame.loot:Hide()
+    frame.mapLoot:Show()
+    ns.List.SetVisibleRows(frame.bosses, BOSS_ROWS_WITH_MAP)
     Window.Refresh()
 end
 
@@ -385,10 +398,14 @@ function Window.Refresh()
         end
     end
 
+    local mapOpen = frame.fullMap:IsShown()
+    local lootList = mapOpen and frame.mapLoot or frame.loot
     local loot = Window.LootEntries(instance, selection)
-    local key = tostring(view.instance) .. ":" .. tostring(selection)
-    ns.List.SetEntries(frame.loot, loot, key == lastSelection)
+    local key = tostring(view.instance) .. ":" .. tostring(selection) .. (mapOpen and ":map" or "")
+    ns.List.SetEntries(lootList, loot, key == lastSelection)
     lastSelection = key
+    frame.empty:ClearAllPoints()
+    frame.empty:SetPoint("TOPLEFT", lootList, "TOPLEFT", 6, -6)
     frame.empty:SetShown(instance ~= nil and #loot == 0)
 
     drawHeader(instance, selection)
@@ -617,6 +634,18 @@ local function create()
         createRow = bossRow, renderRow = renderBoss,
     })
     frame.bosses:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + RAIL_WIDTH + GAP, -TOP)
+    frame.bossRows = frame.bosses.options.rows
+
+    -- Where the loot goes while the big map is open: under the boss list's
+    -- first rows, one tile across.
+    local mapLootTop = TOP + BOSS_ROWS_WITH_MAP * BOSS_ROW + MORE_HEIGHT + 6
+    frame.mapLoot = ns.List.Create(frame, {
+        width = BOSS_WIDTH, rowHeight = LOOT_ROW,
+        rows = math.floor((HEIGHT - mapLootTop - PADDING - MORE_HEIGHT) / LOOT_ROW),
+        createRow = ns.LootRow.Create, renderRow = ns.LootRow.Render,
+    })
+    frame.mapLoot:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + RAIL_WIDTH + GAP, -mapLootTop)
+    frame.mapLoot:Hide()
 
     -- The boss page: header with model and map inset, then the loot grid.
     frame.header = createHeader(frame)

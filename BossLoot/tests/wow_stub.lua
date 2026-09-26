@@ -79,6 +79,7 @@ local function makeWidget(kind, parent, template, env)
     function widget:GetText() return self.text end
     function widget:SetTextColor(r, g, b) self.textColor = { r, g, b } end
     function widget:SetJustifyH(value) self.justifyH = value end
+    function widget:SetWordWrap(value) self.wordWrap = value end
     function widget:SetAutoFocus() end
     function widget:ClearFocus() end
     function widget:SetMaxLetters() end

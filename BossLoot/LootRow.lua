@@ -125,6 +125,10 @@ function LootRow.Create(list)
     row.detail:SetPoint("BOTTOMLEFT", row.icon, "BOTTOMRIGHT", 6, 0)
     row.detail:SetPoint("RIGHT", row, "RIGHT", -CHANCE_WIDTH, 0)
     row.detail:SetJustifyH("LEFT")
+    -- One line each: wrapped, a long type line ("Main Hand, One-Handed Swords")
+    -- runs up into the name. Cut short with "..." instead.
+    row.name:SetWordWrap(false)
+    row.detail:SetWordWrap(false)
 
     row.chance = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     row.chance:SetPoint("RIGHT", row, "RIGHT", -4, 0)

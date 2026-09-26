@@ -498,7 +498,7 @@ describe("the window, after review", function()
     it("keeps every list, and the line under it, inside the window", function()
         local ns = opened()
         local frame = ns.Window.Frame()
-        for name, list in pairs({ rail = frame.instances, bosses = frame.bosses, loot = frame.loot }) do
+        for name, list in pairs({ rail = frame.instances, bosses = frame.bosses, loot = frame.loot, mapLoot = frame.mapLoot }) do
             local _, _, _, _, y = list:GetPoint(1)
             assertTrue(-y + list:GetHeight() + 16 <= 520 - 12, name .. " runs past the bottom")
         end
@@ -508,5 +508,33 @@ describe("the window, after review", function()
         local ns = opened()
         local full = ns.Window.Frame().fullMap
         assertTrue(full.close:GetFrameLevel() > full.view:GetFrameLevel() + 2)
+    end)
+end)
+
+describe("the loot while the big map is open", function()
+    it("moves under the bosses, and back when the map closes", function()
+        local ns = opened()
+        local frame = ns.Window.Frame()
+        local fullRows = frame.bosses.options.rows
+
+        ns.Window.OpenMap()
+        assertFalse(frame.loot:IsShown(), "gone from the page, under the map")
+        assertTrue(frame.mapLoot:IsShown(), "under the bosses instead")
+        assertEqual(1001, frame.mapLoot.rows[1].entry.id)
+        assertTrue(frame.bosses.options.rows < fullRows, "the boss list makes room")
+
+        ns.Window.CloseMap()
+        assertTrue(frame.loot:IsShown())
+        assertFalse(frame.mapLoot:IsShown())
+        assertEqual(fullRows, frame.bosses.options.rows)
+        assertEqual(1001, frame.loot.rows[1].entry.id)
+    end)
+
+    it("follows a boss picked on the map", function()
+        local ns = opened()
+        local frame = ns.Window.Frame()
+        ns.Window.OpenMap()
+        ns.Window.SelectBoss(2)
+        assertEqual(1003, frame.mapLoot.rows[1].entry.id)
     end)
 end)

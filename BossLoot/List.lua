@@ -17,9 +17,15 @@ local function columns(list)
     return list.options.columns or 1
 end
 
+-- How many rows are in use: all of them, unless SetVisibleRows says fewer.
+local function visible(list)
+    return list.options.rows * columns(list)
+end
+
 function List.Render(list)
+    local inUse = visible(list)
     for index, row in ipairs(list.rows) do
-        local entry = list.entries[index + list.offset]
+        local entry = index <= inUse and list.entries[index + list.offset]
         if entry then
             list.options.renderRow(row, entry)
             row:Show()
@@ -30,7 +36,7 @@ function List.Render(list)
     end
 
     -- Mouse-wheel scrolling leaves no other sign that there is more.
-    local below = #list.entries - list.offset - #list.rows
+    local below = #list.entries - list.offset - inUse
     if below > 0 then
         list.more:SetText(MORE_ARROW .. below .. " more")
         list.more:Show()
@@ -46,6 +52,15 @@ function List.Scroll(list, lines)
     local maxOffset = math.max(0, totalLines - list.options.rows) * perLine
     list.offset = math.min(maxOffset, math.max(0, list.offset + lines * perLine))
     List.Render(list)
+end
+
+--- Use only the first `lines` lines of rows (never more than were built),
+-- shrinking the list so the more-below line follows its new bottom.
+function List.SetVisibleRows(list, lines)
+    local built = #list.rows / columns(list)
+    list.options.rows = math.max(1, math.min(built, lines))
+    list:SetHeight(list.options.rows * list.options.rowHeight)
+    List.Scroll(list, 0)
 end
 
 --- Scroll just far enough that the entry at `position` is on screen.
