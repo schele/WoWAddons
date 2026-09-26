@@ -121,6 +121,88 @@ describe("saving the bank", function()
     end)
 end)
 
+describe("bank tabs", function()
+    -- What a client with bank tabs hands over: each tab a container like a
+    -- bag, its "bag" a placeholder item no player is meant to see.
+    local TAB_BAG = { link = "|cffffffff|Hitem:999999::|h[Character Bank Tab Bag (DNT)]|h|r", icon = 4549254 }
+
+    -- The old 28-slot bank, empty unless told otherwise, and two tabs (6 and
+    -- 7) of 4 slots, Linen in the first.
+    local function withTabs(mainItem, setup)
+        return function(env)
+            env.NUM_BAG_SLOTS, env.NUM_TOTAL_EQUIPPED_BAG_SLOTS, env.NUM_BANKBAGSLOTS = 4, 5, 6
+            local main = {}
+            for slot = 1, 28 do main[slot] = false end
+            main[1] = mainItem or false
+            helpers.bank(env,
+                { [-1] = main, [6] = { LINEN, false, false, false }, [7] = { false, false, false, false } },
+                { [6] = TAB_BAG, [7] = TAB_BAG })
+            if setup then setup(env) end
+        end
+    end
+
+    local function saved(setup)
+        local ns, env = helpers.loggedIn(setup)
+        helpers.fire(env, "BANKFRAME_OPENED")
+        return ns.db.characters["Stormwind-Carl"].containers
+    end
+
+    it("names each tab as the game's bank does, not by its placeholder item", function()
+        local containers = saved(withTabs())
+        assertEqual("Tab 1", containers[1].name)
+        assertEqual("Tab 2", containers[2].name)
+        assertEqual(LINEN.link, containers[1].slots[1].link)
+    end)
+
+    it("leaves out the old bank when it is empty and the tabs hold the bank", function()
+        local containers = saved(withTabs())
+        assertEqual(2, #containers)
+        assertEqual(6, containers[1].id)
+    end)
+
+    it("keeps the old bank when something is in it", function()
+        local containers = saved(withTabs(BOOTS))
+        assertEqual(-1, containers[1].id)
+        assertEqual("Bank", containers[1].name)
+        assertEqual(3, #containers)
+    end)
+
+    it("keeps an empty bank on a client without tabs", function()
+        local containers = saved(function(env)
+            local main = {}
+            for slot = 1, 24 do main[slot] = false end
+            helpers.bank(env, { [-1] = main, [5] = { false, false, false, false } }, { [5] = BAG })
+        end)
+        assertEqual(-1, containers[1].id)
+        assertEqual(2, #containers)
+    end)
+
+    it("takes a tab's name and icon from the client, when it says", function()
+        local asked
+        local containers = saved(withTabs(nil, function(env)
+            env.Enum = { BankType = { Character = 0 } }
+            env.C_Bank = {
+                FetchPurchasedBankTabData = function(bankType)
+                    asked = bankType
+                    return { { ID = 6, name = "Mats", icon = 134400 }, { ID = 7, name = "" } }
+                end,
+            }
+        end))
+        assertEqual(0, asked, "the character's own tabs")
+        assertEqual("Mats", containers[1].name)
+        assertEqual(134400, containers[1].icon)
+        assertEqual("Tab 2", containers[2].name, "a tab never named is numbered")
+    end)
+
+    it("still saves the bank when the client's tab data raises", function()
+        local containers = saved(withTabs(nil, function(env)
+            env.C_Bank = { FetchPurchasedBankTabData = function() error("secret") end }
+        end))
+        assertEqual("Tab 1", containers[1].name)
+        assertEqual(2, #containers)
+    end)
+end)
+
 describe("which containers are the bank bags", function()
     -- The ids saved, with every container from -1 to 13 holding one slot.
     local function savedIds(setup)

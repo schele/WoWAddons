@@ -87,20 +87,72 @@ local function readContainer(container, name)
     return copy
 end
 
---- The bank as it is: the main bank, then each bank bag that has slots.
-function Bank.Read()
-    local containers = {}
-    local main = readContainer(MAIN, "Bank")
-    if main then
-        table.insert(containers, main)
+-- On a client with bank tabs, each tab is a container like a bank bag, and
+-- its "bag" is a placeholder item, "Character Bank Tab Bag (DNT)": DNT, do not
+-- translate, is Blizzard's mark on a name no player was meant to see. A tab's
+-- real name and icon come from C_Bank, where the client has it: tab ID ->
+-- { name, icon }.
+local function tabData()
+    local tabs = {}
+    if not (C_Bank and C_Bank.FetchPurchasedBankTabData) then
+        return tabs
     end
+    local character = (Enum and Enum.BankType and Enum.BankType.Character) or 0
+    local ok, list = pcall(C_Bank.FetchPurchasedBankTabData, character)
+    if not (ok and type(list) == "table") then
+        return tabs
+    end
+    for _, tab in ipairs(list) do
+        if type(tab) == "table" and tab.ID then
+            tabs[tab.ID] = tab
+        end
+    end
+    return tabs
+end
+
+local function isPlaceholder(name)
+    return name ~= nil and name:find("(DNT)", 1, true) ~= nil
+end
+
+local function isEmpty(container)
+    for slot = 1, container.size do
+        if container.slots[slot] then
+            return false
+        end
+    end
+    return true
+end
+
+--- The bank as it is: the main bank, then each bank bag or tab that has slots.
+function Bank.Read()
+    local tabs = tabData()
+    local containers = {}
+    local tabCount = 0
     for container = FIRST_BAG, LAST_BAG do
         local link, icon = bagItem(container)
-        local copy = readContainer(container, link and link:match("%[(.-)%]") or "Bag")
+        local name = link and link:match("%[(.-)%]")
+        local copy = readContainer(container, name or "Bag")
         if copy then
             copy.link, copy.icon = link, icon
+            local tab = tabs[container]
+            if tab or isPlaceholder(name) then
+                -- Named as the game's bank names it: what the player called the
+                -- tab, or its number. The placeholder item has nothing to say.
+                tabCount = tabCount + 1
+                copy.name = (tab and type(tab.name) == "string" and tab.name ~= "" and tab.name)
+                    or ("Tab " .. tabCount)
+                copy.icon = (tab and tab.icon) or icon
+                copy.link = nil
+            end
             table.insert(containers, copy)
         end
+    end
+
+    -- A client with tabs still reports the old bank, every slot of it empty:
+    -- shown, it is rows of slots nothing can go in. Kept if anything is there.
+    local main = readContainer(MAIN, "Bank")
+    if main and not (tabCount > 0 and isEmpty(main)) then
+        table.insert(containers, 1, main)
     end
     return containers
 end
