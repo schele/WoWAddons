@@ -1067,3 +1067,54 @@ describe("the window's heading", function()
         assertEqual(frame.logo, relativeTo, "the name follows the icon")
     end)
 end)
+
+-- The game's search box, as far as a test needs it: its word and glass, and
+-- an OnTextChanged of its own that shows and hides the word.
+local function withGameSearchBox(env)
+    local create = env.CreateFrame
+    function env.CreateFrame(kind, name, parent, template)
+        local made = create(kind, name, parent, template)
+        if template == "SearchBoxTemplate" then
+            made.Instructions = made:CreateFontString()
+            made.Instructions:SetText("Search")
+            made.searchIcon = made:CreateTexture()
+            made:SetScript("OnTextChanged", function(self)
+                self.Instructions:SetShown(self:GetText() == "")
+            end)
+        end
+        return made
+    end
+end
+
+local function withoutGameSearchBox(env)
+    env.__missingTemplates.SearchBoxTemplate = true
+end
+
+describe("the search box", function()
+    local function openedWith(setup)
+        local ns, env = helpers.loadAddon(nil, setup)
+        helpers.sampleInstances(ns)
+        helpers.login(ns, env)
+        ns.Window.Open()
+        return ns, env, ns.Window.Frame()
+    end
+
+    it("is the game's own search box, whose word its own script still hides", function()
+        local ns, env, frame = openedWith(withGameSearchBox)
+        assertEqual(frame.search.Instructions, frame.searchHint)
+        assertTrue(frame.searchHint:IsShown())
+        frame.search:SetText("zz")
+        assertFalse(frame.searchHint:IsShown(), "the game's own script still runs")
+        assertEqual("No matches", frame.instances.entries[1].text, "and so does the search")
+    end)
+
+    it("draws the glass and the word itself on a client without that box", function()
+        local ns, env, frame = openedWith(withoutGameSearchBox)
+        assertEqual("Interface\\Common\\UI-Searchbox-Icon", frame.search.icon:GetTexture())
+        assertEqual("Search", frame.searchHint:GetText())
+        frame.search:SetText("zz")
+        assertFalse(frame.searchHint:IsShown())
+        frame.search:SetText("")
+        assertTrue(frame.searchHint:IsShown())
+    end)
+end)

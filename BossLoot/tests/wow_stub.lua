@@ -90,6 +90,7 @@ local function makeWidget(kind, parent, template, env)
     -- Six pixels a character: near enough for laying labels out.
     function widget:GetStringWidth() return #(self.text or "") * 6 end
     function widget:SetTextColor(r, g, b) self.textColor = { r, g, b } end
+    function widget:SetTextInsets(...) self.textInsets = { ... } end
     function widget:SetJustifyH(value) self.justifyH = value end
     function widget:SetWordWrap(value) self.wordWrap = value end
     function widget:SetAutoFocus() end

@@ -767,6 +767,38 @@ local function createFrame(kind, name, parent, template)
     return created
 end
 
+-- The game's own search box: a magnifying glass, the word "Search" in grey
+-- while it is empty, and a clear button. SearchBoxTemplate draws all three and
+-- shows and hides the word from its own OnTextChanged, so a box made from it
+-- is hooked, never given a script of ours in that slot. On a client without
+-- it, an input box gets the glass and the word drawn here.
+local SEARCH_ICON = "Interface\\Common\\UI-Searchbox-Icon"
+
+local function createSearchBox(parent)
+    local ok, box = pcall(CreateFrame, "EditBox", nil, parent, "SearchBoxTemplate")
+    if ok and box and box.Instructions then
+        box.hint = box.Instructions
+        return box
+    end
+    if ok and box then
+        box:Hide() -- a template of that name, but not the box this expects
+    end
+    box = createFrame("EditBox", nil, parent, "InputBoxTemplate")
+    box.icon = box:CreateTexture(nil, "OVERLAY")
+    box.icon:SetTexture(SEARCH_ICON)
+    box.icon:SetSize(14, 14)
+    box.icon:SetPoint("LEFT", box, "LEFT", 0, -1)
+    box:SetTextInsets(16, 4, 0, 0)
+    -- On the box itself: a string on the window would draw under the box's art.
+    box.hint = box:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+    box.hint:SetPoint("LEFT", box, "LEFT", 18, 0)
+    box.hint:SetText(SEARCH or "Search")
+    box:HookScript("OnTextChanged", function(self)
+        box.hint:SetShown(self:GetText() == "")
+    end)
+    return box
+end
+
 -- A close button like every other window's, at the template's own size, or
 -- a plain "X" if the template has no picture.
 local function createCloseButton(parent, onClick)
@@ -1058,17 +1090,13 @@ local function create()
     frame.allProgress = frame.debug.progress
 
     -- The rail: search, tabs, instances.
-    local search = createFrame("EditBox", nil, frame, "InputBoxTemplate")
+    local search = createSearchBox(frame)
     search:SetSize(RAIL_WIDTH - 14, SEARCH_HEIGHT)
     search:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + 8, -TOP - 2)
     search:SetAutoFocus(false)
     search:SetMaxLetters(40)
-    -- On the box itself: a string on the window would draw under the box's art.
-    frame.searchHint = search:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    frame.searchHint:SetPoint("LEFT", search, "LEFT", 4, 0)
-    frame.searchHint:SetText("Search...")
-    search:SetScript("OnTextChanged", function(self)
-        frame.searchHint:SetShown(self:GetText() == "")
+    frame.searchHint = search.hint
+    search:HookScript("OnTextChanged", function()
         Window.Refresh()
     end)
     search:SetScript("OnEscapePressed", function(self)

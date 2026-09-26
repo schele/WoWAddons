@@ -96,6 +96,38 @@ local function createFrame(kind, name, parent, template)
     return CreateFrame(kind, name, parent)
 end
 
+-- The game's own search box: a magnifying glass, the word "Search" in grey
+-- while it is empty, and a clear button. SearchBoxTemplate draws all three and
+-- shows and hides the word from its own OnTextChanged, so a box made from it
+-- is hooked, never given a script of ours in that slot. On a client without
+-- it, an input box gets the glass and the word drawn here.
+local SEARCH_ICON = "Interface\\Common\\UI-Searchbox-Icon"
+
+local function createSearchBox(parent)
+    local ok, box = pcall(CreateFrame, "EditBox", nil, parent, "SearchBoxTemplate")
+    if ok and box and box.Instructions then
+        box.hint = box.Instructions
+        return box
+    end
+    if ok and box then
+        box:Hide() -- a template of that name, but not the box this expects
+    end
+    box = createFrame("EditBox", nil, parent, "InputBoxTemplate")
+    box.icon = box:CreateTexture(nil, "OVERLAY")
+    box.icon:SetTexture(SEARCH_ICON)
+    box.icon:SetSize(14, 14)
+    box.icon:SetPoint("LEFT", box, "LEFT", 0, -1)
+    box:SetTextInsets(16, 4, 0, 0)
+    -- On the box itself: a string on the window would draw under the box's art.
+    box.hint = box:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+    box.hint:SetPoint("LEFT", box, "LEFT", 18, 0)
+    box.hint:SetText(SEARCH or "Search")
+    box:HookScript("OnTextChanged", function(self)
+        box.hint:SetShown(self:GetText() == "")
+    end)
+    return box
+end
+
 local function scrollTo(offset)
     local most = math.max(0, frame.content:GetHeight() - VIEW_HEIGHT)
     frame.scroll:SetVerticalScroll(math.max(0, math.min(most, offset)))
@@ -319,11 +351,11 @@ local function create()
         cycle(mouseButton == "RightButton" and -1 or 1)
     end)
 
-    frame.search = createFrame("EditBox", nil, frame, "InputBoxTemplate")
+    frame.search = createSearchBox(frame)
     frame.search:SetSize(180, 20)
     frame.search:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PADDING - 4, -(PADDING + TITLE_HEIGHT))
     frame.search:SetAutoFocus(false)
-    frame.search:SetScript("OnTextChanged", function(self)
+    frame.search:HookScript("OnTextChanged", function(self)
         search = self:GetText() or ""
         Window.Refresh()
     end)
