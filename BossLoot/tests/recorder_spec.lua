@@ -346,3 +346,71 @@ describe("keeping the lists up to date", function()
         assertEqual(1, applied, "once for both")
     end)
 end)
+
+describe("recording with the newer merchant and profession calls", function()
+    it("records a merchant's prices from C_MerchantFrame, with how many the price buys", function()
+        local ns, env = helpers.loggedIn()
+        function env.UnitGUID(unit) return unit == "npc" and "Creature-0-3110-0-47-1234-0000AA" or nil end
+        function env.GetMerchantNumItems() return 1 end
+        function env.GetMerchantItemLink() return "|Hitem:2901::|h[Mining Pick]|h" end
+        env.C_MerchantFrame = { GetItemInfo = function() return { name = "Mining Pick", price = 81, stackCount = 5 } end }
+        helpers.fire(env, "MERCHANT_SHOW")
+        local item = ns.db.recorded.merchants["npc:1234"].items[2901]
+        assertEqual(81, item.price)
+        assertEqual(5, item.count)
+    end)
+
+    it("records what a profession's recipes make from C_TradeSkillUI", function()
+        local ns, env = helpers.loggedIn()
+        env.C_TradeSkillUI = {
+            GetBaseProfessionInfo = function() return { professionName = "Blacksmithing" } end,
+            GetAllRecipeIDs = function() return { 2660, 7418, 3115 } end,
+            GetRecipeSchematic = function(id)
+                if id == 2660 then return { outputItemID = 2851 } end
+                return {} -- an enchant makes no item
+            end,
+            GetRecipeItemLink = function(id) return id == 3115 and "|Hitem:3470::|h[Rough Grinding Stone]|h" or nil end,
+        }
+        helpers.fire(env, "TRADE_SKILL_SHOW")
+        local made = ns.db.recorded.crafts["Blacksmithing"]
+        assertTrue(made[2851], "from the recipe's schematic")
+        assertTrue(made[3470], "or its item link")
+        local count = 0
+        for _ in pairs(made) do count = count + 1 end
+        assertEqual(2, count, "nothing for the enchant")
+    end)
+
+    it("records again when the profession's list comes in, after a moment", function()
+        local ns, env = helpers.loggedIn()
+        local recipes = {}
+        env.C_TradeSkillUI = {
+            GetBaseProfessionInfo = function() return { professionName = "Tailoring" } end,
+            GetAllRecipeIDs = function() return recipes end,
+            GetRecipeSchematic = function() return { outputItemID = 2568 } end,
+        }
+        helpers.fire(env, "TRADE_SKILL_SHOW")
+        recipes = { 2385 }
+        helpers.fire(env, "TRADE_SKILL_LIST_UPDATE")
+        helpers.fire(env, "TRADE_SKILL_LIST_UPDATE")
+        env.__runTimers()
+        assertTrue(ns.db.recorded.crafts["Tailoring"][2568])
+    end)
+
+    it("counts the newer calls as there in /bl probe", function()
+        local ns, env = helpers.loggedIn()
+        for _, name in ipairs({ "GetNumLootItems", "GetLootSlotLink", "GetLootSlotInfo", "GetLootSourceInfo",
+            "GetInstanceInfo", "GetRealZoneText", "UnitGUID", "UnitName", "UnitIsDead", "IsFishingLoot",
+            "GetQuestID", "GetTitleText", "GetNumQuestRewards", "GetNumQuestChoices", "GetQuestItemLink",
+            "UnitFactionGroup", "GetMerchantNumItems", "GetMerchantItemLink" }) do
+            env[name] = function() end
+        end
+        env.C_MerchantFrame = { GetItemInfo = function() end }
+        env.C_TradeSkillUI = {
+            GetBaseProfessionInfo = function() end, GetAllRecipeIDs = function() end,
+            GetRecipeSchematic = function() end,
+        }
+        env.C_Item.GetItemStats = function() end
+        helpers.command(env, "probe")
+        assertMatch("Everything the recorder needs", helpers.printed(env))
+    end)
+end)

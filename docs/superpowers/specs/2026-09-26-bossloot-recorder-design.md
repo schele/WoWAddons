@@ -82,12 +82,19 @@ faction (`UnitFactionGroup("player")`) is noted.
 
 **Merchant goods.** On `MERCHANT_SHOW`: the merchant (`UnitGUID("npc")`, which
 gives the npc id, and `UnitName("npc")`), the zone, and for each item
-`GetMerchantItemLink(i)` and its price from `GetMerchantItemInfo(i)`. Rank and
-reputation needs stay in the item's own data, for the gear finder.
+`GetMerchantItemLink(i)` and its price and how many it buys, from
+`C_MerchantFrame.GetItemInfo(i)` on newer clients (WoW Forever's) or
+`GetMerchantItemInfo(i)` on older ones. Rank and reputation needs stay in the
+item's own data, for the gear finder.
 
-**Crafted items.** On `TRADE_SKILL_SHOW` and `TRADE_SKILL_UPDATE`: the
-profession (`GetTradeSkillLine()`), and for each recipe that is not a header
-(`GetTradeSkillInfo(i)`), `GetTradeSkillItemLink(i)`.
+**Crafted items.** On `TRADE_SKILL_SHOW`, and a moment after the list updates
+(`TRADE_SKILL_LIST_UPDATE`, `TRADE_SKILL_UPDATE`): the profession and what
+each recipe makes. WoW Forever's client has the newer `C_TradeSkillUI`: the
+profession from `GetBaseProfessionInfo()`, the recipes from
+`GetAllRecipeIDs()`, and each one's item from `GetRecipeSchematic(id)` or
+`GetRecipeItemLink(id)`. Older clients: `GetTradeSkillLine()`, and for each
+recipe that is not a header (`GetTradeSkillInfo(i)`),
+`GetTradeSkillItemLink(i)`.
 
 **Items.** For every item recorded, its name, quality, type, subtype and slot
 come from the game (`LootRow.ItemInfo`). They are saved with the recording,

@@ -18,6 +18,7 @@ local SEEN_LIMIT = 500        -- corpses remembered, so a reopened one does not 
 local ENCOUNTER_WINDOW = 60   -- seconds after a fight that a looted creature can be its boss
 local KINDS = { Creature = "npc", Vehicle = "npc", GameObject = "object" }
 local REFRESH_DELAY = 0.5     -- seconds of loot gathered into one update of the lists
+local CRAFTS_DELAY = 1        -- seconds of profession list updates gathered into one reading
 
 local function recorded()
     return ns.db and ns.db.recorded
@@ -268,6 +269,22 @@ function Recorder.QuestShown()
     quests[questID] = quest
 end
 
+-- A merchant item's price and how many the price buys: the newer call
+-- (C_MerchantFrame), or the old one.
+local function merchantPrice(index)
+    if C_MerchantFrame and C_MerchantFrame.GetItemInfo then
+        local info = C_MerchantFrame.GetItemInfo(index)
+        if info then
+            return info.price, info.stackCount
+        end
+    end
+    if GetMerchantItemInfo then
+        local _, _, price, count = GetMerchantItemInfo(index)
+        return price, count
+    end
+    return nil
+end
+
 --- A merchant window (MERCHANT_SHOW): what it sells, and for how much.
 function Recorder.MerchantShown()
     if not (recorded() and GetMerchantNumItems and GetMerchantItemLink and UnitGUID) then
@@ -285,37 +302,92 @@ function Recorder.MerchantShown()
     for index = 1, GetMerchantNumItems() do
         local itemID = itemIDOf(GetMerchantItemLink(index))
         if itemID then
-            local price = GetMerchantItemInfo and select(3, GetMerchantItemInfo(index)) or nil
-            merchant.items[itemID] = { price = price }
+            local price, count = merchantPrice(index)
+            merchant.items[itemID] = { price = price, count = count }
             remember(itemID)
         end
     end
     merchants[key] = merchant
 end
 
---- A profession window (TRADE_SKILL_SHOW, TRADE_SKILL_UPDATE): what each of
--- its recipes makes.
+-- The open profession's name and what its recipes make: the newer
+-- profession calls (C_TradeSkillUI, a recipe's schematic or item link), or
+-- the old ones. A recipe that makes no item (an enchant) gives none.
+local function craftsNow()
+    local ui = C_TradeSkillUI
+    if ui and ui.GetAllRecipeIDs then
+        local profession
+        if ui.GetBaseProfessionInfo then
+            local info = ui.GetBaseProfessionInfo()
+            profession = info and info.professionName
+        end
+        if (not profession or profession == "") and ui.GetTradeSkillLine then
+            local _, name = ui.GetTradeSkillLine()
+            profession = name
+        end
+        local items = {}
+        for _, recipeID in ipairs(ui.GetAllRecipeIDs() or {}) do
+            local itemID
+            if ui.GetRecipeSchematic then
+                local schematic = ui.GetRecipeSchematic(recipeID, false)
+                itemID = schematic and schematic.outputItemID
+            end
+            if not itemID and ui.GetRecipeItemLink then
+                itemID = itemIDOf(ui.GetRecipeItemLink(recipeID))
+            end
+            if itemID then
+                table.insert(items, itemID)
+            end
+        end
+        return profession, items
+    end
+    if GetTradeSkillLine and GetNumTradeSkills and GetTradeSkillInfo and GetTradeSkillItemLink then
+        local items = {}
+        for index = 1, GetNumTradeSkills() do
+            local _, skillType = GetTradeSkillInfo(index)
+            if skillType ~= "header" then
+                local itemID = itemIDOf(GetTradeSkillItemLink(index))
+                if itemID then
+                    table.insert(items, itemID)
+                end
+            end
+        end
+        return GetTradeSkillLine(), items
+    end
+    return nil
+end
+
+--- A profession window (TRADE_SKILL_SHOW, and its list updates): what each
+-- of its recipes makes.
 function Recorder.TradeSkillShown()
-    if not (recorded() and GetTradeSkillLine and GetNumTradeSkills and GetTradeSkillInfo and GetTradeSkillItemLink) then
+    if not recorded() then
         return
     end
-    local profession = GetTradeSkillLine()
-    if not profession or profession == "UNKNOWN" then
+    local profession, items = craftsNow()
+    if not profession or profession == "" or profession == "UNKNOWN" then
         return
     end
     local crafts = recorded().crafts
     local made = crafts[profession] or {}
-    for index = 1, GetNumTradeSkills() do
-        local _, skillType = GetTradeSkillInfo(index)
-        if skillType ~= "header" then
-            local itemID = itemIDOf(GetTradeSkillItemLink(index))
-            if itemID then
-                made[itemID] = true
-                remember(itemID)
-            end
-        end
+    for _, itemID in ipairs(items) do
+        made[itemID] = true
+        remember(itemID)
     end
     crafts[profession] = made
+end
+
+-- A profession's list can come in after its window opens, and updates with
+-- every search: read it once, a moment after the last update.
+local craftsPending = false
+local function craftsLater()
+    if craftsPending or not (C_Timer and C_Timer.After) then
+        return
+    end
+    craftsPending = true
+    C_Timer.After(CRAFTS_DELAY, function()
+        craftsPending = false
+        Recorder.TradeSkillShown()
+    end)
 end
 
 --- How much the player has recorded.
@@ -333,21 +405,39 @@ function Recorder.Counts()
     return counts
 end
 
--- The calls the recorder (and the gear finder after it) uses.
+-- The calls the recorder (and the gear finder after it) uses. "A|B": either
+-- will do -- newer clients have some under C_ namespaces instead.
 local PROBED = {
     "GetNumLootItems", "GetLootSlotLink", "GetLootSlotInfo", "GetLootSourceInfo", "GetInstanceInfo",
     "GetRealZoneText", "UnitGUID", "UnitName", "UnitIsDead", "IsFishingLoot",
     "GetQuestID", "GetTitleText", "GetNumQuestRewards", "GetNumQuestChoices", "GetQuestItemLink",
-    "UnitFactionGroup", "GetMerchantNumItems", "GetMerchantItemLink", "GetMerchantItemInfo",
-    "GetTradeSkillLine", "GetNumTradeSkills", "GetTradeSkillInfo", "GetTradeSkillItemLink",
-    "GetItemStats",
+    "UnitFactionGroup", "GetMerchantNumItems", "GetMerchantItemLink",
+    "GetMerchantItemInfo|C_MerchantFrame.GetItemInfo",
+    "GetTradeSkillLine|C_TradeSkillUI.GetBaseProfessionInfo|C_TradeSkillUI.GetTradeSkillLine",
+    "GetNumTradeSkills|C_TradeSkillUI.GetAllRecipeIDs",
+    "GetTradeSkillInfo|C_TradeSkillUI.GetAllRecipeIDs",
+    "GetTradeSkillItemLink|C_TradeSkillUI.GetRecipeSchematic|C_TradeSkillUI.GetRecipeItemLink",
+    "GetItemStats|C_Item.GetItemStats",
 }
+
+local function present(name)
+    local namespace, field = name:match("^([%w_]+)%.([%w_]+)$")
+    if namespace then
+        local space = _G[namespace]
+        return type(space) == "table" and space[field] ~= nil
+    end
+    return _G[name] ~= nil
+end
 
 ns.RegisterCommand("probe", "Check this client has what the recorder needs", function()
     local missing = {}
-    for _, name in ipairs(PROBED) do
-        if not (_G[name] or (C_Item and C_Item[name])) then
-            table.insert(missing, name)
+    for _, entry in ipairs(PROBED) do
+        local found = false
+        for name in entry:gmatch("[^|]+") do
+            found = found or present(name)
+        end
+        if not found then
+            table.insert(missing, (entry:match("^[^|]+")))
         end
     end
     if #missing == 0 then
@@ -379,7 +469,8 @@ local handlers = {
     QUEST_COMPLETE = function() Recorder.QuestShown() end,
     MERCHANT_SHOW = function() Recorder.MerchantShown() end,
     TRADE_SKILL_SHOW = function() Recorder.TradeSkillShown() end,
-    TRADE_SKILL_UPDATE = function() Recorder.TradeSkillShown() end,
+    TRADE_SKILL_UPDATE = function() craftsLater() end,
+    TRADE_SKILL_LIST_UPDATE = function() craftsLater() end,
 }
 
 local events = CreateFrame("Frame")
