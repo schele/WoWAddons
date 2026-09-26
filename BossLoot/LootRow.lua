@@ -116,6 +116,12 @@ function LootRow.Create(list)
     row:SetSize(list.options.columnWidth or list.options.width, LootRow.HEIGHT)
     row:RegisterForClicks("LeftButtonUp")
 
+    -- The band behind the item picked from a search.
+    row.selectedTexture = row:CreateTexture(nil, "BACKGROUND")
+    row.selectedTexture:SetAllPoints()
+    row.selectedTexture:SetColorTexture(1, 0.82, 0, 0.18)
+    row.selectedTexture:Hide()
+
     row.highlight = row:CreateTexture(nil, "HIGHLIGHT")
     row.highlight:SetAllPoints()
     row.highlight:SetColorTexture(1, 1, 1, 0.08)
@@ -177,4 +183,5 @@ function LootRow.Render(row, entry)
     end
 
     row.chance:SetText(ns.Format.Chance(entry.chance))
+    row.selectedTexture:SetShown(entry.selected and true or false)
 end

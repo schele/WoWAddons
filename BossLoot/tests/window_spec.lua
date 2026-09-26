@@ -559,3 +559,44 @@ describe("the loot under the bosses", function()
         assertEqual(-(40 + 6 * 34 + 16 + 6), y)
     end)
 end)
+
+describe("an item picked from the search", function()
+    local function searched()
+        local ns, env = opened()
+        env.__items[1002] = { name = "Hand of Justice", quality = 3 }
+        local frame = ns.Window.Frame()
+        frame.search:SetText("justice")
+        return ns, env, frame
+    end
+
+    local function lootRowFor(frame, id)
+        for _, row in ipairs(frame.loot.rows) do
+            if row:IsShown() and row.entry and row.entry.id == id then return row end
+        end
+    end
+
+    it("is highlighted in the results and in the loot", function()
+        local ns, env, frame = searched()
+        local itemRow = frame.instances.rows[2]
+        itemRow.scripts.OnClick(itemRow, "LeftButton")
+        assertTrue(frame.instances.rows[2].selectedTexture:IsShown(), "the item in the results")
+        assertTrue(frame.instances.rows[3].selectedTexture:IsShown(), "the place it was found")
+        assertTrue(lootRowFor(frame, 1002).selectedTexture:IsShown(), "the item in the loot")
+        assertFalse(lootRowFor(frame, 1001).selectedTexture:IsShown(), "and nothing else")
+    end)
+
+    it("is highlighted when picked by its place, too", function()
+        local ns, env, frame = searched()
+        local placeRow = frame.instances.rows[3]
+        placeRow.scripts.OnClick(placeRow, "LeftButton")
+        assertTrue(lootRowFor(frame, 1002).selectedTexture:IsShown())
+        assertTrue(frame.instances.rows[3].selectedTexture:IsShown())
+    end)
+
+    it("stops being highlighted when the search is cleared", function()
+        local ns, env, frame = searched()
+        frame.instances.rows[2].scripts.OnClick(frame.instances.rows[2], "LeftButton")
+        frame.search:SetText("")
+        assertFalse(lootRowFor(frame, 1002).selectedTexture:IsShown())
+    end)
+end)

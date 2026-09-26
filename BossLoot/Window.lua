@@ -48,6 +48,9 @@ local frame
 local lastSelection
 -- The instance the boss list last showed, likewise.
 local lastBossInstance
+-- The item picked from a search, marked in the results and in the loot until
+-- another is picked or the search is cleared.
+local highlightItem
 
 --------------------------------------------------------------------------------
 -- What each column holds. Pure, so the specs read them directly.
@@ -64,7 +67,7 @@ end
 
 -- One place an item drops, as a search result under the item: where, and how
 -- likely. Choosing it jumps there.
-local function placeEntry(itemID, source)
+local function placeEntry(itemID, source, view)
     local instance = ns.instanceByKey[source.instance]
     local label, list
     if type(source.boss) == "number" then
@@ -84,9 +87,10 @@ local function placeEntry(itemID, source)
 
     return {
         kind = "place",
-        value = source,
+        value = { instance = source.instance, boss = source.boss, item = itemID },
         text = string.format("    %s: %s", instance.name, label),
         right = ns.Format.Chance(chance),
+        selected = itemID == highlightItem and source.instance == view.instance and source.boss == view.boss,
     }
 end
 
@@ -114,9 +118,10 @@ function Window.InstanceEntries(view, searchText)
                     kind = "item",
                     value = item.id,
                     text = ns.Format.Colored(item.name, info and info.quality),
+                    selected = item.id == highlightItem,
                 })
                 for _, source in ipairs(item.sources) do
-                    table.insert(entries, placeEntry(item.id, source))
+                    table.insert(entries, placeEntry(item.id, source, view))
                 end
             end
         end
@@ -186,7 +191,10 @@ end
 function Window.LootEntries(instance, selection)
     local entries = {}
     for _, entry in ipairs(lootSource(instance, selection) or {}) do
-        table.insert(entries, { id = entry[1], chance = entry[2], sources = entry[3] })
+        table.insert(entries, {
+            id = entry[1], chance = entry[2], sources = entry[3],
+            selected = entry[1] == highlightItem,
+        })
     end
     return entries
 end
@@ -384,6 +392,11 @@ function Window.Refresh()
     local view = ns.db.view
     local instance, selection = Window.Current()
 
+    -- A cleared search lets go of the item it picked.
+    if frame.search:GetText() == "" then
+        highlightItem = nil
+    end
+
     ns.List.SetEntries(frame.instances, Window.InstanceEntries(view, frame.search:GetText()), true)
 
     -- The boss list keeps its place within an instance, starts at the top in
@@ -414,6 +427,12 @@ function Window.Refresh()
     local key = tostring(view.instance) .. ":" .. tostring(selection) .. (mapOpen and ":map" or "")
     ns.List.SetEntries(lootList, loot, key == lastSelection)
     lastSelection = key
+    for position, entry in ipairs(loot) do
+        if entry.selected then
+            ns.List.Reveal(lootList, position)
+            break
+        end
+    end
     frame.empty:ClearAllPoints()
     frame.empty:SetPoint("TOPLEFT", lootList, "TOPLEFT", 6, -6)
     frame.empty:SetShown(instance ~= nil and #loot == 0)
@@ -436,8 +455,10 @@ end
 
 local function onInstanceClick(entry, mouseButton)
     if entry.kind == "item" then
+        highlightItem = entry.value
         Window.SelectItem(entry.value)
     elseif entry.kind == "place" then
+        highlightItem = entry.value.item
         Window.SelectInstance(entry.value.instance)
         Window.SelectBoss(entry.value.boss)
     elseif mouseButton == "RightButton" then
