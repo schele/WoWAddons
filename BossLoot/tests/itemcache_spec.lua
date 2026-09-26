@@ -116,11 +116,17 @@ describe("after a patch", function()
         for id = 5001, 5008 do ns.LootRow.RequestLoad(id) end
         for id = 9001, 9008 do ns.LootRow.RequestLoad(id, true) end
         ns.LootRow.Render(row(ns, env), { id = 11684, chance = 1 })
-        env.__runTimers()
-        assertEqual(1, env.__requestCount[9001])
-        assertNil(env.__requestCount[11684], "the items with nothing to show go first")
-        env.__runTimers()
-        assertEqual(1, env.__requestCount[11684], "then the saved one")
+        -- The server answers each request as it comes.
+        for _ = 1, 40 do
+            env.__runTimers()
+            for _, id in ipairs(env.__requestOrder) do ns.LootRow.Arrived(id, true) end
+        end
+        local position = {}
+        for index, id in ipairs(env.__requestOrder) do position[id] = position[id] or index end
+        assertTrue(position[11684], "the saved one is asked about in the end")
+        for id = 9001, 9008 do
+            assertTrue(position[id] < position[11684], "after the items with nothing to show")
+        end
     end)
 
     it("keeps the saved copy when the server's answer comes back empty", function()

@@ -12,6 +12,25 @@ local function opened()
     return ns, env
 end
 
+-- Let the queue run while the server answers each request as it comes:
+-- requests go out one at a time, so the ones behind need the answers.
+local function serve(ns, env)
+    for _ = 1, 40 do
+        env.__runTimers()
+        for _, id in ipairs(env.__requestOrder) do ns.LootRow.Arrived(id, true) end
+    end
+end
+
+-- Let the queue run while the server never answers, until it gives up.
+local function neverAnswer(env)
+    env.__now = 100
+    function env.GetTime() return env.__now end
+    for _ = 1, 40 do
+        env.__now = env.__now + 11
+        for _ = 1, 5 do env.__runTimers() end
+    end
+end
+
 describe("the boss column", function()
     it("lists bosses under their wing headings, then the notable drops", function()
         local ns = helpers.loggedIn()
@@ -160,6 +179,7 @@ describe("selecting", function()
     it("asks the client to load an instance's items when it is opened", function()
         local ns, env = opened()
         ns.Window.SelectInstance("Spire")
+        serve(ns, env)
         assertTrue(env.__requested[3001])
         assertTrue(env.__requested[3002])
     end)
@@ -660,15 +680,7 @@ describe("the item loading bar", function()
     end
 
     -- Ask for every item until the server is given up on.
-    local function giveUpOnAll(env)
-        env.__now = 100
-        function env.GetTime() return env.__now end
-        for _ = 1, 10 do
-            env.__now = env.__now + 11
-            env.__runTimers()
-            env.__runTimers()
-        end
-    end
+    local giveUpOnAll = neverAnswer
 
     it("shows how many of the instance's items have loaded", function()
         local ns, env, bar = opened({ 1001, 1002 })
@@ -831,7 +843,7 @@ describe("loading every item", function()
 
     it("asks for every item once the window opens, behind the open instance's", function()
         local ns, env = opened()
-        env.__runTimers()
+        serve(ns, env)
         local position = {}
         for index, id in ipairs(env.__requestOrder) do position[id] = position[id] or index end
         assertTrue(position[3001] and position[3002], "Low Spire's too, though Test Depths is open")
@@ -864,18 +876,12 @@ describe("loading every item", function()
 
     it("says how many failed, and asks for them again on a click", function()
         local ns, env, bar = opened({ 1001 })
-        env.__now = 100
-        function env.GetTime() return env.__now end
-        for _ = 1, 10 do
-            env.__now = env.__now + 11
-            env.__runTimers()
-            env.__runTimers()
-        end
+        neverAnswer(env)
         bar.scripts.OnUpdate(bar, 1)
         assertEqual("All items 1 / 7 (6 failed)", bar.text:GetText())
-        local asked = env.__requestCount[3002]
+        local asked = env.__requestCount[1002]
         bar.scripts.OnClick(bar, "LeftButton")
-        assertEqual(asked + 1, env.__requestCount[3002])
+        assertEqual(asked + 1, env.__requestCount[1002], "the first of them straight away, the rest in turn")
         assertEqual("All items 1 / 7", bar.text:GetText())
     end)
 end)
@@ -905,10 +911,14 @@ describe("the loading details, for testing", function()
     it("count what was asked for and what came back, as it happens", function()
         local ns, env, frame = opened()
         helpers.command(env, "debug")
+        -- 1001 went on opening; two moments more, 1002 and 1003.
+        env.__runTimers()
+        env.__runTimers()
         ns.LootRow.Arrived(1001, true)
         ns.LootRow.Arrived(1002, false)
         frame.debug.scripts.OnUpdate(frame.debug, 1)
-        assertEqual("Asked 7 times: 1 answered, 1 empty, 0 no answer", frame.debug.asked:GetText())
-        assertEqual("Waiting 1, asking now 5, 1 item a second", frame.debug.waiting:GetText(), "the empty one waits to be asked again")
+        assertEqual("Asked 3 times: 1 answered, 1 empty, 0 no answer", frame.debug.asked:GetText())
+        assertEqual("Waiting 5, asking now 1, 1 item a second", frame.debug.waiting:GetText(),
+            "four in the queue, and the empty one waiting to be asked again")
     end)
 end)

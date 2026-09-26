@@ -44,30 +44,41 @@ function LootRow.ItemInfo(itemID)
     return ns.ItemCache.Get(itemID)
 end
 
--- Asking the server for items. Asked for a whole instance at once -- two
--- hundred items for Scholomance -- the server drops most requests without a
--- word, and those items sit at "Loading" for good. So requests go out a few
--- at a time, what is on screen first, and an item with no answer, or an empty
--- one, is asked for again a few times before it is given up on.
-local BATCH = 8          -- requests per tick
-local TICK = 0.25        -- seconds between ticks
+-- Asking the server for items. The server has no patience: asked eight at
+-- once, thirty-two a second, it refused or dropped most of them -- over half
+-- of every item, all real ones. So requests go out one at a time, a moment
+-- apart, with no more than a few unanswered at once: the next goes when an
+-- answer frees a place, so the server sets the pace. What is on screen goes
+-- first. An item with no answer, or an empty one, is asked for again, after
+-- a longer wait each time, and given up on only after several tries.
+local TICK = 0.1         -- seconds between requests, at the most
+local MAX_IN_FLIGHT = 4  -- requests out, unanswered, at once
 local TIMEOUT = 10       -- seconds to wait for an answer before asking again
-local RETRY_DELAY = 5    -- seconds before asking again after an empty answer
-local MAX_TRIES = 4
+local RETRY_DELAYS = { 5, 15, 45, 90, 180 } -- seconds before each try after an empty answer
+local MAX_TRIES = 6
+LootRow.MAX_IN_FLIGHT, LootRow.MAX_TRIES = MAX_IN_FLIGHT, MAX_TRIES
 
 local queue = {}         -- item ids waiting to be asked for, in order
 local waiting = {}       -- id -> true while in the queue
 local inFlight = {}      -- id -> when it was asked for
-local notBefore = {}     -- id -> earliest time to ask for it again
+local later = {}         -- id -> when it goes back in the queue, after an empty answer
 local tries = {}         -- id -> times asked for
 local failed = {}        -- id -> true once an answer came back empty
-local tokens = BATCH
+local sentThisTick = false
 local ticking = false
 -- What the queue has done this session, for the loading details.
 local counts = { asked = 0, answered = 0, empty = 0, noAnswer = 0 }
 
 local function now()
     return GetTime and GetTime() or 0
+end
+
+local function count(set)
+    local n = 0
+    for _ in pairs(set) do
+        n = n + 1
+    end
+    return n
 end
 
 -- Nothing to ask for: the client has the item, or it was saved under this
@@ -77,7 +88,13 @@ local function loaded(itemID)
     return info ~= nil and not info.stale
 end
 
+-- Room to ask now: nothing asked yet this moment, and a place free.
+local function canSend()
+    return not sentThisTick and count(inFlight) < MAX_IN_FLIGHT
+end
+
 local function send(itemID)
+    sentThisTick = true
     tries[itemID] = (tries[itemID] or 0) + 1
     inFlight[itemID] = now()
     counts.asked = counts.asked + 1
@@ -123,10 +140,10 @@ end
 
 function tick()
     ticking = false
-    tokens = BATCH
+    sentThisTick = false
     local time = now()
 
-    -- No answer for too long: the request was dropped. Ask again, a few times.
+    -- No answer for too long: the request was dropped. Ask again, in turn.
     for itemID, asked in pairs(inFlight) do
         if time - asked >= TIMEOUT then
             inFlight[itemID] = nil
@@ -139,45 +156,40 @@ function tick()
         end
     end
 
-    -- Only as far along the queue as there is room to ask: with every item
-    -- in the game waiting, looking them all over each tick would stall the
-    -- game. The rest are looked at when they reach the front.
-    local keep = {}
-    local index = 1
-    while index <= #queue and tokens > 0 do
-        local itemID = queue[index]
-        if loaded(itemID) then
-            waiting[itemID] = nil
-        elseif (notBefore[itemID] or 0) <= time then
-            waiting[itemID] = nil
-            tokens = tokens - 1
-            send(itemID)
-        else
-            table.insert(keep, itemID)
+    -- Waited long enough after an empty answer: back in the queue.
+    for itemID, due in pairs(later) do
+        if due <= time then
+            later[itemID] = nil
+            enqueue(itemID)
         end
-        index = index + 1
     end
-    for rest = index, #queue do
-        table.insert(keep, queue[rest])
-    end
-    queue = keep
 
-    if #queue > 0 or next(inFlight) then
+    -- The next one, if there is room. Only the front of the queue is looked
+    -- at: with every item in the game waiting, looking them all over each
+    -- moment would stall the game. Items loaded meanwhile drop out here.
+    while #queue > 0 and canSend() do
+        local itemID = table.remove(queue, 1)
+        waiting[itemID] = nil
+        if not loaded(itemID) then
+            send(itemID)
+        end
+    end
+
+    if #queue > 0 or next(inFlight) or next(later) then
         schedule()
     end
 end
 
---- Ask the server for an item: now if this tick has room, otherwise in turn.
+--- Ask the server for an item: now if there is room, otherwise in turn.
 -- `urgent` (a row on screen) goes ahead of the rest.
 function LootRow.RequestLoad(itemID, urgent)
-    if loaded(itemID) or inFlight[itemID] then
+    if loaded(itemID) or inFlight[itemID] or later[itemID] then
         return
     end
     if failed[itemID] and (tries[itemID] or 0) >= MAX_TRIES then
         return
     end
-    if tokens > 0 and not waiting[itemID] and (notBefore[itemID] or 0) <= now() then
-        tokens = tokens - 1
+    if canSend() and not waiting[itemID] then
         send(itemID)
         schedule()
         return
@@ -186,17 +198,18 @@ function LootRow.RequestLoad(itemID, urgent)
 end
 
 --- The server's answer about an item (GET_ITEM_INFO_RECEIVED). An empty one
--- is asked about again in a few seconds, up to the limit; meanwhile the row
--- says the item is not loaded yet, or keeps showing its saved copy. A full
--- one is saved, whether or not its row is on screen.
+-- is asked about again after a wait that grows with each try, up to the
+-- limit; meanwhile the row says the item is not loaded yet, or keeps showing
+-- its saved copy. A full one is saved, whether or not its row is on screen.
 function LootRow.Arrived(itemID, success)
     inFlight[itemID] = nil
     if success == false then
         counts.empty = counts.empty + 1
         failed[itemID] = true
-        if (tries[itemID] or 0) < MAX_TRIES then
-            notBefore[itemID] = now() + RETRY_DELAY
-            enqueue(itemID)
+        local asked = tries[itemID] or 0
+        if asked < MAX_TRIES then
+            later[itemID] = now() + RETRY_DELAYS[math.max(1, math.min(asked, #RETRY_DELAYS))]
+            schedule()
         end
     else
         counts.answered = counts.answered + 1
@@ -207,22 +220,18 @@ end
 
 --- What the queue has done this session: requests `asked`, answers with the
 -- item (`answered`), empty answers, requests that timed out (`noAnswer`);
--- and now, items `waiting` their turn and requests out (`asking`).
+-- and now, items `waiting` their turn (or a retry) and requests out (`asking`).
 function LootRow.Activity()
-    local asking = 0
-    for _ in pairs(inFlight) do
-        asking = asking + 1
-    end
     return {
         asked = counts.asked, answered = counts.answered, empty = counts.empty,
-        noAnswer = counts.noAnswer, waiting = #queue, asking = asking,
+        noAnswer = counts.noAnswer, waiting = #queue + count(later), asking = count(inFlight),
     }
 end
 
 -- Given up on: every try came back empty or not at all.
 local function givenUp(itemID)
     return failed[itemID] and (tries[itemID] or 0) >= MAX_TRIES
-        and not inFlight[itemID] and not waiting[itemID]
+        and not inFlight[itemID] and not waiting[itemID] and not later[itemID]
 end
 
 -- Items seen loaded this session. Items do not unload, and a count of every
@@ -250,7 +259,7 @@ end
 function LootRow.Retry(itemIDs)
     for _, itemID in ipairs(itemIDs) do
         if givenUp(itemID) and not loaded(itemID) then
-            tries[itemID], failed[itemID], notBefore[itemID] = 0, nil, nil
+            tries[itemID], failed[itemID] = 0, nil
             LootRow.RequestLoad(itemID, true)
         end
     end

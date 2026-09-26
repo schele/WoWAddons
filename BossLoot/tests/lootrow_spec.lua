@@ -125,6 +125,23 @@ describe("an item the server did not send", function()
         env.__runTimers()
         assertEqual(2, env.__requestCount[999], "again after a few seconds")
     end)
+
+    it("waits longer before each try after that", function()
+        local ns, env = helpers.loadAddon(FILES)
+        env.__now = 100
+        function env.GetTime() return env.__now end
+        ns.LootRow.RequestLoad(999)
+        ns.LootRow.Arrived(999, false)
+        env.__now = 106
+        env.__runTimers()
+        ns.LootRow.Arrived(999, false)
+        env.__now = 115
+        env.__runTimers()
+        assertEqual(2, env.__requestCount[999], "not after another five seconds")
+        env.__now = 122
+        env.__runTimers()
+        assertEqual(3, env.__requestCount[999], "but after fifteen")
+    end)
 end)
 
 describe("asking the server for items", function()
@@ -134,23 +151,39 @@ describe("asking the server for items", function()
         return n
     end
 
-    it("asks a few at a time, not hundreds at once", function()
-        -- Asked for a whole instance at once, the server drops most requests.
+    it("asks one at a time, a moment apart", function()
+        -- Eight at once, thirty-two a second, and the server refused most.
         local ns, env = helpers.loadAddon(FILES)
         for id = 5001, 5030 do ns.LootRow.RequestLoad(id) end
-        assertEqual(8, count(env))
+        assertEqual(1, count(env))
         env.__runTimers()
-        assertEqual(16, count(env))
+        assertEqual(2, count(env))
+    end)
+
+    it("keeps no more than a few requests out at once", function()
+        local ns, env = helpers.loadAddon(FILES)
+        for id = 5001, 5030 do ns.LootRow.RequestLoad(id) end
+        for _ = 1, 10 do env.__runTimers() end
+        assertEqual(ns.LootRow.MAX_IN_FLIGHT, count(env))
+    end)
+
+    it("asks for the next as soon as an answer frees a place", function()
+        local ns, env = helpers.loadAddon(FILES)
+        for id = 5001, 5030 do ns.LootRow.RequestLoad(id) end
+        for _ = 1, 10 do env.__runTimers() end
+        ns.LootRow.Arrived(5001, true)
+        env.__runTimers()
+        assertEqual(ns.LootRow.MAX_IN_FLIGHT + 1, count(env))
     end)
 
     it("asks for what is on screen before the rest", function()
         local ns, env = helpers.loadAddon(FILES)
         for id = 5001, 5030 do ns.LootRow.RequestLoad(id) end
         ns.LootRow.RequestLoad(9999, true)
-        assertNil(env.__requestCount[9999], "the first few are already used")
+        assertNil(env.__requestCount[9999], "one is already out this moment")
         env.__runTimers()
         assertEqual(1, env.__requestCount[9999])
-        assertNil(env.__requestCount[5030], "ahead of the rest")
+        assertNil(env.__requestCount[5002], "ahead of the rest")
     end)
 
     it("asks again for an item the server never answered", function()
@@ -170,12 +203,12 @@ describe("asking the server for items", function()
         function env.GetTime() return env.__now end
         local r = row(ns, env)
         ns.LootRow.Render(r, { id = 999, chance = 5 })
-        for _ = 1, 10 do
+        for _ = 1, 20 do
             env.__now = env.__now + 11
             env.__runTimers()
             env.__runTimers()
         end
-        assertEqual(4, env.__requestCount[999])
+        assertEqual(ns.LootRow.MAX_TRIES, env.__requestCount[999])
         ns.LootRow.Render(r, { id = 999, chance = 5 })
         assertMatch("not loaded", r.name:GetText())
     end)
@@ -233,7 +266,7 @@ describe("a long wait for items", function()
         assertTrue(env.__infoCalls < 100, "looked at " .. env.__infoCalls)
         local asked = 0
         for _ in pairs(env.__requestCount) do asked = asked + 1 end
-        assertEqual(16, asked, "and still asks for the next few")
+        assertEqual(2, asked, "and still asks for the next")
     end)
 end)
 
@@ -243,16 +276,17 @@ describe("what the queue is doing", function()
         env.__now = 100
         function env.GetTime() return env.__now end
         for id = 5001, 5010 do ns.LootRow.RequestLoad(id) end
+        for _ = 1, 3 do env.__runTimers() end -- 5001 to 5004 out
         ns.LootRow.Arrived(5001, true)
         ns.LootRow.Arrived(5002, false)
-        env.__now = 111
+        env.__now = 111 -- 5003 and 5004 unanswered
         env.__runTimers()
         local activity = ns.LootRow.Activity()
         assertEqual(1, activity.answered)
         assertEqual(1, activity.empty)
-        assertEqual(6, activity.noAnswer, "the rest of the first eight, left unanswered")
-        assertEqual(16, activity.asked, "the first eight, then eight more")
-        assertEqual(8, activity.asking)
-        assertEqual(1, activity.waiting)
+        assertEqual(2, activity.noAnswer)
+        assertEqual(5, activity.asked, "four, then 5005")
+        assertEqual(1, activity.asking)
+        assertEqual(8, activity.waiting, "5006 to 5010, then 5003, 5004 and 5002 again")
     end)
 end)
