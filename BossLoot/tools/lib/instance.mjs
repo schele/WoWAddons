@@ -53,7 +53,9 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
   const skipRef = (ref) => world.refs.has(ref);
   const factions = db.factionConditions();
   const allowCondition = (id) => factions.has(id);
-  const isWorldItem = (id) => world.items.has(id);
+  // World loot copied straight into a table; the same item in a boss's own
+  // pool stays (see resolveLoot's skipItem).
+  const skipItem = (id) => world.items.has(id);
 
   const items = new Map();
   const itemOf = (id) => {
@@ -64,7 +66,7 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
   // The same loot table is shared by many trash mobs; resolve each once.
   const loot = (table, entry) => {
     const key = `${table}:${entry}`;
-    if (!cache.has(key)) cache.set(key, resolveLoot(db.lootRows, table, entry, { skipRef, allowCondition }));
+    if (!cache.has(key)) cache.set(key, resolveLoot(db.lootRows, table, entry, { skipRef, allowCondition, skipItem }));
     return cache.get(key);
   };
 
@@ -104,7 +106,7 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
     }
 
     const entries = [...found]
-      .filter(([id]) => keepForBoss(itemOf(id)) && !isWorldItem(id))
+      .filter(([id]) => keepForBoss(itemOf(id)))
       .map(([id, chance]) => ({ id, chance }));
     if (!entries.length) warnings.push(`${def.name}: ${boss.name} has no loot`);
 
@@ -129,7 +131,7 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
     const byItem = new Map();
     for (const source of sources) {
       for (const [id, chance] of loot(source.table, source.entry)) {
-        if (chance < NOTABLE_MIN_CHANCE || !isNotable(itemOf(id)) || isWorldItem(id)) continue;
+        if (chance < NOTABLE_MIN_CHANCE || !isNotable(itemOf(id))) continue;
         if (!byItem.has(id)) byItem.set(id, { id, chance: 0, sources: new Map() });
         const entry = byItem.get(id);
         entry.chance = Math.max(entry.chance, chance);

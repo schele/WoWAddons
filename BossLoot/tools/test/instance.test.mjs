@@ -122,6 +122,24 @@ test('an item copied straight into mobs on both continents is a world drop', () 
   assert.ok(!instance.bosses[0].loot.some((e) => e.id === 105));
 });
 
+test("a boss's own pool keeps an item that is copied into world mobs elsewhere", () => {
+  // Goraluk Anvilcrack's Plans: Invulnerable Mail, 14% from his own pool,
+  // 0.02% from mobs on nine maps.
+  const { db, add } = world();
+  add('creature_loot_template', { entry: 1, item: 0, ChanceOrQuestChance: 100, mincountOrRef: -903 });
+  add('reference_loot_template', { entry: 903, item: 105, ChanceOrQuestChance: 14 });
+  for (const [entry, map] of [[10, 0], [11, 1]]) {
+    add('creature_template', { entry, name: `Mob ${entry}`, loot_id: entry });
+    add('creature', { id: entry, map });
+    add('creature_loot_template', { entry, item: 105, ChanceOrQuestChance: 0.02 });
+  }
+  const dbx = openDb(db);
+  const found = worldLoot(dbx);
+  assert.ok(found.items.has(105), 'a world drop by the per-item measure');
+  const { instance } = buildInstance(dbx, def, { world: found });
+  assert.ok(instance.bosses[0].loot.some((e) => e.id === 105 && e.chance === 14));
+});
+
 test('rows gated only on faction are kept; other conditions are not', () => {
   const { db, add } = world();
   add('conditions', { condition_entry: 2, type: 6, value1: 67 });

@@ -3,7 +3,7 @@
 import { DatabaseSync } from 'node:sqlite';
 
 const LOOT_COLUMNS = `entry int, item int, ChanceOrQuestChance real, groupid int default 0,
-  mincountOrRef int default 1, condition_id int default 0, patch_min int default 0, patch_max int default 10`;
+  mincountOrRef int default 1, maxcount int default 1, condition_id int default 0, patch_min int default 0, patch_max int default 10`;
 
 export function fixtureDb() {
   const db = new DatabaseSync(':memory:');

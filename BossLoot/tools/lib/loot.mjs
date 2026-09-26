@@ -17,13 +17,15 @@ function keepMax(map, item, chance) {
 //
 // A plain row (groupid 0) rolls on its own. In a group at most one row drops:
 // rows with an explicit chance keep it, and rows with chance 0 share whatever
-// the explicit ones leave, equally.
+// the explicit ones leave, equally. Only item rows join a group: a reference
+// row always rolls on its own, and its groupid names which group of the
+// referenced table it reads (vMaNGOS LootTemplate::AddEntry).
 function rowChances(rows) {
   const chances = new Map();
   const groups = new Map();
 
   for (const row of rows) {
-    if (row.groupid > 0) {
+    if (row.groupid > 0 && row.mincountOrRef > 0) {
       if (!groups.has(row.groupid)) groups.set(row.groupid, []);
       groups.get(row.groupid).push(row);
     } else {
@@ -48,36 +50,51 @@ function rowChances(rows) {
  * Every item a loot table can produce, with its chance in percent.
  *
  * fetch(table, entry) returns the table's rows for that entry. A reference row
- * (negative mincountOrRef) is followed into reference_loot_template, and its
- * items' chances are scaled by the reference row's own chance. An item
- * reachable more than one way keeps its best chance.
+ * (negative mincountOrRef) is followed into reference_loot_template and rolled
+ * maxcount times; each of its items gets the reference row's own chance times
+ * its chance of coming up at least once in those rolls. An item reachable more
+ * than one way keeps its best chance.
+ *
+ * skipItem(id) drops items written into the table itself, but not the same
+ * item reached through a reference: vMaNGOS copies generic world loot straight
+ * into some mobs' tables, while a boss's own pool may carry the same item
+ * for real.
  *
  * Quest-only rows (negative chance) are left out, and so are conditional rows
  * (holiday items, quest-state drops) unless allowCondition(id) says the
  * condition is one every player meets one way or another -- a faction.
  */
-export function resolveLoot(fetch, table, entry, options = {}, scale = 100, seen = new Set()) {
-  const { skipRef = () => false, allowCondition = () => false } = options;
+export function resolveLoot(fetch, table, entry, options = {}, seen = new Set(), onlyGroup = 0) {
+  const { skipRef = () => false, allowCondition = () => false, skipItem = () => false } = options;
   const loot = new Map();
+  const direct = seen.size === 0;
 
   const rows = fetch(table, entry).filter(
     (row) => inPatch(row)
       && (row.condition_id === 0 || allowCondition(row.condition_id))
-      && row.ChanceOrQuestChance >= 0,
+      && row.ChanceOrQuestChance >= 0
+      && (!onlyGroup || row.groupid === onlyGroup),
   );
 
   for (const [row, percent] of rowChances(rows)) {
-    const chance = (scale * percent) / 100;
-    if (chance <= 0) continue;
+    if (percent <= 0) continue;
 
     if (row.mincountOrRef < 0) {
       const ref = -row.mincountOrRef;
       if (skipRef(ref) || seen.has(ref)) continue;
 
-      const nested = resolveLoot(fetch, 'reference_loot_template', ref, options, chance, new Set([...seen, ref]));
-      for (const [item, itemChance] of nested) keepMax(loot, item, itemChance);
-    } else {
-      keepMax(loot, row.item, chance);
+      const rolls = Math.max(1, row.maxcount ?? 1);
+      const nested = resolveLoot(fetch, 'reference_loot_template', ref, options, new Set([...seen, ref]), row.groupid);
+      for (const [item, itemPercent] of nested) {
+        // One roll is kept as a plain product, which stays exact in floating
+        // point; more rolls need the chance of at least one hit.
+        const chance = rolls === 1
+          ? (percent * itemPercent) / 100
+          : percent * (1 - (1 - itemPercent / 100) ** rolls);
+        keepMax(loot, item, chance);
+      }
+    } else if (!(direct && skipItem(row.item))) {
+      keepMax(loot, row.item, percent);
     }
   }
 

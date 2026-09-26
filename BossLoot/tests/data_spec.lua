@@ -46,6 +46,19 @@ describe("the generated data", function()
         end
     end)
 
+    it("lists random encounters boss by boss, since only one of them comes each run", function()
+        -- Merged, Grizzle's guaranteed plans read as a 100% drop from the
+        -- Ring of Law, which it is not.
+        local names = {}
+        for _, instance in ipairs(ns.instances) do
+            for _, boss in ipairs(instance.bosses) do names[boss.name] = true end
+        end
+        assertNil(names["Ring of Law"], "Ring of Law merged")
+        assertNil(names["Edge of Madness"], "Edge of Madness merged")
+        assertTrue(names["Ring of Law: Grizzle"], "Grizzle on his own")
+        assertTrue(names["Edge of Madness: Gri'lek"], "Gri'lek on his own")
+    end)
+
     it("has no two instances with the same key", function()
         local seen = {}
         for _, instance in ipairs(ns.instances) do

@@ -160,6 +160,7 @@ ns.AddInstance({
             name = "Goraluk Anvilcrack",
             wing = "Upper",
             loot = {
+                { 12728, 14.29 },
                 { 18779, 15 },
                 { 12834, 14.29 },
                 { 12837, 14.29 },
