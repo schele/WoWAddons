@@ -105,7 +105,7 @@ end
 
 function LootRow.Create(list)
     local row = CreateFrame("Button", nil, list)
-    row:SetSize(list.options.width, LootRow.HEIGHT)
+    row:SetSize(list.options.columnWidth or list.options.width, LootRow.HEIGHT)
     row:RegisterForClicks("LeftButtonUp")
 
     row.highlight = row:CreateTexture(nil, "HIGHLIGHT")

@@ -8,8 +8,14 @@ local addonName, ns = ...
 local List = {}
 ns.List = List
 
--- How many entries one notch of the mouse wheel moves.
+-- How many lines one notch of the mouse wheel moves.
 local WHEEL_STEP = 3
+
+local MORE_ARROW = "|TInterface\\Buttons\\Arrow-Down-Up:12:12|t "
+
+local function columns(list)
+    return list.options.columns or 1
+end
 
 function List.Render(list)
     for index, row in ipairs(list.rows) do
@@ -22,11 +28,23 @@ function List.Render(list)
             row:Hide()
         end
     end
+
+    -- Mouse-wheel scrolling leaves no other sign that there is more.
+    local below = #list.entries - list.offset - #list.rows
+    if below > 0 then
+        list.more:SetText(MORE_ARROW .. below .. " more")
+        list.more:Show()
+    else
+        list.more:Hide()
+    end
 end
 
-function List.Scroll(list, by)
-    local maxOffset = math.max(0, #list.entries - #list.rows)
-    list.offset = math.min(maxOffset, math.max(0, list.offset + by))
+--- Move by whole lines; a line is one row per column.
+function List.Scroll(list, lines)
+    local perLine = columns(list)
+    local totalLines = math.ceil(#list.entries / perLine)
+    local maxOffset = math.max(0, totalLines - list.options.rows) * perLine
+    list.offset = math.min(maxOffset, math.max(0, list.offset + lines * perLine))
     List.Render(list)
 end
 
@@ -40,20 +58,30 @@ function List.SetEntries(list, entries, keepOffset)
     List.Scroll(list, 0)
 end
 
+--- A list of `rows` lines. With `columns`, each line holds that many rows,
+-- `columnWidth` apart, filled left to right: a grid.
 function List.Create(parent, options)
     local list = CreateFrame("Frame", nil, parent)
+    local perLine = options.columns or 1
+    local columnWidth = options.columnWidth or options.width
     list:SetSize(options.width, options.rowHeight * options.rows)
     list.options = options
     list.rows = {}
     list.entries = {}
     list.offset = 0
 
-    for index = 1, options.rows do
+    for index = 1, options.rows * perLine do
+        local column = (index - 1) % perLine
+        local line = math.floor((index - 1) / perLine)
         local row = options.createRow(list, index)
-        row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -(index - 1) * options.rowHeight)
+        row:SetPoint("TOPLEFT", list, "TOPLEFT", column * columnWidth, -line * options.rowHeight)
         row:Hide()
         list.rows[index] = row
     end
+
+    list.more = list:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    list.more:SetPoint("TOPRIGHT", list, "BOTTOMRIGHT", 0, -2)
+    list.more:Hide()
 
     list:EnableMouseWheel(true)
     list:SetScript("OnMouseWheel", function(self, delta)
@@ -68,7 +96,7 @@ end
 function List.TextRow(onClick)
     return function(list)
         local row = CreateFrame("Button", nil, list)
-        row:SetSize(list.options.width, list.options.rowHeight)
+        row:SetSize(list.options.columnWidth or list.options.width, list.options.rowHeight)
         row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
         row.selectedTexture = row:CreateTexture(nil, "BACKGROUND")
