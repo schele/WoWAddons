@@ -31,6 +31,12 @@ local BOSS_ROW = 34
 local LOOT_ROW = ns.LootRow.HEIGHT + 2
 local INSET_WIDTH, INSET_HEIGHT = 150, 84
 local TURN_PER_PIXEL = 0.02 -- radians the boss's model turns per pixel dragged
+local CLICK_SLOP = 4 -- pixels a press on a model may move and still be a click
+-- The big model's window, beside the main one, and its zoom.
+local MODEL_VIEW_WIDTH = 340
+local MODEL_HINT_HEIGHT = 18
+local MODEL_ZOOM_STEP = 1.15
+local MODEL_NEAREST, MODEL_FARTHEST = 0.3, 3
 -- The item loading bar, under the boss's name, as wide as the name may be.
 local PROGRESS_WIDTH = PAGE_WIDTH - 100 - (INSET_WIDTH + 12)
 local PROGRESS_HEIGHT = 14
@@ -446,6 +452,39 @@ local function createProgress(header)
     return bar
 end
 
+-- The big model, while it is open: the picked boss, or closed for a pick
+-- with no model.
+local function drawModelView(instance, selection)
+    local view = frame.modelView
+    if not view:IsShown() then
+        return
+    end
+    local boss = instance and type(selection) == "number" and instance.bosses[selection]
+    if not (boss and boss.display) then
+        view:Hide()
+        return
+    end
+    view.title:SetText(boss.name)
+    if view.model.shownDisplay == boss.display then
+        return
+    end
+    if ns.Portrait.SetModel(view.model, boss.display) then
+        view.model.shownDisplay = boss.display
+        view.model.turnedByHand = false
+    else
+        view:Hide()
+    end
+end
+
+--- Open the big model of the picked boss.
+function Window.OpenModel()
+    if not frame then
+        return
+    end
+    frame.modelView:Show()
+    drawModelView(Window.Current())
+end
+
 local function drawHeader(instance, selection)
     local header = frame.header
 
@@ -542,6 +581,7 @@ function Window.Refresh()
     frame.empty:SetShown(instance ~= nil and #loot == 0)
 
     drawHeader(instance, selection)
+    drawModelView(instance, selection)
     frame.header.progress.itemIDs = instance and ns.Index.ItemIDs(instance.key) or {}
     updateProgress(frame.header.progress)
     local pinned = type(selection) == "number" and selection or nil
@@ -651,32 +691,45 @@ local function renderBoss(row, entry)
     row.number:SetText(entry.number and tostring(entry.number) or "")
 end
 
-local function createHeader(parent)
-    local header = CreateFrame("Frame", nil, parent)
-    header:SetPoint("TOPLEFT", parent, "TOPLEFT", PAGE_LEFT, -TOP)
-    header:SetSize(PAGE_WIDTH, HEADER_HEIGHT)
+-- A boss's model that turns slowly by itself, and with the cursor when
+-- dragged; it then stays where it is left until given another boss, which
+-- clears `turnedByHand`. A press and release without a drag is a click.
+local function makeTurnable(model, onClick)
+    model.facing = 0
+    model:EnableMouse(true)
 
-    -- The boss, turning slowly. Dragged, it turns with the cursor, and stays
-    -- where it is left until another boss is picked.
-    header.model = CreateFrame("PlayerModel", nil, header)
-    header.model:SetSize(84, 84)
-    header.model:SetPoint("LEFT", header, "LEFT", 4, 0)
-    header.model.facing = 0
-    header.model:EnableMouse(true)
-    header.model:SetScript("OnMouseDown", function(self, button)
-        if button == "LeftButton" then
-            self.dragX = GetCursorPosition() / self:GetEffectiveScale()
-            self.turnedByHand = true
-        end
-    end)
-    header.model:SetScript("OnMouseUp", function(self)
-        self.dragX = nil
-    end)
-    header.model:SetScript("OnUpdate", function(self, elapsed)
-        if self.dragX then
-            local x = GetCursorPosition() / self:GetEffectiveScale()
+    local function cursorX(self)
+        return GetCursorPosition() / self:GetEffectiveScale()
+    end
+    -- Turn by how far the cursor has moved since last looked at.
+    local function follow(self)
+        local x = cursorX(self)
+        if x ~= self.dragX then
+            self.dragged = self.dragged + math.abs(x - self.dragX)
             self.facing = self.facing + (x - self.dragX) * TURN_PER_PIXEL
             self.dragX = x
+            self.turnedByHand = true
+        end
+    end
+
+    model:SetScript("OnMouseDown", function(self, button)
+        if button == "LeftButton" then
+            self.dragX, self.dragged = cursorX(self), 0
+        end
+    end)
+    model:SetScript("OnMouseUp", function(self)
+        if not self.dragX then
+            return
+        end
+        follow(self)
+        self.dragX = nil
+        if self.dragged < CLICK_SLOP and onClick then
+            onClick()
+        end
+    end)
+    model:SetScript("OnUpdate", function(self, elapsed)
+        if self.dragX then
+            follow(self)
         elseif not self.turnedByHand then
             self.facing = self.facing + (elapsed or 0) * 0.4
         end
@@ -684,6 +737,83 @@ local function createHeader(parent)
         if self.SetFacing then
             self:SetFacing(self.facing)
         end
+    end)
+end
+
+-- The big model, in a window of its own beside the main one: the picked
+-- boss, to turn by dragging and zoom with the mouse wheel.
+local function createModelView(parent)
+    local view = createFrame("Frame", nil, parent, "BackdropTemplate")
+    view:SetSize(MODEL_VIEW_WIDTH, HEIGHT)
+    view:SetPoint("TOPLEFT", parent, "TOPRIGHT", 2, 0)
+    view:SetClampedToScreen(true)
+    view:EnableMouse(true)
+
+    view.background = view:CreateTexture(nil, "BACKGROUND", nil, -8)
+    view.background:SetPoint("TOPLEFT", view, "TOPLEFT", 4, -4)
+    view.background:SetPoint("BOTTOMRIGHT", view, "BOTTOMRIGHT", -4, 4)
+    view.background:SetColorTexture(0.06, 0.045, 0.03, 1)
+    if view.SetBackdrop then
+        view:SetBackdrop({
+            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+            edgeSize = 32,
+            insets = { left = 11, right = 12, top = 12, bottom = 11 },
+        })
+    end
+    local stageHeight = HEIGHT - TOP - PADDING - MODEL_HINT_HEIGHT
+    panel(view, PADDING, TOP, MODEL_VIEW_WIDTH - 2 * PADDING, stageHeight, 0.12)
+
+    view.title = view:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    view.title:SetPoint("TOPLEFT", view, "TOPLEFT", PADDING + 6, -PADDING - 4)
+    view.title:SetPoint("RIGHT", view, "RIGHT", -36, 0)
+    view.title:SetJustifyH("LEFT")
+    view.title:SetWordWrap(false)
+
+    view.close = createFrame("Button", nil, view, "UIPanelCloseButton")
+    view.close:SetSize(32, 32)
+    view.close:SetPoint("TOPRIGHT", view, "TOPRIGHT", -4, -4)
+    view.close:SetScript("OnClick", function()
+        view:Hide()
+    end)
+
+    view.model = CreateFrame("PlayerModel", nil, view)
+    view.model:SetPoint("TOPLEFT", view, "TOPLEFT", PADDING, -TOP)
+    view.model:SetSize(MODEL_VIEW_WIDTH - 2 * PADDING, stageHeight)
+    makeTurnable(view.model)
+    view.model.distance = 1
+    view.model:EnableMouseWheel(true)
+    view.model:SetScript("OnMouseWheel", function(self, delta)
+        local step = delta > 0 and 1 / MODEL_ZOOM_STEP or MODEL_ZOOM_STEP
+        self.distance = math.max(MODEL_NEAREST, math.min(MODEL_FARTHEST, self.distance * step))
+        if self.SetCamDistanceScale then
+            self:SetCamDistanceScale(self.distance)
+        end
+    end)
+
+    view.hint = view:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    view.hint:SetPoint("BOTTOM", view, "BOTTOM", 0, PADDING + 4)
+    view.hint:SetText("Drag to turn, scroll to zoom")
+
+    -- Shown again, the model is set afresh: one kept while hidden can come
+    -- back blank.
+    view:SetScript("OnHide", function()
+        view.model.shownDisplay = nil
+    end)
+    view:Hide()
+    return view
+end
+
+local function createHeader(parent)
+    local header = CreateFrame("Frame", nil, parent)
+    header:SetPoint("TOPLEFT", parent, "TOPLEFT", PAGE_LEFT, -TOP)
+    header:SetSize(PAGE_WIDTH, HEADER_HEIGHT)
+
+    -- The boss, turning slowly; a click opens the big model.
+    header.model = CreateFrame("PlayerModel", nil, header)
+    header.model:SetSize(84, 84)
+    header.model:SetPoint("LEFT", header, "LEFT", 4, 0)
+    makeTurnable(header.model, function()
+        Window.OpenModel()
     end)
 
     header.portrait = header:CreateTexture(nil, "ARTWORK")
@@ -807,6 +937,7 @@ local function create()
 
     -- The boss page: header with model and map inset, then the loot grid.
     frame.header = createHeader(frame)
+    frame.modelView = createModelView(frame)
 
     frame.inset = ns.MapView.Create(frame.header, INSET_WIDTH, INSET_HEIGHT)
     frame.inset:SetPoint("RIGHT", frame.header, "RIGHT", -6, 0)

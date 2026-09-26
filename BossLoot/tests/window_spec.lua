@@ -638,6 +638,8 @@ describe("turning the boss's model by hand", function()
         local ns, env, model = withModels()
         env.__cursorX = 100
         model.scripts.OnMouseDown(model, "LeftButton")
+        env.__cursorX = 130
+        model.scripts.OnUpdate(model, 0)
         model.scripts.OnMouseUp(model, "LeftButton")
         local facing = model.facing
         model.scripts.OnUpdate(model, 1)
@@ -706,5 +708,81 @@ describe("the item loading bar", function()
         bar.scripts.OnEnter(bar)
         assertMatch("1 loaded", table.concat(env.GameTooltip.lines, "\n"))
         assertMatch("4 loading", table.concat(env.GameTooltip.lines, "\n"))
+    end)
+end)
+
+describe("the big model", function()
+    local function withModels()
+        local ns, env = helpers.loadAddon()
+        helpers.sampleInstances(ns)
+        ns.instanceByKey.Depths.bosses[1].display = 8807
+        ns.instanceByKey.Depths.bosses[2].display = 8808
+        helpers.login(ns, env)
+        ns.Window.Open()
+        local frame = ns.Window.Frame()
+        return ns, env, frame.header.model, frame.modelView
+    end
+
+    local function click(env, model)
+        env.__cursorX = 100
+        model.scripts.OnMouseDown(model, "LeftButton")
+        model.scripts.OnMouseUp(model, "LeftButton")
+    end
+
+    it("opens on a click on the boss's model, with the boss in it", function()
+        local ns, env, model, view = withModels()
+        assertFalse(view:IsShown())
+        click(env, model)
+        assertTrue(view:IsShown())
+        assertEqual(8807, view.model.display)
+        assertEqual("First Boss", view.title:GetText())
+    end)
+
+    it("does not open when the small model is dragged round", function()
+        local ns, env, model, view = withModels()
+        env.__cursorX = 100
+        model.scripts.OnMouseDown(model, "LeftButton")
+        env.__cursorX = 150
+        model.scripts.OnUpdate(model, 0)
+        model.scripts.OnMouseUp(model, "LeftButton")
+        assertFalse(view:IsShown())
+    end)
+
+    it("turns when dragged, and zooms with the mouse wheel", function()
+        local ns, env, model, view = withModels()
+        click(env, model)
+        local big = view.model
+        local start = big.facing
+        env.__cursorX = 100
+        big.scripts.OnMouseDown(big, "LeftButton")
+        env.__cursorX = 150
+        big.scripts.OnUpdate(big, 0)
+        big.scripts.OnMouseUp(big, "LeftButton")
+        assertTrue(math.abs(big.facing - (start + 1)) < 1e-9)
+
+        big.scripts.OnMouseWheel(big, 1)
+        assertTrue(big.camDistanceScale < 1, "closer")
+        for _ = 1, 30 do big.scripts.OnMouseWheel(big, -1) end
+        assertTrue(big.camDistanceScale <= 3, "but only so far away")
+    end)
+
+    it("shows whichever boss is picked while it is open", function()
+        local ns, env, model, view = withModels()
+        click(env, model)
+        ns.Window.SelectBoss(2)
+        assertEqual(8808, view.model.display)
+        assertEqual("Second Boss", view.title:GetText())
+    end)
+
+    it("closes for a pick with no model, and with its button", function()
+        local ns, env, model, view = withModels()
+        click(env, model)
+        ns.Window.SelectBoss(3)
+        assertFalse(view:IsShown(), "the third boss has no model")
+
+        ns.Window.SelectBoss(1)
+        click(env, model)
+        view.close.scripts.OnClick(view.close, "LeftButton")
+        assertFalse(view:IsShown())
     end)
 end)

@@ -113,6 +113,7 @@ local function makeWidget(kind, parent, template, env)
 
     -- Model frames. A test marks one model id as one the client refuses.
     function widget:SetFacing(value) self.facing = value end
+    function widget:SetCamDistanceScale(value) self.camDistanceScale = value end
     function widget:SetDisplayInfo(display)
         if env and display == env.__badDisplay then error("bad display") end
         self.display = display

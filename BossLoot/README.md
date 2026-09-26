@@ -7,7 +7,8 @@ recipes, quest starters, keys, and what is in the chests.
 Open it with `/bl` or the minimap button. On the left, the instances
 (Dungeons and Raids tabs, with level ranges) and a search box. In the middle,
 the bosses in kill order, each with its portrait and a number. On the right,
-the boss itself: its model (drag it to turn it), and a map of the instance
+the boss itself: its model (drag it to turn it, click it for a big one to turn
+and zoom), and a map of the instance
 with every boss pinned by number; click the map for a big one, with every
 boss named beside its pin and the entrance marked, and click a pin to jump to
 that boss. On the big map, scroll to zoom in on the cursor or out, drag to move
