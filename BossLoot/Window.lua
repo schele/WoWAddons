@@ -625,6 +625,13 @@ local function drawHeader(instance, selection)
     end
 
     local boss = instance.bosses[selection]
+    if not boss then
+        header.model:Hide()
+        header.portrait:Hide()
+        header.title:SetText(instance.name)
+        header.subtitle:SetText("")
+        return
+    end
     header.title:SetText(boss.name)
     header.subtitle:SetText(boss.wing and (instance.name .. ", " .. boss.wing) or instance.name)
 

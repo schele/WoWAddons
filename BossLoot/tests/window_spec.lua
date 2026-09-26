@@ -1029,3 +1029,30 @@ describe("recorded loot in the lists", function()
         assertEqual("3/5", entries[3].right)
     end)
 end)
+
+describe("a recorded instance with nothing to show yet", function()
+    local function recorded(items, itemInfo, view)
+        local ns, env = helpers.loadAddon(nil, function(e)
+            e.BossLootDB = { view = view, recorded = { recorder = "me", items = itemInfo or {}, sources = {
+                ["npc:8002@9999"] = { kind = "npc", id = 8002, map = 9999, instance = "Hall of Thanes",
+                    instanceType = "party", name = "Guard", kills = 3, items = items },
+            } } }
+        end)
+        helpers.sampleInstances(ns)
+        helpers.login(ns, env)
+        return ns, env
+    end
+
+    it("is not listed while only common things, or money, have dropped", function()
+        local ns = recorded({ [8003] = 2 }, { [8003] = { "Guard's Belt", 2 } })
+        assertNil(ns.instanceByKey["rec:9999"])
+        local money = recorded({})
+        assertNil(money.instanceByKey["rec:9999"])
+    end)
+
+    it("does not break the window when the saved view points at it", function()
+        local ns = recorded({}, nil, { kind = "dungeon", instance = "rec:9999", boss = 1 })
+        ns.Window.Open()
+        assertEqual("Depths", ns.Window.Current().key, "back to the first instance")
+    end)
+end)

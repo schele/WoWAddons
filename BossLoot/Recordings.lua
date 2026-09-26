@@ -210,6 +210,19 @@ function Recordings.Apply()
     for entries in pairs(indexes) do
         table.sort(entries, byCount)
     end
+
+    -- A recorded instance with no named boss and nothing notable yet (only
+    -- money, or common finds) has nothing to show: it is listed once it does.
+    for position = #ns.instances, 1, -1 do
+        local instance = ns.instances[position]
+        local notable = instance.recordedNotable
+        local empty = #instance.bosses == 0
+            and (not notable or (#notable.trash == 0 and #notable.objects == 0))
+        if instance.recorded and empty then
+            table.remove(ns.instances, position)
+            ns.instanceByKey[instance.key] = nil
+        end
+    end
 end
 
 --- Something was recorded, or the saved recordings are in: bring the
