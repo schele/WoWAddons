@@ -140,6 +140,14 @@ local function targetName(guid)
     return nil
 end
 
+-- A live creature's loot window is its pocket (Pick Pocket), not its loot.
+local function livingTarget(guid)
+    if not (UnitGUID and UnitIsDead) then
+        return false
+    end
+    return ns.Guarded(function() return UnitGUID("target") == guid and not UnitIsDead("target") end, false)
+end
+
 --- A loot window opened (LOOT_OPENED): each corpse or chest it holds loot
 -- from counts one kill or opening, the first time only, and its items once.
 -- Everything is asked of the client first and recorded after, so a call that
@@ -147,6 +155,10 @@ end
 -- corpse is next opened.
 function Recorder.LootOpened()
     if not (recorded() and GetNumLootItems and GetLootSlotLink and GetLootSourceInfo) then
+        return
+    end
+    -- What was fished up is the water's, not a creature's or a chest's.
+    if IsFishingLoot and ns.Guarded(IsFishingLoot, false) then
         return
     end
     local where = whereNow()
@@ -168,7 +180,7 @@ function Recorder.LootOpened()
             local entry = found[guid]
             if entry == nil then
                 local kind, id = Recorder.ParseGUID(guid)
-                if kind and not seenBefore(guid) then
+                if kind and not seenBefore(guid) and not livingTarget(guid) then
                     entry = { kind = kind, id = id, name = targetName(guid), items = {} }
                     table.insert(order, guid)
                 else

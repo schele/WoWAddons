@@ -173,6 +173,30 @@ describe("recording loot", function()
         assertNil(source.name)
     end)
 
+    it("leaves a picked pocket out, so the corpse counts when it is looted", function()
+        local ns, env = helpers.loggedIn()
+        local alive = true
+        function env.UnitIsDead(unit) return unit == "target" and not alive end
+        looting(env, { withSources(GLOVES, REVELOSH, 1) }, { guid = REVELOSH, name = "Revelosh" })
+        helpers.fire(env, "LOOT_OPENED")
+        assertNil(ns.db.recorded.sources["npc:6910@70"], "a live mob's pocket is not its loot")
+        alive = false
+        looting(env, { withSources(BOOTS, REVELOSH, 1) }, { guid = REVELOSH, name = "Revelosh" })
+        helpers.fire(env, "LOOT_OPENED")
+        local source = ns.db.recorded.sources["npc:6910@70"]
+        assertEqual(1, source.kills)
+        assertEqual(1, source.items[9387])
+        assertNil(source.items[9388])
+    end)
+
+    it("leaves fishing out", function()
+        local ns, env = helpers.loggedIn()
+        function env.IsFishingLoot() return true end
+        looting(env, { withSources(BOOTS, "GameObject-0-3110-0-47-35591-0000A", 1) })
+        helpers.fire(env, "LOOT_OPENED")
+        assertNil(next(ns.db.recorded.sources))
+    end)
+
     it("does nothing, and does not fail, on a client without the loot calls", function()
         local ns, env = helpers.loggedIn()
         helpers.fire(env, "LOOT_OPENED")
