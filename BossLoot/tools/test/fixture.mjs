@@ -10,7 +10,7 @@ export function fixtureDb() {
   db.exec(`
     create table creature_template (entry int, patch int default 0, name text, loot_id int default 0, display_id1 int default 0);
     create table creature (guid integer primary key, id int, id2 int default 0, id3 int default 0,
-      id4 int default 0, id5 int default 0, map int, patch_min int default 0, patch_max int default 10,
+      id4 int default 0, id5 int default 0, map int, patch_min int default 0, patch_max int default 10, wander_distance real default 0,
       position_x real default 0, position_y real default 0, position_z real default 0);
     create table gameobject_template (entry int, patch int default 0, type int, name text, data1 int default 0);
     create table gameobject (guid integer primary key, id int, map int, patch_min int default 0, patch_max int default 10,

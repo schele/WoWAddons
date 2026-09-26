@@ -46,3 +46,17 @@ describe("type labels", function()
         assertEqual("Key", ns.Format.TypeLabel("Key", "Key", ""))
     end)
 end)
+
+describe("whole-number chances and empty types", function()
+    local ns = helpers.loadAddon({ "BossLoot.lua", "Format.lua" })
+
+    it("drops a trailing .0 under ten percent", function()
+        assertEqual("5%", ns.Format.Chance(5))
+        assertEqual("1%", ns.Format.Chance(1.02))
+        assertEqual("1.8%", ns.Format.Chance(1.8))
+    end)
+
+    it("treats an empty item type as none, rather than printing a lone comma", function()
+        assertEqual("Other", ns.Format.TypeLabel("", "Other", ""))
+    end)
+end)

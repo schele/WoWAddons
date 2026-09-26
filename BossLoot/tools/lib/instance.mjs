@@ -131,7 +131,7 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
 
   // The map, made to take in every boss standing near its edge, then a pin
   // per boss that is on it.
-  const map = buildMap(db.mapPoints(def.map), { keep: spawns.filter(Boolean) });
+  const map = buildMap(db.mapShapes(def.map), { keep: spawns.filter(Boolean) });
   bosses.forEach((boss, index) => {
     const pin = pinFor(map, spawns[index]);
     if (pin) boss.pin = pin;
@@ -177,7 +177,7 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
       name: def.name,
       kind: def.kind,
       levels: def.levels,
-      map: map ? { cols: map.cols, rows: map.rows, cells: map.cells } : undefined,
+      map: map ? { cols: map.cols, rows: map.rows, runs: map.runs } : undefined,
       bosses,
       notable: { trash: notable(trashSources), objects: notable(objectSources) },
     },

@@ -16,6 +16,10 @@ function Format.Chance(percent)
 
     local tenths = math.floor(percent * 10 + 0.5) / 10
     if tenths < 10 then
+        -- A whole number reads as one: "5%", not "5.0%".
+        if tenths == math.floor(tenths) then
+            return string.format("%d%%", tenths)
+        end
         return string.format("%.1f%%", tenths)
     end
 
@@ -46,9 +50,14 @@ end
 -- ("Two-Hand, Maces"), the type and kind for anything else ("Recipe,
 -- Tailoring"), collapsing a repeat ("Key", not "Key, Key").
 function Format.TypeLabel(itemType, itemSubType, equipLoc)
-    local slot = equipLoc and equipLoc ~= "" and _G[equipLoc] or nil
-    local first = slot or itemType
-    local second = itemSubType
+    -- Some items come back with an empty type; treat it as none, or the
+    -- label reads ", Other".
+    local function named(value)
+        return value ~= "" and value or nil
+    end
+    local slot = named(equipLoc) and _G[equipLoc] or nil
+    local first = slot or named(itemType)
+    local second = named(itemSubType)
 
     if first and second and second ~= "" and second ~= first then
         return first .. ", " .. second

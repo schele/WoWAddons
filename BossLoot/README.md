@@ -12,9 +12,10 @@ by number; click the map for a big one, and a pin to jump to that boss.
 Under that, the loot in two columns. At the bottom of the boss list,
 **Notable drops** holds the trash and chest finds.
 
-The map is drawn from where the instance's mobs stand and walk, so it shows
-rooms and corridors as a sketch rather than a picture; higher ground is
-lighter. A boss that only appears when a script summons it has no pin.
+The map is a floor plan worked out from where the instance's mobs stand,
+how far they wander and where they patrol, so it shows the rooms and
+corridors they use rather than every wall. A boss that only appears when a
+script summons it has no pin.
 
 A loot row works like an item anywhere else: hover for the tooltip,
 shift-click to link it in chat, ctrl-click to preview it on your character.

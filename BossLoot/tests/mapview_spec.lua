@@ -1,9 +1,10 @@
 local helpers = require("helpers")
 local FILES = { "BossLoot.lua", "MapView.lua" }
 
+-- A 4 by 2 map: two cells of floor at the top left, one at the bottom right.
 local instance = {
     key = "T", name = "T", kind = "dungeon", levels = { 1, 2 },
-    map = { cols = 4, rows = 2, cells = { 0 * 4 + 0, 7 * 4 + 3 } },
+    map = { cols = 4, rows = 2, runs = { 0, 0, 2, 1, 3, 1 } },
     bosses = {
         { name = "A", pin = { 0.25, 0.5 }, loot = {} },
         { name = "Summoned", loot = {} },
@@ -25,21 +26,26 @@ describe("the map view", function()
         assertEqual(50, scale); assertEqual(0, ox); assertEqual(50, oy)
     end)
 
-    it("draws a square per filled cell, where the cell is", function()
+    it("draws a strip per run of floor, where the run is", function()
         local ns, env = helpers.loadAddon(FILES)
         local view = ns.MapView.Create(env.UIParent, 200, 200)
         ns.MapView.Show(view, instance)
-        assertEqual(2, shown(view.cells))
-        local _, _, _, x, y = view.cells[2]:GetPoint(1)
-        assertEqual(175, x, "column 3 of 4, centred")
-        assertEqual(-125, y, "row 1 of 2, below the top margin")
+        assertEqual(2, shown(view.floor))
+        local _, _, _, x, y = view.floor[2]:GetPoint(1)
+        assertEqual(150, x, "column 3 of 4")
+        assertEqual(-100, y, "row 1 of 2, below the top margin")
+        assertEqual(50, view.floor[2]:GetWidth())
+        assertEqual(50, view.floor[2]:GetHeight())
     end)
 
-    it("colours higher cells lighter", function()
+    it("outlines the floor by drawing it a cell wider underneath, in a lighter colour", function()
         local ns, env = helpers.loadAddon(FILES)
+        local outline = ns.MapView.Outline(instance.map)
+        assertEqual("0,0,4,1,0,4", table.concat(outline, ","))
         local view = ns.MapView.Create(env.UIParent, 200, 200)
         ns.MapView.Show(view, instance)
-        assertTrue(view.cells[2].colorTexture[3] > view.cells[1].colorTexture[3])
+        assertEqual(2, shown(view.edges))
+        assertTrue(view.edges[1].colorTexture[1] > view.floor[1].colorTexture[1])
     end)
 
     it("pins every boss that has a place, numbered by its place in the list", function()
@@ -62,12 +68,13 @@ describe("the map view", function()
         assertEqual(3, clicked)
     end)
 
-    it("reuses its textures from one instance to the next", function()
+    it("reuses its strips from one instance to the next", function()
         local ns, env = helpers.loadAddon(FILES)
         local view = ns.MapView.Create(env.UIParent, 200, 200)
         ns.MapView.Show(view, instance)
+        ns.MapView.Show(view, { map = { cols = 4, rows = 2, runs = { 0, 0, 1, 1, 1, 1 } }, bosses = {} })
         ns.MapView.Show(view, instance)
-        assertEqual(2, #view.cells)
+        assertEqual(2, #view.floor)
     end)
 
     it("shows nothing, and does not fail, for an instance without a map", function()
@@ -75,19 +82,20 @@ describe("the map view", function()
         local view = ns.MapView.Create(env.UIParent, 200, 200)
         ns.MapView.Show(view, instance)
         ns.MapView.Show(view, { bosses = {}, notable = {} })
-        assertEqual(0, shown(view.cells))
+        assertEqual(0, shown(view.floor))
+        assertEqual(0, shown(view.edges))
         assertEqual(0, shown(view.pins))
         ns.MapView.Show(view, nil)
     end)
 end)
 
 describe("redrawing the same map", function()
-    it("leaves the cells alone and only updates the pins", function()
+    it("leaves the strips alone and only updates the pins", function()
         local ns, env = helpers.loadAddon(FILES)
         local view = ns.MapView.Create(env.UIParent, 200, 200)
         ns.MapView.Show(view, instance, 1)
         ns.MapView.Show(view, instance, 3)
-        assertEqual(1, view.cells[1].colorSets)
+        assertEqual(1, view.floor[1].colorSets)
         assertTrue(view.pins[2].selected, "the new selection still shows")
     end)
 end)

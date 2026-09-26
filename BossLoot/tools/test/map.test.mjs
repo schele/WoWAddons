@@ -1,73 +1,123 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMap, pinFor, BANDS } from '../lib/map.mjs';
+import { buildMap, pinFor, removeIslands, fillHoles, toRuns } from '../lib/map.mjs';
 
-const p = (x, y, z = 0) => ({ x, y, z });
+const disc = (x, y, r = 0) => ({ x, y, z: 0, r });
+const at = (x, y) => ({ x, y, z: 0 });
 
-test('fills a cell where points fall, seen from above with north up and east right', () => {
-  // North is +x, east is -y.
-  const map = buildMap([p(100, 0), p(0, -100)], { grid: 10, trim: 0 });
-  assert.equal(map.cols, 10);
-  assert.equal(map.rows, 10);
-  assert.deepEqual(map.cells, [0 * BANDS, 99 * BANDS], 'north-west corner, then south-east');
+// Where a world point falls, and whether that cell is floor.
+function cellAt(map, point) {
+  return {
+    row: Math.floor((map.bounds.x1 - point.x) / map.cell),
+    col: Math.floor((map.bounds.y1 - point.y) / map.cell),
+  };
+}
+function isFloor(map, point) {
+  const { row, col } = cellAt(map, point);
+  for (let i = 0; i < map.runs.length; i += 3) {
+    if (map.runs[i] === row && col >= map.runs[i + 1] && col < map.runs[i + 1] + map.runs[i + 2]) return true;
+  }
+  return false;
+}
+
+const bounded = { trim: 0, minCell: 2, maxCells: 100 };
+
+test('fills the ground a mob wanders over', () => {
+  const map = buildMap({ discs: [disc(0, 0, 10), disc(100, -100, 10)], paths: [] }, bounded);
+  assert.ok(isFloor(map, at(0, 0)));
+  assert.ok(isFloor(map, at(7, 0)), 'within its wander radius');
+  assert.ok(!isFloor(map, at(50, -50)), 'nothing between the two');
 });
 
-test('uses square cells, so a long thin instance gets fewer rows', () => {
-  const map = buildMap([p(0, 0), p(50, -100)], { grid: 10, trim: 0 });
-  assert.equal(map.cols, 10);
-  assert.equal(map.rows, 5);
+test('joins a patrol path into a corridor', () => {
+  const paths = [[at(0, 0), at(0, -60)]];
+  const map = buildMap({ discs: [disc(100, 0), disc(0, -100)], paths }, bounded);
+  assert.ok(isFloor(map, at(0, -30)));
 });
 
-test('ignores a stray point far from the rest', () => {
-  const points = [];
-  for (let i = 0; i < 200; i++) points.push(p(i % 20, -(i % 13)));
-  points.push(p(5000, -5000));
-  const map = buildMap(points, { grid: 20 });
-  assert.ok(map.bounds.x1 < 100, `bounds reach ${map.bounds.x1}`);
+test('does not join a jump longer than a patrol step', () => {
+  const paths = [[at(0, 0), at(0, -200)]];
+  const map = buildMap({ discs: [disc(0, 0, 5), disc(0, -200, 5)], paths }, bounded);
+  assert.ok(!isFloor(map, at(0, -100)));
 });
 
-test('bands cells by height, higher in higher bands', () => {
-  const map = buildMap([p(100, 0, 0), p(0, -100, 100)], { grid: 10, trim: 0 });
-  assert.deepEqual(map.cells.map((v) => v % BANDS), [0, BANDS - 1]);
+test('puts north at the top and east on the right', () => {
+  const map = buildMap({ discs: [disc(100, 0, 5), disc(0, -100, 5)], paths: [] }, bounded);
+  const north = cellAt(map, at(100, 0));
+  const east = cellAt(map, at(0, -100));
+  assert.ok(north.row < east.row, 'north above');
+  assert.ok(east.col > north.col, 'east to the right');
 });
 
-test('has no map without points', () => {
-  assert.equal(buildMap([]), null);
+test('uses cells of at least the minimum size, and at most so many across', () => {
+  const small = buildMap({ discs: [disc(0, 0), disc(20, -20)], paths: [] }, { trim: 0, minCell: 4, maxCells: 100 });
+  assert.ok(small.cell >= 4);
+  const large = buildMap({ discs: [disc(0, 0), disc(2000, -2000)], paths: [] }, { trim: 0, minCell: 4, maxCells: 100 });
+  assert.ok(large.cols <= 101 && large.rows <= 101);
+});
+
+test('has no map without anything on it', () => {
+  assert.equal(buildMap({ discs: [], paths: [] }), null);
+});
+
+test('drops specks smaller than the minimum island', () => {
+  const cols = 10;
+  const rows = 3;
+  const grid = new Uint8Array(cols * rows);
+  grid[0] = 1; // a single-cell speck
+  for (let c = 4; c < 10; c++) { grid[c] = 1; grid[cols + c] = 1; } // a 12-cell area
+  removeIslands(grid, cols, rows, 5);
+  assert.equal(grid[0], 0);
+  assert.equal(grid[4], 1);
+});
+
+test('fills a small hole inside an area, but not open ground outside it', () => {
+  const cols = 5;
+  const rows = 5;
+  const grid = new Uint8Array(cols * rows);
+  for (let r = 1; r <= 3; r++) for (let c = 1; c <= 3; c++) grid[r * cols + c] = 1;
+  grid[2 * cols + 2] = 0; // the hole
+  fillHoles(grid, cols, rows, 4);
+  assert.equal(grid[2 * cols + 2], 1, 'hole filled');
+  assert.equal(grid[0], 0, 'outside untouched');
+});
+
+test('writes each row as runs of floor: row, first column, length', () => {
+  const grid = Uint8Array.from([1, 1, 0, 1, 0, 0, 1, 1]);
+  assert.deepEqual(toRuns(grid, 4, 2), [0, 0, 2, 0, 3, 1, 1, 2, 2]);
 });
 
 test('places a pin as fractions of the map', () => {
-  const map = buildMap([p(100, 0), p(0, -100)], { grid: 10, trim: 0 });
-  assert.deepEqual(pinFor(map, p(100, 0)), { x: 0, y: 0 });
-  assert.deepEqual(pinFor(map, p(50, -50)), { x: 0.5, y: 0.5 });
+  const map = buildMap({ discs: [disc(100, 0), disc(0, -100)], paths: [] }, { ...bounded, margin: 0 });
+  assert.deepEqual(pinFor(map, at(100, 0)), { x: 0, y: 0 });
+  const middle = pinFor(map, at(50, -50));
+  assert.ok(Math.abs(middle.x - 0.5) < 0.02 && Math.abs(middle.y - 0.5) < 0.02);
 });
 
 test('gives no pin to a point well outside the map, rather than one on its edge', () => {
-  // Clamped, Kel'Thuzad sat in an empty corner a hundred cells from his room.
-  const map = buildMap([p(100, 0), p(0, -100)], { grid: 10, trim: 0 });
-  assert.equal(pinFor(map, p(-999, 999)), undefined);
+  const map = buildMap({ discs: [disc(100, 0), disc(0, -100)], paths: [] }, bounded);
+  assert.equal(pinFor(map, at(-999, 999)), undefined);
 });
 
-test('grows the bounds to take in a boss just past the trimmed edge, room and all', () => {
-  // Bosses stand at the far ends of instances, which is just what trimming cuts.
-  const points = [];
-  for (let i = 0; i < 100; i++) points.push(p(i % 10, 0));
-  const room = [p(11, 0), p(11, -1), p(11, 1)];
-  const boss = p(11, 0);
-  const trimmed = buildMap([...points, ...room], { grid: 20, trim: 0.05 });
-  assert.equal(trimmed.bounds.x1, 9, 'the trim cuts the room');
-  const kept = buildMap([...points, ...room], { grid: 20, trim: 0.05, keep: [boss] });
+test('grows the bounds to take in a boss just past the trimmed edge', () => {
+  const discs = [];
+  for (let i = 0; i < 100; i++) discs.push(disc(i % 10, 0));
+  const boss = at(11, 0);
+  const options = { trim: 0.05, minCell: 1, maxCells: 100, margin: 0 };
+  assert.equal(buildMap({ discs, paths: [] }, options).bounds.x1, 9, 'the trim cuts it');
+  const kept = buildMap({ discs, paths: [] }, { ...options, keep: [boss] });
   assert.equal(kept.bounds.x1, 11);
-  assert.ok(pinFor(kept, boss), 'and the boss has a pin');
+  assert.ok(pinFor(kept, boss));
 });
 
 test('does not stretch the map for a boss far beyond it', () => {
-  const points = [];
-  for (let i = 0; i < 100; i++) points.push(p(i % 10, 0));
-  const map = buildMap(points, { grid: 20, trim: 0.05, keep: [p(1000, 0)] });
-  assert.ok(map.bounds.x1 < 20);
+  const discs = [];
+  for (let i = 0; i < 100; i++) discs.push(disc(i % 10, 0));
+  const map = buildMap({ discs, paths: [] }, { trim: 0.05, minCell: 1, keep: [at(1000, 0)] });
+  assert.ok(map.bounds.x1 < 50);
 });
 
 test('has no pin without a point or a map', () => {
-  assert.equal(pinFor(null, p(0, 0)), undefined);
-  assert.equal(pinFor(buildMap([p(0, 0), p(1, 1)]), undefined), undefined);
+  assert.equal(pinFor(null, at(0, 0)), undefined);
+  assert.equal(pinFor(buildMap({ discs: [disc(0, 0), disc(1, 1)], paths: [] }), undefined), undefined);
 });

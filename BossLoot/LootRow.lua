@@ -32,20 +32,27 @@ function LootRow.ItemInfo(itemID)
     }
 end
 
--- Items already asked for, and items the server answered it does not have.
--- Asked once each: a row redraws whenever any item arrives, and asking again
--- on every draw would turn an item the server lacks -- WoW Forever does not
--- have every instance -- into a request, answer and redraw loop.
+-- When each item was last asked for, and which answers came back empty.
+-- Asked at most every RETRY seconds: a row redraws whenever any item
+-- arrives, and asking on every draw turns an item the server will not send
+-- into a request, answer and redraw loop. But not once for good either:
+-- asked for hundreds at a time, the server answers some empty that are real
+-- items (their icons show), and a later ask gets them.
+local RETRY = 30
 local requested = {}
 local failed = {}
 
---- Ask the client to load an item, once. GET_ITEM_INFO_RECEIVED says when it
--- has, or that it could not.
+local function now()
+    return GetTime and GetTime() or 0
+end
+
+--- Ask the client to load an item, unless it was asked for recently.
+-- GET_ITEM_INFO_RECEIVED says when it has, or that it could not.
 function LootRow.RequestLoad(itemID)
-    if requested[itemID] then
+    if requested[itemID] and now() - requested[itemID] < RETRY then
         return
     end
-    requested[itemID] = true
+    requested[itemID] = now()
 
     if C_Item and C_Item.RequestLoadItemDataByID then
         C_Item.RequestLoadItemDataByID(itemID)
@@ -55,7 +62,8 @@ function LootRow.RequestLoad(itemID)
     end
 end
 
---- The server has no such item: stop showing it as loading.
+--- The server sent nothing for an item: say so rather than "loading", until
+-- a later ask brings it.
 function LootRow.MarkFailed(itemID)
     failed[itemID] = true
 end
@@ -151,8 +159,9 @@ function LootRow.Render(row, entry)
         row.name:SetText(ns.Format.Colored(info.name, info.quality))
         row.link = info.link
     elseif failed[entry.id] then
-        row.name:SetText("|cff808080Unknown item " .. entry.id .. "|r")
+        row.name:SetText("|cff808080Item " .. entry.id .. " (not loaded yet)|r")
         row.link = nil
+        LootRow.RequestLoad(entry.id)
     else
         row.name:SetText("|cff808080Loading item " .. entry.id .. "...|r")
         row.link = nil

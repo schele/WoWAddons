@@ -77,7 +77,8 @@ describe("the instance column", function()
         local ns, env = helpers.loggedIn()
         env.__items[1002] = { name = "Hand of Justice", quality = 3 }
         local entries = ns.Window.InstanceEntries({ kind = "dungeon", instance = "" }, "justice")
-        assertEqual("Items|" .. "|cff0070ddHand of Justice|r|" .. "    Test Depths: First Boss |cff8080801.5%|r", texts(entries))
+        assertEqual("Items|" .. "|cff0070ddHand of Justice|r|" .. "    Test Depths: First Boss", texts(entries))
+        assertEqual("1.5%", entries[3].right)
     end)
 
     it("says so when a search finds nothing", function()
@@ -279,7 +280,7 @@ describe("items the server cannot load", function()
         local row = ns.Window.Frame().loot.rows[1]
         helpers.fire(env, "GET_ITEM_INFO_RECEIVED", 1001, false)
         env.__runTimers()
-        assertMatch("Unknown item 1001", row.name:GetText())
+        assertMatch("not loaded", row.name:GetText())
     end)
 end)
 
@@ -289,15 +290,18 @@ describe("the places an item drops, in search results", function()
         env.__items[1001] = { name = "Shared Blade", quality = 3 }
         local entries = ns.Window.InstanceEntries({ kind = "dungeon", instance = "" }, "blade")
         assertEqual("Items|" .. "|cff0070ddShared Blade|r|"
-            .. "    Test Depths: First Boss |cff80808020%|r|"
-            .. "    Molten Test: Raid Boss |cff80808012%|r", texts(entries))
+            .. "    Test Depths: First Boss|"
+            .. "    Molten Test: Raid Boss", texts(entries))
+        assertEqual("20%", entries[3].right)
+        assertEqual("12%", entries[4].right)
     end)
 
     it("name the notable lists the way the boss column does", function()
         local ns, env = helpers.loggedIn()
         env.__items[3002] = { name = "Chest Prize", quality = 3 }
         local entries = ns.Window.InstanceEntries({ kind = "dungeon", instance = "" }, "prize")
-        assertEqual("    Low Spire: Chests & objects |cff808080100%|r", entries[3].text)
+        assertEqual("    Low Spire: Chests & objects", entries[3].text)
+        assertEqual("100%", entries[3].right)
     end)
 
     it("each jump to their own instance and boss when clicked", function()
@@ -368,7 +372,7 @@ describe("the redesigned window", function()
     it("shows the instance map in the header, the selected boss's pin lit", function()
         local ns, env = helpers.loadAddon()
         helpers.sampleInstances(ns)
-        ns.instanceByKey.Depths.map = { cols = 2, rows = 2, cells = { 0, 12 } }
+        ns.instanceByKey.Depths.map = { cols = 2, rows = 2, runs = { 0, 0, 1, 1, 1, 1 } }
         ns.instanceByKey.Depths.bosses[2].pin = { 0.5, 0.5 }
         helpers.login(ns, env)
         ns.Window.Open()
@@ -381,7 +385,7 @@ describe("the redesigned window", function()
     it("opens the full map from the inset, and a pin there picks that boss", function()
         local ns, env = helpers.loadAddon()
         helpers.sampleInstances(ns)
-        ns.instanceByKey.Depths.map = { cols = 2, rows = 2, cells = { 0, 12 } }
+        ns.instanceByKey.Depths.map = { cols = 2, rows = 2, runs = { 0, 0, 1, 1, 1, 1 } }
         ns.instanceByKey.Depths.bosses[3].pin = { 0.5, 0.5 }
         helpers.login(ns, env)
         ns.Window.Open()
@@ -536,5 +540,22 @@ describe("the loot while the big map is open", function()
         ns.Window.OpenMap()
         ns.Window.SelectBoss(2)
         assertEqual(1003, frame.mapLoot.rows[1].entry.id)
+    end)
+end)
+
+describe("the loot under the bosses", function()
+    it("starts right under the last boss, not at a fixed place", function()
+        local ns = opened()
+        ns.Window.SelectInstance("Spire")
+        ns.Window.OpenMap()
+        local _, _, _, _, y = ns.Window.Frame().mapLoot:GetPoint(1)
+        assertEqual(-(40 + 3 * 34 + 6), y, "three rows: the boss, the heading, the chest list")
+    end)
+
+    it("leaves room for the more line when the bosses do not all fit", function()
+        local ns = opened()
+        ns.Window.OpenMap()
+        local _, _, _, _, y = ns.Window.Frame().mapLoot:GetPoint(1)
+        assertEqual(-(40 + 6 * 34 + 16 + 6), y)
     end)
 end)

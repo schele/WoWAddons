@@ -85,7 +85,8 @@ local function placeEntry(itemID, source)
     return {
         kind = "place",
         value = source,
-        text = string.format("    %s: %s |cff808080%s|r", instance.name, label, ns.Format.Chance(chance)),
+        text = string.format("    %s: %s", instance.name, label),
+        right = ns.Format.Chance(chance),
     }
 end
 
@@ -400,6 +401,15 @@ function Window.Refresh()
 
     local mapOpen = frame.fullMap:IsShown()
     local lootList = mapOpen and frame.mapLoot or frame.loot
+    if mapOpen then
+        -- Straight under the last boss row showing, and down to the bottom.
+        local showing = math.min(#bossEntries - frame.bosses.offset, BOSS_ROWS_WITH_MAP)
+        local more = #bossEntries - frame.bosses.offset > BOSS_ROWS_WITH_MAP
+        local top = TOP + math.max(0, showing) * BOSS_ROW + (more and MORE_HEIGHT or 0) + 6
+        frame.mapLoot:ClearAllPoints()
+        frame.mapLoot:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + RAIL_WIDTH + GAP, -top)
+        ns.List.SetVisibleRows(frame.mapLoot, math.floor((HEIGHT - top - PADDING - MORE_HEIGHT) / LOOT_ROW))
+    end
     local loot = Window.LootEntries(instance, selection)
     local key = tostring(view.instance) .. ":" .. tostring(selection) .. (mapOpen and ":map" or "")
     ns.List.SetEntries(lootList, loot, key == lastSelection)
@@ -636,15 +646,15 @@ local function create()
     frame.bosses:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + RAIL_WIDTH + GAP, -TOP)
     frame.bossRows = frame.bosses.options.rows
 
-    -- Where the loot goes while the big map is open: under the boss list's
-    -- first rows, one tile across.
-    local mapLootTop = TOP + BOSS_ROWS_WITH_MAP * BOSS_ROW + MORE_HEIGHT + 6
+    -- Where the loot goes while the big map is open: under the boss list,
+    -- one tile across. Built with rows enough to fill the column from its
+    -- top; Refresh moves it under the last boss and uses as many as fit.
     frame.mapLoot = ns.List.Create(frame, {
         width = BOSS_WIDTH, rowHeight = LOOT_ROW,
-        rows = math.floor((HEIGHT - mapLootTop - PADDING - MORE_HEIGHT) / LOOT_ROW),
+        rows = math.floor((HEIGHT - TOP - 6 - PADDING - MORE_HEIGHT) / LOOT_ROW),
         createRow = ns.LootRow.Create, renderRow = ns.LootRow.Render,
     })
-    frame.mapLoot:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + RAIL_WIDTH + GAP, -mapLootTop)
+    frame.mapLoot:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + RAIL_WIDTH + GAP, -TOP)
     frame.mapLoot:Hide()
 
     -- The boss page: header with model and map inset, then the loot grid.

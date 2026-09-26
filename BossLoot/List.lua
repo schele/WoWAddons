@@ -143,6 +143,13 @@ function List.TextRow(onClick)
         row.text:SetPoint("LEFT", row, "LEFT", 4, 0)
         row.text:SetPoint("RIGHT", row, "RIGHT", -4, 0)
         row.text:SetJustifyH("LEFT")
+        -- One line: in a narrow column, wrapped text runs into the next row.
+        row.text:SetWordWrap(false)
+
+        -- A short right-hand column, for a search result's chance.
+        row.right = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        row.right:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+        row.right:SetJustifyH("RIGHT")
 
         row:SetScript("OnClick", function(self, mouseButton)
             if self.entry and self.entry.kind ~= "heading" then
@@ -158,6 +165,11 @@ end
 function List.RenderText(row, entry)
     row.entry = entry
     row.text:SetText(entry.text)
+    if row.right then
+        row.right:SetText(entry.right or "")
+        -- The text stops short of the right-hand column when there is one.
+        row.text:SetPoint("RIGHT", row, "RIGHT", entry.right and -44 or -4, 0)
+    end
 
     if entry.kind == "heading" then
         row.text:SetTextColor(1, 0.82, 0)

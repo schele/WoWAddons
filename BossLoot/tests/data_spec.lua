@@ -62,9 +62,11 @@ describe("the generated data", function()
     it("keeps every map cell and pin inside its map", function()
         for _, instance in ipairs(ns.instances) do
             if instance.map then
-                local limit = instance.map.cols * instance.map.rows * 4
-                for _, value in ipairs(instance.map.cells) do
-                    assertTrue(value >= 0 and value < limit, instance.key .. " cell " .. value)
+                local runs = instance.map.runs
+                for i = 1, #runs, 3 do
+                    local row, first, length = runs[i], runs[i + 1], runs[i + 2]
+                    assertTrue(row >= 0 and row < instance.map.rows, instance.key .. " run row " .. row)
+                    assertTrue(first >= 0 and length > 0 and first + length <= instance.map.cols, instance.key .. " run at " .. first)
                 end
             end
             for _, boss in ipairs(instance.bosses) do
@@ -81,7 +83,7 @@ describe("the generated data", function()
 
     it("has a map for every instance", function()
         for _, instance in ipairs(ns.instances) do
-            assertTrue(instance.map ~= nil and #instance.map.cells > 0, instance.key .. " map")
+            assertTrue(instance.map ~= nil and #instance.map.runs > 0, instance.key .. " map")
         end
     end)
 

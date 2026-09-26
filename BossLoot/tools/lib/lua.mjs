@@ -20,9 +20,9 @@ export function instanceFile(instance) {
   ];
 
   if (instance.map) {
-    lines.push(`    map = { cols = ${instance.map.cols}, rows = ${instance.map.rows}, cells = {`);
-    for (let i = 0; i < instance.map.cells.length; i += 20) {
-      lines.push(`        ${instance.map.cells.slice(i, i + 20).join(', ')},`);
+    lines.push(`    map = { cols = ${instance.map.cols}, rows = ${instance.map.rows}, runs = {`);
+    for (let i = 0; i < instance.map.runs.length; i += 30) {
+      lines.push(`        ${instance.map.runs.slice(i, i + 30).join(', ')},`);
     }
     lines.push('    } },');
   }

@@ -49,23 +49,52 @@ export function openDb(source) {
     creatureLootIds: () => latest('creature_template', 't.loot_id > 0'),
     lootLinks: (table) => prepare(`select entry, item, mincountOrRef from ${table} where ${SPAWNED}`).all(),
 
-    // Everything that marks out an instance's shape: where creatures and
-    // objects are spawned, and every waypoint of the creatures' patrols.
-    mapPoints(map) {
-      const points = [
-        ...prepare(`select position_x as x, position_y as y, position_z as z from creature where map = ? and ${SPAWNED}`).all(map),
-        ...prepare(`select position_x as x, position_y as y, position_z as z from gameobject where map = ? and ${SPAWNED}`).all(map),
+    // What marks out an instance's floor: every spawn with how far it wanders
+    // (discs), and every patrol in order (paths) -- per spawn, per creature
+    // template, and scripted escorts.
+    mapShapes(map) {
+      const discs = [
+        ...prepare(`select position_x as x, position_y as y, position_z as z, wander_distance as r from creature where map = ? and ${SPAWNED}`).all(map),
+        ...prepare(`select position_x as x, position_y as y, position_z as z, 0 as r from gameobject where map = ? and ${SPAWNED}`).all(map),
       ];
-      try {
-        points.push(...prepare(`
-          select m.position_x as x, m.position_y as y, m.position_z as z
-          from creature_movement m join creature c on c.guid = m.id
-          where c.map = ? and c.patch_min <= ${P} and ${P} <= c.patch_max
-        `).all(map));
-      } catch {
-        // A dump without patrol paths still has its spawns.
-      }
-      return points;
+
+      // A dump without one of the patrol tables still has the others.
+      const rows = (sql) => {
+        try {
+          return prepare(sql).all(map);
+        } catch {
+          return [];
+        }
+      };
+      const onMap = `(select id from creature where map = ? and ${SPAWNED})`;
+      const paths = [];
+      const group = (points) => {
+        let current;
+        let key;
+        for (const point of points) {
+          if (!current || point.path !== key) {
+            current = [];
+            paths.push(current);
+            key = point.path;
+          }
+          current.push({ x: point.x, y: point.y, z: point.z });
+        }
+      };
+      group(rows(`
+        select m.id as path, m.position_x as x, m.position_y as y, m.position_z as z
+        from creature_movement m join creature c on c.guid = m.id
+        where c.map = ? and c.patch_min <= ${P} and ${P} <= c.patch_max
+        order by m.id, m.point`));
+      group(rows(`
+        select t.entry as path, t.position_x as x, t.position_y as y, t.position_z as z
+        from creature_movement_template t where t.entry in ${onMap}
+        order by t.entry, t.point`));
+      group(rows(`
+        select s.entry as path, s.location_x as x, s.location_y as y, s.location_z as z
+        from script_waypoint s where s.entry in ${onMap}
+        order by s.entry, s.pointid`));
+
+      return { discs, paths };
     },
     creatureSpawn: (entry, map) => prepare(`select position_x as x, position_y as y, position_z as z from creature where id = ? and map = ? and ${SPAWNED} order by guid limit 1`).get(entry, map),
     objectSpawn: (entry, map) => prepare(`select position_x as x, position_y as y, position_z as z from gameobject where id = ? and map = ? and ${SPAWNED} order by guid limit 1`).get(entry, map),

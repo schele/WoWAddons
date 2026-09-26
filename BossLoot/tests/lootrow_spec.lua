@@ -19,7 +19,7 @@ describe("a loot row", function()
         assertEqual(5555, r.icon:GetTexture())
         assertEqual("|cffa335eeIronfoe|r", r.name:GetText())
         assertEqual("Two-Hand, Maces", r.detail:GetText())
-        assertEqual("1.0%", r.chance:GetText())
+        assertEqual("1%", r.chance:GetText())
     end)
 
     it("says what drops a notable item instead of its type", function()
@@ -94,7 +94,8 @@ describe("an item that will not load", function()
         local r = row(ns, env)
         ns.LootRow.MarkFailed(999)
         ns.LootRow.Render(r, { id = 999, chance = 5 })
-        assertMatch("Unknown item 999", r.name:GetText())
+        assertMatch("999", r.name:GetText())
+        assertMatch("not loaded", r.name:GetText())
     end)
 end)
 
@@ -104,5 +105,23 @@ describe("a loot tile's text", function()
         local r = row(ns, env)
         assertEqual(false, r.name.wordWrap)
         assertEqual(false, r.detail.wordWrap)
+    end)
+end)
+
+describe("an item the server did not send", function()
+    it("is asked for again after a while, not given up on", function()
+        -- Hundreds of items asked for at once, some answers come back empty;
+        -- the item is real (its icon shows), so it is worth asking again.
+        local ns, env = helpers.loadAddon(FILES)
+        env.__now = 100
+        function env.GetTime() return env.__now end
+        local r = row(ns, env)
+        ns.LootRow.Render(r, { id = 999, chance = 5 })
+        ns.LootRow.MarkFailed(999)
+        ns.LootRow.Render(r, { id = 999, chance = 5 })
+        assertEqual(1, env.__requestCount[999], "not straight away")
+        env.__now = 131
+        ns.LootRow.Render(r, { id = 999, chance = 5 })
+        assertEqual(2, env.__requestCount[999], "again after half a minute")
     end)
 end)

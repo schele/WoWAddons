@@ -1,21 +1,19 @@
 local addonName, ns = ...
 
--- Draws an instance's generated map into a frame of any size: a small square
--- per filled cell, lighter the higher it lies, and a numbered pin per boss
--- that has a place. The same view serves the header's inset and the full map.
+-- Draws an instance's generated floor plan into a frame of any size, and a
+-- numbered pin per boss that has a place. The same view serves the header's
+-- inset and the full map.
+--
+-- The floor comes as runs: row, first column, length. Each run is one strip
+-- of texture, so a whole instance is a few hundred strips rather than
+-- thousands of squares. The outline is the floor grown by a cell each way,
+-- drawn underneath in a lighter colour: only its rim shows.
 
 local MapView = {}
 ns.MapView = MapView
 
-local BANDS = 4
--- Cells are drawn larger than their spacing so neighbours merge into areas.
-local SPREAD = 1.5
-local BAND_COLOURS = {
-    { 0.20, 0.25, 0.40 },
-    { 0.27, 0.34, 0.54 },
-    { 0.36, 0.45, 0.68 },
-    { 0.50, 0.60, 0.84 },
-}
+local FLOOR = { 0.36, 0.29, 0.19 }
+local EDGE = { 0.77, 0.64, 0.43 }
 local PIN = "Interface\\COMMON\\Indicator-Red"
 local PIN_SELECTED = "Interface\\COMMON\\Indicator-Yellow"
 
@@ -26,17 +24,62 @@ function MapView.Layout(map, width, height)
     return scale, (width - map.cols * scale) / 2, (height - map.rows * scale) / 2
 end
 
+--- The floor grown by one cell each way, as runs. Worked out once per map.
+function MapView.Outline(map)
+    if map.outline then
+        return map.outline
+    end
+
+    local spans = {}
+    local runs = map.runs
+    for i = 1, #runs, 3 do
+        local row, first, length = runs[i], runs[i + 1], runs[i + 2]
+        for r = row - 1, row + 1 do
+            if r >= 0 and r < map.rows then
+                spans[r] = spans[r] or {}
+                table.insert(spans[r], { math.max(0, first - 1), math.min(map.cols, first + length + 1) })
+            end
+        end
+    end
+
+    local rows = {}
+    for row in pairs(spans) do
+        table.insert(rows, row)
+    end
+    table.sort(rows)
+
+    local outline = {}
+    for _, row in ipairs(rows) do
+        local list = spans[row]
+        table.sort(list, function(a, b) return a[1] < b[1] end)
+        local start, finish = list[1][1], list[1][2]
+        for k = 2, #list do
+            if list[k][1] <= finish then
+                finish = math.max(finish, list[k][2])
+            else
+                table.insert(outline, row); table.insert(outline, start); table.insert(outline, finish - start)
+                start, finish = list[k][1], list[k][2]
+            end
+        end
+        table.insert(outline, row); table.insert(outline, start); table.insert(outline, finish - start)
+    end
+
+    map.outline = outline
+    return outline
+end
+
 function MapView.Create(parent, width, height, options)
     options = options or {}
     local view = CreateFrame("Button", nil, parent)
     view:SetSize(width, height)
     view.options = options
-    view.cells = {}
+    view.floor = {}
+    view.edges = {}
     view.pins = {}
 
     view.background = view:CreateTexture(nil, "BACKGROUND")
     view.background:SetAllPoints()
-    view.background:SetColorTexture(0.02, 0.02, 0.03, 1)
+    view.background:SetColorTexture(0.06, 0.045, 0.03, 1)
 
     return view
 end
@@ -69,53 +112,52 @@ local function pin(view, index)
     return button
 end
 
--- Lay the map's cells out. Done only when the map or the view's size
--- changes: a redraw of the same map (a new boss picked, an item arrived)
--- touches just the pins.
-local function drawCells(view, map, scale, offsetX, offsetY)
-    for _, cell in ipairs(view.cells) do
-        cell:Hide()
-    end
-
-    local size = math.max(1, scale * SPREAD)
-    for index, value in ipairs(map.cells) do
-        local band = value % BANDS
-        local cellIndex = (value - band) / BANDS
-        local column = cellIndex % map.cols
-        local row = (cellIndex - column) / map.cols
-
-        local cell = view.cells[index]
-        if not cell then
-            cell = view:CreateTexture(nil, "ARTWORK")
-            view.cells[index] = cell
+-- One layer of strips from a run list, reusing the pool's textures.
+local function drawStrips(view, pool, runs, layer, colour, scale, offsetX, offsetY)
+    local count = 0
+    for i = 1, #runs, 3 do
+        count = count + 1
+        local strip = pool[count]
+        if not strip then
+            strip = view:CreateTexture(nil, layer)
+            pool[count] = strip
         end
-        cell:ClearAllPoints()
-        cell:SetSize(size, size)
-        cell:SetPoint("CENTER", view, "TOPLEFT", offsetX + (column + 0.5) * scale, -(offsetY + (row + 0.5) * scale))
-        local colour = BAND_COLOURS[band + 1]
-        cell:SetColorTexture(colour[1], colour[2], colour[3], 0.9)
-        cell:Show()
+        strip:ClearAllPoints()
+        strip:SetPoint("TOPLEFT", view, "TOPLEFT", offsetX + runs[i + 1] * scale, -(offsetY + runs[i] * scale))
+        strip:SetSize(runs[i + 2] * scale, scale)
+        strip:SetColorTexture(colour[1], colour[2], colour[3], 1)
+        strip:Show()
+    end
+    for i = count + 1, #pool do
+        pool[i]:Hide()
+    end
+end
+
+local function hideAll(pool)
+    for _, item in ipairs(pool) do
+        item:Hide()
     end
 end
 
 function MapView.Show(view, instance, selected)
-    for _, button in ipairs(view.pins) do
-        button:Hide()
-    end
+    hideAll(view.pins)
 
     local map = instance and instance.map
     if not map then
-        for _, cell in ipairs(view.cells) do
-            cell:Hide()
-        end
+        hideAll(view.floor)
+        hideAll(view.edges)
         view.shownMap = nil
         return
     end
 
     local width, height = view:GetWidth(), view:GetHeight()
     local scale, offsetX, offsetY = MapView.Layout(map, width, height)
+
+    -- The strips only change with the map or the view's size; a redraw of the
+    -- same map (a new boss picked, an item arrived) touches just the pins.
     if view.shownMap ~= map or view.shownWidth ~= width or view.shownHeight ~= height then
-        drawCells(view, map, scale, offsetX, offsetY)
+        drawStrips(view, view.edges, MapView.Outline(map), "BORDER", EDGE, scale, offsetX, offsetY)
+        drawStrips(view, view.floor, map.runs, "ARTWORK", FLOOR, scale, offsetX, offsetY)
         view.shownMap, view.shownWidth, view.shownHeight = map, width, height
     end
 

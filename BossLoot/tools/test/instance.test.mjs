@@ -200,8 +200,9 @@ test('draws a map of where mobs stand and walk, with the boss pinned where it st
   db.exec('update creature set position_x = 0, position_y = -100 where id = 2');
   add('creature_movement', { id: 2, point: 1, position_x: 50, position_y: -50, position_z: 0 });
   const { instance } = buildInstance(openDb(db), def);
-  assert.ok(instance.map.cells.length >= 3, 'two spawns, a chest and a waypoint');
-  assert.deepEqual(instance.bosses[0].pin, { x: 0, y: 0 });
+  assert.ok(instance.map.runs.length >= 3, 'floor drawn from the spawns, the chest and the patrol');
+  const pin = instance.bosses[0].pin;
+  assert.ok(pin.x < 0.2 && pin.y < 0.2, 'north-west corner, inside the margin');
 });
 
 test('pins a chest-only boss at its chest, and gives a summoned boss no pin', () => {
@@ -211,7 +212,8 @@ test('pins a chest-only boss at its chest, and gives a summoned boss no pin', ()
   add('creature_template', { entry: 3, name: 'Summoned Boss', loot_id: 1 });
   const bosses = [{ name: 'Chest Only', creatures: [], objects: ['Old Chest'] }, 'Summoned Boss'];
   const { instance } = buildInstance(openDb(db), { ...def, bosses });
-  assert.deepEqual(instance.bosses[0].pin, { x: 1, y: 1 });
+  const pin = instance.bosses[0].pin;
+  assert.ok(pin.x > 0.8 && pin.y > 0.8, 'south-east corner, inside the margin');
   assert.equal(instance.bosses[1].pin, undefined);
 });
 
