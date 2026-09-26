@@ -9,6 +9,7 @@ BossLoot.lua
 Format.lua
 # BEGIN GENERATED DATA
 Data\Items.lua
+Data\Recorded.lua
 Data\RagefireChasm.lua
 Data\WailingCaverns.lua
 Data\TheDeadmines.lua

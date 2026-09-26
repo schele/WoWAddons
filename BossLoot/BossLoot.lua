@@ -61,6 +61,14 @@ function ns.AddItems(items)
     end
 end
 
+-- Recordings baked into a release, from the generated Data\Recorded.lua:
+-- recorder id -> its recordings. See Recordings.lua.
+ns.bakedRecordings = {}
+
+function ns.AddRecordings(recorder, data)
+    ns.bakedRecordings[recorder] = data
+end
+
 local function ensureDatabase()
     if type(BossLootDB) ~= "table" then
         BossLootDB = {}

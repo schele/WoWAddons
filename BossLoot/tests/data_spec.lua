@@ -17,9 +17,10 @@ describe("the generated data", function()
     for _, file in ipairs(files) do table.insert(all, file) end
     local ns = helpers.loadAddon(all)
 
-    it("has one instance for each data file listed in the .toc, besides the items", function()
-        assertTrue(#files > 1)
-        assertEqual(#files - 1, #ns.instances)
+    it("has one instance for each data file listed in the .toc, besides the items and recordings", function()
+        assertTrue(#files > 2)
+        assertEqual(#files - 2, #ns.instances)
+        assertTrue(type(ns.bakedRecordings) == "table")
     end)
 
     it("knows the name and quality of every item the instances list", function()

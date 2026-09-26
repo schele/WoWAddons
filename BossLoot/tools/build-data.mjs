@@ -13,6 +13,7 @@ import { worldLoot } from './lib/world.mjs';
 import { buildInstance } from './lib/instance.mjs';
 import { instanceFile, itemsFile, updateToc } from './lib/lua.mjs';
 import { itemIdsOf } from './lib/items.mjs';
+import { readRecordings, recordedFile } from './lib/recordings.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const addon = join(here, '..');
@@ -62,6 +63,13 @@ const items = itemIdsOf(built).map((id) => db.item(id)).filter(Boolean);
 writeFileSync(join(dataDir, 'Items.lua'), itemsFile(items));
 files.unshift('Items.lua');
 console.log(`ok    ${items.length} items`);
+
+// Recordings players sent in, baked in after the items and before the instances.
+const { recordings, warnings: recordingWarnings } = readRecordings(join(here, 'recordings'));
+for (const warning of recordingWarnings) console.warn(`warn  ${warning}`);
+writeFileSync(join(dataDir, 'Recorded.lua'), recordedFile(recordings));
+files.splice(1, 0, 'Recorded.lua');
+console.log(`ok    ${recordings.length} recorders' recordings`);
 
 const tocPath = join(addon, 'BossLoot.toc');
 writeFileSync(tocPath, updateToc(readFileSync(tocPath, 'utf8'), files));
