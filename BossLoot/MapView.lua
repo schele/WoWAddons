@@ -69,22 +69,15 @@ local function pin(view, index)
     return button
 end
 
-function MapView.Show(view, instance, selected)
+-- Lay the map's cells out. Done only when the map or the view's size
+-- changes: a redraw of the same map (a new boss picked, an item arrived)
+-- touches just the pins.
+local function drawCells(view, map, scale, offsetX, offsetY)
     for _, cell in ipairs(view.cells) do
         cell:Hide()
     end
-    for _, button in ipairs(view.pins) do
-        button:Hide()
-    end
 
-    local map = instance and instance.map
-    if not map then
-        return
-    end
-
-    local scale, offsetX, offsetY = MapView.Layout(map, view:GetWidth(), view:GetHeight())
     local size = math.max(1, scale * SPREAD)
-
     for index, value in ipairs(map.cells) do
         local band = value % BANDS
         local cellIndex = (value - band) / BANDS
@@ -102,6 +95,28 @@ function MapView.Show(view, instance, selected)
         local colour = BAND_COLOURS[band + 1]
         cell:SetColorTexture(colour[1], colour[2], colour[3], 0.9)
         cell:Show()
+    end
+end
+
+function MapView.Show(view, instance, selected)
+    for _, button in ipairs(view.pins) do
+        button:Hide()
+    end
+
+    local map = instance and instance.map
+    if not map then
+        for _, cell in ipairs(view.cells) do
+            cell:Hide()
+        end
+        view.shownMap = nil
+        return
+    end
+
+    local width, height = view:GetWidth(), view:GetHeight()
+    local scale, offsetX, offsetY = MapView.Layout(map, width, height)
+    if view.shownMap ~= map or view.shownWidth ~= width or view.shownHeight ~= height then
+        drawCells(view, map, scale, offsetX, offsetY)
+        view.shownMap, view.shownWidth, view.shownHeight = map, width, height
     end
 
     local count = 0

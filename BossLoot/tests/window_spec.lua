@@ -428,3 +428,85 @@ describe("the redesigned window", function()
         assertEqual("GameFontNormal", ns.Window.Frame().tabs.dungeon.normalFont)
     end)
 end)
+
+describe("the window, after review", function()
+    local function withLongInstance()
+        local ns, env = helpers.loadAddon()
+        helpers.sampleInstances(ns)
+        local bosses = {}
+        for i = 1, 20 do bosses[i] = { name = "Boss " .. i, loot = { { 7000 + i, 10 } } } end
+        ns.AddInstance({ key = "Long", name = "Long Halls", kind = "dungeon", levels = { 50, 60 }, bosses = bosses, notable = { trash = {}, objects = {} } })
+        helpers.login(ns, env)
+        ns.Window.Open()
+        return ns, env
+    end
+
+    it("shows a chest, not a skull, for a boss with no model", function()
+        local ns = opened()
+        local frame = ns.Window.Frame()
+        assertEqual(ns.Portrait.ICONS.objects, frame.header.portrait:GetTexture())
+        assertEqual(ns.Portrait.ICONS.objects, frame.bosses.rows[2].portrait:GetTexture())
+    end)
+
+    it("draws the search placeholder on the box, above the box's art", function()
+        local ns = opened()
+        local frame = ns.Window.Frame()
+        assertEqual(frame.search, frame.searchHint:GetParent())
+    end)
+
+    it("does not reload the boss's model when it has not changed", function()
+        local ns, env = helpers.loadAddon()
+        helpers.sampleInstances(ns)
+        ns.instanceByKey.Depths.bosses[1].display = 8807
+        helpers.login(ns, env)
+        ns.Window.Open()
+        ns.Window.Refresh()
+        ns.Window.Refresh()
+        assertEqual(1, ns.Window.Frame().header.model.displaySets)
+    end)
+
+    it("does not redraw portraits that have not changed", function()
+        local ns, env = helpers.loadAddon()
+        helpers.sampleInstances(ns)
+        ns.instanceByKey.Depths.bosses[1].display = 8807
+        helpers.login(ns, env)
+        ns.Window.Open()
+        local before = env.__portraitCalls
+        ns.Window.Refresh()
+        assertEqual(before, env.__portraitCalls)
+    end)
+
+    it("keeps the selected boss in view in a long list", function()
+        local ns = withLongInstance()
+        ns.Window.SelectInstance("Long")
+        ns.Window.SelectBoss(20)
+        local seen = false
+        for _, row in ipairs(ns.Window.Frame().bosses.rows) do
+            if row:IsShown() and row.entry and row.entry.value == 20 then seen = true end
+        end
+        assertTrue(seen)
+    end)
+
+    it("opens another instance at the top of its boss list", function()
+        local ns = withLongInstance()
+        ns.Window.SelectInstance("Long")
+        ns.Window.SelectBoss(20)
+        ns.Window.SelectInstance("Depths")
+        assertEqual(0, ns.Window.Frame().bosses.offset)
+    end)
+
+    it("keeps every list, and the line under it, inside the window", function()
+        local ns = opened()
+        local frame = ns.Window.Frame()
+        for name, list in pairs({ rail = frame.instances, bosses = frame.bosses, loot = frame.loot }) do
+            local _, _, _, _, y = list:GetPoint(1)
+            assertTrue(-y + list:GetHeight() + 16 <= 520 - 12, name .. " runs past the bottom")
+        end
+    end)
+
+    it("keeps the full map's close button above its pins", function()
+        local ns = opened()
+        local full = ns.Window.Frame().fullMap
+        assertTrue(full.close:GetFrameLevel() > full.view:GetFrameLevel() + 2)
+    end)
+end)

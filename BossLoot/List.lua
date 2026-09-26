@@ -48,6 +48,22 @@ function List.Scroll(list, lines)
     List.Render(list)
 end
 
+--- Scroll just far enough that the entry at `position` is on screen.
+function List.Reveal(list, position)
+    if not position then
+        return
+    end
+    local perLine = columns(list)
+    local line = math.ceil(position / perLine)
+    local firstLine = list.offset / perLine + 1
+    local lastLine = firstLine + list.options.rows - 1
+    if line < firstLine then
+        List.Scroll(list, line - firstLine)
+    elseif line > lastLine then
+        List.Scroll(list, line - lastLine)
+    end
+end
+
 --- Point the list at new entries. Back to the top unless `keepOffset`, which
 -- a redraw of the same entries (an item finished loading) wants.
 function List.SetEntries(list, entries, keepOffset)

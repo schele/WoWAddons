@@ -43,6 +43,8 @@ local frame
 -- The selection the loot column last showed: a new one scrolls it to the top,
 -- a redraw of the same one keeps its place.
 local lastSelection
+-- The instance the boss list last showed, likewise.
+local lastBossInstance
 
 --------------------------------------------------------------------------------
 -- What each column holds. Pure, so the specs read them directly.
@@ -297,33 +299,67 @@ end
 -- Drawing
 --------------------------------------------------------------------------------
 
+-- The portrait for a row or header: the boss's face, or -- for a row with no
+-- model at all, a chest-only boss -- the chest. Drawn only when it changes:
+-- the window redraws on every keystroke and every item that arrives.
+local function setPortrait(texture, display, icon)
+    local key = icon or display or "none"
+    if texture.portraitKey == key then
+        return
+    end
+    texture.portraitKey = key
+    if icon then
+        texture:SetTexture(icon)
+    else
+        ns.Portrait.Set(texture, display, not display and ns.Portrait.ICONS.objects or nil)
+    end
+end
+
+local function showPortrait(header, display, icon)
+    header.model:Hide()
+    setPortrait(header.portrait, display, icon)
+    header.portrait:Show()
+end
+
 local function drawHeader(instance, selection)
     local header = frame.header
-    header.model:Hide()
-    header.portrait:Hide()
 
     if not instance then
+        header.model:Hide()
+        header.portrait:Hide()
         header.title:SetText("")
         header.subtitle:SetText("")
         return
     end
 
-    if type(selection) == "number" then
-        local boss = instance.bosses[selection]
-        header.title:SetText(boss.name)
-        header.subtitle:SetText(boss.wing and (instance.name .. ", " .. boss.wing) or instance.name)
-        if ns.Portrait.SetModel(header.model, boss.display) then
-            header.model:Show()
-        else
-            ns.Portrait.Set(header.portrait, boss.display)
-            header.portrait:Show()
-        end
-    else
+    if type(selection) ~= "number" then
         header.title:SetText(NOTABLE_NAMES[selection])
         header.subtitle:SetText(instance.name)
-        header.portrait:SetTexture(ns.Portrait.ICONS[selection])
-        header.portrait:Show()
+        showPortrait(header, nil, ns.Portrait.ICONS[selection])
+        return
     end
+
+    local boss = instance.bosses[selection]
+    header.title:SetText(boss.name)
+    header.subtitle:SetText(boss.wing and (instance.name .. ", " .. boss.wing) or instance.name)
+
+    -- The model is set while shown, and only when the boss changes: setting
+    -- it again restarts its animation, and one set while hidden can come up
+    -- blank.
+    if boss.display then
+        header.model:Show()
+        if header.model.shownDisplay == boss.display then
+            header.portrait:Hide()
+            return
+        end
+        if ns.Portrait.SetModel(header.model, boss.display) then
+            header.model.shownDisplay = boss.display
+            header.portrait:Hide()
+            return
+        end
+        header.model.shownDisplay = nil
+    end
+    showPortrait(header, boss.display)
 end
 
 function Window.Refresh()
@@ -335,7 +371,19 @@ function Window.Refresh()
     local instance, selection = Window.Current()
 
     ns.List.SetEntries(frame.instances, Window.InstanceEntries(view, frame.search:GetText()), true)
-    ns.List.SetEntries(frame.bosses, Window.BossEntries(instance, selection), true)
+
+    -- The boss list keeps its place within an instance, starts at the top in
+    -- a new one, and always shows the selected boss (picked on the map, it
+    -- may be further down than the list shows).
+    local bossEntries = Window.BossEntries(instance, selection)
+    ns.List.SetEntries(frame.bosses, bossEntries, view.instance == lastBossInstance)
+    lastBossInstance = view.instance
+    for position, entry in ipairs(bossEntries) do
+        if entry.selected then
+            ns.List.Reveal(frame.bosses, position)
+            break
+        end
+    end
 
     local loot = Window.LootEntries(instance, selection)
     local key = tostring(view.instance) .. ":" .. tostring(selection)
@@ -443,11 +491,7 @@ local function renderBoss(row, entry)
         row.number:SetText("")
         return
     end
-    if entry.icon then
-        row.portrait:SetTexture(entry.icon)
-    else
-        ns.Portrait.Set(row.portrait, entry.display)
-    end
+    setPortrait(row.portrait, entry.display, entry.icon)
     row.portrait:Show()
     row.number:SetText(entry.number and tostring(entry.number) or "")
 end
@@ -540,7 +584,8 @@ local function create()
     search:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + 8, -TOP - 2)
     search:SetAutoFocus(false)
     search:SetMaxLetters(40)
-    frame.searchHint = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    -- On the box itself: a string on the window would draw under the box's art.
+    frame.searchHint = search:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     frame.searchHint:SetPoint("LEFT", search, "LEFT", 4, 0)
     frame.searchHint:SetText("Search...")
     search:SetScript("OnTextChanged", function(self)
@@ -560,7 +605,7 @@ local function create()
     local railTop = TOP + SEARCH_HEIGHT + TAB_HEIGHT + 12
     frame.instances = ns.List.Create(frame, {
         width = RAIL_WIDTH, rowHeight = RAIL_ROW,
-        rows = math.floor((HEIGHT - railTop - PADDING) / RAIL_ROW),
+        rows = math.floor((HEIGHT - railTop - PADDING - MORE_HEIGHT) / RAIL_ROW),
         createRow = ns.List.TextRow(onInstanceClick), renderRow = ns.List.RenderText,
     })
     frame.instances:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING, -railTop)
@@ -612,6 +657,8 @@ local function create()
     frame.fullMap.view:SetPoint("TOPLEFT", frame.fullMap, "TOPLEFT", 0, 0)
     frame.fullMap.close = createFrame("Button", nil, frame.fullMap, "UIPanelCloseButton")
     frame.fullMap.close:SetPoint("TOPRIGHT", frame.fullMap, "TOPRIGHT", 0, 0)
+    -- Above the pins, which can sit right under it (Blackrock Depths' 25).
+    frame.fullMap.close:SetFrameLevel(frame.fullMap.view:GetFrameLevel() + 10)
     frame.fullMap.close:SetScript("OnClick", function()
         Window.CloseMap()
     end)

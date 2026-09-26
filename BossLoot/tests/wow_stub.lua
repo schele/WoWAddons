@@ -85,7 +85,10 @@ local function makeWidget(kind, parent, template, env)
 
     function widget:SetTexture(value) self.texture = value end
     function widget:GetTexture() return self.texture end
-    function widget:SetColorTexture(r, g, b, a) self.colorTexture = { r, g, b, a } end
+    function widget:SetColorTexture(r, g, b, a)
+        self.colorTexture = { r, g, b, a }
+        self.colorSets = (self.colorSets or 0) + 1
+    end
     function widget:SetTexCoord() end
     function widget:SetVertexColor() end
     function widget:SetBackdrop(value) self.backdrop = value end
@@ -100,6 +103,7 @@ local function makeWidget(kind, parent, template, env)
     function widget:SetDisplayInfo(display)
         if env and display == env.__badDisplay then error("bad display") end
         self.display = display
+        self.displaySets = (self.displaySets or 0) + 1
     end
 
     function widget:CreateTexture(_, layer)
@@ -194,6 +198,7 @@ function stub.newEnv()
     function env.SetPortraitTextureFromCreatureDisplayID(texture, display)
         if display == env.__badDisplay then error("bad display") end
         texture.portraitDisplay = display
+        env.__portraitCalls = (env.__portraitCalls or 0) + 1
     end
 
     env.__modifiedClicks = {}
