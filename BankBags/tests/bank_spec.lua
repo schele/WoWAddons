@@ -125,6 +125,7 @@ describe("bank tabs", function()
     -- What a client with bank tabs hands over: each tab a container like a
     -- bag, its "bag" a placeholder item no player is meant to see.
     local TAB_BAG = { link = "|cffffffff|Hitem:999999::|h[Character Bank Tab Bag (DNT)]|h|r", icon = 4549254 }
+    local TAB_ICON = "Interface\\AddOns\\BankBags\\tab"
 
     -- The old 28-slot bank, empty unless told otherwise, and two tabs (6 and
     -- 7) of 4 slots, Linen in the first.
@@ -152,6 +153,12 @@ describe("bank tabs", function()
         assertEqual("Tab 1", containers[1].name)
         assertEqual("Tab 2", containers[2].name)
         assertEqual(LINEN.link, containers[1].slots[1].link)
+    end)
+
+    it("gives a tab BankBags' own tab icon, not the placeholder item's", function()
+        local containers = saved(withTabs())
+        assertEqual(TAB_ICON, containers[1].icon)
+        assertEqual(TAB_ICON, containers[2].icon)
     end)
 
     it("leaves out the old bank when it is empty and the tabs hold the bank", function()
@@ -184,14 +191,31 @@ describe("bank tabs", function()
             env.C_Bank = {
                 FetchPurchasedBankTabData = function(bankType)
                     asked = bankType
-                    return { { ID = 6, name = "Mats", icon = 134400 }, { ID = 7, name = "" } }
+                    return { { ID = 6, name = "Mats", icon = 133784 }, { ID = 7, name = "" } }
                 end,
             }
         end))
         assertEqual(0, asked, "the character's own tabs")
         assertEqual("Mats", containers[1].name)
-        assertEqual(134400, containers[1].icon)
+        assertEqual(133784, containers[1].icon)
         assertEqual("Tab 2", containers[2].name, "a tab never named is numbered")
+    end)
+
+    -- A tab bought and never given an icon wears the game's question mark,
+    -- 134400, which reads as a broken texture beside a heading.
+    it("gives a tab still wearing the game's question mark BankBags' own icon", function()
+        local containers = saved(withTabs(nil, function(env)
+            env.C_Bank = {
+                FetchPurchasedBankTabData = function()
+                    return {
+                        { ID = 6, name = "Mats", icon = 134400 },
+                        { ID = 7, name = "Ore", icon = "Interface\\Icons\\INV_Misc_QuestionMark" },
+                    }
+                end,
+            }
+        end))
+        assertEqual(TAB_ICON, containers[1].icon)
+        assertEqual(TAB_ICON, containers[2].icon)
     end)
 
     it("still saves the bank when the client's tab data raises", function()

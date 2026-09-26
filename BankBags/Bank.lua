@@ -114,6 +114,24 @@ local function isPlaceholder(name)
     return name ~= nil and name:find("(DNT)", 1, true) ~= nil
 end
 
+-- BankBags' own art for a tab with no icon of its own (tools/draw-icons.mjs).
+local TAB_ICON = "Interface\\AddOns\\BankBags\\tab"
+-- INV_Misc_QuestionMark: what a tab wears until the player picks an icon,
+-- and beside a heading it reads as a texture that failed to load.
+local QUESTION_MARK = 134400
+
+--- The icon the player chose for a tab, or nil when they have chosen none.
+local function chosenIcon(tab)
+    local icon = tab and tab.icon
+    if icon == nil or icon == 0 or icon == "" or icon == QUESTION_MARK then
+        return nil
+    end
+    if type(icon) == "string" and icon:lower():find("questionmark", 1, true) then
+        return nil
+    end
+    return icon
+end
+
 local function isEmpty(container)
     for slot = 1, container.size do
         if container.slots[slot] then
@@ -141,7 +159,7 @@ function Bank.Read()
                 tabCount = tabCount + 1
                 copy.name = (tab and type(tab.name) == "string" and tab.name ~= "" and tab.name)
                     or ("Tab " .. tabCount)
-                copy.icon = (tab and tab.icon) or icon
+                copy.icon = chosenIcon(tab) or TAB_ICON
                 copy.link = nil
             end
             table.insert(containers, copy)

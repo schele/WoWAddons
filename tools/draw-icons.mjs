@@ -170,6 +170,21 @@ const sackDetails = union(
 );
 const sackShine = ellipse(26, 35.5, 4.5, 2);
 
+// A BankBags bank tab with no icon of its own: a small safe, one compartment
+// of the bank. Not a chest, which is BossLoot's.
+const safe = union(
+  roundBox(32, 31, 19, 16.5, 3.5), // the body
+  roundBox(20, 48.5, 4, 3, 1.2), // two feet
+  roundBox(44, 48.5, 4, 3, 1.2),
+);
+const safeDetails = union(
+  (x, y) => Math.abs(roundBox(32, 31, 14, 12, 2.5)(x, y)) - 0.9, // the door's edge
+  (x, y) => Math.abs(len(x - 36, y - 31) - 5.5) - 1.3, // the dial
+  circle(36, 31, 1.6), // its hub
+  roundBox(23.5, 31, 1.4, 4.5, 1.4), // the handle
+);
+const safeShine = roundBox(27, 18.5, 10, 1.4, 1.4);
+
 const root = process.argv[2];
 writeTga(path.join(root, 'BossLoot', 'icon.tga'), draw(crimson, chest, chestDetails, chestShine));
 writeTga(path.join(root, 'BossLoot', 'minimap.tga'), draw(crimson, chest, chestDetails, chestShine, { tile: false, zoom: 1.4 }));
@@ -177,4 +192,5 @@ writeTga(path.join(root, 'FishScale', 'icon.tga'), draw(orange, fish, fishDetail
 writeTga(path.join(root, 'FishScale', 'minimap.tga'), draw(orange, fish, fishDetails, fishShine, { tile: false, zoom: 1.3 }));
 writeTga(path.join(root, 'BankBags', 'icon.tga'), draw(teal, sack, sackDetails, sackShine));
 writeTga(path.join(root, 'BankBags', 'minimap.tga'), draw(teal, sack, sackDetails, sackShine, { tile: false, zoom: 1.4 }));
+writeTga(path.join(root, 'BankBags', 'tab.tga'), draw(teal, safe, safeDetails, safeShine, { tile: false, zoom: 1.3 }));
 console.log('written');
