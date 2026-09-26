@@ -10,3 +10,4 @@ TrinketMenu.lua
 Items.lua
 Bar.lua
 Settings.lua
+Minimap.lua

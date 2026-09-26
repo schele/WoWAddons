@@ -15,6 +15,33 @@ local function makeWidget(kind, parent, template)
     }
 
     function widget:SetScript(name, fn) self.scripts[name] = fn end
+    -- For a minimap button.
+    widget.points = {}
+    function widget:SetPoint(...) table.insert(self.points, { ... }) end
+    function widget:ClearAllPoints() self.points = {} end
+    function widget:GetPoint(index)
+        local point = self.points[index or 1]
+        if point then return table.unpack(point) end
+    end
+    function widget:GetWidth() return self.width or 0 end
+    function widget:GetParent() return self.parent end
+    function widget:SetFrameStrata(value) self.strata = value end
+    function widget:SetFrameLevel(value) self.frameLevel = value end
+    function widget:GetFrameLevel() return self.frameLevel or 1 end
+    function widget:RegisterForDrag(...) self.drag = { ... } end
+    function widget:SetHighlightTexture(value) self.highlightTexture = value end
+    function widget:SetTexture(value) self.texture = value end
+    function widget:GetTexture() return self.texture end
+    function widget:Show() self.shown = true end
+    function widget:Hide() self.shown = false end
+    function widget:SetShown(value) self.shown = value and true or false end
+    function widget:IsShown() return self.shown end
+    function widget:GetCenter() return self.centerX or 0, self.centerY or 0 end
+    function widget:GetEffectiveScale() return 1 end
+    function widget:CreateTexture() return makeWidget("Texture", self) end
+    function widget:SetOwner(owner, anchor) self.owner, self.anchor = owner, anchor end
+    function widget:SetText(value) self.text = value end
+    function widget:AddLine(value) self.lines = self.lines or {}; table.insert(self.lines, value) end
     function widget:RegisterEvent(event) self.registeredEvents[event] = true end
     function widget:UnregisterEvent(event) self.registeredEvents[event] = nil end
     function widget:SetSize(w, h) self.width, self.height = w, h end
@@ -42,6 +69,7 @@ function stub.newEnv()
     env._G = env
 
     env.UIParent = makeWidget("Frame")
+    env.GameTooltip = makeWidget("GameTooltip", env.UIParent)
     env.SlashCmdList = {}
 
     function env.print(...)

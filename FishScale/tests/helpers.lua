@@ -5,6 +5,7 @@ local M = {}
 M.FILES = {
     "FishScale.lua",
     "Fishing.lua",
+    "Minimap.lua",
 }
 
 --- Load the addon's files into a stubbed environment, the way WoW would:

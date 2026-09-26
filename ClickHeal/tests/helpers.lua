@@ -11,6 +11,7 @@ M.FILES = {
     "Group.lua",
     "ManaBar.lua",
     "Settings.lua",
+    "Minimap.lua",
 }
 
 --- Load the addon's files into a stubbed environment, the way WoW would:

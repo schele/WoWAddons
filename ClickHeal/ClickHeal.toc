@@ -14,3 +14,4 @@ Row.lua
 Group.lua
 ManaBar.lua
 Settings.lua
+Minimap.lua

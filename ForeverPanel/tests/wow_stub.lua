@@ -130,6 +130,9 @@ local function makeWidget(kind, parent)
 
     function widget:RegisterForClicks() end
     function widget:RegisterForDrag() end
+    -- For a minimap button.
+    function widget:SetHighlightTexture(value) self.highlightTexture = value end
+    function widget:GetCenter() return self.centerX or 0, self.centerY or 0 end
     function widget:EnableMouse() end
     function widget:SetFrameStrata() end
     function widget:SetFrameLevel() end

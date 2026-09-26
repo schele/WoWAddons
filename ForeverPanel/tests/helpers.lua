@@ -12,6 +12,7 @@ M.FILES = {
     "Modules/UITweaks.lua",
     "Modules/ChatKeys.lua",
     "Modules/Settings.lua",
+    "Minimap.lua",
 }
 
 --- Load the addon's files into a stubbed environment, the way WoW would:
