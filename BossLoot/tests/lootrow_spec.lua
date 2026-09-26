@@ -92,7 +92,7 @@ describe("an item that will not load", function()
     it("says it is unknown once the server says it has no such item", function()
         local ns, env = helpers.loadAddon(FILES)
         local r = row(ns, env)
-        ns.LootRow.MarkFailed(999)
+        ns.LootRow.Arrived(999, false)
         ns.LootRow.Render(r, { id = 999, chance = 5 })
         assertMatch("999", r.name:GetText())
         assertMatch("not loaded", r.name:GetText())
@@ -109,7 +109,7 @@ describe("a loot tile's text", function()
 end)
 
 describe("an item the server did not send", function()
-    it("is asked for again after a while, not given up on", function()
+    it("is asked for again after a moment, not given up on", function()
         -- Hundreds of items asked for at once, some answers come back empty;
         -- the item is real (its icon shows), so it is worth asking again.
         local ns, env = helpers.loadAddon(FILES)
@@ -117,11 +117,73 @@ describe("an item the server did not send", function()
         function env.GetTime() return env.__now end
         local r = row(ns, env)
         ns.LootRow.Render(r, { id = 999, chance = 5 })
-        ns.LootRow.MarkFailed(999)
+        ns.LootRow.Arrived(999, false)
         ns.LootRow.Render(r, { id = 999, chance = 5 })
+        env.__runTimers()
         assertEqual(1, env.__requestCount[999], "not straight away")
-        env.__now = 131
+        env.__now = 106
+        env.__runTimers()
+        assertEqual(2, env.__requestCount[999], "again after a few seconds")
+    end)
+end)
+
+describe("asking the server for items", function()
+    local function count(env)
+        local n = 0
+        for _, c in pairs(env.__requestCount) do n = n + c end
+        return n
+    end
+
+    it("asks a few at a time, not hundreds at once", function()
+        -- Asked for a whole instance at once, the server drops most requests.
+        local ns, env = helpers.loadAddon(FILES)
+        for id = 5001, 5030 do ns.LootRow.RequestLoad(id) end
+        assertEqual(8, count(env))
+        env.__runTimers()
+        assertEqual(16, count(env))
+    end)
+
+    it("asks for what is on screen before the rest", function()
+        local ns, env = helpers.loadAddon(FILES)
+        for id = 5001, 5030 do ns.LootRow.RequestLoad(id) end
+        ns.LootRow.RequestLoad(9999, true)
+        assertNil(env.__requestCount[9999], "the first few are already used")
+        env.__runTimers()
+        assertEqual(1, env.__requestCount[9999])
+        assertNil(env.__requestCount[5030], "ahead of the rest")
+    end)
+
+    it("asks again for an item the server never answered", function()
+        local ns, env = helpers.loadAddon(FILES)
+        env.__now = 100
+        function env.GetTime() return env.__now end
+        ns.LootRow.RequestLoad(999)
+        env.__now = 111
+        env.__runTimers()
+        env.__runTimers()
+        assertEqual(2, env.__requestCount[999])
+    end)
+
+    it("gives up after a few tries, and says so", function()
+        local ns, env = helpers.loadAddon(FILES)
+        env.__now = 100
+        function env.GetTime() return env.__now end
+        local r = row(ns, env)
         ns.LootRow.Render(r, { id = 999, chance = 5 })
-        assertEqual(2, env.__requestCount[999], "again after half a minute")
+        for _ = 1, 10 do
+            env.__now = env.__now + 11
+            env.__runTimers()
+            env.__runTimers()
+        end
+        assertEqual(4, env.__requestCount[999])
+        ns.LootRow.Render(r, { id = 999, chance = 5 })
+        assertMatch("not loaded", r.name:GetText())
+    end)
+
+    it("does not ask for an item it already has", function()
+        local ns, env = helpers.loadAddon(FILES)
+        env.__items[5001] = { name = "Here", quality = 2 }
+        ns.LootRow.RequestLoad(5001)
+        assertNil(env.__requestCount[5001])
     end)
 end)

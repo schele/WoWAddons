@@ -32,28 +32,37 @@ function LootRow.ItemInfo(itemID)
     }
 end
 
--- When each item was last asked for, and which answers came back empty.
--- Asked at most every RETRY seconds: a row redraws whenever any item
--- arrives, and asking on every draw turns an item the server will not send
--- into a request, answer and redraw loop. But not once for good either:
--- asked for hundreds at a time, the server answers some empty that are real
--- items (their icons show), and a later ask gets them.
-local RETRY = 30
-local requested = {}
-local failed = {}
+-- Asking the server for items. Asked for a whole instance at once -- two
+-- hundred items for Scholomance -- the server drops most requests without a
+-- word, and those items sit at "Loading" for good. So requests go out a few
+-- at a time, what is on screen first, and an item with no answer, or an empty
+-- one, is asked for again a few times before it is given up on.
+local BATCH = 8          -- requests per tick
+local TICK = 0.25        -- seconds between ticks
+local TIMEOUT = 10       -- seconds to wait for an answer before asking again
+local RETRY_DELAY = 5    -- seconds before asking again after an empty answer
+local MAX_TRIES = 4
+
+local queue = {}         -- item ids waiting to be asked for, in order
+local waiting = {}       -- id -> true while in the queue
+local inFlight = {}      -- id -> when it was asked for
+local notBefore = {}     -- id -> earliest time to ask for it again
+local tries = {}         -- id -> times asked for
+local failed = {}        -- id -> true once an answer came back empty
+local tokens = BATCH
+local ticking = false
 
 local function now()
     return GetTime and GetTime() or 0
 end
 
---- Ask the client to load an item, unless it was asked for recently.
--- GET_ITEM_INFO_RECEIVED says when it has, or that it could not.
-function LootRow.RequestLoad(itemID)
-    if requested[itemID] and now() - requested[itemID] < RETRY then
-        return
-    end
-    requested[itemID] = now()
+local function loaded(itemID)
+    return LootRow.ItemInfo(itemID) ~= nil
+end
 
+local function send(itemID)
+    tries[itemID] = (tries[itemID] or 0) + 1
+    inFlight[itemID] = now()
     if C_Item and C_Item.RequestLoadItemDataByID then
         C_Item.RequestLoadItemDataByID(itemID)
     elseif GetItemInfo then
@@ -62,10 +71,106 @@ function LootRow.RequestLoad(itemID)
     end
 end
 
---- The server sent nothing for an item: say so rather than "loading", until
--- a later ask brings it.
-function LootRow.MarkFailed(itemID)
-    failed[itemID] = true
+local tick
+
+local function schedule()
+    if ticking or not (C_Timer and C_Timer.After) then
+        return
+    end
+    ticking = true
+    C_Timer.After(TICK, tick)
+end
+
+local function enqueue(itemID, urgent)
+    if waiting[itemID] then
+        if urgent then
+            for index, queued in ipairs(queue) do
+                if queued == itemID then
+                    table.remove(queue, index)
+                    break
+                end
+            end
+            table.insert(queue, 1, itemID)
+        end
+        return
+    end
+    waiting[itemID] = true
+    if urgent then
+        table.insert(queue, 1, itemID)
+    else
+        table.insert(queue, itemID)
+    end
+    schedule()
+end
+
+function tick()
+    ticking = false
+    tokens = BATCH
+    local time = now()
+
+    -- No answer for too long: the request was dropped. Ask again, a few times.
+    for itemID, asked in pairs(inFlight) do
+        if time - asked >= TIMEOUT then
+            inFlight[itemID] = nil
+            if (tries[itemID] or 0) < MAX_TRIES then
+                enqueue(itemID)
+            else
+                failed[itemID] = true
+            end
+        end
+    end
+
+    local keep = {}
+    for _, itemID in ipairs(queue) do
+        if loaded(itemID) then
+            waiting[itemID] = nil
+        elseif tokens > 0 and (notBefore[itemID] or 0) <= time then
+            waiting[itemID] = nil
+            tokens = tokens - 1
+            send(itemID)
+        else
+            table.insert(keep, itemID)
+        end
+    end
+    queue = keep
+
+    if #queue > 0 or next(inFlight) then
+        schedule()
+    end
+end
+
+--- Ask the server for an item: now if this tick has room, otherwise in turn.
+-- `urgent` (a row on screen) goes ahead of the rest.
+function LootRow.RequestLoad(itemID, urgent)
+    if loaded(itemID) or inFlight[itemID] then
+        return
+    end
+    if failed[itemID] and (tries[itemID] or 0) >= MAX_TRIES then
+        return
+    end
+    if tokens > 0 and not waiting[itemID] and (notBefore[itemID] or 0) <= now() then
+        tokens = tokens - 1
+        send(itemID)
+        schedule()
+        return
+    end
+    enqueue(itemID, urgent)
+end
+
+--- The server's answer about an item (GET_ITEM_INFO_RECEIVED). An empty one
+-- is asked about again in a few seconds, up to the limit; meanwhile the row
+-- says the item is not loaded yet.
+function LootRow.Arrived(itemID, success)
+    inFlight[itemID] = nil
+    if success == false then
+        failed[itemID] = true
+        if (tries[itemID] or 0) < MAX_TRIES then
+            notBefore[itemID] = now() + RETRY_DELAY
+            enqueue(itemID)
+        end
+    else
+        failed[itemID] = nil
+    end
 end
 
 -- The icon lookup by ID works before the item itself has loaded, so even a
@@ -167,11 +272,11 @@ function LootRow.Render(row, entry)
     elseif failed[entry.id] then
         row.name:SetText("|cff808080Item " .. entry.id .. " (not loaded yet)|r")
         row.link = nil
-        LootRow.RequestLoad(entry.id)
+        LootRow.RequestLoad(entry.id, true)
     else
         row.name:SetText("|cff808080Loading item " .. entry.id .. "...|r")
         row.link = nil
-        LootRow.RequestLoad(entry.id)
+        LootRow.RequestLoad(entry.id, true)
     end
 
     if entry.sources then

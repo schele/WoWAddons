@@ -770,9 +770,7 @@ local redrawPending = false
 local events = CreateFrame("Frame")
 events:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 events:SetScript("OnEvent", function(_, _, itemID, success)
-    if success == false then
-        ns.LootRow.MarkFailed(itemID)
-    end
+    ns.LootRow.Arrived(itemID, success)
     if redrawPending or not (frame and frame:IsShown()) then
         return
     end
