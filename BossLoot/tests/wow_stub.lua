@@ -103,7 +103,7 @@ local function makeWidget(kind, parent, template, env)
         self.colorSets = (self.colorSets or 0) + 1
     end
     function widget:SetTexCoord() end
-    function widget:SetVertexColor() end
+    function widget:SetVertexColor(r, g, b, a) self.vertexColor = { r, g, b, a } end
     function widget:SetBackdrop(value) self.backdrop = value end
     function widget:SetBackdropColor() end
     function widget:SetBackdropBorderColor() end

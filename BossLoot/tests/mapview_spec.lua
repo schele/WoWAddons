@@ -298,7 +298,7 @@ describe("the picked boss on the map", function()
         local view = ns.MapView.Create(env.UIParent, 300, 300, { labels = true })
         ns.MapView.Show(view, pair, 2)
         local picked, other = view.pins[2], view.pins[1]
-        assertEqual(other.icon:GetTexture(), picked.icon:GetTexture(), "the same red pin")
+        assertEqual(other.ball.vertexColor[1], picked.ball.vertexColor[1], "the same red ball")
         assertTrue(picked.ring:IsShown())
         assertFalse(other.ring:IsShown())
         assertEqual(1, view.labels[2].textColor[1])
@@ -450,5 +450,30 @@ describe("bosses on one spot", function()
         assertEqual(view.pins[1].x, view.pins[2].x, "in a column at first")
         for _ = 1, 30 do view.scripts.OnMouseWheel(view, 1) end
         assertTrue(view.pins[2].x > view.pins[1].x, "side by side, as they stand, zoomed in")
+    end)
+end)
+
+describe("a pin's ball", function()
+    it("is drawn round the middle of the pin, where the number is", function()
+        -- The game's red-ball picture has its ball off the middle, so a
+        -- number in the middle of the pin sat to one side of it.
+        local ns, env = helpers.loadAddon(FILES)
+        local view = ns.MapView.Create(env.UIParent, 300, 300, { pinSize = 26 })
+        ns.MapView.Show(view, {
+            name = "One", map = { cols = 1, rows = 1, runs = { 0, 0, 1 } },
+            bosses = { { name = "Boss", pin = { 0.5, 0.5 }, loot = {} } },
+        })
+        local button = view.pins[1]
+        for _, part in ipairs({ button.rim, button.ball }) do
+            local point, relative, relativePoint, x, y = part:GetPoint(1)
+            assertEqual("CENTER", point)
+            assertEqual(button, relative)
+            assertEqual("CENTER", relativePoint)
+            assertEqual(0, x)
+            assertEqual(0, y)
+        end
+        assertEqual(math.floor(26 * ns.MapView.BALL), button.ball:GetWidth())
+        assertTrue(button.rim:GetWidth() > button.ball:GetWidth(), "a dark rim round it")
+        assertEqual(button.ball:GetWidth(), button.ball:GetHeight(), "round")
     end)
 end)

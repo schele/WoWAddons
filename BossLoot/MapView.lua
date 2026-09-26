@@ -21,8 +21,8 @@ ns.MapView = MapView
 
 MapView.MIN_ZOOM = 0.5
 MapView.MAX_ZOOM = 4
--- The red ball fills about this share of its pin's picture; the rest is
--- empty corners.
+-- The red ball is drawn this share of its pin across: the pin, a little
+-- bigger, is what the cursor finds.
 MapView.BALL = 0.65
 
 local BACKGROUND = { 0.06, 0.045, 0.03 }
@@ -41,10 +41,14 @@ local EDGE = faint({ 0.80, 0.68, 0.46 })
 local FLOOR = faint({ 0.44, 0.35, 0.22 })
 local INNER = faint({ 0.30, 0.24, 0.15 })
 local GOLD = { 1, 0.82, 0 }
-local PIN = "Interface\\COMMON\\Indicator-Red"
 local ENTRANCE = "Interface\\COMMON\\Indicator-Green"
--- A white disc: tinted gold behind a pin, it rings the picked boss.
-local RING = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+-- A white disc, tinted: the pins are drawn from it -- a dark rim, a red
+-- ball -- centred on the pin, and a gold one behind rings the picked boss.
+-- (The game's red-ball picture has its ball off the middle, so a number in
+-- the middle of the pin sat to one side of it.)
+local DISC = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+local PIN_RED = { 0.78, 0.1, 0.06 }
+local PIN_RIM = { 0.12, 0.02, 0.01 }
 local LABEL_HEIGHT = 12
 -- A pin this far right gets its name on its left, so it stays on the map.
 local LABEL_FLIP = 0.7
@@ -356,12 +360,20 @@ local function pin(view, index)
     button.ring = button:CreateTexture(nil, "BACKGROUND")
     button.ring:SetSize(ringSize, ringSize)
     button.ring:SetPoint("CENTER", button, "CENTER", 0, 0)
-    button.ring:SetTexture(RING)
+    button.ring:SetTexture(DISC)
     button.ring:SetVertexColor(GOLD[1], GOLD[2], GOLD[3], 1)
     button.ring:Hide()
-    button.icon = button:CreateTexture(nil, "ARTWORK")
-    button.icon:SetAllPoints()
-    button.icon:SetTexture(PIN)
+    local ballSize = math.floor(size * MapView.BALL)
+    local function disc(sublevel, discSize, colour)
+        local texture = button:CreateTexture(nil, "ARTWORK", nil, sublevel)
+        texture:SetSize(discSize, discSize)
+        texture:SetPoint("CENTER", button, "CENTER", 0, 0)
+        texture:SetTexture(DISC)
+        texture:SetVertexColor(colour[1], colour[2], colour[3], 1)
+        return texture
+    end
+    button.rim = disc(0, ballSize + 2, PIN_RIM)
+    button.ball = disc(1, ballSize, PIN_RED)
     button.text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     button.text:SetPoint("CENTER", button, "CENTER", 0, 0)
     button.text:SetJustifyH("CENTER")
