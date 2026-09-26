@@ -4,10 +4,17 @@ Every Classic dungeon and raid, every boss in it, and what each one drops,
 with drop chances. Plus the valuable things no boss drops: rare trash drops,
 recipes, quest starters, keys, and what is in the chests.
 
-Open it with `/bl` or the minimap button. Three columns: instances (Dungeons
-and Raids tabs, with level ranges), bosses (in kill order, under wing headings
-where an instance has wings), and loot. At the bottom of the boss list,
+Open it with `/bl` or the minimap button. On the left, the instances
+(Dungeons and Raids tabs, with level ranges) and a search box. In the middle,
+the bosses in kill order, each with its portrait and a number. On the right,
+the boss itself: its model, and a map of the instance with every boss pinned
+by number; click the map for a big one, and a pin to jump to that boss.
+Under that, the loot in two columns. At the bottom of the boss list,
 **Notable drops** holds the trash and chest finds.
+
+The map is drawn from where the instance's mobs stand and walk, so it shows
+rooms and corridors as a sketch rather than a picture; higher ground is
+lighter. A boss that only appears when a script summons it has no pin.
 
 A loot row works like an item anywhere else: hover for the tooltip,
 shift-click to link it in chat, ctrl-click to preview it on your character.

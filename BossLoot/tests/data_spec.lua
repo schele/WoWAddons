@@ -59,6 +59,32 @@ describe("the generated data", function()
         assertTrue(names["Edge of Madness: Gri'lek"], "Gri'lek on his own")
     end)
 
+    it("keeps every map cell and pin inside its map", function()
+        for _, instance in ipairs(ns.instances) do
+            if instance.map then
+                local limit = instance.map.cols * instance.map.rows * 4
+                for _, value in ipairs(instance.map.cells) do
+                    assertTrue(value >= 0 and value < limit, instance.key .. " cell " .. value)
+                end
+            end
+            for _, boss in ipairs(instance.bosses) do
+                if boss.pin then
+                    assertTrue(boss.pin[1] >= 0 and boss.pin[1] <= 1 and boss.pin[2] >= 0 and boss.pin[2] <= 1,
+                        instance.key .. " " .. boss.name .. " pin")
+                end
+                if boss.display then
+                    assertTrue(math.type(boss.display) == "integer" and boss.display > 0, boss.name .. " model")
+                end
+            end
+        end
+    end)
+
+    it("has a map for every instance", function()
+        for _, instance in ipairs(ns.instances) do
+            assertTrue(instance.map ~= nil and #instance.map.cells > 0, instance.key .. " map")
+        end
+    end)
+
     it("has no two instances with the same key", function()
         local seen = {}
         for _, instance in ipairs(ns.instances) do
