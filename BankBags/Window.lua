@@ -318,6 +318,11 @@ local function create()
         search = self:GetText() or ""
         Window.Refresh()
     end)
+    -- Enter or Escape lets go of the keyboard: otherwise the movement keys go
+    -- on typing into the box.
+    frame.search:SetScript("OnEnterPressed", function(self)
+        self:ClearFocus()
+    end)
     frame.search:SetScript("OnEscapePressed", function(self)
         self:ClearFocus()
     end)

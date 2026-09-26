@@ -69,6 +69,15 @@ describe("the bank window", function()
         assertEqual(1, frame.slots[1].alpha)
     end)
 
+    it("lets go of the keyboard when Enter is pressed in the search", function()
+        -- Otherwise the movement keys go on typing into the box.
+        local ns, env, frame = opened()
+        local cleared = false
+        function frame.search:ClearFocus() cleared = true end
+        frame.search.scripts.OnEnterPressed(frame.search)
+        assertTrue(cleared)
+    end)
+
     it("says when the bank was saved", function()
         local ns, env, frame = opened()
         assertEqual("Saved 2 hours ago", frame.footer:GetText())
