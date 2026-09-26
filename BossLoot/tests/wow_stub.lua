@@ -92,6 +92,15 @@ local function makeWidget(kind, parent, template, env)
     function widget:SetBackdropColor() end
     function widget:SetBackdropBorderColor() end
     function widget:SetHighlightTexture(value) self.highlightTexture = value end
+    function widget:SetNormalFontObject(font) self.normalFont = font end
+    function widget:SetFontObject(font) self.fontObject = font end
+
+    -- Model frames. A test marks one model id as one the client refuses.
+    function widget:SetFacing(value) self.facing = value end
+    function widget:SetDisplayInfo(display)
+        if env and display == env.__badDisplay then error("bad display") end
+        self.display = display
+    end
 
     function widget:CreateTexture(_, layer)
         local texture = makeWidget("Texture", self, nil, env)
@@ -179,6 +188,13 @@ function stub.newEnv()
     function env.GameTooltip:SetItemByID(id) self.itemID = id end
     function env.GameTooltip:SetText(text) self.text = text end
     function env.GameTooltip:AddLine(text) self.lines = self.lines or {}; table.insert(self.lines, text) end
+
+    -- Round creature portraits. A test removes this to stage a client
+    -- without it.
+    function env.SetPortraitTextureFromCreatureDisplayID(texture, display)
+        if display == env.__badDisplay then error("bad display") end
+        texture.portraitDisplay = display
+    end
 
     env.__modifiedClicks = {}
     function env.HandleModifiedItemClick(link)
