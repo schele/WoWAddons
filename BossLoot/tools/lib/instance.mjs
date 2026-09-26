@@ -75,7 +75,8 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
   const spawnedObjects = db.spawnedObjects(def.map);
   const claimedCreatures = new Set();
   const claimedObjects = new Set();
-  const map = buildMap(db.mapPoints(def.map));
+  // Where each boss stands, by boss index, for its pin once the map is drawn.
+  const spawns = [];
 
   const bosses = [];
   for (const boss of bossDefs(def)) {
@@ -123,12 +124,19 @@ export function buildInstance(db, def, { world = NO_WORLD, cache = new Map() } =
 
     // The pin: where the boss stands, or its chest for a chest-only boss. A
     // boss a script summons has no spawn, and so no pin.
-    const spawn = creatures.map((c) => db.creatureSpawn(c.entry, def.map)).find(Boolean)
-      ?? chestsUsed.map((o) => db.objectSpawn(o.entry, def.map)).find(Boolean);
-    const pin = pinFor(map, spawn);
-    if (pin) out.pin = pin;
+    spawns.push(creatures.map((c) => db.creatureSpawn(c.entry, def.map)).find(Boolean)
+      ?? chestsUsed.map((o) => db.objectSpawn(o.entry, def.map)).find(Boolean));
     bosses.push(out);
   }
+
+  // The map, made to take in every boss standing near its edge, then a pin
+  // per boss that is on it.
+  const map = buildMap(db.mapPoints(def.map), { keep: spawns.filter(Boolean) });
+  bosses.forEach((boss, index) => {
+    const pin = pinFor(map, spawns[index]);
+    if (pin) boss.pin = pin;
+    else if (spawns[index] && map) warnings.push(`${def.name}: ${boss.name} stands outside the map; no pin`);
+  });
 
   const trashSources = [...spawnedCreatures]
     .filter((id) => !claimedCreatures.has(id))

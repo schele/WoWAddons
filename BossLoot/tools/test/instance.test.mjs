@@ -227,3 +227,12 @@ test('an instance with nothing on its map has no map', () => {
   const { instance } = buildInstance(openDb(db), { ...def, map: 999 });
   assert.equal(instance.map, undefined);
 });
+
+test('a boss far outside the drawn map gets no pin, and the build says so', () => {
+  const { db, add } = world();
+  for (let i = 0; i < 150; i++) add('creature', { id: 2, map: MAP, position_x: i % 15, position_y: 0 });
+  db.exec('update creature set position_x = 1000 where id = 1');
+  const { instance, warnings } = buildInstance(openDb(db), def);
+  assert.equal(instance.bosses[0].pin, undefined);
+  assert.ok(warnings.some((w) => w.includes('Boss One') && w.includes('outside the map')), warnings.join('; '));
+});
