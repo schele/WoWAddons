@@ -333,8 +333,11 @@ local function pin(view, index)
     button = CreateFrame("Button", nil, view.canvas)
     button:SetSize(size, size)
     button:SetFrameLevel(view.canvas:GetFrameLevel() + 2)
+    -- The red ball fills about two thirds of its picture; the ring shows a
+    -- few pixels round the ball.
+    local ringSize = math.floor(size * 0.65) + 6
     button.ring = button:CreateTexture(nil, "BACKGROUND")
-    button.ring:SetSize(size + 8, size + 8)
+    button.ring:SetSize(ringSize, ringSize)
     button.ring:SetPoint("CENTER", button, "CENTER", 0, 0)
     button.ring:SetTexture(RING)
     button.ring:SetVertexColor(GOLD[1], GOLD[2], GOLD[3], 1)

@@ -302,3 +302,16 @@ describe("the picked boss on the map", function()
         assertFalse(view.pins[2].ring:IsShown())
     end)
 end)
+
+describe("the ring round the picked boss's pin", function()
+    it("hugs the red ball, which fills only part of the pin's picture", function()
+        local ns, env = helpers.loadAddon(FILES)
+        local view = ns.MapView.Create(env.UIParent, 300, 300, { labels = true, pinSize = 20 })
+        ns.MapView.Show(view, {
+            name = "One", map = { cols = 1, rows = 1, runs = { 0, 0, 1 } },
+            bosses = { { name = "Boss", pin = { 0.5, 0.5 }, loot = {} } },
+        }, 1)
+        assertTrue(view.pins[1].ring:GetWidth() <= 20, "no wider than the pin")
+        assertTrue(view.pins[1].ring:GetWidth() > 14, "but still round the ball")
+    end)
+end)
