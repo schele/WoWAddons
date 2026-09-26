@@ -37,8 +37,9 @@ local MODEL_VIEW_WIDTH = 340
 local MODEL_HINT_HEIGHT = 18
 local MODEL_ZOOM_STEP = 1.15
 local MODEL_NEAREST, MODEL_FARTHEST = 0.3, 3
--- The item loading bar, under the boss's name, as wide as the name may be.
-local PROGRESS_WIDTH = PAGE_WIDTH - 100 - (INSET_WIDTH + 12)
+-- The item loading bar, in the window's top row over the boss page, clear of
+-- the close button: the big map, which covers the page, leaves it in sight.
+local PROGRESS_WIDTH = PAGE_WIDTH - 36
 local PROGRESS_HEIGHT = 14
 local PROGRESS_POLL = 0.5 -- seconds between counts while items load
 local MORE_HEIGHT = 16
@@ -401,10 +402,10 @@ local function progressTooltip(bar)
     GameTooltip:Show()
 end
 
-local function createProgress(header)
-    local bar = CreateFrame("Button", nil, header)
+local function createProgress(parent)
+    local bar = CreateFrame("Button", nil, parent)
     bar:SetSize(PROGRESS_WIDTH, PROGRESS_HEIGHT)
-    bar:SetPoint("TOPLEFT", header.subtitle, "BOTTOMLEFT", 0, -8)
+    bar:SetPoint("TOPLEFT", parent, "TOPLEFT", PAGE_LEFT, -(PADDING + 7))
     bar:RegisterForClicks("LeftButtonUp")
 
     bar.background = bar:CreateTexture(nil, "BACKGROUND")
@@ -424,7 +425,11 @@ local function createProgress(header)
     bar.failedFill:SetVertexColor(0.7, 0.15, 0.1)
 
     bar.text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    bar.text:SetPoint("CENTER", bar, "CENTER", 0, 0)
+    -- Held at both ends and never wrapped: a long count is cut short with
+    -- "...", not run out past the bar.
+    bar.text:SetPoint("LEFT", bar, "LEFT", 4, 0)
+    bar.text:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
+    bar.text:SetWordWrap(false)
 
     -- Items arrive, and are given up on, without a redraw: count again
     -- every so often while the bar shows.
@@ -582,8 +587,8 @@ function Window.Refresh()
 
     drawHeader(instance, selection)
     drawModelView(instance, selection)
-    frame.header.progress.itemIDs = instance and ns.Index.ItemIDs(instance.key) or {}
-    updateProgress(frame.header.progress)
+    frame.progress.itemIDs = instance and ns.Index.ItemIDs(instance.key) or {}
+    updateProgress(frame.progress)
     local pinned = type(selection) == "number" and selection or nil
     ns.MapView.Show(frame.inset, instance, pinned)
     if frame.fullMap:IsShown() then
@@ -838,8 +843,6 @@ local function createHeader(parent)
     header.subtitle:SetPoint("TOPLEFT", header.title, "BOTTOMLEFT", 0, -4)
     header.subtitle:SetJustifyH("LEFT")
 
-    header.progress = createProgress(header)
-
     return header
 end
 
@@ -887,6 +890,8 @@ local function create()
         frame:Hide()
     end)
     frame.close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
+
+    frame.progress = createProgress(frame)
 
     -- The rail: search, tabs, instances.
     local search = createFrame("EditBox", nil, frame, "InputBoxTemplate")

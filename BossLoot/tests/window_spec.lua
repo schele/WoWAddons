@@ -656,7 +656,7 @@ describe("the item loading bar", function()
         local ns, env = helpers.loggedIn()
         for _, id in ipairs(loaded or {}) do env.__items[id] = { name = "Item " .. id, quality = 2 } end
         ns.Window.Open()
-        return ns, env, ns.Window.Frame().header.progress
+        return ns, env, ns.Window.Frame().progress
     end
 
     -- Ask for every item until the server is given up on.
@@ -795,5 +795,24 @@ describe("close buttons", function()
             assertEqual(frame.close:GetWidth(), close:GetWidth())
             assertEqual(frame.close:GetHeight(), close:GetHeight())
         end
+    end)
+end)
+
+describe("the item loading bar's place", function()
+    it("sits in the window's top row, where the big map does not cover it", function()
+        local ns = opened()
+        local frame = ns.Window.Frame()
+        assertEqual(frame, frame.progress:GetParent())
+        ns.Window.OpenMap()
+        local _, _, _, _, barTop = frame.progress:GetPoint(1)
+        local _, _, _, _, mapTop = frame.fullMap:GetPoint(1)
+        assertTrue(barTop > mapTop, "above the map")
+    end)
+
+    it("keeps its text inside the bar, cut short if need be", function()
+        local ns = opened()
+        local text = ns.Window.Frame().progress.text
+        assertEqual(false, text.wordWrap)
+        assertEqual(2, #text.points, "held at both ends of the bar")
     end)
 end)
