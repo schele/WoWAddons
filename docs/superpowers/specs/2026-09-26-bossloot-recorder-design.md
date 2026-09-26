@@ -100,8 +100,8 @@ In `BossLootDB.recorded`. Saved variables are per account.
 ```lua
 recorded = {
     recorder = "a1b2c3d4",      -- random, made once: whose recordings these are
-    sources = {                  -- loot, by "<kind>:<id>"
-        ["npc:6910"] = {
+    sources = {                  -- loot, by "<kind>:<id>@<map>": one id can stand in several places
+        ["npc:6910@70"] = {
             kind = "npc", id = 6910, name = "Revelosh", encounter = "Revelosh",
             map = 70, instance = "Uldaman", instanceType = "party", zone = "Uldaman",
             kills = 5,                         -- kills, or openings for objects

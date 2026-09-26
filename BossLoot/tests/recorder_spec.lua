@@ -44,7 +44,7 @@ describe("recording loot", function()
         looting(env, { withSources(BOOTS, REVELOSH, 1), withSources(GLOVES, REVELOSH, 1) },
             { guid = REVELOSH, name = "Revelosh" })
         helpers.fire(env, "LOOT_OPENED")
-        local source = ns.db.recorded.sources["npc:6910"]
+        local source = ns.db.recorded.sources["npc:6910@70"]
         assertEqual(1, source.kills)
         assertEqual(1, source.items[9387])
         assertEqual(1, source.items[9388])
@@ -59,7 +59,7 @@ describe("recording loot", function()
         looting(env, { withSources(BOOTS, REVELOSH, 1) })
         helpers.fire(env, "LOOT_OPENED")
         helpers.fire(env, "LOOT_OPENED")
-        local source = ns.db.recorded.sources["npc:6910"]
+        local source = ns.db.recorded.sources["npc:6910@70"]
         assertEqual(1, source.kills)
         assertEqual(1, source.items[9387])
     end)
@@ -68,7 +68,7 @@ describe("recording loot", function()
         local ns, env = helpers.loggedIn()
         looting(env, { { sources = { REVELOSH, 1 } } })
         helpers.fire(env, "LOOT_OPENED")
-        local source = ns.db.recorded.sources["npc:6910"]
+        local source = ns.db.recorded.sources["npc:6910@70"]
         assertEqual(1, source.kills)
         assertNil(next(source.items))
     end)
@@ -77,9 +77,9 @@ describe("recording loot", function()
         local ns, env = helpers.loggedIn()
         looting(env, { withSources(BOOTS, REVELOSH, 1, OTHER, 1) })
         helpers.fire(env, "LOOT_OPENED")
-        assertEqual(1, ns.db.recorded.sources["npc:6910"].kills)
-        assertEqual(1, ns.db.recorded.sources["npc:7000"].kills)
-        assertEqual(1, ns.db.recorded.sources["npc:7000"].items[9387])
+        assertEqual(1, ns.db.recorded.sources["npc:6910@70"].kills)
+        assertEqual(1, ns.db.recorded.sources["npc:7000@70"].kills)
+        assertEqual(1, ns.db.recorded.sources["npc:7000@70"].items[9387])
     end)
 
     it("remembers corpses looted before a reload", function()
@@ -91,7 +91,7 @@ describe("recording loot", function()
         helpers.login(later, laterEnv)
         looting(laterEnv, { withSources(BOOTS, REVELOSH, 1) })
         helpers.fire(laterEnv, "LOOT_OPENED")
-        assertEqual(1, later.db.recorded.sources["npc:6910"].kills)
+        assertEqual(1, later.db.recorded.sources["npc:6910@70"].kills)
     end)
 
     it("marks the boss the game named when the fight ended, for a minute", function()
@@ -101,14 +101,14 @@ describe("recording loot", function()
         helpers.fire(env, "ENCOUNTER_END", 1, "Revelosh", 1, 5, 1)
         looting(env, { withSources(BOOTS, REVELOSH, 1) }, { guid = REVELOSH, name = "Revelosh" })
         helpers.fire(env, "LOOT_OPENED")
-        assertEqual("Revelosh", ns.db.recorded.sources["npc:6910"].encounter)
+        assertEqual("Revelosh", ns.db.recorded.sources["npc:6910@70"].encounter)
 
         helpers.fire(env, "ENCOUNTER_END", 2, "Ironaya", 1, 5, 1)
         env.__now = 200
         local IRONAYA = "Creature-0-3110-70-47-7228-00001A2B3E"
         looting(env, { withSources(GLOVES, IRONAYA, 1) }, { guid = IRONAYA, name = "Ironaya" })
         helpers.fire(env, "LOOT_OPENED")
-        assertNil(ns.db.recorded.sources["npc:7228"].encounter, "too long after")
+        assertNil(ns.db.recorded.sources["npc:7228@70"].encounter, "too long after")
     end)
 
     it("saves each item's name and quality from the loot window when the game has no more", function()
@@ -128,6 +128,24 @@ describe("recording loot", function()
         assertEqual("Forever Boots", item[1])
         assertEqual(3, item[2])
         assertEqual("Leather", item[4])
+    end)
+
+    it("keeps a chest found in two places apart", function()
+        -- Scarab Coffers stand in both Ahn'Qiraj instances, under one id.
+        local ns, env = helpers.loggedIn()
+        looting(env, { withSources(BOOTS, "GameObject-0-3110-509-47-180691-0000A", 1) })
+        function env.GetInstanceInfo() return "Ruins of Ahn'Qiraj", "raid", 1, "Normal", 20, 0, false, 509 end
+        helpers.fire(env, "LOOT_OPENED")
+        looting(env, { withSources(GLOVES, "GameObject-0-3110-531-47-180691-0000B", 1) })
+        function env.GetInstanceInfo() return "Temple of Ahn'Qiraj", "raid", 1, "Normal", 40, 0, false, 531 end
+        helpers.fire(env, "LOOT_OPENED")
+        local ruins = ns.db.recorded.sources["object:180691@509"]
+        local temple = ns.db.recorded.sources["object:180691@531"]
+        assertEqual(1, ruins.kills)
+        assertEqual(1, ruins.items[9387])
+        assertEqual(1, temple.kills)
+        assertEqual(1, temple.items[9388])
+        assertNil(temple.items[9387])
     end)
 
     it("does nothing, and does not fail, on a client without the loot calls", function()

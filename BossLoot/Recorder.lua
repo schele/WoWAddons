@@ -66,9 +66,11 @@ local function whereNow()
     return where
 end
 
+-- A source is a creature or object in one place, "<kind>:<id>@<map>": one
+-- chest or herb id can stand in several instances, and each keeps its own.
 local function sourceFor(kind, id, where)
     local sources = recorded().sources
-    local key = kind .. ":" .. id
+    local key = kind .. ":" .. id .. "@" .. (where.map or 0)
     local source = sources[key]
     if not source then
         source = { kind = kind, id = id, kills = 0, items = {} }
