@@ -18,8 +18,10 @@ ns.AddDefaults({
 local WIDTH = 860
 local HEIGHT = 520
 local PADDING = 12
-local TITLE_HEIGHT = 28
-local TOP = PADDING + TITLE_HEIGHT
+local TITLE_BAR = 24 -- the game's title bar, with the name in it
+local TOP = TITLE_BAR + 6
+local LOGO = 16 -- the chest before the name, sized to the title bar
+local LOGO_GAP = 6
 local GAP = 8
 local RAIL_WIDTH = 170
 local BOSS_WIDTH = 230
@@ -827,6 +829,60 @@ local function dress(target)
     end
 end
 
+-- A window's frame: the options window's own, the name in its title bar and
+-- its red X, so this reads as one of the game's windows. On a client without
+-- it, the dialog border, a name and a close button of our own. Solid either
+-- way: the options window lets the world show through, which the loot text
+-- cannot bear. With a logo, it sits before the name; without, a long name
+-- (a boss's) is cut short before the X.
+local function createWindowFrame(name, parent, logo)
+    local ok, made = pcall(CreateFrame, "Frame", name, parent, "SettingsFrameTemplate")
+    if not (ok and made) then
+        made = createFrame("Frame", name, parent, "BackdropTemplate")
+    end
+    local native = made.NineSlice and made.NineSlice.Text and made.ClosePanelButton and made.Bg
+
+    local titleY
+    if native then
+        -- On the game's background, so under its border and title bar too;
+        -- the same dark as dress's.
+        made.background = made.Bg:CreateTexture(nil, "BACKGROUND", nil, 7)
+        made.background:SetAllPoints(made.Bg)
+        made.background:SetColorTexture(0.06, 0.045, 0.03, 1)
+        made.title = made.NineSlice.Text
+        made.close = made.ClosePanelButton
+        titleY = -5
+    else
+        dress(made)
+        made.title = made:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        made.close = createCloseButton(made)
+        made.close:SetPoint("TOPRIGHT", made, "TOPRIGHT", -4, -4)
+        titleY = -14
+    end
+
+    made.title:ClearAllPoints()
+    made.title:SetWordWrap(false)
+    if logo then
+        made.title:SetPoint("TOP", made, "TOP", (LOGO + LOGO_GAP) / 2, titleY)
+        -- Drawn with the name, so over the title bar.
+        made.logo = made.title:GetParent():CreateTexture(nil, "OVERLAY")
+        made.logo:SetSize(LOGO, LOGO)
+        made.logo:SetPoint("RIGHT", made.title, "LEFT", -LOGO_GAP, 0)
+        made.logo:SetTexture(logo)
+    else
+        made.title:SetPoint("TOP", made, "TOP", 0, titleY)
+        made.title:SetPoint("LEFT", made, "LEFT", 60, 0)
+        made.title:SetPoint("RIGHT", made, "RIGHT", -60, 0)
+    end
+
+    -- Our own, not the game's: that asks the window manager, which an addon
+    -- may not do in combat.
+    made.close:SetScript("OnClick", function()
+        made:Hide()
+    end)
+    return made
+end
+
 local function savePosition(self)
     self:StopMovingOrSizing()
     local point, _, relativePoint, x, y = self:GetPoint(1)
@@ -966,26 +1022,14 @@ end
 -- The big model, in a window of its own beside the main one: the picked
 -- boss, to turn by dragging and zoom with the mouse wheel.
 local function createModelView(parent)
-    local view = createFrame("Frame", nil, parent, "BackdropTemplate")
+    local view = createWindowFrame(nil, parent)
     view:SetSize(MODEL_VIEW_WIDTH, HEIGHT)
     view:SetPoint("TOPLEFT", parent, "TOPRIGHT", 2, 0)
     view:SetClampedToScreen(true)
     view:EnableMouse(true)
 
-    dress(view)
     local stageHeight = HEIGHT - TOP - PADDING - MODEL_HINT_HEIGHT
     panel(view, PADDING, TOP, MODEL_VIEW_WIDTH - 2 * PADDING, stageHeight, 0.12)
-
-    view.title = view:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    view.title:SetPoint("TOPLEFT", view, "TOPLEFT", PADDING + 6, -PADDING - 4)
-    view.title:SetPoint("RIGHT", view, "RIGHT", -36, 0)
-    view.title:SetJustifyH("LEFT")
-    view.title:SetWordWrap(false)
-
-    view.close = createCloseButton(view, function()
-        view:Hide()
-    end)
-    view.close:SetPoint("TOPRIGHT", view, "TOPRIGHT", -4, -4)
 
     view.model = CreateFrame("PlayerModel", nil, view)
     view.model:SetPoint("TOPLEFT", view, "TOPLEFT", PADDING, -TOP)
@@ -1044,7 +1088,10 @@ local function createHeader(parent)
 end
 
 local function create()
-    frame = createFrame("Frame", "BossLootFrame", UIParent, "BackdropTemplate")
+    -- The chest alone, as the minimap button shows it, before the name: the
+    -- AddOns list icon carries a square tile that reads as a sticker here.
+    frame = createWindowFrame("BossLootFrame", UIParent, "Interface\\AddOns\\BossLoot\\minimap")
+    frame.title:SetText("BossLoot")
     frame:SetSize(WIDTH, HEIGHT)
     frame:SetFrameStrata("HIGH")
     frame:SetClampedToScreen(true)
@@ -1057,8 +1104,6 @@ local function create()
     local saved = ns.db.window
     frame:SetPoint(saved.point, UIParent, saved.relativePoint, saved.x, saved.y)
 
-    dress(frame)
-
     local columnHeight = HEIGHT - TOP - PADDING
     panel(frame, PADDING, TOP, RAIL_WIDTH, columnHeight, 0.035)
     panel(frame, PADDING + RAIL_WIDTH + GAP, TOP, BOSS_WIDTH, columnHeight, 0.05)
@@ -1067,23 +1112,12 @@ local function create()
     -- Escape closes it, like every other window.
     table.insert(UISpecialFrames, "BossLootFrame")
 
-    -- The chest alone, as the minimap button shows it, before the name: the
-    -- AddOns list icon carries a square tile that reads as a sticker here.
-    local logo = frame:CreateTexture(nil, "OVERLAY")
-    logo:SetSize(24, 24)
-    logo:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + 6, -PADDING)
-    logo:SetTexture("Interface\\AddOns\\BossLoot\\minimap")
-    frame.logo = logo
-
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
-    title:SetText("BossLoot")
-    frame.title = title
-
-    frame.close = createCloseButton(frame, function()
-        frame:Hide()
-    end)
-    frame.close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
+    -- One window at a time: the options window opening closes this one.
+    if SettingsPanel and SettingsPanel.HookScript then
+        SettingsPanel:HookScript("OnShow", function()
+            frame:Hide()
+        end)
+    end
 
     frame.progress = createProgress(frame, PAGE_LEFT, PROGRESS_WIDTH, "Items in this instance", describeInstance)
     frame.debug = createDebugPanel(frame)
@@ -1203,9 +1237,27 @@ function Window.Frame()
     return frame
 end
 
+-- The click the options window makes as it opens on an addon's page, so every
+-- addon's window sounds alike. Closing is silent, as it is there.
+local function playOpenSound()
+    if PlaySound and SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_TAB then
+        PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB)
+    end
+end
+
 function Window.Open()
     if not frame then
         create()
+    end
+    -- One window at a time: the options window and BankBags' close.
+    if ns.CloseOptions then
+        ns.CloseOptions()
+    end
+    if _G.BankBagsFrame then
+        _G.BankBagsFrame:Hide()
+    end
+    if not frame:IsShown() then
+        playOpenSound()
     end
     frame:Show()
     Window.Refresh()
