@@ -107,6 +107,11 @@ local function addSlot(container, button, key, own)
     local slot = { key = key }
 
     local function initializeFrame(frame)
+        -- Blizzard's aura button takes the mouse, and in the stacked bar
+        -- this box sits over the top of the icon on the row below: a click
+        -- there would land on the timer and cast nothing. On its own guard,
+        -- so a refusal costs the click-through and not the number.
+        pcall(frame.EnableMouse, frame, false)
         frame:SetSize(ns.Row.TIMER_WIDTH, ns.Row.TIMER_HEIGHT)
         frame:SetPoint("TOP", button, "BOTTOM", 0, -3)
         frame:SetFrameLevel(container:GetFrameLevel() + (own and 2 or 1))
@@ -156,6 +161,9 @@ function AuraSlots.Attach(row)
     local container
     local built = pcall(function()
         container = CreateFrame("AuraContainer", nil, row, "CustomAuraContainerTemplate")
+        -- The row's place, as the probe's container had one: a frame with no
+        -- points is not drawn, and the slots hang off this one.
+        container:SetAllPoints(row)
         container:SetUnit(row.unit)
 
         local slots = {}
@@ -184,6 +192,20 @@ end
 --- Whether the game draws this row's timers, rather than ClickHeal.
 function AuraSlots.Drawn(row)
     return row.auraContainer ~= nil
+end
+
+--- Have the game read this row's unit afresh. The container re-reads a
+-- unit only when one of its auras changes, and after a roster change the
+-- same token can mean somebody else: without this, a row could go on
+-- showing the last person's buffs. Only marks the container for an update,
+-- which Blizzard exposes for exactly this ("external events ... e.g. target
+-- changes"), so it is safe in combat; guarded all the same.
+function AuraSlots.Refresh(row)
+    if row.auraContainer then
+        ns.Guarded(function()
+            row.auraContainer:UpdateAllAuras()
+        end)
+    end
 end
 
 --- Point the slots under button `index` at `spell`, or at nothing. Out of

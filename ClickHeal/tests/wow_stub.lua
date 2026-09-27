@@ -61,7 +61,9 @@ local function makeWidget(kind, parent, template, env)
         table.insert(self.points, { ... })
     end
     function widget:ClearAllPoints() self.points = {} end
-    function widget:SetAllPoints() end
+    -- Recorded, not ignored: a frame given no points does not render, and
+    -- this is how some frames are given theirs.
+    function widget:SetAllPoints(relativeTo) self.allPointsTo = relativeTo or self.parent end
     function widget:GetPoint(index)
         local point = self.points[index or 1]
         if point then return table.unpack(point) end
@@ -354,8 +356,13 @@ function stub.newEnv()
         local container = makeWidget("AuraContainer", parent, template, env)
         container.slots = {}
         container.filterWrites = 0
+        container.refreshes = 0
 
         function container:SetUnit(unit) self.unit = unit end
+
+        -- Counted: the container re-reads its unit on its own only when one
+        -- of that unit's auras changes, so a test can see a refresh asked for.
+        function container:UpdateAllAuras() self.refreshes = self.refreshes + 1 end
 
         function container:AddAuraSlot(key, filterString, options)
             if env.__auraSlotError then
@@ -367,6 +374,9 @@ function stub.newEnv()
             slot.key, slot.filterString = key, filterString
             slot.candidateFilters = copy(options.candidateFilters)
             slot.enabled = true
+            -- A Button with OnEnter and OnClick of its own
+            -- (Blizzard_AuraButton.xml), so it takes the mouse unless told not to.
+            slot.mouseEnabled = true
 
             function slot:SetDurationText(label, textOptions)
                 if label ~= self and not isDescendant(label, self) then

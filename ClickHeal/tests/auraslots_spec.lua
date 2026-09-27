@@ -291,3 +291,29 @@ describe("the game's numbers", function()
         assertNil(row.auraSlots[1].own.frame.durationOptions.textFormatter)
     end)
 end)
+
+describe("the game's timers on screen, after review", function()
+    it("let clicks through to the spell icons around them", function()
+        -- Each slot is Blizzard's aura button, which takes the mouse. In the
+        -- stacked bar a 40 by 14 timer box sits over the top of the icon on
+        -- the row below, and a click there would land on the timer: no heal.
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        for index = 1, ns.Slots.MAX do
+            for _, slot in pairs(row.auraSlots[index]) do
+                assertFalse(slot.frame.mouseEnabled, "button " .. index .. ": " .. slot.key)
+            end
+        end
+    end)
+
+    it("give the container its row's place, as the probe did", function()
+        -- A frame with no points is not drawn; the slots are anchored to the
+        -- buttons, but nothing promises the game draws them under a parent
+        -- that has no place of its own.
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        assertEqual(row, row.auraContainer.allPointsTo)
+    end)
+end)

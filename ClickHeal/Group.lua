@@ -449,6 +449,14 @@ watcher:SetScript("OnEvent", function(_, event, unit)
         -- Names and classes change wholesale, so no single row is enough.
         Group.RefreshAll()
 
+        -- So do the people behind each unit token, and the game's aura
+        -- containers only re-read a unit when one of its auras changes.
+        if ns.AuraSlots then
+            for _, row in pairs(rows) do
+                ns.AuraSlots.Refresh(row)
+            end
+        end
+
         -- A roster change is also when Layout's contiguous stack can need
         -- reshuffling (a unit appearing or vanishing). ApplyAll is what
         -- knows to hold that re-stack, and the spell attributes it also
