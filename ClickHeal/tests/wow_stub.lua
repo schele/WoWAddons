@@ -597,7 +597,7 @@ function stub.newEnv()
     local function auraData(aura)
         if aura.caster == "secret" then
             return setmetatable(
-                { name = aura.name, expirationTime = aura.expirationTime },
+                { name = aura.name, expirationTime = aura.expirationTime, spellId = aura.spellId },
                 {
                     __index = function(_, key)
                         if key == "sourceUnit" then
@@ -614,6 +614,7 @@ function stub.newEnv()
             name = aura.name,
             expirationTime = aura.expirationTime,
             sourceUnit = auraCaster(aura),
+            spellId = aura.spellId,
         }
     end
 

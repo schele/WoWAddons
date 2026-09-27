@@ -190,3 +190,59 @@ describe("pointing a button's slots at its spell", function()
         assertFalse(row.auraSlots[1].own.frame.enabled)
     end)
 end)
+
+describe("learning other ranks' IDs", function()
+    local function withIDs(e)
+        e.__spellIDsByName["Rejuvenation"] = 774
+    end
+
+    it("widens both slots with an ID seen on a buff out of combat", function()
+        local ns, env = loggedIn(withIDs)
+        local row = rowWith(ns, env, "party1", { "Rejuvenation" })
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1007, spellId = 1430 } }
+
+        ns.Row.Refresh(row)
+
+        local slots = row.auraSlots[1]
+        assertTrue(slots.own.frame.candidateFilters.includeSpellIDs[774], "the spellbook's still")
+        assertTrue(slots.own.frame.candidateFilters.includeSpellIDs[1430])
+        assertTrue(slots.other.frame.candidateFilters.includeSpellIDs[1430])
+    end)
+
+    it("waits for combat to end before touching the slots", function()
+        local ns, env = loggedIn(withIDs)
+        local row = rowWith(ns, env, "party1", { "Rejuvenation" })
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1007, spellId = 1430 } }
+        local writes = row.auraContainer.filterWrites
+
+        env.__inCombat = true
+        ns.Row.RefreshAuras(row)
+        assertEqual(writes, row.auraContainer.filterWrites, "no filter changes in combat")
+
+        env.__inCombat = false
+        ns.Row.RefreshAuras(row)
+        assertTrue(row.auraSlots[1].own.frame.candidateFilters.includeSpellIDs[1430])
+    end)
+
+    it("widens every row holding the spell, not just the one it was seen on", function()
+        local ns, env = loggedIn(withIDs)
+        local first = rowWith(ns, env, "party1", { "Rejuvenation" })
+        local second = rowWith(ns, env, "party2", { "Rejuvenation" })
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1007, spellId = 1430 } }
+
+        ns.Row.Refresh(first)
+
+        assertTrue(second.auraSlots[1].own.frame.candidateFilters.includeSpellIDs[1430])
+    end)
+
+    it("writes no number of its own on a row the game draws", function()
+        local ns, env = loggedIn(withIDs)
+        local row = rowWith(ns, env, "party1", { "Rejuvenation" })
+        env.__now = 1000
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1007, spellId = 774 } }
+
+        ns.Row.Refresh(row)
+
+        assertEqual("", row.buttons[1].timer:GetText(), "the game's number is the only one")
+    end)
+end)

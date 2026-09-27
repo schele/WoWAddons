@@ -789,3 +789,23 @@ describe("a spell's ID", function()
         assertNil(ns.Spells.SpellID(""))
     end)
 end)
+
+describe("the spell ID of a buff on someone", function()
+    it("is kept with the buff", function()
+        local ns, env = loggedIn()
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1007, spellId = 1430 } }
+
+        assertEqual(1430, ns.Spells.HelpfulAuras("party1").Rejuvenation.spellId)
+    end)
+
+    it("is left out when the client will not let us use it", function()
+        -- A secret ID would raise again later, as a table key, on every
+        -- refresh; left out, it costs only the learning.
+        local ns, env = loggedIn()
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1007, spellId = env.__secret() } }
+
+        local aura = ns.Spells.HelpfulAuras("party1").Rejuvenation
+        assertTrue(aura ~= nil, "the buff itself is still there")
+        assertNil(aura.spellId)
+    end)
+end)

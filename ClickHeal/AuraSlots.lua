@@ -24,6 +24,13 @@ local PLATE_ALPHA = 0.85
 -- for the session only. Filled by AuraSlots.Learn.
 local learned = {}
 
+-- Every row the game draws, so an ID learned on one reaches them all.
+local attached = {}
+
+-- Names whose learned IDs have not reached the slots yet: filters are
+-- changed out of combat only.
+local pending = {}
+
 --- What a slot takes: the buff's spell IDs, and whose cast.
 local function filtersFor(ids, own)
     return { includeSpellIDs = ids, isFromPlayerOrPlayerPet = own }
@@ -147,6 +154,7 @@ function AuraSlots.Attach(row)
     end
 
     row.auraContainer = container
+    attached[#attached + 1] = row
     return true
 end
 
@@ -166,4 +174,35 @@ function AuraSlots.SetSpell(row, index, spell)
 
     slots.spell = spell
     applyFilters(row, slots)
+end
+
+--- Take spell IDs from buffs read out of combat -- Spells.HelpfulAuras'
+-- table, by name, each with its spellId -- and widen the slots of every
+-- button holding that name, on every row. In combat the IDs wait for it to
+-- end: slot filters are only changed out of combat. On 1.60.1 nothing can
+-- be read in combat anyway, so what waits is only what a test stages.
+function AuraSlots.Learn(auras)
+    for name, aura in pairs(auras or {}) do
+        local id = aura.spellId
+        if type(id) == "number" then
+            learned[name] = learned[name] or {}
+            if not learned[name][id] then
+                learned[name][id] = true
+                pending[name] = true
+            end
+        end
+    end
+
+    if next(pending) == nil or (InCombatLockdown and InCombatLockdown()) then
+        return
+    end
+
+    for _, row in ipairs(attached) do
+        for _, slots in pairs(row.auraSlots) do
+            if slots.spell and pending[slots.spell] then
+                applyFilters(row, slots)
+            end
+        end
+    end
+    pending = {}
 end

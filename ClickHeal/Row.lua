@@ -759,6 +759,14 @@ end
 function Row.RefreshAuras(row)
     local auras = ns.Spells.HelpfulAuras(row.unit)
 
+    -- The game draws this row's numbers, in combat too. What can still be
+    -- read out of combat teaches its slots the IDs of other ranks and other
+    -- casters' copies; button.timer stays empty, so there is one number.
+    if ns.AuraSlots and ns.AuraSlots.Drawn(row) then
+        ns.AuraSlots.Learn(auras)
+        return
+    end
+
     for index = 1, ns.Slots.MAX do
         local button = row.buttons[index]
         local spell = button:GetAttribute("spell")
