@@ -40,6 +40,22 @@ end
 local BUTTON_GAP = 4
 local PADDING = 4
 
+-- The box the number under an icon is written in: room for "38m" in the
+-- small font, and for the font's own height.
+local TIMER_WIDTH = 40
+local TIMER_HEIGHT = 14
+
+-- The gold frame a button shows under the cursor: how thick, whatever the
+-- icon size, and its four edges as the pair of corners each runs between.
+-- `across` marks the top and bottom, which are sized by height.
+local HOVER_BORDER = 2
+local HOVER_SIDES = {
+    { "TOPLEFT", "TOPRIGHT", across = true },
+    { "BOTTOMLEFT", "BOTTOMRIGHT", across = true },
+    { "TOPLEFT", "BOTTOMLEFT" },
+    { "TOPRIGHT", "BOTTOMRIGHT" },
+}
+
 -- Exported because the row's width, the gap a hidden button gives back and
 -- Group's own arithmetic all have to agree on it, and because a test that
 -- restates it as a literal stops agreeing the moment it changes.
@@ -313,17 +329,36 @@ function Row.Create(unit, parent)
         button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
         button.icon:Hide()
 
-        -- The action bar's own hover highlight, so these buttons light up
-        -- under the cursor the way the ones beside them do. The client draws
-        -- it; there is no OnEnter or OnLeave to write, and nothing to undo
-        -- when the cursor leaves. ADD blends it as a glow over the icon
-        -- rather than laying an opaque square on top of it.
-        button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+        -- A gold frame while the cursor is on the button. The action bar's
+        -- own glow was the first try, and over a bright icon it was too faint
+        -- to tell whether the cursor was on anything at all. The client shows
+        -- the HIGHLIGHT layer on mouseover by itself, so there is no OnEnter
+        -- or OnLeave to write, and nothing to undo when the cursor leaves.
+        -- The edges sit on the icon's own edge, clear of the next button.
+        button.hoverBorder = {}
+        for _, side in ipairs(HOVER_SIDES) do
+            local edge = button:CreateTexture(nil, "HIGHLIGHT")
+            edge:SetColorTexture(1, 0.82, 0, 1) -- the game's gold
+            edge:SetPoint(side[1], button, side[1])
+            edge:SetPoint(side[2], button, side[2])
+            if side.across then
+                edge:SetHeight(HOVER_BORDER)
+            else
+                edge:SetWidth(HOVER_BORDER)
+            end
+            button.hoverBorder[#button.hoverBorder + 1] = edge
+        end
 
         -- Just below the icon rather than across it: at 22 pixels there is
         -- no room to lay a number over the art and still read either.
         button.timer = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         button.timer:SetPoint("TOP", button, "BOTTOM", 0, -3)
+        -- A box of its own. Left to size itself from the one point above,
+        -- it stayed 1 by 1 pixel on 1.60.1 -- GetStringWidth 16.7 for "8m",
+        -- GetWidth 1 -- and the number was clipped to nothing. Wider than
+        -- the gap to the next icon is fine: the text is centred and short,
+        -- so neighbouring boxes overlap where there is nothing to draw.
+        button.timer:SetSize(TIMER_WIDTH, TIMER_HEIGHT)
 
         -- Blizzard's own cooldown widget, so the sweep is the one the action
         -- bars draw and the client animates it for us; all we ever hand it is

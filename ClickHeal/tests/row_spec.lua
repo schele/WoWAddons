@@ -79,21 +79,24 @@ describe("building a row", function()
         end
     end)
 
-    it("gives every button the action bar's own hover highlight", function()
-        -- The same texture and blend Blizzard's action buttons use, so a
-        -- ClickHeal button lights up under the cursor exactly as the ones
-        -- beside it do. ADD is what makes it a glow rather than an opaque
-        -- square laid over the icon.
+    it("frames every button in gold while the cursor is on it", function()
+        -- The action bar's glow was too faint to tell whether the cursor was
+        -- on a button at all. Four gold edges in the HIGHLIGHT layer, which
+        -- the client shows on mouseover by itself, and 2 pixels thick.
         local ns, env = loggedIn()
         local row = ns.Row.Create("party1", env.UIParent)
 
         for index = 1, ns.Slots.MAX do
-            assertEqual(
-                "Interface\\Buttons\\ButtonHilight-Square",
-                row.buttons[index].highlightTexture,
-                "button " .. index .. " highlights on hover"
-            )
-            assertEqual("ADD", row.buttons[index].highlightBlend)
+            local button = row.buttons[index]
+            assertNil(button.highlightTexture, "button " .. index .. " has no glow over the gold")
+            assertEqual(4, #button.hoverBorder, "button " .. index .. " has four edges")
+            for _, edge in ipairs(button.hoverBorder) do
+                assertEqual("HIGHLIGHT", edge.drawLayer)
+                assertEqual(1, edge.colorTexture[1])
+                assertEqual(0.82, edge.colorTexture[2])
+                assertEqual(0, edge.colorTexture[3])
+                assertTrue(edge.width == 2 or edge.height == 2, "2 pixels thick")
+            end
         end
     end)
 
@@ -1032,6 +1035,20 @@ describe("the remaining time under an icon", function()
         assertEqual("38m", ns.Row.FormatDuration(2280), "exactly 38 minutes is 38m, not 39m")
         assertEqual("57m", ns.Row.FormatDuration(56 * 60 + 30), "the case that did not match")
         assertEqual("2h", ns.Row.FormatDuration(3700))
+    end)
+
+    it("gives every label a box of its own, wide enough for any number", function()
+        -- Left to size itself from one anchor point, the label stayed 1 by 1
+        -- pixel on 1.60.1 -- GetStringWidth 16.7 for "8m", GetWidth 1 -- and
+        -- the number was clipped to nothing. Given a size, it showed.
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        for index = 1, ns.Slots.MAX do
+            local timer = row.buttons[index].timer
+            assertTrue(timer.width >= 30, "button " .. index .. ": room for 38m")
+            assertTrue(timer.height >= 12, "button " .. index .. ": room for the font")
+        end
     end)
 
     it("writes nothing at all when there is nothing to count", function()
