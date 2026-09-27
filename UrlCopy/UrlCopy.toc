@@ -11,3 +11,4 @@ Detect.lua
 Popup.lua
 Chat.lua
 Settings.lua
+Minimap.lua

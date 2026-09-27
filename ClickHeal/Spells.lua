@@ -116,6 +116,27 @@ function Spells.IsKnown(spellName)
     return true
 end
 
+--- The spell ID the spellbook gives `spellName`, or nil. The highest rank
+-- known, which is the one a button casting by name casts. Only a number
+-- counts: the aura container matches buffs by ID, and anything else would
+-- match nothing while looking as if it matched.
+function Spells.SpellID(spellName)
+    if type(spellName) ~= "string" or spellName == "" then
+        return nil
+    end
+
+    return ns.Guarded(function()
+        local id
+        if C_Spell and C_Spell.GetSpellInfo then
+            local info = C_Spell.GetSpellInfo(spellName)
+            id = type(info) == "table" and info.spellID or nil
+        elseif GetSpellInfo then
+            id = select(7, GetSpellInfo(spellName))
+        end
+        return type(id) == "number" and id or nil
+    end, nil)
+end
+
 --- What spell, if any, is on the cursor -- nil for anything else (an item, a
 -- macro, an empty cursor), so a player dropping or clicking one of those can
 -- carry on carrying it. GetCursorInfo's extra returns for a spell differ by
@@ -452,24 +473,25 @@ function Spells.HelpfulAuras(unit)
         local auras = {}
 
         for index = 1, AURA_LIMIT do
-            local name, expires, source
+            local name, expires, source, spellId
 
             if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
                 local data = C_UnitAuras.GetAuraDataByIndex(unit, index, AURA_FILTER)
                 if type(data) ~= "table" then
                     break
                 end
-                name, expires = data.name, data.expirationTime
+                name, expires, spellId = data.name, data.expirationTime, data.spellId
                 -- Not fetched here, and not on this line: see castByPlayer.
                 source = function() return data.sourceUnit end
             elseif UnitAura then
-                -- name, icon, count, dispelType, duration, expirationTime, caster
-                local found, _, _, _, _, expirationTime, caster =
+                -- name, icon, count, dispelType, duration, expirationTime,
+                -- caster, isStealable, nameplateShowPersonal, spellId
+                local found, _, _, _, _, expirationTime, caster, _, _, id =
                     UnitAura(unit, index, AURA_FILTER)
                 if not found then
                     break
                 end
-                name, expires = found, expirationTime
+                name, expires, spellId = found, expirationTime, id
                 source = function() return caster end
             else
                 break
@@ -484,6 +506,12 @@ function Spells.HelpfulAuras(unit)
                     -- caller holding the gathered table has no way back to
                     -- it.
                     mine = castByPlayer(source),
+                    -- Only a number the client lets us do sums on. A secret
+                    -- one would raise again as a table key, on every
+                    -- refresh, in AuraSlots.Learn.
+                    spellId = ns.Guarded(function()
+                        return type(spellId) == "number" and spellId + 0 or nil
+                    end, nil),
                 }
             end
         end
@@ -587,14 +615,30 @@ end
 -- and whether it stopped because the client ran out of auras or because it
 -- raised, are distinctions HelpfulAuras is entitled to flatten into one empty
 -- table and a report is not.
+--- What the client said as it raised, as plain text. The error may be
+-- anything at all, so describing it is guarded like any other value here.
+local function describeError(err)
+    return ns.Guarded(function() return tostring(err) end, "an error it will not describe")
+end
+
+--- Run `fn` and keep what the client raised with, where ns.Guarded rightly
+-- throws it away: in a report, the reason is the finding. The second return
+-- is `fn`'s result, or "raised: " and the client's words.
+local function attempt(fn)
+    local ok, result = pcall(fn)
+    if ok then
+        return true, result
+    end
+    return false, "raised: " .. describeError(result)
+end
+
 local function walkAuras(unit, filter, add)
     local found = 0
 
     for index = 1, AURA_LIMIT do
-        -- "raised" as the unknown value rather than nil, because nil is what
-        -- an honest end of the list looks like and the two must not read the
-        -- same here.
-        local entry = ns.Guarded(function()
+        -- A raise kept apart from nil, because nil is what an honest end of
+        -- the list looks like and the two must not read the same here.
+        local read, entry = pcall(function()
             if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
                 local data = C_UnitAuras.GetAuraDataByIndex(unit, index, filter)
                 if type(data) ~= "table" then
@@ -628,10 +672,13 @@ local function walkAuras(unit, filter, add)
             end
 
             return nil
-        end, "raised")
+        end)
 
-        if entry == "raised" then
-            add("  %s #%d: the client raised on the read", filter, index)
+        -- With the client's own words: in combat, 1.60.1 raises on the very
+        -- first read, and whether it refuses the call or a value in its
+        -- answer decides which way round that there is.
+        if not read then
+            add("  %s #%d: the client raised on the read: %s", filter, index, describeError(entry))
             return found
         end
 
@@ -653,6 +700,90 @@ local function walkAuras(unit, filter, add)
     end
 
     return found
+end
+
+-- A label and a countdown binding for the report to try the game's route
+-- with, made once and reused: a binding keeps writing into its label, so one
+-- per aura per report would pile up. The label's frame stays hidden.
+local probeLabel, probeBinding
+
+local function countdownProbe()
+    if not probeBinding then
+        local holder = CreateFrame("Frame")
+        holder:Hide()
+        probeLabel = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        probeBinding = C_DurationUtil.CreateDurationTextBinding()
+        -- The formatter the game's own buff buttons use.
+        if C_StringUtil and C_StringUtil.CreateSecondsFormatter then
+            probeBinding:SetFormatter(C_StringUtil.CreateSecondsFormatter())
+        end
+        probeBinding:SetFontString(probeLabel)
+    end
+    return probeLabel, probeBinding
+end
+
+--- One aura, asked for the way the game's own buff frames ask: by its ID,
+-- for its duration object, and for a countdown the game writes into a label
+-- itself, so the addon never touches the numbers. Each step on its own, so a
+-- refused one names itself and the rest still answer.
+local function reportInstance(unit, id, add)
+    local _, data = attempt(function()
+        local aura = C_UnitAuras.GetAuraDataByAuraInstanceID(unit, id)
+        if type(aura) ~= "table" then
+            return "nothing"
+        end
+        return string.format("name=%s spell=%s expires=%s",
+            describe(aura.name), describe(aura.spellId), describe(aura.expirationTime))
+    end)
+
+    local gotDuration, duration = "-", nil
+    if C_UnitAuras.GetAuraDuration then
+        _, gotDuration = attempt(function()
+            duration = C_UnitAuras.GetAuraDuration(unit, id)
+            return type(duration)
+        end)
+    end
+
+    local countdown = "-"
+    if duration ~= nil and C_DurationUtil and C_DurationUtil.CreateDurationTextBinding then
+        local _, result = attempt(function()
+            local label, binding = countdownProbe()
+            label:SetText("")
+            binding:SetDuration(duration)
+            binding:UpdateFontString()
+            return describe(label:GetText())
+        end)
+        countdown = result
+    end
+
+    add("  #%s: %s duration=%s countdown=%s", describe(id), tostring(data), gotDuration, countdown)
+end
+
+--- The same ground by the other road: the unit's aura instance IDs, and for
+-- each what reportInstance finds. In combat 1.60.1 raises on the by-index
+-- walk outright, and this is the road its own buff frames still travel.
+local function reportInstances(unit, add)
+    if not (C_UnitAuras and C_UnitAuras.GetUnitAuraInstanceIDs) then
+        add("  instance IDs: not in this client")
+        return
+    end
+
+    local ok, ids = attempt(function()
+        return C_UnitAuras.GetUnitAuraInstanceIDs(unit, AURA_FILTER)
+    end)
+    if not ok then
+        add("  instance IDs: %s", ids)
+        return
+    end
+    if type(ids) ~= "table" then
+        add("  instance IDs: %s", describe(ids))
+        return
+    end
+
+    add("  instance IDs: %d", #ids)
+    for position = 1, math.min(#ids, REPORT_LIMIT) do
+        reportInstance(unit, ids[position], add)
+    end
 end
 
 --- What the timers can actually read on `unit`, layer by layer, as lines of
@@ -693,6 +824,8 @@ function Spells.Report(unit, spells)
     -- walk above found. A day when it does not is a day this file can go back
     -- to letting the client do the filtering.
     add("  HELPFUL|PLAYER: %d aura(s)", walkAuras(unit, "HELPFUL|PLAYER", add))
+
+    reportInstances(unit, add)
 
     local auras = Spells.HelpfulAuras(unit)
     local names = {}

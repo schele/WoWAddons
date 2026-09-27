@@ -40,6 +40,26 @@ end
 local BUTTON_GAP = 4
 local PADDING = 4
 
+-- The box the number under an icon is written in: room for "38m" in the
+-- small font, and for the font's own height.
+local TIMER_WIDTH = 40
+local TIMER_HEIGHT = 14
+
+-- Read by AuraSlots, which lays the game's numbers out in the same box.
+Row.TIMER_WIDTH = TIMER_WIDTH
+Row.TIMER_HEIGHT = TIMER_HEIGHT
+
+-- The gold frame a button shows under the cursor: how thick, whatever the
+-- icon size, and its four edges as the pair of corners each runs between.
+-- `across` marks the top and bottom, which are sized by height.
+local HOVER_BORDER = 2
+local HOVER_SIDES = {
+    { "TOPLEFT", "TOPRIGHT", across = true },
+    { "BOTTOMLEFT", "BOTTOMRIGHT", across = true },
+    { "TOPLEFT", "BOTTOMLEFT" },
+    { "TOPRIGHT", "BOTTOMRIGHT" },
+}
+
 -- Exported because the row's width, the gap a hidden button gives back and
 -- Group's own arithmetic all have to agree on it, and because a test that
 -- restates it as a literal stops agreeing the moment it changes.
@@ -130,6 +150,7 @@ local RANGE_DIM = 0.4
 -- enough to read as the quieter of two numbers side by side, not so far that
 -- it stops being legible against a spell icon.
 local OTHERS_DIM = 0.55
+Row.OTHERS_DIM = OTHERS_DIM
 
 -- Blizzard's own stand-in for a spell it will not draw. Reached only when
 -- the player knows the spell but the icon lookup came back empty, so that a
@@ -313,17 +334,36 @@ function Row.Create(unit, parent)
         button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
         button.icon:Hide()
 
-        -- The action bar's own hover highlight, so these buttons light up
-        -- under the cursor the way the ones beside them do. The client draws
-        -- it; there is no OnEnter or OnLeave to write, and nothing to undo
-        -- when the cursor leaves. ADD blends it as a glow over the icon
-        -- rather than laying an opaque square on top of it.
-        button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+        -- A gold frame while the cursor is on the button. The action bar's
+        -- own glow was the first try, and over a bright icon it was too faint
+        -- to tell whether the cursor was on anything at all. The client shows
+        -- the HIGHLIGHT layer on mouseover by itself, so there is no OnEnter
+        -- or OnLeave to write, and nothing to undo when the cursor leaves.
+        -- The edges sit on the icon's own edge, clear of the next button.
+        button.hoverBorder = {}
+        for _, side in ipairs(HOVER_SIDES) do
+            local edge = button:CreateTexture(nil, "HIGHLIGHT")
+            edge:SetColorTexture(1, 0.82, 0, 1) -- the game's gold
+            edge:SetPoint(side[1], button, side[1])
+            edge:SetPoint(side[2], button, side[2])
+            if side.across then
+                edge:SetHeight(HOVER_BORDER)
+            else
+                edge:SetWidth(HOVER_BORDER)
+            end
+            button.hoverBorder[#button.hoverBorder + 1] = edge
+        end
 
         -- Just below the icon rather than across it: at 22 pixels there is
         -- no room to lay a number over the art and still read either.
         button.timer = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         button.timer:SetPoint("TOP", button, "BOTTOM", 0, -3)
+        -- A box of its own. Left to size itself from the one point above,
+        -- it stayed 1 by 1 pixel on 1.60.1 -- GetStringWidth 16.7 for "8m",
+        -- GetWidth 1 -- and the number was clipped to nothing. Wider than
+        -- the gap to the next icon is fine: the text is centred and short,
+        -- so neighbouring boxes overlap where there is nothing to draw.
+        button.timer:SetSize(TIMER_WIDTH, TIMER_HEIGHT)
 
         -- Blizzard's own cooldown widget, so the sweep is the one the action
         -- bars draw and the client animates it for us; all we ever hand it is
@@ -434,6 +474,13 @@ function Row.Create(unit, parent)
         row.buttons[index] = button
     end
 
+    -- The game draws this row's timers where it can, which is what keeps
+    -- them counting in combat: see AuraSlots.lua. Where it cannot, the row
+    -- keeps button.timer, written by RefreshAuras.
+    if ns.AuraSlots then
+        ns.AuraSlots.Attach(row)
+    end
+
     return row
 end
 
@@ -529,6 +576,13 @@ function Row.ApplySpells(row)
             button:SetAttribute("spell", nil)
             button.icon:Hide()
             button:Hide()
+        end
+
+        -- Read back off the button, so the slots follow exactly the spell
+        -- it will cast: a resurrection left off your own row takes its
+        -- slots with it.
+        if ns.AuraSlots then
+            ns.AuraSlots.SetSpell(row, index, button:GetAttribute("spell"))
         end
     end
 
@@ -704,6 +758,14 @@ end
 -- druid's is a heal you thought you had.
 function Row.RefreshAuras(row)
     local auras = ns.Spells.HelpfulAuras(row.unit)
+
+    -- The game draws this row's numbers, in combat too. What can still be
+    -- read out of combat teaches its slots the IDs of other ranks and other
+    -- casters' copies; button.timer stays empty, so there is one number.
+    if ns.AuraSlots and ns.AuraSlots.Drawn(row) then
+        ns.AuraSlots.Learn(auras)
+        return
+    end
 
     for index = 1, ns.Slots.MAX do
         local button = row.buttons[index]

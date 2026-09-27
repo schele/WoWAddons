@@ -1,0 +1,79 @@
+local helpers = require("helpers")
+
+describe("chance text", function()
+    local ns = helpers.loadAddon({ "BossLoot.lua", "Format.lua" })
+
+    it("shows one decimal under ten percent", function()
+        assertEqual("1.8%", ns.Format.Chance(1.8))
+        assertEqual("0.5%", ns.Format.Chance(0.5))
+    end)
+
+    it("shows whole numbers from ten percent up", function()
+        assertEqual("14%", ns.Format.Chance(14.2))
+        assertEqual("100%", ns.Format.Chance(100))
+    end)
+
+    it("does not print 10.0% for a chance that rounds up to ten", function()
+        assertEqual("10%", ns.Format.Chance(9.96))
+    end)
+
+    it("says under 0.1% rather than 0.0%", function()
+        assertEqual("<0.1%", ns.Format.Chance(0.04))
+    end)
+end)
+
+describe("quality colours", function()
+    local ns = helpers.loadAddon({ "BossLoot.lua", "Format.lua" })
+
+    it("colours text by quality", function()
+        assertEqual("|cffa335eeIronfoe|r", ns.Format.Colored("Ironfoe", 4))
+    end)
+
+    it("falls back to white for an unknown quality", function()
+        assertEqual("ffffff", ns.Format.QualityHex(nil))
+    end)
+end)
+
+describe("type labels", function()
+    local ns = helpers.loadAddon({ "BossLoot.lua", "Format.lua" })
+
+    it("names the slot and the kind of item", function()
+        assertEqual("Two-Hand, Maces", ns.Format.TypeLabel("Weapon", "Maces", "INVTYPE_2HWEAPON"))
+    end)
+
+    it("names the type for something that is not worn", function()
+        assertEqual("Recipe, Tailoring", ns.Format.TypeLabel("Recipe", "Tailoring", ""))
+        assertEqual("Key", ns.Format.TypeLabel("Key", "Key", ""))
+    end)
+end)
+
+describe("whole-number chances and empty types", function()
+    local ns = helpers.loadAddon({ "BossLoot.lua", "Format.lua" })
+
+    it("drops a trailing .0 under ten percent", function()
+        assertEqual("5%", ns.Format.Chance(5))
+        assertEqual("1%", ns.Format.Chance(1.02))
+        assertEqual("1.8%", ns.Format.Chance(1.8))
+    end)
+
+    it("treats an empty item type as none, rather than printing a lone comma", function()
+        assertEqual("Other", ns.Format.TypeLabel("", "Other", ""))
+    end)
+end)
+
+describe("items that are not worn, as this client reports them", function()
+    -- The client gives them a slot, INVTYPE_NON_EQUIP_IGNORE, whose text is
+    -- empty: named as the slot, it left ", Quest" and ", Other".
+    local ns, env = helpers.loadAddon({ "BossLoot.lua", "Format.lua" })
+    env.INVTYPE_NON_EQUIP_IGNORE = ""
+
+    it("names the type, not an empty slot", function()
+        assertEqual("Quest", ns.Format.TypeLabel("Quest", "Quest", "INVTYPE_NON_EQUIP_IGNORE"))
+        assertEqual("Miscellaneous, Other", ns.Format.TypeLabel("Miscellaneous", "Other", "INVTYPE_NON_EQUIP_IGNORE"))
+    end)
+
+    it("treats text of only spaces as empty too", function()
+        env.INVTYPE_BLANK = " "
+        assertEqual("Other", ns.Format.TypeLabel(" ", "Other", "INVTYPE_BLANK"))
+    end)
+end)

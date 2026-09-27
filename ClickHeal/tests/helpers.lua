@@ -7,10 +7,12 @@ M.FILES = {
     "Anchors.lua",
     "Spells.lua",
     "Slots.lua",
+    "AuraSlots.lua",
     "Row.lua",
     "Group.lua",
     "ManaBar.lua",
     "Settings.lua",
+    "Minimap.lua",
 }
 
 --- Load the addon's files into a stubbed environment, the way WoW would:

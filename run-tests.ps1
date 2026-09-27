@@ -74,6 +74,19 @@ foreach ($folder in $folders) {
         if ($LASTEXITCODE -ne 0) {
             $failed += $folder.Name
         }
+
+        # An addon with a build script tests it with Node's own runner. The
+        # argument is a glob: Node does not accept a directory here on Windows.
+        if (Test-Path "tools/test") {
+            if (Get-Command node -ErrorAction SilentlyContinue) {
+                & node --no-warnings --test "tools/test/*.test.mjs"
+                if ($LASTEXITCODE -ne 0) {
+                    $failed += "$($folder.Name) (tools)"
+                }
+            } else {
+                Write-Host "$($folder.Name): node not found, skipping tools/test"
+            }
+        }
     }
     finally {
         Pop-Location

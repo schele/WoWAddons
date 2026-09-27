@@ -38,15 +38,28 @@ All of these go back to how they were as soon as FishScale lets go of the key.
 | Soft target interact range | 30 yards | A cast lands further out than the default range |
 | Auto loot | On | So picking up the bobber puts the fish straight in your bags. `/fs autoloot` turns this off |
 
+## Settings
+
+FishScale has a page in the game's options (Esc, Options, AddOns, FishScale):
+turn it on or off, set the fishing key by clicking the key button and pressing
+the key you want (with Shift, Ctrl or Alt if you like; Escape cancels), take the
+key without a pole, and turn auto loot on while fishing.
+
+The minimap button opens and closes that page. Right-click it to turn
+FishScale on or off; its tooltip says which it is. Drag it to move it round the
+minimap.
+
 ## Commands
 
 | Command | Does |
 |---|---|
+| `/fs settings` | Open the settings page |
 | `/fs key F` | Set the fishing key. Anything the game accepts as a binding: `F`, `SHIFT-F`, `BUTTON4` |
 | `/fs on` / `/fs off` | Turn FishScale on, or off and give the key back |
 | `/fs nopole` | Take the key even without a fishing pole equipped |
 | `/fs autoloot` | Toggle turning auto loot on while fishing |
 | `/fs status` | Show what the key is doing right now |
+| `/fs minimap` | Hide or show the minimap button |
 
 The key defaults to `F`.
 

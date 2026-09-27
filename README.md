@@ -9,6 +9,7 @@ World of Warcraft addons, one folder each.
 | [ClickHeal](ClickHeal/) | A row of spell buttons beside every party member, so healing or dispelling someone is one click |
 | [TrinketMenu](TrinketMenu/) | Every trinket you are carrying, on a bar: left-click to equip in slot 1, right-click for slot 2 |
 | [FishScale](FishScale/) | One key to cast, pick up the bobber and recast while fishing |
+| [BossLoot](BossLoot/) | Every dungeon and raid, its bosses and their loot with drop chances, plus notable trash and chest drops |
 
 ## Layout
 

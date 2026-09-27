@@ -554,6 +554,21 @@ function ns.OpenSettings()
     Settings_.Refresh()
 end
 
+--- Close the options window if it is showing this panel; otherwise open it
+-- here, which also turns it over from another addon's page. Both shown is the
+-- test: the window keeps this frame hidden while any other page is up.
+function ns.ToggleSettings()
+    if panel and panel:IsShown() and SettingsPanel and SettingsPanel:IsShown() then
+        if HideUIPanel then
+            HideUIPanel(SettingsPanel)
+        else
+            SettingsPanel:Hide()
+        end
+        return
+    end
+    ns.OpenSettings()
+end
+
 ns.RegisterCommand("settings", "Open the settings panel", function()
     ns.OpenSettings()
 end)

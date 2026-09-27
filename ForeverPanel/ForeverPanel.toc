@@ -15,3 +15,4 @@ Modules/Bags.lua
 Modules/UITweaks.lua
 Modules/ChatKeys.lua
 Modules/Settings.lua
+Minimap.lua

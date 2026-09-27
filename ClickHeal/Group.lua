@@ -455,6 +455,14 @@ watcher:SetScript("OnEvent", function(_, event, unit)
         -- Names and classes change wholesale, so no single row is enough.
         Group.RefreshAll()
 
+        -- So do the people behind each unit token, and the game's aura
+        -- containers only re-read a unit when one of its auras changes.
+        if ns.AuraSlots then
+            for _, row in pairs(rows) do
+                ns.AuraSlots.Refresh(row)
+            end
+        end
+
         -- A roster change is also when Layout's contiguous stack can need
         -- reshuffling (a unit appearing or vanishing). ApplyAll is what
         -- knows to hold that re-stack, and the spell attributes it also
@@ -650,6 +658,16 @@ ns.RegisterCommand("auras", "Report what the buff timers can read on each unit",
 
         for _, line in ipairs(ns.Spells.Report(unit, row and ns.Row.AssignedSpells(row))) do
             ns.Print(line)
+        end
+
+        -- Which way this row's numbers reach the screen, because the reads
+        -- above answer for ClickHeal's own way only: in combat they all
+        -- fail on 1.60.1 while the game's own numbers go on counting.
+        if row then
+            ns.Print(string.format("  timers: %s",
+                (ns.AuraSlots and ns.AuraSlots.Drawn(row))
+                    and "drawn by the game (aura container)"
+                    or "drawn by ClickHeal"))
         end
     end
 end)

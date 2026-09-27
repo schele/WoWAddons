@@ -1,0 +1,13 @@
+## Interface: 11509, 16001
+## Title: BankBags
+## Notes: Your bank, and every character's, from anywhere.
+## IconTexture: Interface\AddOns\BankBags\icon
+## Author: You
+## Version: 0.1.0
+## SavedVariables: BankBagsDB
+
+BankBags.lua
+Bank.lua
+Window.lua
+Minimap.lua
+Settings.lua

@@ -7,6 +7,7 @@ M.FILES = {
     "Items.lua",
     "Bar.lua",
     "Settings.lua",
+    "Minimap.lua",
 }
 
 --- Load the addon's files into a stubbed environment, the way WoW would:

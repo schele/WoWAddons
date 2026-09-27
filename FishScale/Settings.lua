@@ -1,136 +1,42 @@
 local addonName, ns = ...
 
--- The settings panel. Everything on it comes from ns.RegisterSetting, so this
--- file never needs editing when a setting is added: it renders whatever has
--- been declared, in declaration order.
+-- FishScale's page in the game's options window: the switches /fs has, as
+-- checkboxes, and the fishing key as a button that takes the next key pressed.
 
 local PADDING = 16
-
--- The height of the heading, so the paragraph clears the logo and title.
--- Controls no longer measure anything from the top -- they hang off each
--- other -- so this is the only fixed vertical offset left.
-local TITLE_ROW = 30
-
--- Headroom above a slider for the label that sits on top of it. A slider is
--- the one control whose text is above rather than beside it, so it needs
--- clearing from whatever is above it as well as from its own row.
-local SLIDER_EXTRA = 26
-
--- Between one control and the next, and between the intro paragraph and the
--- first control. Generous on purpose: the paragraph wraps to however many
--- lines the text needs, and a fixed offset that fits today is one sentence
--- away from the first checkbox sitting on top of it.
-local ROW_GAP = 14
-local HINT_GAP = 18
-
--- Between a control and the words naming it. At 4 the label touched the box.
-local LABEL_GAP = 8
-
--- Wide enough for a 200px slider with room to spare, and comfortably inside
--- the canvas the game gives us.
-local COLUMN_WIDTH = 280
-
 -- Big enough to read as a logo beside a GameFontNormalLarge title without
--- crowding the line the hint sits on just below it.
+-- crowding the line below it.
 local LOGO_SIZE = 24
+local ROW_HEIGHT = 30
+local PANEL_WIDTH = 400
+local INDENT = PADDING + 30 -- under a checkbox's label, not its box
 
 local Panel = {}
 ns.SettingsPanel = Panel
-Panel.controls = {}
 
 local panel, category, built
 
-local function addCheckbox(setting, anchorTo, gap)
-    local button = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-    button:SetPoint("TOPLEFT", anchorTo, "BOTTOMLEFT", 0, -gap)
+-- True while the key button is waiting for a key.
+local capturing = false
 
-    -- The label belongs to the template on some clients and not others, so
-    -- write our own rather than reaching for button.Text and finding nil.
-    local label = button:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    label:SetPoint("LEFT", button, "RIGHT", LABEL_GAP, 0)
-    label:SetText(setting.name)
-
-    button:SetScript("OnClick", function(self)
-        ns.SetSettingValue(setting, self:GetChecked() and true or false)
-    end)
-
-    return {
-        setting = setting,
-        widget = button,
-        Refresh = function()
-            button:SetChecked(ns.SettingValue(setting) and true or false)
-        end,
-    }
+--- Let keys we are not interested in carry on to the rest of the UI. A frame
+-- with an OnKeyDown script eats every key unless it says otherwise, and one
+-- left eating them leaves the player unable to move or press Escape.
+local function passKeysThrough(frame, pass)
+    if frame.SetPropagateKeyboardInput then
+        frame:SetPropagateKeyboardInput(pass and true or false)
+    end
 end
 
-local function addSlider(setting, anchorTo, gap)
-    local slider = CreateFrame("Slider", nil, panel, "OptionsSliderTemplate")
-    -- SLIDER_EXTRA on top of the usual gap: a slider wears its label above
-    -- itself rather than beside it, so it needs room the other controls do
-    -- not.
-    slider:SetPoint("TOPLEFT", anchorTo, "BOTTOMLEFT", 0, -(gap + SLIDER_EXTRA))
-    slider:SetMinMaxValues(setting.min, setting.max)
-    slider:SetValueStep(setting.step or 1)
-    slider:SetObeyStepOnDrag(true)
-    slider:SetWidth(200)
-
-    -- The template labels its ends "Low" and "High", which says nothing about
-    -- the range. Show the actual numbers where the template exposes them.
-    if slider.Low and slider.Low.SetText then
-        slider.Low:SetText(tostring(setting.min))
+--- The binding a key press makes with the modifiers held, in the order WoW
+-- writes them. Nil for a key that is not a binding by itself: Escape, or a
+-- modifier pressed on its own while the player reaches for the rest. A bare
+-- key is fine here, unlike on ForeverPanel's chat keys: F is the default.
+local function combination(key)
+    if not key or key == "ESCAPE" or key == "UNKNOWN" then
+        return nil
     end
-    if slider.High and slider.High.SetText then
-        slider.High:SetText(tostring(setting.max))
-    end
-
-    local label = slider:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    label:SetPoint("BOTTOMLEFT", slider, "TOPLEFT", 0, 4)
-
-    -- A setting may describe its own value where the number alone does not
-    -- tell the whole story -- the reach is asked for but only sometimes
-    -- granted, and a slider reading 45 beside a client that allowed 20 is a
-    -- lie the player has no way to catch.
-    local function relabel(value)
-        local shown = setting.describe and setting.describe(value)
-            or string.format("%d", value or 0)
-        label:SetText(string.format("%s: %s", setting.name, shown))
-    end
-
-    slider:SetScript("OnValueChanged", function(_, value)
-        value = math.floor(value + 0.5)
-        ns.SetSettingValue(setting, value)
-        -- Relabelled after the write, not before: describe() asks the client
-        -- what it granted, and before the write it would still be answering
-        -- about the old value.
-        relabel(value)
-    end)
-
-    return {
-        setting = setting,
-        widget = slider,
-        Refresh = function()
-            local value = ns.SettingValue(setting)
-            slider:SetValue(value)
-            relabel(value)
-        end,
-    }
-end
-
--- Pressed on their own these set no binding; they are what a binding is built
--- *with*. Without this the capture ends the instant a player reaches for
--- Shift, and the key they wanted is never seen.
-local MODIFIER_KEYS = {
-    LSHIFT = true, RSHIFT = true,
-    LCTRL = true, RCTRL = true,
-    LALT = true, RALT = true,
-    UNKNOWN = true,
-}
-
---- The binding string for a key pressed right now, or nil if that key cannot
--- be one on its own. Modifiers in the order the client writes them, so what
--- is stored is what SetOverrideBinding would have produced.
-local function bindingFor(key)
-    if not key or MODIFIER_KEYS[key] then
+    if key:match("^[LR]CTRL$") or key:match("^[LR]SHIFT$") or key:match("^[LR]ALT$") then
         return nil
     end
 
@@ -144,122 +50,90 @@ local function bindingFor(key)
     if IsShiftKeyDown and IsShiftKeyDown() then
         prefix = prefix .. "SHIFT-"
     end
-
     return prefix .. key
 end
 
---- A button that takes a key by having it pressed at it.
---
--- Not a text box. A key is not a value to be typed -- "SHIFT-BUTTON4" is
--- exactly the sort of string that is easy to get subtly wrong and impossible
--- to tell is wrong, because a binding that does not parse simply never fires.
--- Pressing the key cannot be misspelled.
-local function addKeybind(setting, anchorTo, gap)
+local function stopCapture()
+    if not capturing then
+        return
+    end
+    capturing = false
+    Panel.key:EnableKeyboard(false)
+    passKeysThrough(Panel.key, true)
+    Panel.key:SetText(ns.db.fishing.key)
+end
+
+local function addKeyButton(y)
+    local label = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    label:SetPoint("TOPLEFT", INDENT, y - 4)
+    label:SetText("Fishing key")
+
     local button = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    button:SetPoint("TOPLEFT", anchorTo, "BOTTOMLEFT", 0, -gap)
-    button:SetSize(150, 24)
-    -- The template carries this, but a button that takes no mouse looks
-    -- entirely correct and does nothing, and this repo has lost rounds to
-    -- exactly that. Cheaper to say it than to diagnose it.
-    button:EnableMouse(true)
+    button:SetPoint("TOPLEFT", INDENT + 90, y)
+    button:SetSize(120, 22)
+    button:EnableKeyboard(false)
+    passKeysThrough(button, true)
 
-    local label = button:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    label:SetPoint("LEFT", button, "RIGHT", LABEL_GAP, 0)
-    label:SetText(setting.name)
+    local hint = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    hint:SetPoint("LEFT", button, "RIGHT", 8, 0)
+    hint:SetText("Click, then press the key.")
 
-    local capturing = false
-
-    local function show()
-        if capturing then
-            button:SetText("Press a key...")
-        else
-            button:SetText(ns.SettingValue(setting) or "not set")
-        end
-    end
-
-    local function stopCapture()
-        capturing = false
-        button:EnableKeyboard(false)
-        -- Let key presses reach the game again. Left set, the player's
-        -- movement keys stop working the moment they close the panel.
-        if button.SetPropagateKeyboardInput then
-            button:SetPropagateKeyboardInput(true)
-        end
-        show()
-    end
-
-    local function startCapture()
+    button:SetScript("OnClick", function(self)
         capturing = true
-        button:EnableKeyboard(true)
-        -- Swallow what is pressed while the panel is listening, so binding
-        -- the key does not also fire whatever it currently does.
-        if button.SetPropagateKeyboardInput then
-            button:SetPropagateKeyboardInput(false)
-        end
-        show()
-    end
+        self:SetText("Press a key")
+        self:EnableKeyboard(true)
+        passKeysThrough(self, false)
+    end)
 
-    local function take(key)
+    button:SetScript("OnKeyDown", function(self, key)
         if not capturing then
+            passKeysThrough(self, true)
             return
         end
-
         if key == "ESCAPE" then
             stopCapture()
             return
         end
-
-        local binding = bindingFor(key)
+        local binding = combination(key)
         if not binding then
-            -- A modifier on its own: keep listening for the key it modifies.
-            return
+            return -- a modifier on its own: keep waiting for the rest
         end
-
         stopCapture()
-        ns.SetSettingValue(setting, binding)
-        show()
-    end
-
-    button:SetScript("OnClick", startCapture)
-    button:SetScript("OnKeyDown", function(_, key) take(key) end)
-
-    -- Mouse buttons past the first two can be bindings too, and a player who
-    -- fishes with a thumb button should not have to type its name. Left and
-    -- right are what opened the capture, so they are not on offer.
-    button:RegisterForClicks("LeftButtonUp")
-    button:SetScript("OnMouseDown", function(_, mouseButton)
-        if mouseButton == "LeftButton" or mouseButton == "RightButton" then
-            return
-        end
-        take(mouseButton)
+        ns.Fishing.SetKey(binding)
     end)
 
-    return {
-        setting = setting,
-        widget = button,
-        -- Exposed so a panel closing mid-capture can put the keyboard back.
-        StopCapture = stopCapture,
-        Refresh = show,
-    }
+    return button
 end
 
--- Guards against a refresh that starts another. A slider's Refresh sets its
--- own value, which the client answers with OnValueChanged, which runs the
--- setting's onChange. It still cannot recurse from inside a Refresh already
--- running: ns.SetSettingValue returns early when the value has not changed,
--- and Refresh always sets a control to exactly the value already stored.
-local refreshing = false
+local function addCheckbox(text, y, indent, onClick)
+    local button = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+    button:SetPoint("TOPLEFT", indent, y)
 
+    -- The label belongs to the template on some clients and not others, so
+    -- write our own rather than reaching for button.Text and finding nil.
+    local label = button:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    label:SetPoint("LEFT", button, "RIGHT", 4, 0)
+    label:SetText(text)
+
+    button:SetScript("OnClick", function(self)
+        onClick(self:GetChecked() and true or false)
+    end)
+    return button
+end
+
+--- Show what is saved. Safe to call before the page is built: every setter
+-- in Fishing.lua calls it, from a command as much as from here.
 function Panel.Refresh()
-    if refreshing then
+    if not built then
         return
     end
-
-    refreshing = true
-    for _, control in ipairs(Panel.controls) do
-        control.Refresh()
+    local db = ns.db.fishing
+    Panel.enabled:SetChecked(db.enabled)
+    Panel.withoutPole:SetChecked(db.withoutPole)
+    Panel.autoLoot:SetChecked(db.autoLoot)
+    if not capturing then
+        Panel.key:SetText(db.key)
     end
-    refreshing = false
 end
 
 local function ensureBuilt()
@@ -268,87 +142,60 @@ local function ensureBuilt()
     end
     built = true
 
-    -- logo, not icon. They are the same fish drawn twice: icon.tga has the
-    -- tile behind it that the AddOns list needs, because every entry there
-    -- is a square and one that is not looks broken. Here the opposite is
-    -- true -- a square tile on a dark grey panel reads as a sticker pasted
-    -- on it -- so logo.tga is the fish alone, on transparency.
-    --
-    -- Built from addonName rather than spelled out: the .toc already names
-    -- this folder, and a second copy of the path is the one that goes stale
-    -- when it is renamed.
+    -- The minimap icon, not the AddOns list one: that carries a square tile,
+    -- which on a dark panel reads as a sticker pasted on.
     local logo = panel:CreateTexture(nil, "ARTWORK")
     logo:SetSize(LOGO_SIZE, LOGO_SIZE)
     logo:SetPoint("TOPLEFT", PADDING, -PADDING)
-    logo:SetTexture("Interface\\AddOns\\" .. addonName .. "\\logo")
+    logo:SetTexture("Interface\\AddOns\\" .. addonName .. "\\minimap")
     Panel.logo = logo
 
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    -- Centred against the logo rather than pinned to the panel, so the two
-    -- read as one heading whatever size the logo is given.
     title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
     title:SetText("FishScale")
 
-    -- From the addon's own metadata, not a constant here, which would drift
-    -- from the .toc the first time either is bumped without the other.
     local metadata = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
     local version = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     version:SetPoint("LEFT", title, "RIGHT", 8, -2)
     version:SetText("Version " .. ((metadata and metadata(addonName, "Version")) or "unknown"))
 
     local hint = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    hint:SetPoint("TOPLEFT", PADDING, -PADDING - TITLE_ROW)
-    hint:SetWidth(COLUMN_WIDTH - PADDING * 2)
+    hint:SetPoint("TOPLEFT", PADDING, -PADDING - ROW_HEIGHT)
+    hint:SetWidth(PANEL_WIDTH - PADDING * 2)
     hint:SetJustifyH("LEFT")
-    Panel.hint = hint
     hint:SetText(
-        "One key for the whole loop: press it to cast, and press it again "
-        .. "to pick the bobber up. The key is yours again in combat, and "
-        .. "while the loot window is open."
+        "One key for the whole fishing loop: it casts, picks up the bobber, and "
+        .. "waits while you loot. Never in combat: when a fight starts, the key "
+        .. "goes back to its usual job."
     )
 
-    -- Each control hangs below the one before it, and the first below the
-    -- paragraph, rather than every control sitting at a counted offset from
-    -- the top. The paragraph wraps to however many lines its text needs, and
-    -- only the client knows how many that is -- a count kept here was right
-    -- for two lines and put the first checkbox on top of the third.
-    local anchorTo = hint
-    local gap = HINT_GAP
+    local y = -PADDING - ROW_HEIGHT * 2 - 12
 
-    for _, setting in ipairs(ns.settings) do
-        local control
-        if setting.type == "slider" then
-            control = addSlider(setting, anchorTo, gap)
-        elseif setting.type == "keybind" then
-            control = addKeybind(setting, anchorTo, gap)
-        else
-            control = addCheckbox(setting, anchorTo, gap)
-        end
+    Panel.enabled = addCheckbox("Take the fishing key while a pole is equipped", y, PADDING, function(value)
+        ns.Fishing.SetEnabled(value)
+    end)
+    y = y - ROW_HEIGHT
 
-        table.insert(Panel.controls, control)
-        anchorTo = control.widget
-        gap = ROW_GAP
-    end
+    Panel.key = addKeyButton(y)
+    y = y - ROW_HEIGHT
+
+    Panel.withoutPole = addCheckbox("Take it without a fishing pole too", y, PADDING, function(value)
+        ns.Fishing.SetWithoutPole(value)
+    end)
+    y = y - ROW_HEIGHT
+
+    Panel.autoLoot = addCheckbox("Turn auto loot on while fishing", y, PADDING, function(value)
+        ns.Fishing.SetAutoLoot(value)
+    end)
 
     Panel.Refresh()
 end
 
-Panel.EnsureBuilt = ensureBuilt
-
---- Give the keyboard back, whatever the panel was in the middle of.
---
--- A capture left running when the panel closes holds every key press away
--- from the game, which looks exactly like the client having frozen.
-function Panel.StopCapturing()
-    for _, control in ipairs(Panel.controls) do
-        if control.StopCapture then
-            control.StopCapture()
-        end
-    end
-end
-
 --- Claim a place in the game's options, without building anything yet.
 local function register()
+    -- Parented and hidden. Left parentless and shown, as the canvas examples
+    -- suggest, the frame is live on screen from login. The Settings system
+    -- shows it when the category is opened, and that is when it gets filled.
     panel = CreateFrame("Frame", nil, UIParent)
     panel:Hide()
     panel.name = "FishScale"
@@ -358,19 +205,20 @@ local function register()
         ensureBuilt()
         Panel.Refresh()
     end)
+    -- A key button left listening would keep the keyboard after the page is
+    -- gone.
+    panel:SetScript("OnHide", stopCapture)
 
-    panel:SetScript("OnHide", Panel.StopCapturing)
-
-    -- A canvas category holds widgets we own, which avoids
-    -- Settings.RegisterAddOnSetting: its argument list changed in 11.0 and a
-    -- wrong guess there registers nothing and fails silently.
     category = Settings.RegisterCanvasLayoutCategory(panel, "FishScale")
     Settings.RegisterAddOnCategory(category)
 end
 
--- Whether the panel on screen was opened from our command rather than through
--- the game menu. Decides where closing it should leave the player.
+-- Whether the page on screen was opened from here rather than through the
+-- game menu. Decides where closing it should leave the player.
 local openedByUs = false
+
+-- Armed while the client is closing a page we opened, so the game menu it
+-- puts up on the way out can be turned away at the door.
 local suppressGameMenu = false
 local closeHooked = false
 
@@ -390,9 +238,7 @@ local function watchForClose()
     closeHooked = true
 
     SettingsPanel:HookScript("OnHide", function()
-        Panel.StopCapturing()
-
-        -- Opening the panel from a command leaves the client queued to fall
+        -- Opening the page from a command leaves the client queued to fall
         -- back to the game menu, which is not where the player came from.
         if not openedByUs then
             return
@@ -400,6 +246,7 @@ local function watchForClose()
         openedByUs = false
         suppressGameMenu = true
 
+        -- Backstop, in case the menu is already up or has no OnShow to catch.
         C_Timer.After(0, function()
             if suppressGameMenu then
                 if GameMenuFrame and GameMenuFrame:IsShown() then
@@ -410,6 +257,7 @@ local function watchForClose()
         end)
     end)
 
+    -- Caught as it shows, so it never reaches the screen.
     if GameMenuFrame and GameMenuFrame.HookScript then
         GameMenuFrame:HookScript("OnShow", function(self)
             if suppressGameMenu then
@@ -419,28 +267,45 @@ local function watchForClose()
     end
 end
 
+--- Open the page in the game's options window.
 function ns.OpenSettings()
     if not category then
-        ns.Print("This client has no settings panel. Use /fs help for commands.")
+        ns.Print("This client has no settings panel. Use /fs for commands.")
         return
     end
 
     watchForClose()
     openedByUs = true
+
+    -- Build before showing, in case the client opens the category without
+    -- firing OnShow on our canvas.
     ensureBuilt()
 
     Settings.OpenToCategory(category:GetID())
     Panel.Refresh()
 end
 
-ns.RegisterCommand("settings", "Open the settings panel", function()
+--- Close the options window if it is showing this page; otherwise open it
+-- here, which also turns it over from another addon's page. Both shown is the
+-- test: the window keeps this frame hidden while any other page is up.
+function ns.ToggleSettings()
+    if panel and panel:IsShown() and SettingsPanel and SettingsPanel:IsShown() then
+        if HideUIPanel then
+            HideUIPanel(SettingsPanel)
+        else
+            SettingsPanel:Hide()
+        end
+        return
+    end
+    ns.OpenSettings()
+end
+
+ns.RegisterCommand("settings", "Open the settings page", function()
     ns.OpenSettings()
 end)
 
 ns.OnLogin(function()
     if Settings and Settings.RegisterCanvasLayoutCategory then
         register()
-    else
-        ns.Print("This client has no settings panel API. Use /fs help instead.")
     end
 end)

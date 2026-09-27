@@ -794,3 +794,53 @@ describe("the aura report", function()
         assertTrue(ok, "a diagnostic with no rows to read must still report")
     end)
 end)
+
+describe("the aura report saying who draws the timers", function()
+    local FILES_WITH_SLOTS = { "ClickHeal.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "AuraSlots.lua", "Row.lua", "Group.lua" }
+
+    local function reportWith(container)
+        local ns, env = helpers.loadAddon(FILES_WITH_SLOTS)
+        env.__auraContainer = container
+        helpers.login(ns, env)
+        helpers.command(env, "auras")
+        return helpers.printed(env)
+    end
+
+    it("says the game draws them where it has the container", function()
+        assertMatch("timers: drawn by the game", reportWith(true))
+    end)
+
+    it("says ClickHeal draws them where it does not", function()
+        assertMatch("timers: drawn by ClickHeal", reportWith(false))
+    end)
+
+    it("has no probe any more", function()
+        local ns, env = helpers.loadAddon(FILES_WITH_SLOTS)
+        helpers.login(ns, env)
+
+        helpers.command(env, "probe")
+
+        assertMatch("Unknown command: probe", helpers.printed(env))
+    end)
+end)
+
+describe("the game's timers when the party changes", function()
+    it("has every row's container read its unit afresh", function()
+        -- "party2" can come to mean somebody else, and the container only
+        -- re-reads a unit when one of its auras changes: without this, a
+        -- row could go on showing the last person's buffs.
+        local ns, env = helpers.loadAddon({ "ClickHeal.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "AuraSlots.lua", "Row.lua", "Group.lua" })
+        env.__auraContainer = true
+        helpers.login(ns, env)
+        local before = {}
+        for unit, row in pairs(ns.Group.Rows()) do
+            before[unit] = row.auraContainer.refreshes
+        end
+
+        helpers.fire(env, "GROUP_ROSTER_UPDATE")
+
+        for unit, row in pairs(ns.Group.Rows()) do
+            assertTrue(row.auraContainer.refreshes > before[unit], unit .. " re-read")
+        end
+    end)
+end)

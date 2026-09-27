@@ -1,0 +1,45 @@
+local helpers = require("helpers")
+
+describe("the core", function()
+    it("sets up its saved variables at login", function()
+        local ns, env = helpers.loggedIn()
+        assertTrue(type(env.BankBagsDB) == "table")
+        assertEqual(env.BankBagsDB, ns.db)
+    end)
+
+    it("keeps what was saved, and adds what is new", function()
+        local ns, env = helpers.loadAddon({ "BankBags.lua" }, function(e)
+            e.BankBagsDB = { kept = true }
+        end)
+        ns.AddDefaults({ fresh = { value = 1 } })
+        helpers.login(ns, env)
+        assertTrue(ns.db.kept)
+        assertEqual(1, ns.db.fresh.value)
+    end)
+
+    it("lists its commands with /bb help, under /bankbags as well", function()
+        local ns, env = helpers.loadAddon({ "BankBags.lua" })
+        ns.RegisterCommand("thing", "Does a thing", function() end)
+        helpers.login(ns, env)
+        helpers.command(env, "help")
+        assertMatch("/bb thing %- Does a thing", helpers.printed(env))
+        assertEqual("/bankbags", env.SLASH_BANKBAGS1)
+        assertEqual("/bb", env.SLASH_BANKBAGS2)
+    end)
+
+    it("runs the default command for a bare /bb", function()
+        local ns, env = helpers.loadAddon({ "BankBags.lua" })
+        local ran = false
+        ns.DefaultCommand = function() ran = true end
+        helpers.login(ns, env)
+        helpers.command(env, "")
+        assertTrue(ran)
+    end)
+
+    it("says so for a command it does not know", function()
+        local ns, env = helpers.loadAddon({ "BankBags.lua" })
+        helpers.login(ns, env)
+        helpers.command(env, "nonsense")
+        assertMatch("Unknown command: nonsense", helpers.printed(env))
+    end)
+end)

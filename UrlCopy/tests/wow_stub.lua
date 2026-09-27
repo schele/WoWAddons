@@ -64,6 +64,12 @@ local function makeWidget(kind, parent)
     function widget:IsShown() return self.shown end
 
     function widget:SetScript(name, fn) self.scripts[name] = fn end
+    -- For a minimap button.
+    function widget:GetFrameLevel() return self.frameLevel or 1 end
+    function widget:RegisterForDrag(...) self.drag = { ... } end
+    function widget:SetHighlightTexture(value) self.highlightTexture = value end
+    function widget:GetCenter() return self.centerX or 0, self.centerY or 0 end
+    function widget:GetEffectiveScale() return 1 end
     function widget:GetScript(name) return self.scripts[name] end
 
     function widget:HookScript(name, fn)
