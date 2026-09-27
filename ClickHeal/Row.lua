@@ -577,6 +577,13 @@ function Row.ApplySpells(row)
             button.icon:Hide()
             button:Hide()
         end
+
+        -- Read back off the button, so the slots follow exactly the spell
+        -- it will cast: a resurrection left off your own row takes its
+        -- slots with it.
+        if ns.AuraSlots then
+            ns.AuraSlots.SetSpell(row, index, button:GetAttribute("spell"))
+        end
     end
 
     -- Narrowed to what is actually on it, so the frame behind the row stops

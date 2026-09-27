@@ -131,3 +131,62 @@ describe("the game drawing a row's timers", function()
         assertFalse(container:IsShown(), "nothing half-built left on screen")
     end)
 end)
+
+describe("pointing a button's slots at its spell", function()
+    local function withIDs(e)
+        e.__spellIDsByName["Rejuvenation"] = 774
+        e.__spellIDsByName["Mark of the Wild"] = 1126
+    end
+
+    it("matches both slots to the button's spell by its ID, and switches them on", function()
+        local ns, env = loggedIn(withIDs)
+        local row = rowWith(ns, env, "party1", { "Rejuvenation" })
+        local slots = row.auraSlots[1]
+
+        assertTrue(slots.own.frame.candidateFilters.includeSpellIDs[774])
+        assertTrue(slots.other.frame.candidateFilters.includeSpellIDs[774])
+        assertEqual(true, slots.own.frame.candidateFilters.isFromPlayerOrPlayerPet)
+        assertEqual(false, slots.other.frame.candidateFilters.isFromPlayerOrPlayerPet)
+        assertTrue(slots.own.frame.enabled)
+        assertTrue(slots.other.frame.enabled)
+    end)
+
+    it("keeps the slots of a button with no spell switched off", function()
+        local ns, env = loggedIn(withIDs)
+        local row = rowWith(ns, env, "party1", { "Rejuvenation" })
+
+        assertFalse(row.auraSlots[2].own.frame.enabled)
+        assertFalse(row.auraSlots[2].other.frame.enabled)
+    end)
+
+    it("switches a button's slots off when its spell has no ID, rather than matching every buff", function()
+        local ns, env = loggedIn(withIDs)
+        local row = rowWith(ns, env, "party1", { "Healing Touch" })
+
+        assertFalse(row.auraSlots[1].own.frame.enabled)
+        assertFalse(row.auraSlots[1].other.frame.enabled)
+    end)
+
+    it("follows a change of spell", function()
+        local ns, env = loggedIn(withIDs)
+        local row = rowWith(ns, env, "party1", { "Rejuvenation" })
+
+        ns.Slots.Set(1, "Mark of the Wild")
+        ns.Row.ApplySpells(row)
+
+        local ids = row.auraSlots[1].own.frame.candidateFilters.includeSpellIDs
+        assertTrue(ids[1126])
+        assertNil(ids[774])
+    end)
+
+    it("takes its slots with it when a button is emptied", function()
+        local ns, env = loggedIn(withIDs)
+        local row = rowWith(ns, env, "party1", { "Rejuvenation" })
+
+        -- Emptied, not counted away: Slots.Count never goes below 1.
+        ns.Slots.Set(1, "")
+        ns.Row.ApplySpells(row)
+
+        assertFalse(row.auraSlots[1].own.frame.enabled)
+    end)
+end)

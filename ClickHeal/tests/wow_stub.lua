@@ -665,6 +665,12 @@ function stub.newEnv()
     -- __spellTextures/__spellIDs/__spellbook tables above, e.g.:
     --   env.C_Spell.GetSpellTexture = nil
     --   env.GetSpellTexture = function(name) return env.__spellTextures[name] end
+    -- The spell ID a name looks up to, for a test that needs a number: the
+    -- aura container matches buffs by ID. Empty by default, which leaves a
+    -- lookup by name answering with the name, as it always has here.
+    --   env.__spellIDsByName["Rejuvenation"] = 774
+    env.__spellIDsByName = {}
+
     env.C_Spell = {
         GetSpellTexture = function(name) return env.__spellTextures[name] end,
         -- The real call accepts a spellID or a name; both __spellIDs and
@@ -676,7 +682,7 @@ function stub.newEnv()
                 name = identifier
             end
             if not name then return nil end
-            return { name = name, spellID = identifier }
+            return { name = name, spellID = env.__spellIDsByName[identifier] or identifier }
         end,
         -- A table, where the old global returned four loose values. That
         -- difference is the whole reason Spells.Cooldown exists.

@@ -19,9 +19,51 @@ local PLATE_WIDTH = 26
 local PLATE_HEIGHT = 13
 local PLATE_ALPHA = 0.85
 
+-- Spell IDs seen on buffs out of combat, by the buff's name: other ranks,
+-- and other casters' copies, that the spellbook knows nothing about. Kept
+-- for the session only. Filled by AuraSlots.Learn.
+local learned = {}
+
 --- What a slot takes: the buff's spell IDs, and whose cast.
 local function filtersFor(ids, own)
     return { includeSpellIDs = ids, isFromPlayerOrPlayerPet = own }
+end
+
+--- Every spell ID `spell` is known by, as the map a slot's filter wants:
+-- the spellbook's, and any learned. Nil when there are none, and then the
+-- button's slots are switched off rather than left to match every buff.
+local function idsFor(spell)
+    if not spell then
+        return nil
+    end
+
+    local ids, any = {}, false
+    local fromBook = ns.Spells.SpellID(spell)
+    if fromBook then
+        ids[fromBook] = true
+        any = true
+    end
+    for id in pairs(learned[spell] or {}) do
+        ids[id] = true
+        any = true
+    end
+
+    return any and ids or nil
+end
+
+--- Point a button's two slots at its spell's IDs, or switch them off.
+-- Guarded: a refusal here costs this button its number, never the caller
+-- -- Row.ApplySpells, which the whole bar goes through.
+local function applyFilters(row, slots)
+    ns.Guarded(function()
+        local ids = idsFor(slots.spell)
+        for _, slot in ipairs({ slots.own, slots.other }) do
+            if ids then
+                row.auraContainer:SetAuraSlotCandidateFilters(slot.key, filtersFor(ids, slot == slots.own))
+            end
+            row.auraContainer:SetAuraSlotEnabled(slot.key, ids ~= nil)
+        end
+    end)
 end
 
 --- One slot under `button`: yours (white on the plate, drawn on top) or
@@ -111,4 +153,17 @@ end
 --- Whether the game draws this row's timers, rather than ClickHeal.
 function AuraSlots.Drawn(row)
     return row.auraContainer ~= nil
+end
+
+--- Point the slots under button `index` at `spell`, or at nothing. Out of
+-- combat only, like every other change to a button: Row.ApplySpells calls
+-- it for every button, every time.
+function AuraSlots.SetSpell(row, index, spell)
+    local slots = row.auraSlots and row.auraSlots[index]
+    if not slots then
+        return
+    end
+
+    slots.spell = spell
+    applyFilters(row, slots)
 end

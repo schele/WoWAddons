@@ -771,3 +771,21 @@ describe("a client that will not say who cast an aura", function()
         assertMatch("HELPFUL: 1 aura", printed)
     end)
 end)
+
+describe("a spell's ID", function()
+    it("is the one the spellbook gives its name", function()
+        local ns, env = loggedIn()
+        env.__spellIDsByName["Rejuvenation"] = 774
+
+        assertEqual(774, ns.Spells.SpellID("Rejuvenation"))
+    end)
+
+    it("is nil when the lookup gives no number", function()
+        local ns = loggedIn()
+
+        assertNil(ns.Spells.SpellID("Rejuvenation"), "the stub answers with the name")
+        assertNil(ns.Spells.SpellID("Nothing Anyone Knows"))
+        assertNil(ns.Spells.SpellID(nil))
+        assertNil(ns.Spells.SpellID(""))
+    end)
+end)
