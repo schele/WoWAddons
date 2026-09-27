@@ -551,6 +551,20 @@ describe("the aura report", function()
         assertMatch("raised", table.concat(lines, "\n"))
     end)
 
+    it("gives the client's own words for why it raised", function()
+        -- What 1.60.1 does to every walk in combat. "It raised" alone
+        -- cannot tell a read refused outright from a value it will not let
+        -- us touch, and those want different fixes.
+        local ns, env = loggedIn()
+        env.C_UnitAuras.GetAuraDataByIndex = function()
+            error("aura data is restricted for tainted callers", 0)
+        end
+
+        local printed = report(ns, "party1")
+
+        assertTrue(printed:find("aura data is restricted for tainted callers", 1, true) ~= nil, printed)
+    end)
+
     it("answers for each spell the row's buttons are holding", function()
         local ns, env = loggedIn()
         env.__now = 1000
@@ -560,6 +574,87 @@ describe("the aura report", function()
 
         assertMatch("Rejuvenation: 7s", printed)
         assertMatch("Mark of the Wild: no number", printed)
+    end)
+end)
+
+-- The route the game's own buff frames take, staged: each aura's instance
+-- ID, what asking by that ID gives, its duration object, and a countdown
+-- binding that writes into a label what the game would.
+local function withInstanceRoute(env, auras)
+    env.C_UnitAuras.GetUnitAuraInstanceIDs = function()
+        local ids = {}
+        for id in pairs(auras) do ids[#ids + 1] = id end
+        table.sort(ids)
+        return ids
+    end
+    env.C_UnitAuras.GetAuraDataByAuraInstanceID = function(_, id) return auras[id] end
+    env.C_UnitAuras.GetAuraDuration = function(_, id) return { aura = auras[id] } end
+    env.C_StringUtil = { CreateSecondsFormatter = function() return {} end }
+    env.C_DurationUtil = {
+        CreateDurationTextBinding = function()
+            local binding = {}
+            function binding:SetFormatter(formatter) self.formatter = formatter end
+            function binding:SetFontString(label) self.label = label end
+            function binding:SetDuration(duration) self.duration = duration end
+            function binding:UpdateFontString()
+                self.label:SetText(self.formatter and self.duration.aura.countdown or "")
+            end
+            return binding
+        end,
+    }
+end
+
+describe("the aura report following the game's own route", function()
+    local function report(ns, unit)
+        return table.concat(ns.Spells.Report(unit), "\n")
+    end
+
+    local function has(printed, text)
+        assertTrue(printed:find(text, 1, true) ~= nil, "expected [" .. text .. "] in:\n" .. printed)
+    end
+
+    it("says when this client has no such route", function()
+        local ns = loggedIn()
+
+        has(report(ns, "party1"), "instance IDs: not in this client")
+    end)
+
+    it("asks for each aura by its ID, for its duration, and for a countdown", function()
+        local ns, env = loggedIn()
+        withInstanceRoute(env, {
+            [7] = { name = "Thorns", spellId = 467, expirationTime = 1300, countdown = "5 m" },
+        })
+
+        local printed = report(ns, "party1")
+
+        has(printed, "instance IDs: 1")
+        has(printed, '#number 7: name="Thorns" spell=number 467 expires=number 1300')
+        has(printed, "duration=table")
+        has(printed, 'countdown="5 m"')
+    end)
+
+    it("names the step the client refuses, and goes on past it", function()
+        local ns, env = loggedIn()
+        withInstanceRoute(env, {
+            [7] = { name = "Thorns", spellId = 467, expirationTime = 1300, countdown = "5 m" },
+        })
+        env.C_UnitAuras.GetAuraDuration = function() error("blocked", 0) end
+
+        local ok, lines = pcall(ns.Spells.Report, "party1")
+
+        assertTrue(ok, "the report must survive the client it is reporting on")
+        local printed = table.concat(lines, "\n")
+        has(printed, "duration=raised: blocked")
+        has(printed, "countdown=-")
+        has(printed, "HelpfulAuras")
+    end)
+
+    it("says so when the client will not list the IDs either", function()
+        local ns, env = loggedIn()
+        withInstanceRoute(env, {})
+        env.C_UnitAuras.GetUnitAuraInstanceIDs = function() error("not for you", 0) end
+
+        has(report(ns, "party1"), "instance IDs: raised: not for you")
     end)
 end)
 
