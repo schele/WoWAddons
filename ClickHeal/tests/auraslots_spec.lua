@@ -246,3 +246,48 @@ describe("learning other ranks' IDs", function()
         assertEqual("", row.buttons[1].timer:GetText(), "the game's number is the only one")
     end)
 end)
+
+-- The game's seconds formatter, as far as a test needs it: every setting it
+-- is given, recorded.
+local function withFormatter(e, leaveOut)
+    e.Enum.SecondsFormatterAbbreviation = { None = 0, Truncate = 1, OneLetter = 2 }
+    e.Enum.SecondsFormatterIntervalWhitespace = { Preserve = 0, Strip = 1, StripIgnoreLocale = 2 }
+    e.Enum.SecondsFormatterInterval = { Seconds = 0, Minutes = 1, Hours = 2, Days = 3 }
+    e.Enum.SecondsFormatterRounding = { RoundUp = 0, Truncate = 1 }
+    e.C_StringUtil = {
+        CreateSecondsFormatter = function()
+            local formatter = { settings = {} }
+            for _, setter in ipairs({ "SetDefaultAbbreviation", "SetStripIntervalWhitespace",
+                "SetDesiredUnitCount", "SetMinInterval", "SetRounding", "SetCanRoundUpLastUnit" }) do
+                if setter ~= leaveOut then
+                    formatter[setter] = function(self, value) self.settings[setter] = value end
+                end
+            end
+            return formatter
+        end,
+    }
+end
+
+describe("the game's numbers", function()
+    it("are written as ClickHeal writes them: 7s, 8m, 2h", function()
+        local ns, env = loggedIn(function(e) withFormatter(e) end)
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        local formatter = row.auraSlots[1].own.frame.durationOptions.textFormatter
+        assertEqual(2, formatter.settings.SetDefaultAbbreviation, "one letter")
+        assertEqual(2, formatter.settings.SetStripIntervalWhitespace, "no space, whatever the locale")
+        assertEqual(1, formatter.settings.SetDesiredUnitCount, "one unit")
+        assertEqual(0, formatter.settings.SetMinInterval, "down to seconds")
+        assertEqual(0, formatter.settings.SetRounding, "rounded up")
+        assertEqual(true, formatter.settings.SetCanRoundUpLastUnit)
+        assertEqual(formatter, row.auraSlots[1].other.frame.durationOptions.textFormatter, "one for all")
+    end)
+
+    it("fall back to the game's own style on a client missing part of the formatter", function()
+        local ns, env = loggedIn(function(e) withFormatter(e, "SetStripIntervalWhitespace") end)
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        assertTrue(ns.AuraSlots.Drawn(row), "a number in the game's style beats none")
+        assertNil(row.auraSlots[1].own.frame.durationOptions.textFormatter)
+    end)
+end)
