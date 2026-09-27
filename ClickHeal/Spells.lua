@@ -116,6 +116,27 @@ function Spells.IsKnown(spellName)
     return true
 end
 
+--- The spell ID the spellbook gives `spellName`, or nil. The highest rank
+-- known, which is the one a button casting by name casts. Only a number
+-- counts: the aura container matches buffs by ID, and anything else would
+-- match nothing while looking as if it matched.
+function Spells.SpellID(spellName)
+    if type(spellName) ~= "string" or spellName == "" then
+        return nil
+    end
+
+    return ns.Guarded(function()
+        local id
+        if C_Spell and C_Spell.GetSpellInfo then
+            local info = C_Spell.GetSpellInfo(spellName)
+            id = type(info) == "table" and info.spellID or nil
+        elseif GetSpellInfo then
+            id = select(7, GetSpellInfo(spellName))
+        end
+        return type(id) == "number" and id or nil
+    end, nil)
+end
+
 --- What spell, if any, is on the cursor -- nil for anything else (an item, a
 -- macro, an empty cursor), so a player dropping or clicking one of those can
 -- carry on carrying it. GetCursorInfo's extra returns for a spell differ by
@@ -452,24 +473,25 @@ function Spells.HelpfulAuras(unit)
         local auras = {}
 
         for index = 1, AURA_LIMIT do
-            local name, expires, source
+            local name, expires, source, spellId
 
             if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
                 local data = C_UnitAuras.GetAuraDataByIndex(unit, index, AURA_FILTER)
                 if type(data) ~= "table" then
                     break
                 end
-                name, expires = data.name, data.expirationTime
+                name, expires, spellId = data.name, data.expirationTime, data.spellId
                 -- Not fetched here, and not on this line: see castByPlayer.
                 source = function() return data.sourceUnit end
             elseif UnitAura then
-                -- name, icon, count, dispelType, duration, expirationTime, caster
-                local found, _, _, _, _, expirationTime, caster =
+                -- name, icon, count, dispelType, duration, expirationTime,
+                -- caster, isStealable, nameplateShowPersonal, spellId
+                local found, _, _, _, _, expirationTime, caster, _, _, id =
                     UnitAura(unit, index, AURA_FILTER)
                 if not found then
                     break
                 end
-                name, expires = found, expirationTime
+                name, expires, spellId = found, expirationTime, id
                 source = function() return caster end
             else
                 break
@@ -484,6 +506,12 @@ function Spells.HelpfulAuras(unit)
                     -- caller holding the gathered table has no way back to
                     -- it.
                     mine = castByPlayer(source),
+                    -- Only a number the client lets us do sums on. A secret
+                    -- one would raise again as a table key, on every
+                    -- refresh, in AuraSlots.Learn.
+                    spellId = ns.Guarded(function()
+                        return type(spellId) == "number" and spellId + 0 or nil
+                    end, nil),
                 }
             end
         end

@@ -61,7 +61,9 @@ local function makeWidget(kind, parent, template, env)
         table.insert(self.points, { ... })
     end
     function widget:ClearAllPoints() self.points = {} end
-    function widget:SetAllPoints() end
+    -- Recorded, not ignored: a frame given no points does not render, and
+    -- this is how some frames are given theirs.
+    function widget:SetAllPoints(relativeTo) self.allPointsTo = relativeTo or self.parent end
     function widget:GetPoint(index)
         local point = self.points[index or 1]
         if point then return table.unpack(point) end
@@ -315,9 +317,107 @@ function stub.newEnv()
     -- addon has to survive -- which means the stub has to be able to stage it.
     env.__missingTemplates = {}
 
+    -- Blizzard's aura container (Blizzard_AuraContainer), which 1.60.1 has
+    -- and older clients do not: off unless a test turns it on with
+    --   env.__auraContainer = true
+    -- Modelled on what /ch probe found in game on 2026-09-27. The slot's
+    -- frame runs initializeFrame as it is made -- through securecallfunction
+    -- in the client, so an error there is reported, not raised to the caller
+    -- -- and SetDurationText refuses a label that is not that frame or one of
+    -- its descendants. A test stages a refused AddAuraSlot with
+    --   env.__auraSlotError = "the client's words"
+    env.__auraContainer = false
+
+    local function isDescendant(object, owner)
+        local parent = object and object.parent
+        while parent do
+            if parent == owner then
+                return true
+            end
+            parent = parent.parent
+        end
+        return false
+    end
+
+    -- The client copies what it is handed (securecopy), so a test can never
+    -- see a later change to a table the addon keeps.
+    local function copy(source)
+        if type(source) ~= "table" then
+            return source
+        end
+        local result = {}
+        for key, value in pairs(source) do
+            result[key] = copy(value)
+        end
+        return result
+    end
+
+    local function makeAuraContainer(parent, template)
+        local container = makeWidget("AuraContainer", parent, template, env)
+        container.slots = {}
+        container.filterWrites = 0
+        container.refreshes = 0
+
+        function container:SetUnit(unit) self.unit = unit end
+
+        -- Counted: the container re-reads its unit on its own only when one
+        -- of that unit's auras changes, so a test can see a refresh asked for.
+        function container:UpdateAllAuras() self.refreshes = self.refreshes + 1 end
+
+        function container:AddAuraSlot(key, filterString, options)
+            if env.__auraSlotError then
+                error(env.__auraSlotError, 2)
+            end
+            options = options or {}
+
+            local slot = makeWidget("AuraButton", self, "CustomAuraButtonTemplate", env)
+            slot.key, slot.filterString = key, filterString
+            slot.candidateFilters = copy(options.candidateFilters)
+            slot.enabled = true
+            -- A Button with OnEnter and OnClick of its own
+            -- (Blizzard_AuraButton.xml), so it takes the mouse unless told not to.
+            slot.mouseEnabled = true
+
+            function slot:SetDurationText(label, textOptions)
+                if label ~= self and not isDescendant(label, self) then
+                    error("bad object in function call (must be the owner or "
+                        .. "a direct or indirect descendant of owner)", 2)
+                end
+                self.durationText, self.durationOptions = label, textOptions
+            end
+
+            self.slots[key] = slot
+            if options.initializeFrame then
+                pcall(options.initializeFrame, slot)
+            end
+            return slot
+        end
+
+        function container:GetAuraSlotFrame(key) return self.slots[key] end
+
+        function container:SetAuraSlotEnabled(key, enabled)
+            self.slots[key].enabled = enabled and true or false
+        end
+
+        function container:SetAuraSlotCandidateFilters(key, filters)
+            self.filterWrites = self.filterWrites + 1
+            self.slots[key].candidateFilters = copy(filters)
+        end
+
+        table.insert(env.__frames, container)
+        return container
+    end
+
     function env.CreateFrame(kind, name, parent, template)
         if template and env.__missingTemplates[template] then
             error(string.format("Couldn't find inherited node '%s'", template), 2)
+        end
+
+        if kind == "AuraContainer" then
+            if not env.__auraContainer then
+                error("CreateFrame: Unknown frame type 'AuraContainer'", 2)
+            end
+            return makeAuraContainer(parent, template)
         end
 
         local frame = makeWidget(kind or "Frame", parent, template, env)
@@ -507,7 +607,7 @@ function stub.newEnv()
     local function auraData(aura)
         if aura.caster == "secret" then
             return setmetatable(
-                { name = aura.name, expirationTime = aura.expirationTime },
+                { name = aura.name, expirationTime = aura.expirationTime, spellId = aura.spellId },
                 {
                     __index = function(_, key)
                         if key == "sourceUnit" then
@@ -524,6 +624,7 @@ function stub.newEnv()
             name = aura.name,
             expirationTime = aura.expirationTime,
             sourceUnit = auraCaster(aura),
+            spellId = aura.spellId,
         }
     end
 
@@ -575,6 +676,12 @@ function stub.newEnv()
     -- __spellTextures/__spellIDs/__spellbook tables above, e.g.:
     --   env.C_Spell.GetSpellTexture = nil
     --   env.GetSpellTexture = function(name) return env.__spellTextures[name] end
+    -- The spell ID a name looks up to, for a test that needs a number: the
+    -- aura container matches buffs by ID. Empty by default, which leaves a
+    -- lookup by name answering with the name, as it always has here.
+    --   env.__spellIDsByName["Rejuvenation"] = 774
+    env.__spellIDsByName = {}
+
     env.C_Spell = {
         GetSpellTexture = function(name) return env.__spellTextures[name] end,
         -- The real call accepts a spellID or a name; both __spellIDs and
@@ -586,7 +693,7 @@ function stub.newEnv()
                 name = identifier
             end
             if not name then return nil end
-            return { name = name, spellID = identifier }
+            return { name = name, spellID = env.__spellIDsByName[identifier] or identifier }
         end,
         -- A table, where the old global returned four loose values. That
         -- difference is the whole reason Spells.Cooldown exists.

@@ -449,6 +449,14 @@ watcher:SetScript("OnEvent", function(_, event, unit)
         -- Names and classes change wholesale, so no single row is enough.
         Group.RefreshAll()
 
+        -- So do the people behind each unit token, and the game's aura
+        -- containers only re-read a unit when one of its auras changes.
+        if ns.AuraSlots then
+            for _, row in pairs(rows) do
+                ns.AuraSlots.Refresh(row)
+            end
+        end
+
         -- A roster change is also when Layout's contiguous stack can need
         -- reshuffling (a unit appearing or vanishing). ApplyAll is what
         -- knows to hold that re-stack, and the spell attributes it also
@@ -645,125 +653,17 @@ ns.RegisterCommand("auras", "Report what the buff timers can read on each unit",
         for _, line in ipairs(ns.Spells.Report(unit, row and ns.Row.AssignedSpells(row))) do
             ns.Print(line)
         end
-    end
-end)
 
--- THROWAWAY PROBE, 2026-09-27: delete once answered. In combat this client
--- refuses ClickHeal every aura read ("Auras cannot be accessed when secret
--- while tainted"), so the timers go blank. This asks whether Blizzard's aura
--- container -- a frame an addon may create, filled by the game's own
--- protected code -- still counts a buff down there: one container on the
--- player, one slot for the named spell (Thorns unless another is named), and
--- the game's countdown written into a label above the middle of the screen.
--- /ch probe again takes it down.
-local probe
-
-local function probeStep(name, fn, ...)
-    local ok, result = pcall(fn, ...)
-    ns.Print(string.format("probe %s: %s", name,
-        ok and "ok" or ("raised: " .. ns.Guarded(function() return tostring(result) end, "?"))))
-    return ok, result
-end
-
-ns.RegisterCommand("probe", "Try the game's aura container on one of your own buffs", function(arg)
-    if probe then
-        probe.holder:Hide()
-        probe = nil
-        ns.Print("probe: taken down.")
-        return
-    end
-
-    local spell = (arg and arg ~= "") and arg or "Thorns"
-
-    -- The ID the spellbook gives, and the one on you now if it can be read:
-    -- a rank apart, the two differ.
-    local ids, listed = {}, {}
-    ns.Guarded(function()
-        local info = C_Spell.GetSpellInfo(spell)
-        ids[info.spellID] = true
-    end)
-    ns.Guarded(function()
-        local aura = C_UnitAuras.GetAuraDataBySpellName("player", spell, "HELPFUL")
-        ids[aura.spellId] = true
-    end)
-    for id in pairs(ids) do
-        listed[#listed + 1] = tostring(id)
-    end
-    ns.Print(string.format("probe %s: spell IDs %s", spell,
-        #listed > 0 and table.concat(listed, ", ") or "none found"))
-
-    probe = {}
-    probe.holder = CreateFrame("Frame", nil, UIParent)
-    probe.holder:SetSize(240, 24)
-    probe.holder:SetPoint("CENTER", UIParent, "CENTER", 0, 150)
-    local caption = probe.holder:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    caption:SetPoint("RIGHT", probe.holder, "CENTER", -4, 0)
-    caption:SetText("Probe, " .. spell .. ":")
-
-    -- The label has to belong to the slot's own frame ("must be the owner or
-    -- a direct or indirect descendant of owner"), so it is made there, in the
-    -- callback the game runs on that frame before locking it down. What each
-    -- step said is kept and printed once the slot is added.
-    local label
-    local steps = {}
-    local function initializeFrame(frame)
-        local function step(name, fn, ...)
-            local ok, result = pcall(fn, ...)
-            steps[#steps + 1] = string.format("probe %s: %s", name,
-                ok and "ok" or ("raised: " .. ns.Guarded(function() return tostring(result) end, "?")))
-            return ok, result
+        -- Which way this row's numbers reach the screen, because the reads
+        -- above answer for ClickHeal's own way only: in combat they all
+        -- fail on 1.60.1 while the game's own numbers go on counting.
+        if row then
+            ns.Print(string.format("  timers: %s",
+                (ns.AuraSlots and ns.AuraSlots.Drawn(row))
+                    and "drawn by the game (aura container)"
+                    or "drawn by ClickHeal"))
         end
-        local made, fontString = step("label on slot", frame.CreateFontString, frame,
-            nil, "OVERLAY", "GameFontHighlightLarge")
-        if not made then
-            return
-        end
-        label = fontString
-        fontString:SetPoint("LEFT", frame, "LEFT")
-        fontString:SetSize(100, 20)
-        fontString:SetJustifyH("LEFT")
-        step("duration text", frame.SetDurationText, frame, fontString)
     end
-
-    local ok, container = probeStep("create container", CreateFrame,
-        "AuraContainer", nil, probe.holder, "CustomAuraContainerTemplate")
-    if not ok then
-        return
-    end
-    container:SetSize(24, 24)
-    container:SetPoint("CENTER", probe.holder, "CENTER")
-
-    if not probeStep("set unit", container.SetUnit, container, "player") then
-        return
-    end
-
-    local added, slot = probeStep("add slot", container.AddAuraSlot, container, "probe", "HELPFUL",
-        { candidateFilters = { includeSpellIDs = ids }, initializeFrame = initializeFrame })
-    for _, line in ipairs(steps) do
-        ns.Print(line)
-    end
-    if #steps == 0 then
-        ns.Print("probe: the slot's frame was not set up yet (no callback ran)")
-    end
-    if not added or not label then
-        return
-    end
-
-    -- Beside the caption: the slot's frame is what the game shows and hides
-    -- as the buff comes and goes, and the label rides on it.
-    probeStep("place slot", function()
-        slot:SetSize(100, 20)
-        slot:SetPoint("LEFT", probe.holder, "CENTER", 4, 0)
-    end)
-
-    -- What the label holds a moment later, as far as it can be read: out of
-    -- combat a number, in it perhaps a secret the screen still shows.
-    C_Timer.After(1, function()
-        ns.Print("probe label: " .. ns.Guarded(function()
-            return string.format("%q", label:GetText() or "")
-        end, "WITHHELD"))
-    end)
-    ns.Print("probe up. Watch the number after 'Probe, " .. spell .. ":', then fight. /ch probe takes it down.")
 end)
 
 ns.RegisterSetting({
