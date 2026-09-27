@@ -45,6 +45,10 @@ local PADDING = 4
 local TIMER_WIDTH = 40
 local TIMER_HEIGHT = 14
 
+-- Read by AuraSlots, which lays the game's numbers out in the same box.
+Row.TIMER_WIDTH = TIMER_WIDTH
+Row.TIMER_HEIGHT = TIMER_HEIGHT
+
 -- The gold frame a button shows under the cursor: how thick, whatever the
 -- icon size, and its four edges as the pair of corners each runs between.
 -- `across` marks the top and bottom, which are sized by height.
@@ -146,6 +150,7 @@ local RANGE_DIM = 0.4
 -- enough to read as the quieter of two numbers side by side, not so far that
 -- it stops being legible against a spell icon.
 local OTHERS_DIM = 0.55
+Row.OTHERS_DIM = OTHERS_DIM
 
 -- Blizzard's own stand-in for a spell it will not draw. Reached only when
 -- the player knows the spell but the icon lookup came back empty, so that a
@@ -467,6 +472,13 @@ function Row.Create(unit, parent)
 
         button:Hide()
         row.buttons[index] = button
+    end
+
+    -- The game draws this row's timers where it can, which is what keeps
+    -- them counting in combat: see AuraSlots.lua. Where it cannot, the row
+    -- keeps button.timer, written by RefreshAuras.
+    if ns.AuraSlots then
+        ns.AuraSlots.Attach(row)
     end
 
     return row

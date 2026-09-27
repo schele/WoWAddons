@@ -315,9 +315,99 @@ function stub.newEnv()
     -- addon has to survive -- which means the stub has to be able to stage it.
     env.__missingTemplates = {}
 
+    -- Blizzard's aura container (Blizzard_AuraContainer), which 1.60.1 has
+    -- and older clients do not: off unless a test turns it on with
+    --   env.__auraContainer = true
+    -- Modelled on what /ch probe found in game on 2026-09-27. The slot's
+    -- frame runs initializeFrame as it is made -- through securecallfunction
+    -- in the client, so an error there is reported, not raised to the caller
+    -- -- and SetDurationText refuses a label that is not that frame or one of
+    -- its descendants. A test stages a refused AddAuraSlot with
+    --   env.__auraSlotError = "the client's words"
+    env.__auraContainer = false
+
+    local function isDescendant(object, owner)
+        local parent = object and object.parent
+        while parent do
+            if parent == owner then
+                return true
+            end
+            parent = parent.parent
+        end
+        return false
+    end
+
+    -- The client copies what it is handed (securecopy), so a test can never
+    -- see a later change to a table the addon keeps.
+    local function copy(source)
+        if type(source) ~= "table" then
+            return source
+        end
+        local result = {}
+        for key, value in pairs(source) do
+            result[key] = copy(value)
+        end
+        return result
+    end
+
+    local function makeAuraContainer(parent, template)
+        local container = makeWidget("AuraContainer", parent, template, env)
+        container.slots = {}
+        container.filterWrites = 0
+
+        function container:SetUnit(unit) self.unit = unit end
+
+        function container:AddAuraSlot(key, filterString, options)
+            if env.__auraSlotError then
+                error(env.__auraSlotError, 2)
+            end
+            options = options or {}
+
+            local slot = makeWidget("AuraButton", self, "CustomAuraButtonTemplate", env)
+            slot.key, slot.filterString = key, filterString
+            slot.candidateFilters = copy(options.candidateFilters)
+            slot.enabled = true
+
+            function slot:SetDurationText(label, textOptions)
+                if label ~= self and not isDescendant(label, self) then
+                    error("bad object in function call (must be the owner or "
+                        .. "a direct or indirect descendant of owner)", 2)
+                end
+                self.durationText, self.durationOptions = label, textOptions
+            end
+
+            self.slots[key] = slot
+            if options.initializeFrame then
+                pcall(options.initializeFrame, slot)
+            end
+            return slot
+        end
+
+        function container:GetAuraSlotFrame(key) return self.slots[key] end
+
+        function container:SetAuraSlotEnabled(key, enabled)
+            self.slots[key].enabled = enabled and true or false
+        end
+
+        function container:SetAuraSlotCandidateFilters(key, filters)
+            self.filterWrites = self.filterWrites + 1
+            self.slots[key].candidateFilters = copy(filters)
+        end
+
+        table.insert(env.__frames, container)
+        return container
+    end
+
     function env.CreateFrame(kind, name, parent, template)
         if template and env.__missingTemplates[template] then
             error(string.format("Couldn't find inherited node '%s'", template), 2)
+        end
+
+        if kind == "AuraContainer" then
+            if not env.__auraContainer then
+                error("CreateFrame: Unknown frame type 'AuraContainer'", 2)
+            end
+            return makeAuraContainer(parent, template)
         end
 
         local frame = makeWidget(kind or "Frame", parent, template, env)
