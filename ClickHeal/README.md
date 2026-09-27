@@ -56,8 +56,11 @@ had.
 Under each icon is how long your own copy of that spell has left on that
 person — 7s of Rejuvenation ticking down on one party member, 38m of Mark of
 the Wild on another. Blank means nobody has it on them, which is the signal to
-click. It depends on the client being willing to say, on the same terms as
-range above.
+click. On WoW Forever the game writes these numbers itself, through its own
+aura container: in combat it lets no addon read anyone's buffs, and the
+game's own numbers are the ones that keep counting mid-fight. On a client
+without that container, ClickHeal works them out itself, on the same terms
+as range above.
 
 A buff somebody else cast counts, and is greyed. Re-casting over a Mark of the
 Wild that is already running buys nothing, so a blank there would be asking

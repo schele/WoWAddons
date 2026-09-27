@@ -788,3 +788,32 @@ describe("the aura report", function()
         assertTrue(ok, "a diagnostic with no rows to read must still report")
     end)
 end)
+
+describe("the aura report saying who draws the timers", function()
+    local FILES_WITH_SLOTS = { "ClickHeal.lua", "Anchors.lua", "Spells.lua", "Slots.lua", "AuraSlots.lua", "Row.lua", "Group.lua" }
+
+    local function reportWith(container)
+        local ns, env = helpers.loadAddon(FILES_WITH_SLOTS)
+        env.__auraContainer = container
+        helpers.login(ns, env)
+        helpers.command(env, "auras")
+        return helpers.printed(env)
+    end
+
+    it("says the game draws them where it has the container", function()
+        assertMatch("timers: drawn by the game", reportWith(true))
+    end)
+
+    it("says ClickHeal draws them where it does not", function()
+        assertMatch("timers: drawn by ClickHeal", reportWith(false))
+    end)
+
+    it("has no probe any more", function()
+        local ns, env = helpers.loadAddon(FILES_WITH_SLOTS)
+        helpers.login(ns, env)
+
+        helpers.command(env, "probe")
+
+        assertMatch("Unknown command: probe", helpers.printed(env))
+    end)
+end)
