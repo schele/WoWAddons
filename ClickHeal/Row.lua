@@ -704,25 +704,33 @@ end
 -- One unit, never two: under a small icon "38 m" is readable and "38 m 12 s" is
 -- a smear.
 --
--- Minutes and hours round up, which is what the game's own buff frames do --
--- SecondsToTimeAbbrev ceils everything above a minute. Rounding down instead
--- put our number a whole minute below the one Blizzard was showing for the
--- same buff, side by side on the same screen: 56 m against 57 m. Seconds
--- round up too, so a buff still running never reads 0 s.
+-- Exactly as SecondsToTimeAbbrev writes it, which is what the game's buff
+-- icons call, so ours and the game's agree side by side on the same screen.
+-- Each unit holds until 1.5 of the next -- 75 s, not 2 m -- and rounds up:
+-- rounding minutes down put ours a whole minute below the game's (56 m
+-- against 57 m). Seconds are cut, as the game's %d cuts them: rounding them
+-- up put ours a second ahead.
+local SECONDS_PER_MINUTE, SECONDS_PER_HOUR, SECONDS_PER_DAY = 60, 3600, 86400
+local NEXT_UNIT_AT = 1.5
+
 function Row.FormatDuration(seconds)
     if not seconds or seconds <= 0 then
         return ""
     end
 
-    if seconds < 60 then
-        return string.format("%d s", math.ceil(seconds))
+    if seconds >= SECONDS_PER_DAY * NEXT_UNIT_AT then
+        return string.format("%d d", math.ceil(seconds / SECONDS_PER_DAY))
     end
 
-    if seconds < 3600 then
-        return string.format("%d m", math.ceil(seconds / 60))
+    if seconds >= SECONDS_PER_HOUR * NEXT_UNIT_AT then
+        return string.format("%d h", math.ceil(seconds / SECONDS_PER_HOUR))
     end
 
-    return string.format("%d h", math.ceil(seconds / 3600))
+    if seconds >= SECONDS_PER_MINUTE * NEXT_UNIT_AT then
+        return string.format("%d m", math.ceil(seconds / SECONDS_PER_MINUTE))
+    end
+
+    return string.format("%d s", math.floor(seconds))
 end
 
 --- The spells this row's buttons are actually holding, in button order.
