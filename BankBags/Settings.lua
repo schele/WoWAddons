@@ -69,7 +69,9 @@ local function watchForClose()
     end
 end
 
-local function closeOptions()
+--- Close the options window, and the game menu it may have come from. The
+-- bank window calls this as it opens: one window at a time.
+function ns.CloseOptions()
     if not (SettingsPanel and SettingsPanel:IsShown()) then
         return
     end
@@ -185,8 +187,8 @@ local function ensureBuilt()
     Panel.open:SetPoint("TOPLEFT", PADDING + 4, y)
     Panel.open:SetSize(160, 22)
     Panel.open:SetText("Open BankBags")
+    -- Opening closes the options over it.
     Panel.open:SetScript("OnClick", function()
-        closeOptions()
         ns.Window.Open()
     end)
     y = y - ROW_HEIGHT - 6

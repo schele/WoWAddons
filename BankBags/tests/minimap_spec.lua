@@ -37,6 +37,13 @@ describe("the minimap button", function()
         assertFalse(ns.Window.Frame():IsShown())
     end)
 
+    it("clicks as it opens the bank, as the other addons' buttons do", function()
+        local ns, env = helpers.loggedIn()
+        local button = ns.MinimapButton.Button()
+        button.scripts.OnClick(button, "LeftButton")
+        assertEqual(env.SOUNDKIT.IG_CHARACTER_INFO_TAB, env.__sounds[1])
+    end)
+
     it("hides and shows with /bb minimap, and remembers", function()
         local ns, env = helpers.loggedIn()
         helpers.command(env, "minimap")

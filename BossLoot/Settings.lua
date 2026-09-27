@@ -67,7 +67,9 @@ local function watchForClose()
     end
 end
 
-local function closeOptions()
+--- Close the options window, and the game menu it may have come from. The
+-- loot window calls this as it opens: one window at a time.
+function ns.CloseOptions()
     if not (SettingsPanel and SettingsPanel:IsShown()) then
         return
     end
@@ -157,8 +159,8 @@ local function ensureBuilt()
 
     local y = -PADDING - ROW_HEIGHT * 2 - 8
 
+    -- Opening closes the options over it.
     Panel.open = addButton("Open BossLoot", 160, y, function()
-        closeOptions()
         ns.Window.Open()
     end)
     y = y - ROW_HEIGHT - 6

@@ -16,9 +16,12 @@ local SLOT = 37
 local GAP = 4
 local PER_ROW = 12
 local PADDING = 14
-local TITLE_HEIGHT = 30
-local BAR_HEIGHT = 26 -- the picker and search under the title
-local TOP = PADDING + TITLE_HEIGHT + BAR_HEIGHT
+local TITLE_BAR = 24 -- the game's title bar, with the name in it
+local BAR_TOP = TITLE_BAR + 6
+local BAR_HEIGHT = 26 -- the picker and search under the title bar
+local TOP = BAR_TOP + BAR_HEIGHT
+local LOGO = 16 -- the icon before the name, sized to the title bar
+local LOGO_GAP = 6
 local HEADER = 24 -- a section's heading
 local SECTION_GAP = 6
 local FOOTER = 24
@@ -291,8 +294,66 @@ local function savePosition(self)
     saved.point, saved.relativePoint, saved.x, saved.y = point, relativePoint, x, y
 end
 
+-- The window's frame: the options window's own, the name in its title bar and
+-- its red X, so this reads as one of the game's windows. On a client without
+-- it, the dialog border, a name and a close button of our own. Solid either
+-- way: the options window lets the world show through, which the slots and
+-- their counts cannot bear.
+local function createWindowFrame()
+    local ok, made = pcall(CreateFrame, "Frame", "BankBagsFrame", UIParent, "SettingsFrameTemplate")
+    if not (ok and made) then
+        made = createFrame("Frame", "BankBagsFrame", UIParent, "BackdropTemplate")
+    end
+    local native = made.NineSlice and made.NineSlice.Text and made.ClosePanelButton and made.Bg
+
+    if native then
+        -- On the game's background, so under its border and title bar too.
+        made.background = made.Bg:CreateTexture(nil, "BACKGROUND", nil, 7)
+        made.background:SetAllPoints(made.Bg)
+        made.title = made.NineSlice.Text
+        made.title:ClearAllPoints()
+        made.title:SetPoint("TOP", made, "TOP", (LOGO + LOGO_GAP) / 2, -5)
+        made.close = made.ClosePanelButton
+    else
+        made.background = made:CreateTexture(nil, "BACKGROUND", nil, -8)
+        made.background:SetPoint("TOPLEFT", made, "TOPLEFT", 4, -4)
+        made.background:SetPoint("BOTTOMRIGHT", made, "BOTTOMRIGHT", -4, 4)
+        if made.SetBackdrop then
+            made:SetBackdrop({
+                edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+                edgeSize = 32,
+                insets = { left = 11, right = 12, top = 12, bottom = 11 },
+            })
+        end
+        made.title = made:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        made.title:SetPoint("TOP", made, "TOP", (LOGO + LOGO_GAP) / 2, -14)
+        made.close = createFrame("Button", nil, made, "UIPanelCloseButton")
+        made.close:SetPoint("TOPRIGHT", made, "TOPRIGHT", -4, -4)
+        if not (made.close.GetNormalTexture and made.close:GetNormalTexture()) then
+            made.close:SetText("X")
+        end
+    end
+    made.background:SetColorTexture(0.06, 0.045, 0.03, 1)
+    made.title:SetText("BankBags")
+
+    -- The sack alone, as the minimap button shows it, before the name: the
+    -- AddOns list icon carries a square tile that reads as a sticker here.
+    -- Drawn with the name, so over the title bar.
+    made.logo = (native and made.NineSlice or made):CreateTexture(nil, "OVERLAY")
+    made.logo:SetSize(LOGO, LOGO)
+    made.logo:SetPoint("RIGHT", made.title, "LEFT", -LOGO_GAP, 0)
+    made.logo:SetTexture("Interface\\AddOns\\BankBags\\minimap")
+
+    -- Our own, not the game's: that asks the window manager, which an addon
+    -- may not do in combat.
+    made.close:SetScript("OnClick", function()
+        made:Hide()
+    end)
+    return made
+end
+
 local function create()
-    frame = createFrame("Frame", "BankBagsFrame", UIParent, "BackdropTemplate")
+    frame = createWindowFrame()
     frame:SetSize(WIDTH, HEIGHT)
     frame:SetFrameStrata("HIGH")
     frame:SetClampedToScreen(true)
@@ -304,47 +365,19 @@ local function create()
     local saved = ns.db.window
     frame:SetPoint(saved.point, UIParent, saved.relativePoint, saved.x, saved.y)
     frame.headers, frame.slots = {}, {}
-
-    -- Opaque, whatever the backdrop does, inside the dialog border.
-    frame.background = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
-    frame.background:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -4)
-    frame.background:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 4)
-    frame.background:SetColorTexture(0.06, 0.045, 0.03, 1)
-    if frame.SetBackdrop then
-        frame:SetBackdrop({
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            edgeSize = 32,
-            insets = { left = 11, right = 12, top = 12, bottom = 11 },
-        })
-    end
     table.insert(UISpecialFrames, "BankBagsFrame")
 
-    -- The sack alone, as the minimap button shows it, before the name: the
-    -- AddOns list icon carries a square tile that reads as a sticker here.
-    local logo = frame:CreateTexture(nil, "OVERLAY")
-    logo:SetSize(24, 24)
-    logo:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + 4, -PADDING)
-    logo:SetTexture("Interface\\AddOns\\BankBags\\minimap")
-    frame.logo = logo
-
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
-    title:SetText("BankBags")
-    frame.title = title
-
-    frame.close = createFrame("Button", nil, frame, "UIPanelCloseButton")
-    frame.close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
-    if not (frame.close.GetNormalTexture and frame.close:GetNormalTexture()) then
-        frame.close:SetText("X")
+    -- One window at a time: the options window opening closes this one.
+    if SettingsPanel and SettingsPanel.HookScript then
+        SettingsPanel:HookScript("OnShow", function()
+            frame:Hide()
+        end)
     end
-    frame.close:SetScript("OnClick", function()
-        frame:Hide()
-    end)
 
     -- The character shown: a click for the next, a right-click for the last.
     frame.picker = CreateFrame("Button", nil, frame)
     frame.picker:SetSize(200, 20)
-    frame.picker:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING, -(PADDING + TITLE_HEIGHT))
+    frame.picker:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING, -BAR_TOP)
     frame.picker:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     frame.picker.text = frame.picker:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     frame.picker.text:SetPoint("LEFT", frame.picker, "LEFT", 4, 0)
@@ -354,7 +387,7 @@ local function create()
 
     frame.search = createSearchBox(frame)
     frame.search:SetSize(180, 20)
-    frame.search:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PADDING - 4, -(PADDING + TITLE_HEIGHT))
+    frame.search:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PADDING - 4, -BAR_TOP)
     frame.search:SetAutoFocus(false)
     frame.search:HookScript("OnTextChanged", function(self)
         search = self:GetText() or ""
@@ -393,9 +426,27 @@ function Window.Frame()
     return frame
 end
 
+-- The click the options window makes as it opens on an addon's page, so every
+-- addon's window sounds alike. Closing is silent, as it is there.
+local function playOpenSound()
+    if PlaySound and SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_TAB then
+        PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB)
+    end
+end
+
 function Window.Open()
     if not frame then
         create()
+    end
+    -- One window at a time: the options window and BossLoot's close.
+    if ns.CloseOptions then
+        ns.CloseOptions()
+    end
+    if _G.BossLootFrame then
+        _G.BossLootFrame:Hide()
+    end
+    if not frame:IsShown() then
+        playOpenSound()
     end
     frame:Show()
     Window.Refresh()

@@ -43,6 +43,13 @@ describe("the minimap button", function()
         assertFalse(ns.Window.Frame():IsShown())
     end)
 
+    it("clicks as it opens the window, as the other addons' buttons do", function()
+        local ns, env = helpers.loggedIn()
+        local button = ns.MinimapButton.Button()
+        button.scripts.OnClick(button, "LeftButton")
+        assertEqual(env.SOUNDKIT.IG_CHARACTER_INFO_TAB, env.__sounds[1])
+    end)
+
     it("follows the cursor around the rim while dragged, and saves the angle", function()
         local ns, env = helpers.loggedIn()
         local button = ns.MinimapButton.Button()

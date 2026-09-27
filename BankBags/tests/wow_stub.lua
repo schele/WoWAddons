@@ -190,8 +190,21 @@ function stub.newEnv()
         frame.frameName = name
         table.insert(env.__frames, frame)
         if name then env[name] = frame end
+        -- The options window's frame, as far as a test needs it: the border
+        -- with the title in its bar, the background, and the red X.
+        if template == "SettingsFrameTemplate" then
+            frame.Bg = makeWidget("Frame", frame, nil, env)
+            frame.NineSlice = makeWidget("Frame", frame, nil, env)
+            frame.NineSlice.Text = frame.NineSlice:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            frame.ClosePanelButton = makeWidget("Button", frame, "UIPanelCloseButtonDefaultAnchors", env)
+        end
         return frame
     end
+
+    -- Sounds played, by kit id.
+    env.SOUNDKIT = { IG_CHARACTER_INFO_TAB = 841 }
+    env.__sounds = {}
+    function env.PlaySound(id) table.insert(env.__sounds, id) end
 
     -- Timers run when a test says so, like the client's next frame.
     env.C_Timer = {
