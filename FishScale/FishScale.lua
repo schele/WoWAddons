@@ -8,6 +8,24 @@ local defaults = {
     version = 1,
 }
 
+-- Bumped whenever a stored value has to change for an existing player.
+--
+-- Changing a default cannot do that: applyDefaults fills in what is absent
+-- and leaves what is stored, which is right for a value the player chose and
+-- wrong for one this addon chose badly and retracted. A shipped default
+-- change is invisible to everyone who has run the addon before -- which cost
+-- two rounds of a player testing an arc that had already been ruled out.
+local DB_VERSION = 2
+
+-- version to run at -> what to do. Each file registers its own, next to the
+-- setting it concerns.
+local migrations = {}
+
+function ns.AddMigration(version, fn)
+    migrations[version] = migrations[version] or {}
+    table.insert(migrations[version], fn)
+end
+
 --- Merge a defaults table into a saved table without clobbering stored values.
 -- Recursive, so config added in a later version gets filled in on upgrade
 -- instead of the whole branch being left empty.
@@ -46,6 +64,56 @@ function ns.Guarded(fn, whenUnknown)
     return whenUnknown
 end
 
+-- Settings registry. A file declares the config it owns, and Settings.lua
+-- renders what it finds, so adding a setting needs no edit there.
+local settings = {}
+ns.settings = settings
+
+-- A slider for a number, a checkbox for a flag, and keybind for the one
+-- setting that is neither: a key is not a value to be typed, it is a key to
+-- be pressed, and the panel captures it that way.
+local SETTING_TYPES = { checkbox = true, slider = true, keybind = true }
+
+function ns.RegisterSetting(definition)
+    assert(type(definition) == "table", "RegisterSetting expects a table")
+
+    local store, key = definition.store, definition.key
+    assert(type(store) == "string" and store ~= "", "setting requires a store")
+    assert(type(key) == "string" and key ~= "", "setting requires a key")
+    assert(type(definition.name) == "string", "setting requires a name")
+    assert(
+        SETTING_TYPES[definition.type],
+        "unknown setting type: " .. tostring(definition.type)
+    )
+
+    -- A setting with no default reads nil and writes somewhere nothing else
+    -- looks, which shows up as a control that silently does nothing.
+    assert(
+        type(defaults[store]) == "table" and defaults[store][key] ~= nil,
+        string.format("no default registered for %s.%s", store, key)
+    )
+
+    table.insert(settings, definition)
+    return definition
+end
+
+function ns.SettingValue(setting)
+    local store = ns.db and ns.db[setting.store]
+    return store and store[setting.key]
+end
+
+function ns.SetSettingValue(setting, value)
+    local store = ns.db and ns.db[setting.store]
+    if not store or store[setting.key] == value then
+        return
+    end
+
+    store[setting.key] = value
+    if setting.onChange then
+        setting.onChange(value)
+    end
+end
+
 local function ensureDatabase()
     if type(FishScaleDB) ~= "table" then
         FishScaleDB = {}
@@ -53,6 +121,17 @@ local function ensureDatabase()
 
     applyDefaults(FishScaleDB, defaults)
     ns.db = FishScaleDB
+
+    -- Run after the defaults, so a migration can rely on every key existing,
+    -- and in order, so a database several versions behind arrives by the
+    -- same route as one a single version behind.
+    local from = tonumber(FishScaleDB.version) or 1
+    for version = from + 1, DB_VERSION do
+        for _, migrate in ipairs(migrations[version] or {}) do
+            migrate(FishScaleDB)
+        end
+    end
+    FishScaleDB.version = DB_VERSION
 end
 
 -- Slash commands. Each file registers its own, so a feature owns its commands
@@ -81,7 +160,21 @@ end
 local function runCommand(msg)
     local input = msg and msg:match("^%s*(.-)%s*$") or ""
 
-    if input == "" or input == "help" then
+    -- A bare /fs opens the panel, where the sibling addons list their
+    -- commands. Everything here can be set by pointing at it, so the list is
+    -- the second thing a player wants and the window is the first; `/fs help`
+    -- still prints it, and every command still works for when something
+    -- needs diagnosing.
+    if input == "" then
+        if ns.OpenSettings then
+            ns.OpenSettings()
+        else
+            showHelp()
+        end
+        return
+    end
+
+    if input == "help" then
         showHelp()
         return
     end
@@ -124,6 +217,9 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
             handler()
         end
 
-        ns.Print("Loaded. Type /fs for commands.")
+        -- /fs opens the panel now; it stopped listing commands when there
+        -- was somewhere better to send people. A login line still promising
+        -- a list is the sort of small lie that wastes someone's first minute.
+        ns.Print("Loaded. Type /fs for settings, or /fs help for commands.")
     end
 end)

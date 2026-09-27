@@ -28,15 +28,21 @@ ns.AddDefaults({
         -- Clear of the frame rather than flush against it. The space to the
         -- right of a party frame is also where its buffs and debuffs draw,
         -- so these are settings rather than constants.
+        --
+        -- 30 arrived as one player's preference while saved variables did not
+        -- persist, but it stands on the reason above rather than on that, so
+        -- it stays as the default now saving works.
         attachX = 30,
         attachY = 0,
-        -- Off, though most healers do heal themselves. These two defaults
-        -- are what this player asked for while saved variables do not
-        -- persist on their client: with nothing remembered between sessions,
-        -- the default is the setting. Once saving works, anything they
-        -- choose overrides these and they can go back to being whatever
-        -- suits a new install.
-        showSelf = false,
+        -- On, because most healers do heal themselves.
+        --
+        -- This was false for as long as saved variables did not persist on
+        -- the client being developed against: with nothing remembered between
+        -- sessions the default *is* the setting, so it had to be one player's
+        -- preference rather than what suits a new install. Saving works now,
+        -- so it goes back to the general case and anyone who wants their own
+        -- row hidden can turn it off and have that remembered.
+        showSelf = true,
     },
 })
 

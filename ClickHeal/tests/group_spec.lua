@@ -720,13 +720,19 @@ describe("turning your own icons off", function()
         assertTrue(helpers.rowFor(ns, "player").buttons[1]:IsShown())
     end)
 
-    it("is off by default, which this file's loggedIn overrides", function()
-        -- Loaded raw, because loggedIn turns it back on for everything else
-        -- here and so would hide this changing.
+    it("is on by default, because most healers heal themselves", function()
+        -- Loaded raw, because loggedIn sets it explicitly for everything
+        -- else here and so would hide this changing.
+        --
+        -- False for as long as saved variables did not persist on the client
+        -- being developed against: with nothing remembered between sessions
+        -- the default *is* the setting, so it had to be one player's
+        -- preference rather than what suits a new install. Saving works now,
+        -- so it is back to the general case.
         local ns, env = helpers.loadAddon(FILES)
         helpers.login(ns, env)
 
-        assertFalse(ns.db.bar.showSelf)
+        assertTrue(ns.db.bar.showSelf)
     end)
 end)
 
