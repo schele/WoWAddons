@@ -40,7 +40,7 @@ end
 local BUTTON_GAP = 4
 local PADDING = 4
 
--- The box the number under an icon is written in: room for "38m" in the
+-- The box the number under an icon is written in: room for "38 m" in the
 -- small font, and for the font's own height.
 local TIMER_WIDTH = 40
 local TIMER_HEIGHT = 14
@@ -701,28 +701,28 @@ end
 
 --- How long is left, written the way the game's own buff frames write it.
 --
--- One unit, never two: under a small icon "38m" is readable and "38m 12s" is
+-- One unit, never two: under a small icon "38 m" is readable and "38 m 12 s" is
 -- a smear.
 --
 -- Minutes and hours round up, which is what the game's own buff frames do --
 -- SecondsToTimeAbbrev ceils everything above a minute. Rounding down instead
 -- put our number a whole minute below the one Blizzard was showing for the
--- same buff, side by side on the same screen: 56m against 57 m. Seconds
--- round up too, so a buff still running never reads 0s.
+-- same buff, side by side on the same screen: 56 m against 57 m. Seconds
+-- round up too, so a buff still running never reads 0 s.
 function Row.FormatDuration(seconds)
     if not seconds or seconds <= 0 then
         return ""
     end
 
     if seconds < 60 then
-        return string.format("%ds", math.ceil(seconds))
+        return string.format("%d s", math.ceil(seconds))
     end
 
     if seconds < 3600 then
-        return string.format("%dm", math.ceil(seconds / 60))
+        return string.format("%d m", math.ceil(seconds / 60))
     end
 
-    return string.format("%dh", math.ceil(seconds / 3600))
+    return string.format("%d h", math.ceil(seconds / 3600))
 end
 
 --- The spells this row's buttons are actually holding, in button order.

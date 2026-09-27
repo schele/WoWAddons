@@ -12,26 +12,19 @@ local addonName, ns = ...
 local AuraSlots = {}
 ns.AuraSlots = AuraSlots
 
--- The dark plate behind your own number. It covers someone else's copy of
--- the same buff, drawn underneath -- two druids' Rejuvenations stack -- and
--- reads better over bright ground.
-local PLATE_WIDTH = 26
-local PLATE_HEIGHT = 13
-local PLATE_ALPHA = 0.85
-
 -- Made once, the first time a slot is set up: see durationFormatter.
 local formatter
 
 --- The formatter the game writes the numbers with, set up to match
--- Row.FormatDuration: "7s", "8m", "2h", one unit, rounded up. Nil on a
--- client missing any part of it, which leaves the game's own style ("8 m")
+-- Row.FormatDuration: "7 s", "8 m", "2 h", one unit, rounded up. Nil on a
+-- client missing any part of it, which leaves the game's own style
 -- -- a number in another style beats no number.
 local function durationFormatter()
     if formatter == nil then
         formatter = ns.Guarded(function()
             local made = C_StringUtil.CreateSecondsFormatter()
             made:SetDefaultAbbreviation(Enum.SecondsFormatterAbbreviation.OneLetter)
-            made:SetStripIntervalWhitespace(Enum.SecondsFormatterIntervalWhitespace.StripIgnoreLocale)
+            made:SetStripIntervalWhitespace(Enum.SecondsFormatterIntervalWhitespace.Preserve)
             made:SetDesiredUnitCount(1)
             made:SetMinInterval(Enum.SecondsFormatterInterval.Seconds)
             made:SetRounding(Enum.SecondsFormatterRounding.RoundUp)
@@ -96,7 +89,7 @@ local function applyFilters(row, slots)
     end)
 end
 
---- One slot under `button`: yours (white on the plate, drawn on top) or
+--- One slot under `button`: yours (white, drawn on top) or
 -- anyone else's (grey). Everything its frame needs is done in
 -- initializeFrame, which the game runs on the new frame before it locks the
 -- frame down. The label has to be that frame's own: SetDurationText refuses
@@ -115,14 +108,6 @@ local function addSlot(container, button, key, own)
         frame:SetSize(ns.Row.TIMER_WIDTH, ns.Row.TIMER_HEIGHT)
         frame:SetPoint("TOP", button, "BOTTOM", 0, -3)
         frame:SetFrameLevel(container:GetFrameLevel() + (own and 2 or 1))
-
-        if own then
-            local plate = frame:CreateTexture(nil, "BACKGROUND")
-            plate:SetColorTexture(0, 0, 0, PLATE_ALPHA)
-            plate:SetSize(PLATE_WIDTH, PLATE_HEIGHT)
-            plate:SetPoint("CENTER", frame, "CENTER")
-            slot.plate = plate
-        end
 
         local label = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         label:SetSize(ns.Row.TIMER_WIDTH, ns.Row.TIMER_HEIGHT)

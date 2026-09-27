@@ -68,18 +68,17 @@ describe("the game drawing a row's timers", function()
         end
     end)
 
-    it("draws yours white on a dark plate, above anyone else's grey", function()
+    it("draws yours white with no box behind it, above anyone else's grey", function()
         local ns, env = loggedIn()
         local row = ns.Row.Create("party1", env.UIParent)
         local slots = row.auraSlots[1]
 
         assertEqual(1, slots.own.label.textColor[1])
-        assertEqual(0.85, slots.own.plate.colorTexture[4])
-        assertEqual(slots.own.frame, slots.own.plate:GetParent())
+        assertNil(slots.own.plate)
         assertEqual(0.55, slots.other.label.textColor[1])
         assertNil(slots.other.plate)
         assertTrue(slots.own.frame:GetFrameLevel() > slots.other.frame:GetFrameLevel(),
-            "your plate covers the grey number when both are there")
+            "yours is drawn over the grey number when both are there")
     end)
 
     it("leaves a row to ClickHeal's own timers on a client without the container", function()
@@ -90,7 +89,7 @@ describe("the game drawing a row's timers", function()
 
         assertFalse(ns.AuraSlots.Drawn(row))
         ns.Row.Refresh(row)
-        assertEqual("7s", row.buttons[1].timer:GetText())
+        assertEqual("7 s", row.buttons[1].timer:GetText())
     end)
 
     it("falls back to ClickHeal's own timers when the game refuses a slot", function()
@@ -269,13 +268,13 @@ local function withFormatter(e, leaveOut)
 end
 
 describe("the game's numbers", function()
-    it("are written as ClickHeal writes them: 7s, 8m, 2h", function()
+    it("are written as ClickHeal writes them: 7 s, 8 m, 2 h", function()
         local ns, env = loggedIn(function(e) withFormatter(e) end)
         local row = ns.Row.Create("party1", env.UIParent)
 
         local formatter = row.auraSlots[1].own.frame.durationOptions.textFormatter
         assertEqual(2, formatter.settings.SetDefaultAbbreviation, "one letter")
-        assertEqual(2, formatter.settings.SetStripIntervalWhitespace, "no space, whatever the locale")
+        assertEqual(0, formatter.settings.SetStripIntervalWhitespace, "a space between number and unit")
         assertEqual(1, formatter.settings.SetDesiredUnitCount, "one unit")
         assertEqual(0, formatter.settings.SetMinInterval, "down to seconds")
         assertEqual(0, formatter.settings.SetRounding, "rounded up")

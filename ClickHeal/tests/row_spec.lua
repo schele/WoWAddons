@@ -1030,11 +1030,11 @@ describe("the remaining time under an icon", function()
         -- matching it is the point: our number sits on the same screen as
         -- the game's own for the same buff, and rounding down put the two a
         -- whole minute apart.
-        assertEqual("7s", ns.Row.FormatDuration(6.2), "seconds round up, so a live buff never reads 0s")
-        assertEqual("2m", ns.Row.FormatDuration(90), "as the game writes it")
-        assertEqual("38m", ns.Row.FormatDuration(2280), "exactly 38 minutes is 38m, not 39m")
-        assertEqual("57m", ns.Row.FormatDuration(56 * 60 + 30), "the case that did not match")
-        assertEqual("2h", ns.Row.FormatDuration(3700))
+        assertEqual("7 s", ns.Row.FormatDuration(6.2), "seconds round up, so a live buff never reads 0 s")
+        assertEqual("2 m", ns.Row.FormatDuration(90), "as the game writes it")
+        assertEqual("38 m", ns.Row.FormatDuration(2280), "exactly 38 minutes is 38 m, not 39 m")
+        assertEqual("57 m", ns.Row.FormatDuration(56 * 60 + 30), "the case that did not match")
+        assertEqual("2 h", ns.Row.FormatDuration(3700))
     end)
 
     it("gives every label a box of its own, wide enough for any number", function()
@@ -1046,7 +1046,7 @@ describe("the remaining time under an icon", function()
 
         for index = 1, ns.Slots.MAX do
             local timer = row.buttons[index].timer
-            assertTrue(timer.width >= 30, "button " .. index .. ": room for 38m")
+            assertTrue(timer.width >= 30, "button " .. index .. ": room for 38 m")
             assertTrue(timer.height >= 12, "button " .. index .. ": room for the font")
         end
     end)
@@ -1071,7 +1071,7 @@ describe("the remaining time under an icon", function()
 
         ns.Row.Refresh(row)
 
-        assertEqual("7s", row.buttons[1].timer:GetText())
+        assertEqual("7 s", row.buttons[1].timer:GetText())
     end)
 
     it("leaves the icon unlabelled when the buff is not on that unit", function()
@@ -1258,7 +1258,7 @@ describe("whose cast the number under an icon is", function()
 
         ns.Row.Refresh(row)
 
-        assertEqual("7s", row.buttons[1].timer:GetText())
+        assertEqual("7 s", row.buttons[1].timer:GetText())
     end)
 
     it("greys that number, because it is not a heal you have", function()
@@ -1313,7 +1313,7 @@ describe("whose cast the number under an icon is", function()
 
         ns.Row.Refresh(row)
 
-        assertEqual("38m", row.buttons[1].timer:GetText())
+        assertEqual("38 m", row.buttons[1].timer:GetText())
         assertEqual(1, row.buttons[1].timer.textColor[1])
     end)
 end)

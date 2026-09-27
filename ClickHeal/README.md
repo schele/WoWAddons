@@ -54,7 +54,7 @@ because being told a spell is out of reach when it is not costs you a cast you
 had.
 
 Under each icon is how long your own copy of that spell has left on that
-person — 7s of Rejuvenation ticking down on one party member, 38m of Mark of
+person — 7 s of Rejuvenation ticking down on one party member, 38 m of Mark of
 the Wild on another. Blank means nobody has it on them, which is the signal to
 click. On WoW Forever the game writes these numbers itself, through its own
 aura container: in combat it lets no addon read anyone's buffs, and the
