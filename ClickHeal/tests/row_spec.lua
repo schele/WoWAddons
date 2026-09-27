@@ -1023,18 +1023,23 @@ describe("hanging a row off Blizzard's unit frame", function()
 end)
 
 describe("the remaining time under an icon", function()
-    it("writes seconds, minutes and hours the way the game's buff frames do", function()
+    it("writes seconds, minutes, hours and days the way the game's buff frames do", function()
+        -- Exactly as SecondsToTimeAbbrev does, which is what the game's buff
+        -- icons call: our number sits on the same screen as the game's own
+        -- for the same buff. Seconds are cut, not rounded -- rounding them up
+        -- put ours a second ahead of the game's -- and each unit holds until
+        -- 1.5 of the next, rounded up.
         local ns = loggedIn()
 
-        -- Rounding up above a minute is what SecondsToTimeAbbrev does, and
-        -- matching it is the point: our number sits on the same screen as
-        -- the game's own for the same buff, and rounding down put the two a
-        -- whole minute apart.
-        assertEqual("7 s", ns.Row.FormatDuration(6.2), "seconds round up, so a live buff never reads 0 s")
-        assertEqual("2 m", ns.Row.FormatDuration(90), "as the game writes it")
+        assertEqual("6 s", ns.Row.FormatDuration(6.8), "seconds cut, as the game's %d does")
+        assertEqual("75 s", ns.Row.FormatDuration(75), "still seconds under a minute and a half")
+        assertEqual("89 s", ns.Row.FormatDuration(89.9))
+        assertEqual("2 m", ns.Row.FormatDuration(90), "minutes from 90 seconds, rounded up")
         assertEqual("38 m", ns.Row.FormatDuration(2280), "exactly 38 minutes is 38 m, not 39 m")
-        assertEqual("57 m", ns.Row.FormatDuration(56 * 60 + 30), "the case that did not match")
-        assertEqual("2 h", ns.Row.FormatDuration(3700))
+        assertEqual("57 m", ns.Row.FormatDuration(56 * 60 + 30), "minutes round up")
+        assertEqual("62 m", ns.Row.FormatDuration(3700), "still minutes under an hour and a half")
+        assertEqual("2 h", ns.Row.FormatDuration(5400), "hours from 90 minutes")
+        assertEqual("2 d", ns.Row.FormatDuration(1.5 * 86400), "days from a day and a half")
     end)
 
     it("gives every label a box of its own, wide enough for any number", function()

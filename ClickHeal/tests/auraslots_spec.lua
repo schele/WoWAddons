@@ -268,26 +268,18 @@ local function withFormatter(e, leaveOut)
 end
 
 describe("the game's numbers", function()
-    it("are written as ClickHeal writes them: 7 s, 8 m, 2 h", function()
+    it("are written by the game's own formatter, as its buff icons are", function()
+        -- ClickHeal's own formatter rounded seconds up, and read a second
+        -- ahead of the game's buff icon for the same buff; it also turned
+        -- 75 s into 2 m. With no formatter of ours, SetDurationText uses the
+        -- game's default: seconds cut, seconds up to 90, minutes rounded up.
         local ns, env = loggedIn(function(e) withFormatter(e) end)
         local row = ns.Row.Create("party1", env.UIParent)
 
-        local formatter = row.auraSlots[1].own.frame.durationOptions.textFormatter
-        assertEqual(2, formatter.settings.SetDefaultAbbreviation, "one letter")
-        assertEqual(0, formatter.settings.SetStripIntervalWhitespace, "a space between number and unit")
-        assertEqual(1, formatter.settings.SetDesiredUnitCount, "one unit")
-        assertEqual(0, formatter.settings.SetMinInterval, "down to seconds")
-        assertEqual(0, formatter.settings.SetRounding, "rounded up")
-        assertEqual(true, formatter.settings.SetCanRoundUpLastUnit)
-        assertEqual(formatter, row.auraSlots[1].other.frame.durationOptions.textFormatter, "one for all")
-    end)
-
-    it("fall back to the game's own style on a client missing part of the formatter", function()
-        local ns, env = loggedIn(function(e) withFormatter(e, "SetStripIntervalWhitespace") end)
-        local row = ns.Row.Create("party1", env.UIParent)
-
-        assertTrue(ns.AuraSlots.Drawn(row), "a number in the game's style beats none")
-        assertNil(row.auraSlots[1].own.frame.durationOptions.textFormatter)
+        for _, slot in pairs(row.auraSlots[1]) do
+            local options = slot.frame.durationOptions
+            assertNil(options and options.textFormatter, slot.key .. " leaves the formatting to the game")
+        end
     end)
 end)
 

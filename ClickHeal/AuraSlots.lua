@@ -12,29 +12,6 @@ local addonName, ns = ...
 local AuraSlots = {}
 ns.AuraSlots = AuraSlots
 
--- Made once, the first time a slot is set up: see durationFormatter.
-local formatter
-
---- The formatter the game writes the numbers with, set up to match
--- Row.FormatDuration: "7 s", "8 m", "2 h", one unit, rounded up. Nil on a
--- client missing any part of it, which leaves the game's own style
--- -- a number in another style beats no number.
-local function durationFormatter()
-    if formatter == nil then
-        formatter = ns.Guarded(function()
-            local made = C_StringUtil.CreateSecondsFormatter()
-            made:SetDefaultAbbreviation(Enum.SecondsFormatterAbbreviation.OneLetter)
-            made:SetStripIntervalWhitespace(Enum.SecondsFormatterIntervalWhitespace.Preserve)
-            made:SetDesiredUnitCount(1)
-            made:SetMinInterval(Enum.SecondsFormatterInterval.Seconds)
-            made:SetRounding(Enum.SecondsFormatterRounding.RoundUp)
-            made:SetCanRoundUpLastUnit(true)
-            return made
-        end, false)
-    end
-    return formatter or nil
-end
-
 -- Spell IDs seen on buffs out of combat, by the buff's name: other ranks,
 -- and other casters' copies, that the spellbook knows nothing about. Kept
 -- for the session only. Filled by AuraSlots.Learn.
@@ -119,7 +96,11 @@ local function addSlot(container, button, key, own)
         end
         slot.label = label
 
-        frame:SetDurationText(label, { textFormatter = durationFormatter() })
+        -- No formatter of ours: the game's default is the one its own aura
+        -- frames use -- seconds cut, seconds up to 90, minutes rounded up --
+        -- and matches its buff icons. Ours rounded seconds up and read a
+        -- second ahead of them.
+        frame:SetDurationText(label)
         slot.ready = true
     end
 
