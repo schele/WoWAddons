@@ -16,6 +16,7 @@ M.FILES = {
     "MinimapPins.lua",
     "WorldMap.lua",
     "Settings.lua",
+    "Minimap.lua",
 }
 
 --- Load the addon's files into a stubbed environment, the way WoW would:

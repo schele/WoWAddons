@@ -18,3 +18,4 @@ Pins.lua
 MinimapPins.lua
 WorldMap.lua
 Settings.lua
+Minimap.lua
