@@ -1,6 +1,6 @@
 ## Interface: 11509, 16001
 ## Title: GatherMap
-## Notes: Herbs, ore, fishing pools and chests on the world map and the minimap.
+## Notes: Pins for the veins you have mined and the herbs you have picked.
 ## IconTexture: Interface\AddOns\GatherMap\icon
 ## Author: You
 ## Version: 0.1.0

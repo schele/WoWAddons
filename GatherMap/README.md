@@ -1,45 +1,31 @@
 # GatherMap (World of Warcraft AddOn)
 
-Herbs, ore, fishing pools and treasure chests on the world map and the
-minimap, with filters for each.
+Pins on the world map and the minimap for every vein you have mined and every
+herb you have picked, so you can find your way back. Nothing else: no
+database of spawns, no guesses.
 
-## What it shows
+## How it records
 
-- **Where you have gathered**, with a gold edge. Every herb, vein, chest or
-  pool you loot is counted on its spawn; one the database does not have is
-  added where you stood. Saved per account.
-- **Spawns confirmed in WoW Forever**, at full strength: gathered by players
-  whose recordings went into this release.
-- **Every other spawn the classic database knows**, dimmed. They come from
-  the [vMaNGOS](https://github.com/vmangos/core) vanilla database at patch
-  1.12, and WoW Forever is not vanilla, so treat them as a good guess.
+Mine or pick as usual. When a loot window opens from a herb or vein,
+GatherMap saves the spot where you stand. It knows about 75 kinds of herb and
+vein by name; anything else you gather straight after a Mining or Herbalism
+cast is saved too, named after what it dropped. A vein you mine three times
+counts once per visit. Saved per account, so every character adds to the
+same map.
 
-Hover a pin for its name, the skill it needs (in its skill-up colour) and
-which of the three it is. Where several nodes share one spawn point (Tin or
-Silver, say), there is one pin, and its tooltip names them all.
-**Shift-right-click a pin where nothing grows** to mark it not here: it is
-hidden on every character, and gathering there later takes the mark off.
-On the world map a left click or a plain right-click on a pin does what it
-would on the map itself.
-
-## Sending your recordings
-
-Your gathers and "not here" marks make the next release better for everyone.
-Send `WTF/Account/<name>/SavedVariables/GatherMap.lua`; it goes in
-`tools/recordings/` and the build bakes it in. A spawn leaves the release
-only when at least two recorders marked it not here and nobody gathered it:
-one "nothing here" often only means someone else had just gathered it.
+Hover a pin for what grows there, the skill it needs (in its skill-up
+colour) and how often you have gathered there. **Shift-right-click** a pin to
+forget that place. A left click or a plain right-click on a world map pin
+does what it would on the map itself.
 
 ## Filters
 
 Each has a box for the world map and one for the minimap, in `/gmap`:
 
-- Herbs, ore, fishing pools, chests; open a kind with **+** to pick its nodes
-  one by one, or **All** / **None**.
+- Herbs, ore; open a kind with **+** to pick its nodes one by one, or
+  **All** / **None**.
 - Hide nodes your skill cannot gather yet (on by default).
 - Hide grey nodes, the ones that give no more skill-ups.
-- Only places confirmed in game (yours, or from the release).
-- Show spawns marked not here, to take a mark back off.
 - Pin size.
 
 If you have collapsed the Professions header in your skill list, GatherMap
@@ -53,24 +39,12 @@ keeps the skills it last saw until you open it again.
 | `/gmap toggle` | Show or hide every pin |
 | `/gmap minimap` | Hide or show the minimap button |
 | `/gmap where` | Where the game and GatherMap put you on the map |
-| `/gmap reset gathered` | Forget every place you have gathered and every "not here" mark (asks first) |
+| `/gmap debug` | What GatherMap has, step by step, if pins are missing |
+| `/gmap reset gathered` | Forget every place you have gathered (asks first) |
 | `/gmap help` | List the commands |
 
 The minimap button: click to show or hide every pin, right-click for the
 settings, drag to move it.
-
-## Rebuilding the data
-
-Needs Node 24 or later. Download `db-sqlite-<commit>.zip` from the
-[db_latest release](https://github.com/vmangos/core/releases/tag/db_latest),
-unzip it outside the repo, and from the repo root:
-
-    node GatherMap/tools/build-data.mjs <path to>/sqlite-dump/mangos.sqlite
-
-The one file edited by hand is `tools/nodes.json`: the herb and ore names with
-the skill each needs, and the chest names. A vein or deposit it does not list
-fails the build. Saved-variables files in `tools/recordings/` are baked in
-on every build. The data is derived from GPL material.
 
 ## Install
 
