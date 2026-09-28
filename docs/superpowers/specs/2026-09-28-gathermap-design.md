@@ -1,7 +1,7 @@
 # GatherMap: design
 
 Date: 2026-09-28. Status: approved, then revised for WoW Forever (the game outranks
-vMaNGOS); the check against real gathers is pending.
+vMaNGOS); the check against real gathers is a provisional go.
 
 ## What it is
 
@@ -64,7 +64,17 @@ data1)`, `gameobject_loot_template(entry, item, ChanceOrQuestChance,
 mincountOrRef, patch_min, patch_max)`; Copper Vein is entry 1731 (type 3,
 loot 1502), with 870 spawns on map 0; 24 fishing pool templates (type 25).
 
-Gather comparison: pending the player's log.
+Gather comparison, 2026-09-28, Westfall: 2 of 2 within 15 yards of a
+vMaNGOS spawn of the same entry.
+
+| Entry | Gathered at | Nearest vMaNGOS spawn |
+|---|---|---|
+| 1731 Copper Vein | -10130.9, 794.9 | 3.1 yards |
+| 1731 Copper Vein | -10011.0, 877.2 | 2.6 yards |
+
+Provisional go: few samples and one node type. Herb gathers are to be added
+here as they come in; a miss rate over 20% stops the build and reopens the
+design.
 
 ## Data, and the build that makes it
 
