@@ -94,3 +94,27 @@ test('the confirmed file hands the keys to ns.AddConfirmed', () => {
   assert.match(text, /ns\.AddConfirmed\(\{\n    "0:1731:-10133\.8:793\.8",\n\}\)/);
   assert.match(confirmedFile([]), /ns\.AddConfirmed\(\{\n\}\)/);
 });
+
+test('a pool point 25 yards from a known pool spawn confirms that spawn\'s key', () => {
+  const byContinent = new Map([
+    [0, [{ entry: 180582, x: -10620, y: 1170 }]],
+    [1, []],
+  ]);
+  const { confirmed } = applyRecordings(byContinent, NODES, [
+    { gathered: { '0:180582:-10600.0:1150.0': { continent: 0, entry: 180582, x: -10600, y: 1150, count: 1 } }, missing: {} },
+  ]);
+  assert.deepEqual(confirmed, ['0:180582:-10620.0:1170.0']);
+});
+
+test('a pool point with new: true 40 yards from any pool adds nothing and confirms nothing', () => {
+  const byContinent = new Map([
+    [0, [{ entry: 180582, x: -10620, y: 1170 }]],
+    [1, []],
+  ]);
+  const { confirmed, added } = applyRecordings(byContinent, NODES, [
+    { gathered: { '0:180582:-10550.0:1100.0': { continent: 0, entry: 180582, x: -10550, y: 1100, count: 1, new: true } }, missing: {} },
+  ]);
+  assert.equal(added, 0);
+  assert.deepEqual(confirmed, []);
+  assert.equal(byContinent.get(0).length, 1);
+});

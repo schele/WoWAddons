@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { parseSavedVariables } from '../../../BossLoot/tools/lib/savedvars.mjs';
 
 export const REACH = 15;
+export const POOL_REACH = 30;
 
 const round1 = (value) => Math.round(value * 10) / 10;
 
@@ -44,6 +45,7 @@ export function readRecordings(dir) {
  */
 export function applyRecordings(byContinent, nodes, recorders) {
   const known = new Set(nodes.map((node) => node.entry));
+  const kindOf = new Map(nodes.map((node) => [node.entry, node.kind]));
   const gathered = new Set();
   const missing = new Set();
   for (const recorder of recorders) {
@@ -69,14 +71,16 @@ export function applyRecordings(byContinent, nodes, recorders) {
       if (!list || !known.has(point.entry) || typeof point.x !== 'number' || typeof point.y !== 'number') continue;
       const x = round1(point.x);
       const y = round1(point.y);
-      const near = list.find((s) => s.entry === point.entry && Math.hypot(s.x - x, s.y - y) <= REACH);
+      const kind = kindOf.get(point.entry);
+      const reach = kind === 'pool' ? POOL_REACH : REACH;
+      const near = list.find((s) => s.entry === point.entry && Math.hypot(s.x - x, s.y - y) <= reach);
       if (near) {
         confirmed.add(spawnKey(point.continent, near.entry, near.x, near.y));
-      } else if (point.new) {
+      } else if (point.new && kind !== 'pool') {
         list.push({ entry: point.entry, x, y });
         confirmed.add(spawnKey(point.continent, point.entry, x, y));
         added++;
-      } else {
+      } else if (!near && kind !== 'pool') {
         confirmed.add(key);
       }
     }
