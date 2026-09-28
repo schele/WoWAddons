@@ -8,6 +8,14 @@
 
 GatherMap.lua
 # BEGIN GENERATED DATA
+Data\Nodes.lua
+Data\EasternKingdoms1.lua
+Data\EasternKingdoms2.lua
+Data\EasternKingdoms3.lua
+Data\Kalimdor1.lua
+Data\Kalimdor2.lua
+Data\Kalimdor3.lua
+Data\Confirmed.lua
 # END GENERATED DATA
 Geometry.lua
 Spawns.lua

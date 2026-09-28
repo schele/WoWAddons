@@ -10,6 +10,7 @@ World of Warcraft addons, one folder each.
 | [TrinketMenu](TrinketMenu/) | Every trinket you are carrying, on a bar: left-click to equip in slot 1, right-click for slot 2 |
 | [FishScale](FishScale/) | One key to cast, pick up the bobber and recast while fishing |
 | [BossLoot](BossLoot/) | Every dungeon and raid, its bosses and their loot with drop chances, plus notable trash and chest drops |
+| [GatherMap](GatherMap/) | Herbs, ore, fishing pools and chests on the world map and minimap, with filters |
 
 ## Layout
 

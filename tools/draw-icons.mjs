@@ -1,4 +1,4 @@
-// Draws the 64x64 icons for BossLoot, FishScale and BankBags, and their minimap icons, in the style of
+// Draws the 64x64 icons for BossLoot, FishScale, BankBags and GatherMap, and their minimap icons, in the style of
 // the others: a dark rounded tile with a soft glow in the addon's colour, a
 // thin ring, and a light, glossy symbol with a darker outline and details.
 // A minimap icon is the symbol alone, filling the frame: the minimap button
@@ -185,6 +185,19 @@ const safeDetails = union(
 );
 const safeShine = roundBox(27, 18.5, 10, 1.4, 1.4);
 
+// GatherMap: a map pin with a leaf in its head, in green.
+const green = {
+  dark: [8, 18, 6], glow: [40, 96, 30], ring: [118, 204, 92],
+  light: [206, 250, 180], mid: [110, 192, 84], outline: [22, 58, 14], detail: [34, 86, 24],
+};
+const mapPin = union(circle(32, 25, 15), triangle(19.5, 31, 44.5, 31, 32, 55));
+const intersect = (a, b) => (x, y) => Math.max(a(x, y), b(x, y));
+const pinDetails = union(
+  intersect(circle(27.5, 29.5, 8.5), circle(36.5, 20.5, 8.5)), // the leaf, a lens across the head
+  segment(26.5, 31, 33, 24.5, 0.6), // its vein, drawn in the outline colour below
+);
+const pinShine = ellipse(26, 16.5, 5, 1.6);
+
 const root = process.argv[2];
 writeTga(path.join(root, 'BossLoot', 'icon.tga'), draw(crimson, chest, chestDetails, chestShine));
 writeTga(path.join(root, 'BossLoot', 'minimap.tga'), draw(crimson, chest, chestDetails, chestShine, { tile: false, zoom: 1.4 }));
@@ -193,4 +206,6 @@ writeTga(path.join(root, 'FishScale', 'minimap.tga'), draw(orange, fish, fishDet
 writeTga(path.join(root, 'BankBags', 'icon.tga'), draw(teal, sack, sackDetails, sackShine));
 writeTga(path.join(root, 'BankBags', 'minimap.tga'), draw(teal, sack, sackDetails, sackShine, { tile: false, zoom: 1.4 }));
 writeTga(path.join(root, 'BankBags', 'tab.tga'), draw(teal, safe, safeDetails, safeShine, { tile: false, zoom: 1.3 }));
+writeTga(path.join(root, 'GatherMap', 'icon.tga'), draw(green, mapPin, pinDetails, pinShine));
+writeTga(path.join(root, 'GatherMap', 'minimap.tga'), draw(green, mapPin, pinDetails, pinShine, { tile: false, zoom: 1.35 }));
 console.log('written');
