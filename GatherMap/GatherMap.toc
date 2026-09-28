@@ -11,3 +11,5 @@ GatherMap.lua
 # END GENERATED DATA
 Geometry.lua
 Spawns.lua
+Skills.lua
+Filter.lua

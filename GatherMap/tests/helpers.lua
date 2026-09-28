@@ -9,6 +9,8 @@ M.FILES = {
     "tests/fixture_data.lua",
     "Geometry.lua",
     "Spawns.lua",
+    "Skills.lua",
+    "Filter.lua",
 }
 
 --- Load the addon's files into a stubbed environment, the way WoW would:
