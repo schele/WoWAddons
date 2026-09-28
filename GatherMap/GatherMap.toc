@@ -1,0 +1,11 @@
+## Interface: 11509, 16001
+## Title: GatherMap
+## Notes: Herbs, ore, fishing pools and chests on the world map and the minimap.
+## IconTexture: Interface\AddOns\GatherMap\icon
+## Author: You
+## Version: 0.1.0
+## SavedVariables: GatherMapDB, GatherMapSettings
+
+GatherMap.lua
+# BEGIN GENERATED DATA
+# END GENERATED DATA
