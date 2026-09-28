@@ -92,6 +92,33 @@ describe("the minimap pins", function()
         assertEqual("1731,2843,3764,180582", entries(ns))
     end)
 
+    it("draw one pin where several spawns share a spot", function()
+        local ns = refreshed(function(env) env.__skills[3] = { "Mining", false, 100 } end)
+        assertEqual("1731,2843,3764,180582", entries(ns), "the Silver Vein shares the Tin's pin")
+        local pin = pinFor(ns, C)
+        assertEqual(2, #pin.members)
+        assertEqual("0:1733:-10610.0:1160.0", pin.members[2].key)
+    end)
+
+    it("draw the Silver Vein alone where the Tin is hidden", function()
+        local ns = refreshed(function(env) env.__skills[3] = { "Mining", false, 100 } end)
+        ns.settings.minimap.hidden["Tin Vein"] = true
+        ns.MinimapPins.Refresh()
+        assertEqual("1731,1733,2843,180582", entries(ns))
+    end)
+
+    it("mark not here on a Shift-right-click, and ignore a plain one", function()
+        local ns, env = refreshed()
+        local pin = pinFor(ns, "0:1731:-10603.8:1154.0")
+        pin.scripts.OnMouseUp(pin, "RightButton")
+        assertNil(ns.db.missing["0:1731:-10603.8:1154.0"])
+        assertEqual(0, env.__navigatedToParent, "the world map is not the minimap's")
+        env.__modifiers.shift = true
+        pin.scripts.OnMouseUp(pin, "RightButton")
+        assertEqual(env.__time, ns.db.missing["0:1731:-10603.8:1154.0"])
+        assertEqual("LeftButton", pin.passThrough[1])
+    end)
+
     it("stop at their limit", function()
         local ns = helpers.loggedIn()
         for index = 1, ns.MinimapPins.MAX + 20 do

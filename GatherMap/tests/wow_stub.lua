@@ -72,6 +72,7 @@ local function makeWidget(kind, parent)
     function widget:SetChecked(value) self.checked = value and true or false end
     function widget:GetChecked() return self.checked end
     function widget:EnableMouse(value) self.mouseEnabled = value end
+    function widget:SetPassThroughButtons(...) self.passThrough = { ... } end
     function widget:RegisterForClicks(...) self.clicks = { ... } end
     function widget:RegisterForDrag(...) self.drag = { ... } end
     function widget:SetHighlightTexture(value) self.highlightTexture = value end
@@ -144,6 +145,10 @@ function stub.newEnv()
     env.C_Timer = { After = function(_, fn) fn() end }
     function env.InCombatLockdown() return false end
 
+    -- Modifier keys held: env.__modifiers.shift.
+    env.__modifiers = {}
+    function env.IsShiftKeyDown() return env.__modifiers.shift and true or false end
+
     -- The game's options window and the game menu, both closed.
     env.SettingsPanel = makeWidget("Frame", env.UIParent)
     env.SettingsPanel.shown = false
@@ -215,6 +220,8 @@ function stub.newEnv()
     function env.WorldMapFrame:GetCanvas() return canvas end
     function env.WorldMapFrame:GetMapID() return env.__worldMapID end
     function env.WorldMapFrame:GetCanvasScale() return env.__canvasScale end
+    env.__navigatedToParent = 0
+    function env.WorldMapFrame:NavigateToParentMap() env.__navigatedToParent = env.__navigatedToParent + 1 end
     function env.WorldMapFrame:AddDataProvider(provider)
         table.insert(env.__providers, provider)
         provider:OnAdded(self)

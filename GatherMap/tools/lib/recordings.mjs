@@ -7,6 +7,9 @@ import { parseSavedVariables } from '../../../BossLoot/tools/lib/savedvars.mjs';
 
 export const REACH = 15;
 export const POOL_REACH = 30;
+// A spawn is left out only when this many recorders marked it "not here":
+// one mark often only means someone else had just gathered it.
+export const MIN_MISSING = 2;
 
 const round1 = (value) => Math.round(value * 10) / 10;
 
@@ -40,27 +43,30 @@ export function readRecordings(dir) {
 
 /**
  * Fold the recordings into the database's spawns, in place: new points join,
- * spawns marked "not here" by someone and gathered by no one leave. Returns
- * the keys of every spawn someone gathered, sorted.
+ * spawns marked "not here" by at least MIN_MISSING recorders and gathered by
+ * no one leave. Returns the keys of every spawn someone gathered, sorted.
  */
 export function applyRecordings(byContinent, nodes, recorders) {
   const known = new Set(nodes.map((node) => node.entry));
   const kindOf = new Map(nodes.map((node) => [node.entry, node.kind]));
   const gathered = new Set();
-  const missing = new Set();
+  // Per key, how many recorders marked it.
+  const marks = new Map();
   for (const recorder of recorders) {
     for (const key of Object.keys(recorder.gathered)) gathered.add(key);
-    for (const key of Object.keys(recorder.missing)) missing.add(key);
+    for (const key of Object.keys(recorder.missing)) marks.set(key, (marks.get(key) ?? 0) + 1);
   }
 
   let dropped = 0;
+  const byKey = new Map();
   for (const [continent, list] of byContinent) {
     const kept = list.filter((s) => {
       const key = spawnKey(continent, s.entry, s.x, s.y);
-      return !(missing.has(key) && !gathered.has(key));
+      return !((marks.get(key) ?? 0) >= MIN_MISSING && !gathered.has(key));
     });
     dropped += list.length - kept.length;
     byContinent.set(continent, kept);
+    for (const s of kept) byKey.set(spawnKey(continent, s.entry, s.x, s.y), s);
   }
 
   const confirmed = new Set();
@@ -69,18 +75,35 @@ export function applyRecordings(byContinent, nodes, recorders) {
     for (const [key, point] of Object.entries(recorder.gathered)) {
       const list = byContinent.get(point?.continent);
       if (!list || !known.has(point.entry) || typeof point.x !== 'number' || typeof point.y !== 'number') continue;
+      // The recorder matched this spawn itself: take its word.
+      if (byKey.has(key)) {
+        confirmed.add(key);
+        continue;
+      }
       const x = round1(point.x);
       const y = round1(point.y);
       const kind = kindOf.get(point.entry);
       const reach = kind === 'pool' ? POOL_REACH : REACH;
-      const near = list.find((s) => s.entry === point.entry && Math.hypot(s.x - x, s.y - y) <= reach);
+      let near;
+      let nearest = Infinity;
+      for (const s of list) {
+        if (s.entry !== point.entry) continue;
+        const distance = Math.hypot(s.x - x, s.y - y);
+        if (distance <= reach && distance < nearest) {
+          near = s;
+          nearest = distance;
+        }
+      }
       if (near) {
         confirmed.add(spawnKey(point.continent, near.entry, near.x, near.y));
       } else if (point.new && kind !== 'pool') {
-        list.push({ entry: point.entry, x, y });
-        confirmed.add(spawnKey(point.continent, point.entry, x, y));
+        const spawn = { entry: point.entry, x, y };
+        const newKey = spawnKey(point.continent, point.entry, x, y);
+        list.push(spawn);
+        byKey.set(newKey, spawn);
+        confirmed.add(newKey);
         added++;
-      } else if (!near && kind !== 'pool') {
+      } else if (kind !== 'pool') {
         confirmed.add(key);
       }
     }

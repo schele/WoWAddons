@@ -35,6 +35,18 @@ describe("the data files", function()
     end)
 end)
 
+describe("logging in", function()
+    it("runs every login handler, even after one that raises", function()
+        local ns, env = helpers.loadAddon()
+        local ran = false
+        ns.OnLogin(function() error("broken") end)
+        ns.OnLogin(function() ran = true end)
+        helpers.login(ns, env)
+        assertTrue(ran)
+        assertMatch("Loaded%.", helpers.printed(env))
+    end)
+end)
+
 describe("refreshing", function()
     it("runs every refresher", function()
         local ns = helpers.loggedIn()

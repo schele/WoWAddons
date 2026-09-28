@@ -15,15 +15,20 @@ minimap, with filters for each.
   1.12, and WoW Forever is not vanilla, so treat them as a good guess.
 
 Hover a pin for its name, the skill it needs (in its skill-up colour) and
-which of the three it is. **Right-click a pin where nothing grows** to mark it
-not here: it is hidden on every character, and gathering there later takes
-the mark off.
+which of the three it is. Where several nodes share one spawn point (Tin or
+Silver, say), there is one pin, and its tooltip names them all.
+**Shift-right-click a pin where nothing grows** to mark it not here: it is
+hidden on every character, and gathering there later takes the mark off.
+On the world map a left click or a plain right-click on a pin does what it
+would on the map itself.
 
 ## Sending your recordings
 
 Your gathers and "not here" marks make the next release better for everyone.
 Send `WTF/Account/<name>/SavedVariables/GatherMap.lua`; it goes in
-`tools/recordings/` and the build bakes it in.
+`tools/recordings/` and the build bakes it in. A spawn leaves the release
+only when at least two recorders marked it not here and nobody gathered it:
+one "nothing here" often only means someone else had just gathered it.
 
 ## Filters
 

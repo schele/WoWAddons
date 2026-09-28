@@ -65,3 +65,14 @@ function Filter.Shows(where, spawn)
 
     return true
 end
+
+--- The members of `stack` (a spot's spawns) shown on `where`, in its order.
+function Filter.Shown(where, stack)
+    local shown = {}
+    for _, spawn in ipairs(stack) do
+        if Filter.Shows(where, spawn) then
+            shown[#shown + 1] = spawn
+        end
+    end
+    return shown
+end

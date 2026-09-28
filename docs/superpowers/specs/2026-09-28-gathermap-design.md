@@ -44,7 +44,7 @@ the authority from the start:
    - *from the database only*: dimmed (55%), "not seen in WoW Forever yet"
      in its tooltip.
    The source filter becomes "Only places confirmed in game" (yours or baked).
-3. **"Not here."** Right-click a pin to mark a spawn where nothing grows;
+3. **"Not here."** Shift-right-click a pin to mark a spawn where nothing grows;
    it is hidden on every character (`GatherMapDB.missing`), and gathering
    there later clears the mark. A setting shows marked spawns again, so a
    mistaken mark can be undone.
@@ -52,8 +52,8 @@ the authority from the start:
    files (`GatherMap.lua` from `WTF/Account/<name>/SavedVariables/`) put in
    `tools/recordings/` are read by the build (BossLoot's
    `parseSavedVariables`). Their new points join the spawns, their gathered
-   spawns become confirmed, and a database spawn marked "not here" by any
-   recorder and gathered by none is left out.
+   spawns become confirmed, and a database spawn marked "not here" by at
+   least two recorders and gathered by none is left out.
 
 ### Check result
 
@@ -168,7 +168,7 @@ the catalog.
 One loot window counts once, however many items it holds. A gather on a
 spawn marked "not here" clears the mark.
 
-Right-click on any pin toggles its spawn in `GatherMapDB.missing`.
+Shift-right-click on any pin toggles its spawns in `GatherMapDB.missing`.
 
 ## Skill (`Skills.lua`)
 
@@ -209,8 +209,19 @@ filter or skill change.
 Pin: the node's icon at `pinSize`; a gold edge if you gathered there;
 dimmed if only the database has it. Tooltip: name, required skill in its
 skill-up colour, then "Gathered here N times", "Confirmed in WoW Forever" or
-"From the classic database, not seen in WoW Forever yet", and "Right-click:
-not here" (or "Marked not here. Right-click to undo").
+"From the classic database, not seen in WoW Forever yet", and "Shift-right-click:
+not here" (or "Marked not here. Shift-right-click to undo").
+
+Spawns at one rounded position on a continent (pool alternates: Tin or
+Silver, several schools at one point) are one stack and one pin, drawn if
+any member passes the filter, as the first shown member confirmed in game
+(else the first shown). Gold edge if you gathered any member, full strength
+if any is confirmed. With several members the tooltip names them "A, B or
+C", gives each one's skill line, one status line for the spot (gathered: the
+members' counts summed), and the "not here" line; Shift-right-click marks
+every shown member, or clears them all if all were marked. Pins pass left
+clicks through to the map; a plain right-click on a world-map pin zooms the
+map out (`NavigateToParentMap`), on a minimap pin it does nothing.
 
 ## Minimap (`MinimapPins.lua`)
 
@@ -255,9 +266,11 @@ BossLoot's `parseSavedVariables` and takes each file's `GatherMapDB`:
   or 1, that are not within 15 yards of a database spawn of the same entry
   (or of an earlier recording's point), are added to the spawns;
 - every gathered key, database or new, is written to `Data/Confirmed.lua`
-  (`ns.AddConfirmed({ key, ... })`);
-- a database spawn in any recorder's `missing` and in no recorder's
-  `gathered` is left out of the spawns.
+  (`ns.AddConfirmed({ key, ... })`): a key that is a spawn's own confirms
+  that spawn, otherwise the nearest spawn of the same entry within reach;
+- a database spawn in the `missing` of at least two recorders
+  (`MIN_MISSING = 2`) and in no recorder's `gathered` is left out of the
+  spawns: one "nothing here" often only means someone else just gathered it.
 
 A file that does not parse, or has no `GatherMapDB`, is a warning, not an
 error, as in BossLoot.

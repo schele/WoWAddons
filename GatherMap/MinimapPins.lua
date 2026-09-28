@@ -35,11 +35,16 @@ function MinimapPins.Refresh()
         local rotate = GetCVar("rotateMinimap") == "1"
         local facing = rotate and GetPlayerFacing and GetPlayerFacing()
 
+        -- One pin per spot: its first spawn stands for it.
         ns.Spawns.Near(continent, x, y, radius, function(spawn)
-            if pool.used < MinimapPins.MAX and ns.Filter.Shows("minimap", spawn) then
+            if pool.used >= MinimapPins.MAX or spawn.stack[1] ~= spawn then
+                return
+            end
+            local shown = ns.Filter.Shown("minimap", spawn.stack)
+            if #shown > 0 then
                 local right, up = ns.Geometry.MinimapOffset(x, y, spawn.x, spawn.y, facing, rotate)
                 local pin = pool:Acquire()
-                ns.Pins.Set(pin, spawn, size)
+                ns.Pins.Set(pin, shown, size)
                 pin:ClearAllPoints()
                 pin:SetPoint("CENTER", Minimap, "CENTER", right * scale, up * scale)
             end

@@ -185,8 +185,9 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
         ensureDatabase()
     elseif event == "PLAYER_LOGIN" then
         ensureDatabase()
+        -- One handler that raises must not stop the rest.
         for _, handler in ipairs(loginHandlers) do
-            handler()
+            ns.Guarded(handler)
         end
         ns.Print("Loaded. Type /gmap for settings, or /gmap help for commands.")
     end

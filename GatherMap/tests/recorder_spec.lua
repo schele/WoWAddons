@@ -120,6 +120,30 @@ describe("marking a spawn not here", function()
         assertNil(ns.db.missing[A])
         assertEqual(2, count)
     end)
+
+    it("marks a whole spot if any of it is unmarked, else clears it, with one redraw each", function()
+        local ns, env = helpers.loggedIn()
+        local count = 0
+        ns.OnRefresh(function() count = count + 1 end)
+        local C, C2 = "0:3764:-10610.0:1160.0", "0:1733:-10610.0:1160.0"
+        local members = ns.Spawns.ByKey(C).stack
+        ns.db.missing[C] = 5
+        assertTrue(ns.Recorder.ToggleMissingAll(members))
+        assertEqual(env.__time, ns.db.missing[C])
+        assertEqual(env.__time, ns.db.missing[C2])
+        assertEqual(1, count)
+        assertFalse(ns.Recorder.ToggleMissingAll(members))
+        assertNil(ns.db.missing[C])
+        assertNil(ns.db.missing[C2])
+        assertEqual(2, count)
+    end)
+
+    it("matches a gather to its own entry at a shared spot", function()
+        local ns, env = helpers.loggedIn()
+        loot(env, 1733)
+        assertEqual(1, ns.db.gathered["0:1733:-10610.0:1160.0"].count)
+        assertNil(ns.db.gathered["0:3764:-10610.0:1160.0"])
+    end)
 end)
 
 describe("/gmap reset gathered", function()

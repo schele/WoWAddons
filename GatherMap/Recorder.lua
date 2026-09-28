@@ -52,6 +52,22 @@ function Recorder.ToggleMissing(spawn)
     return marked
 end
 
+--- The same for a spot's spawns together: all marked if any was not, else
+-- all cleared. True when now marked.
+function Recorder.ToggleMissingAll(members)
+    local marked = false
+    for _, spawn in ipairs(members) do
+        if not ns.db.missing[spawn.key] then
+            marked = true
+        end
+    end
+    for _, spawn in ipairs(members) do
+        ns.db.missing[spawn.key] = marked and time() or nil
+    end
+    ns.Refresh()
+    return marked
+end
+
 --- A loot window opened. Counted when it came from a node GatherMap knows,
 -- on one of the two continents, and the client says where the player is.
 function Recorder.LootOpened()

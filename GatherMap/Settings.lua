@@ -194,8 +194,10 @@ local function ensureBuilt()
     end
     built = true
 
-    local ok, scroll = pcall(CreateFrame, "ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
-    if ok and scroll then
+    local scroll = ns.Guarded(function()
+        return CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    end)
+    if scroll then
         -- Room on the right for the template's scroll bar.
         scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, -4)
         scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -28, 4)
@@ -228,7 +230,7 @@ local function ensureBuilt()
     hint:SetJustifyH("LEFT")
     hint:SetText("Each row has two boxes: the world map, then the minimap. "
         .. "Open a kind with + to pick its nodes one by one. Dimmed pins come from "
-        .. "the classic database and are not seen in WoW Forever yet; right-click "
+        .. "the classic database and are not seen in WoW Forever yet; Shift-right-click "
         .. "a pin where nothing grows to mark it not here.")
 
     startY = -PADDING - 84 -- below the title and the three-line hint

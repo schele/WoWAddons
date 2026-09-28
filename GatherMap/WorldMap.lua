@@ -11,10 +11,11 @@ ns.WorldMap = WorldMap
 -- stops being usable, so the rest are left off.
 WorldMap.MAX = 2000
 
--- Per map: every spawn inside it, with its place, as of Spawns.version.
+-- Per map: every spot inside it, with its place, as of Spawns.version.
 local cache = {}
 local pool, provider
 
+--- One place per spot on the map: { spawn = its first, stack, x, y }.
 function WorldMap.SpawnsOn(uiMapID)
     local cached = cache[uiMapID]
     if cached and cached.version == ns.Spawns.version then
@@ -25,9 +26,11 @@ function WorldMap.SpawnsOn(uiMapID)
     local rect = ns.Geometry.MapRect(uiMapID)
     if rect then
         for _, spawn in ipairs(ns.Spawns.All(rect.continent)) do
-            local x, y = ns.Geometry.ToMap(rect, spawn.x, spawn.y)
-            if x >= 0 and x <= 1 and y >= 0 and y <= 1 then
-                table.insert(places, { spawn = spawn, x = x, y = y })
+            if spawn.stack[1] == spawn then
+                local x, y = ns.Geometry.ToMap(rect, spawn.x, spawn.y)
+                if x >= 0 and x <= 1 and y >= 0 and y <= 1 then
+                    table.insert(places, { spawn = spawn, stack = spawn.stack, x = x, y = y })
+                end
             end
         end
     end
@@ -54,9 +57,10 @@ function WorldMap.Refresh()
             if pool.used >= WorldMap.MAX then
                 break
             end
-            if ns.Filter.Shows("worldmap", place.spawn) then
+            local shown = ns.Filter.Shown("worldmap", place.stack)
+            if #shown > 0 then
                 local pin = pool:Acquire()
-                ns.Pins.Set(pin, place.spawn, size)
+                ns.Pins.Set(pin, shown, size)
                 pin:SetScale(scale)
                 pin:ClearAllPoints()
                 pin:SetPoint("CENTER", canvas, "TOPLEFT", place.x * width / scale, -place.y * height / scale)
@@ -72,13 +76,22 @@ function WorldMap.Shown()
     return pool and pool:Shown() or {}
 end
 
+local function zoomOut()
+    ns.Guarded(function()
+        if WorldMapFrame.NavigateToParentMap then
+            WorldMapFrame:NavigateToParentMap()
+        end
+    end)
+end
+
 local function attach()
     if provider or not (WorldMapFrame and WorldMapFrame.AddDataProvider
         and CreateFromMixins and MapCanvasDataProviderMixin) then
         return
     end
 
-    pool = ns.Pins.Pool(WorldMapFrame:GetCanvas())
+    -- A plain right-click on a pin does what it would have done on the map.
+    pool = ns.Pins.Pool(WorldMapFrame:GetCanvas(), zoomOut)
     provider = CreateFromMixins(MapCanvasDataProviderMixin)
     function provider:RefreshAllData() WorldMap.Refresh() end
     function provider:RemoveAllData() pool:Begin(); pool:Finish() end

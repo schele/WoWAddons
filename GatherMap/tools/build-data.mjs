@@ -28,6 +28,11 @@ const db = new DatabaseSync(dbPath, { readOnly: true });
 
 const { nodes: all, errors } = catalog(db, lists);
 for (const error of errors) console.error(`error ${error}`);
+// Stop before Data/ or the .toc is touched: a failed build changes nothing.
+if (errors.length) {
+  console.error(`${errors.length} error(s): fix tools/nodes.json and run again.`);
+  process.exit(1);
+}
 
 const byContinent = spawns(db, all);
 
@@ -66,8 +71,3 @@ for (const kind of ['herb', 'ore', 'pool', 'chest']) {
   console.log(`ok    ${nodes.filter((n) => n.kind === kind).length} ${kind} nodes`);
 }
 for (const [continent, list] of byContinent) console.log(`ok    continent ${continent}: ${list.length} spawns`);
-
-if (errors.length) {
-  console.error(`${errors.length} error(s): fix tools/nodes.json and run again.`);
-  process.exit(1);
-}

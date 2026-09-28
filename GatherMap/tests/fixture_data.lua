@@ -5,6 +5,7 @@ local _, ns = ...
 ns.AddNodes({
     [1731] = { kind = "ore", name = "Copper Vein", skill = 1, item = 2770 },
     [3764] = { kind = "ore", name = "Tin Vein", skill = 65, item = 2771 },
+    [1733] = { kind = "ore", name = "Silver Vein", skill = 75, item = 2775 },
     [1617] = { kind = "herb", name = "Silverleaf", skill = 1, item = 765 },
     [1618] = { kind = "herb", name = "Peacebloom", skill = 1, item = 2447 },
     [1619] = { kind = "herb", name = "Earthroot", skill = 15, item = 2449 },
@@ -17,6 +18,7 @@ ns.AddSpawns(0, {
     1731, -10603.8, 1154.0,  -- A: under the player
     1731, -10000.0, 1000.0,  -- B: the map's top-right corner, 623 yards off
     3764, -10610.0, 1160.0,  -- C: 8.6 yards off
+    1733, -10610.0, 1160.0,  -- C2: a Silver Vein at C's spot, its alternate
     1617, -9000.0, 500.0,    -- D: off map 1436
     180582, -10620.0, 1170.0, -- E: a pool 22.8 yards off
     2843, -10700.0, 1300.0,  -- F: a chest 175 yards off

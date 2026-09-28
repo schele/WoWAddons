@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { readRecordings, applyRecordings, spawnKey } from '../lib/recordings.mjs';
+import { readRecordings, applyRecordings, spawnKey, MIN_MISSING } from '../lib/recordings.mjs';
 import { confirmedFile } from '../lib/lua.mjs';
 
 const NODES = [{ entry: 1731, kind: 'ore' }, { entry: 180582, kind: 'pool' }];
@@ -79,14 +79,50 @@ test('two recorders with the same new point add it once', () => {
   assert.equal(added, 1);
 });
 
-test('a spawn marked not here is dropped, unless someone gathered it', () => {
+test('a spawn two recorders marked not here is dropped, unless someone gathered it', () => {
+  assert.equal(MIN_MISSING, 2);
   const byContinent = world();
   const { dropped } = applyRecordings(byContinent, NODES, [
     { gathered: {}, missing: { '0:1731:-10008.9:878.7': 1, '0:1731:-10133.8:793.8': 1 } },
-    { gathered: { '0:1731:-10133.8:793.8': { continent: 0, entry: 1731, x: -10133.8, y: 793.8, count: 1 } }, missing: {} },
+    {
+      gathered: { '0:1731:-10133.8:793.8': { continent: 0, entry: 1731, x: -10133.8, y: 793.8, count: 1 } },
+      missing: { '0:1731:-10008.9:878.7': 1 },
+    },
   ]);
   assert.equal(dropped, 1);
   assert.deepEqual(byContinent.get(0).map((s) => s.x), [-10133.8]);
+});
+
+test('one recorder\'s mark alone keeps the spawn: someone else may just have gathered it', () => {
+  const byContinent = world();
+  const { dropped } = applyRecordings(byContinent, NODES, [
+    { gathered: {}, missing: { '0:1731:-10008.9:878.7': 1 } },
+    { gathered: {}, missing: {} },
+  ]);
+  assert.equal(dropped, 0);
+  assert.equal(byContinent.get(0).length, 2);
+});
+
+test('a gathered key that is a spawn\'s own confirms that spawn, not an earlier one close by', () => {
+  const byContinent = new Map([
+    [0, [{ entry: 1731, x: -10100, y: 800 }, { entry: 1731, x: -10105, y: 800 }]],
+    [1, []],
+  ]);
+  const { confirmed } = applyRecordings(byContinent, NODES, [
+    { gathered: { '0:1731:-10105.0:800.0': { continent: 0, entry: 1731, x: -10105, y: 800, count: 1 } }, missing: {} },
+  ]);
+  assert.deepEqual(confirmed, ['0:1731:-10105.0:800.0']);
+});
+
+test('a gathered point off every spawn\'s key confirms the nearest within reach', () => {
+  const byContinent = new Map([
+    [0, [{ entry: 1731, x: -10100, y: 800 }, { entry: 1731, x: -10110, y: 800 }]],
+    [1, []],
+  ]);
+  const { confirmed } = applyRecordings(byContinent, NODES, [
+    { gathered: { '0:1731:-10108.0:800.0': { continent: 0, entry: 1731, x: -10108, y: 800, count: 1 } }, missing: {} },
+  ]);
+  assert.deepEqual(confirmed, ['0:1731:-10110.0:800.0']);
 });
 
 test('the confirmed file hands the keys to ns.AddConfirmed', () => {

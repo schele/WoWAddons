@@ -96,3 +96,27 @@ describe("the filter", function()
         assertFalse(ns.Filter.Shows("worldmap", { entry = 424242, key = "x" }))
     end)
 end)
+
+describe("the filter on a spot", function()
+    local function names(list)
+        local out = {}
+        for index, spawn in ipairs(list) do out[index] = spawn.entry end
+        return table.concat(out, ",")
+    end
+
+    it("keeps the members it shows, in the spot's order", function()
+        local ns = helpers.loggedIn(function(env) env.__skills[3] = { "Mining", false, 100 } end)
+        local stack = ns.Spawns.ByKey(C).stack
+        assertEqual("3764,1733", names(ns.Filter.Shown("worldmap", stack)))
+        ns.settings.worldmap.hidden["Tin Vein"] = true
+        assertEqual("1733", names(ns.Filter.Shown("worldmap", stack)))
+        assertEqual("3764,1733", names(ns.Filter.Shown("minimap", stack)))
+        ns.settings.worldmap.kinds.ore = false
+        assertEqual("", names(ns.Filter.Shown("worldmap", stack)))
+    end)
+
+    it("leaves out a member the skill cannot gather yet", function()
+        local ns = helpers.loggedIn()
+        assertEqual("3764", names(ns.Filter.Shown("worldmap", ns.Spawns.ByKey(C).stack)), "Silver needs 75, Mining is 70")
+    end)
+end)

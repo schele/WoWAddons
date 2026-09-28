@@ -1,9 +1,10 @@
 local addonName, ns = ...
 
 -- Every spawn GatherMap knows: the data files' and the new points the
--- player found. Each is { continent, entry, x, y, key }, filed in a grid of
--- 200-yard cells per continent, so the minimap and the recorder look only at
--- the few cells around the player.
+-- player found. Each is { continent, entry, x, y, key, stack }, filed in a
+-- grid of 200-yard cells per continent, so the minimap and the recorder look
+-- only at the few cells around the player. `stack` is every spawn at that
+-- same place, this one included: one table, shared by all of them.
 
 local Spawns = {}
 ns.Spawns = Spawns
@@ -17,6 +18,8 @@ Spawns.version = 0
 local lists = {}
 local grids = {}
 local byKey = {}
+-- Per place, "<continent>:<x>:<y>": every spawn there, in the order added.
+local stacks = {}
 
 function Spawns.Key(continent, entry, x, y)
     return string.format("%d:%d:%.1f:%.1f", continent, entry, x, y)
@@ -34,6 +37,17 @@ local function add(continent, entry, x, y)
 
     local spawn = { continent = continent, entry = entry, x = x, y = y, key = key }
     byKey[key] = spawn
+
+    -- Alternates share a spawn point (Tin or Silver, a school of one fish or
+    -- another), so the spawns at one place are one stack, drawn as one pin.
+    local spot = string.format("%d:%.1f:%.1f", continent, x, y)
+    local stack = stacks[spot]
+    if not stack then
+        stack = {}
+        stacks[spot] = stack
+    end
+    table.insert(stack, spawn)
+    spawn.stack = stack
 
     lists[continent] = lists[continent] or {}
     table.insert(lists[continent], spawn)
