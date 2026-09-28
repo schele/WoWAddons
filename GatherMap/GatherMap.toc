@@ -9,7 +9,6 @@
 GatherMap.lua
 # BEGIN GENERATED DATA
 # END GENERATED DATA
-Settings.lua
 Geometry.lua
 Spawns.lua
 Skills.lua
@@ -18,3 +17,4 @@ Recorder.lua
 Pins.lua
 MinimapPins.lua
 WorldMap.lua
+Settings.lua
