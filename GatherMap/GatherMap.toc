@@ -9,6 +9,7 @@
 GatherMap.lua
 # BEGIN GENERATED DATA
 # END GENERATED DATA
+Settings.lua
 Geometry.lua
 Spawns.lua
 Skills.lua
