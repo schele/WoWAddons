@@ -82,10 +82,11 @@ end
 
 --- A pin on `parent`. Shift-right-click forgets its spot; a plain
 -- right-click calls `onRightClick(pin)`, if given. Left clicks go through to
--- whatever is beneath.
-function Pins.Create(parent, onRightClick)
+-- whatever is beneath. `frameLevel`, if given, is the pin's level; else it
+-- sits just above `parent`.
+function Pins.Create(parent, onRightClick, frameLevel)
     local pin = CreateFrame("Frame", nil, parent)
-    pin:SetFrameLevel(parent:GetFrameLevel() + 5)
+    pin:SetFrameLevel(frameLevel or parent:GetFrameLevel() + 5)
     pin:EnableMouse(true)
     -- The mouse is for the tooltip; a left click belongs to the map.
     ns.Guarded(function() pin:SetPassThroughButtons("LeftButton") end)
@@ -140,8 +141,8 @@ end
 
 --- Pins on one parent, reused from draw to draw: Begin, then Acquire one per
 -- spot drawn, then Finish hides whatever was not acquired. `onRightClick`
--- goes to every pin (see Pins.Create).
-function Pins.Pool(parent, onRightClick)
+-- and `frameLevel` go to every pin (see Pins.Create).
+function Pins.Pool(parent, onRightClick, frameLevel)
     local pool = { pins = {}, used = 0 }
 
     function pool:Begin()
@@ -152,7 +153,7 @@ function Pins.Pool(parent, onRightClick)
         self.used = self.used + 1
         local pin = self.pins[self.used]
         if not pin then
-            pin = Pins.Create(parent, onRightClick)
+            pin = Pins.Create(parent, onRightClick, frameLevel)
             self.pins[self.used] = pin
         end
         return pin

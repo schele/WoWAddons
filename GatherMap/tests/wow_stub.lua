@@ -220,6 +220,11 @@ function stub.newEnv()
     function env.WorldMapFrame:GetCanvas() return canvas end
     function env.WorldMapFrame:GetMapID() return env.__worldMapID end
     function env.WorldMapFrame:GetCanvasScale() return env.__canvasScale end
+    -- The map's pin frame levels, by name, as its pin frame levels manager
+    -- hands them out: the explored-area overlay under the points of interest.
+    env.__pinLevels = { PIN_FRAME_LEVEL_MAP_EXPLORATION = 2010, PIN_FRAME_LEVEL_AREA_POI = 2100 }
+    local pinLevels = { GetValidFrameLevel = function(_, name) return env.__pinLevels[name] end }
+    function env.WorldMapFrame:GetPinFrameLevelsManager() return pinLevels end
     env.__navigatedToParent = 0
     function env.WorldMapFrame:NavigateToParentMap() env.__navigatedToParent = env.__navigatedToParent + 1 end
     function env.WorldMapFrame:AddDataProvider(provider)

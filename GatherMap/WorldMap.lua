@@ -10,6 +10,10 @@ ns.WorldMap = WorldMap
 -- A continent map holds thousands of spawns; past this many pins the map
 -- stops being usable, so the rest are left off.
 WorldMap.MAX = 2000
+-- The pins' frame level where the map will not give one: above Blizzard's
+-- default pin level (2000) and the explored-area overlay, which covers the
+-- whole canvas.
+WorldMap.FALLBACK_LEVEL = 2200
 
 -- Per map: every spot inside it, with its place, as of Spawns.version.
 local cache = {}
@@ -90,8 +94,17 @@ local function attach()
         return
     end
 
+    -- The map's tiles sit at the canvas's level and its own pins far above
+    -- it; ours go where the map puts its points of interest.
+    local level = ns.Guarded(function()
+        return WorldMapFrame:GetPinFrameLevelsManager():GetValidFrameLevel("PIN_FRAME_LEVEL_AREA_POI")
+    end)
+    if type(level) ~= "number" then
+        level = WorldMap.FALLBACK_LEVEL
+    end
+
     -- A plain right-click on a pin does what it would have done on the map.
-    pool = ns.Pins.Pool(WorldMapFrame:GetCanvas(), zoomOut)
+    pool = ns.Pins.Pool(WorldMapFrame:GetCanvas(), zoomOut, level)
     provider = CreateFromMixins(MapCanvasDataProviderMixin)
     function provider:RefreshAllData() WorldMap.Refresh() end
     function provider:RemoveAllData() pool:Begin(); pool:Finish() end

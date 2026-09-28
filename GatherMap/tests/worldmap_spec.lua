@@ -115,6 +115,26 @@ describe("the world map", function()
         assertEqual("1731,1731,3764,424242", shownEntries(ns))
     end)
 
+    it("draws its pins above the map's art, at the level the map gives points of interest", function()
+        local ns, env = opened()
+        local level = pinFor(ns, A):GetFrameLevel()
+        assertEqual(2100, level)
+        assertTrue(level > env.__pinLevels.PIN_FRAME_LEVEL_MAP_EXPLORATION, "above the explored-area overlay")
+    end)
+
+    it("draws its pins at a level of its own where the map will not give one", function()
+        local ns = opened(function(env) env.WorldMapFrame.GetPinFrameLevelsManager = nil end)
+        assertEqual(2200, pinFor(ns, A):GetFrameLevel())
+        assertEqual(2200, ns.WorldMap.FALLBACK_LEVEL)
+    end)
+
+    it("keeps the minimap's pins just above the minimap", function()
+        local ns, env = opened()
+        ns.MinimapPins.Refresh()
+        local pin = ns.MinimapPins.Shown()[1]
+        assertEqual(env.Minimap:GetFrameLevel() + 5, pin:GetFrameLevel())
+    end)
+
     it("loads on a client without the map framework", function()
         local ns, env = helpers.loggedIn(withGathers(function(env) env.MapCanvasDataProviderMixin = nil end))
         assertEqual(0, #env.__providers)
