@@ -12,6 +12,8 @@ M.FILES = {
     "Skills.lua",
     "Filter.lua",
     "Recorder.lua",
+    "Pins.lua",
+    "WorldMap.lua",
 }
 
 --- Load the addon's files into a stubbed environment, the way WoW would:
