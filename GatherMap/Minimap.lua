@@ -46,7 +46,7 @@ end
 
 -- Guarded: a drag that raised every frame would flood the error log.
 local function followCursor()
-    pcall(function()
+    ns.Guarded(function()
         local centerX, centerY = Minimap:GetCenter()
         local cursorX, cursorY = GetCursorPosition()
         local scale = Minimap:GetEffectiveScale()
