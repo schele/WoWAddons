@@ -254,6 +254,12 @@ function stub.newEnv()
     -- Loot: the GUID GetLootSourceInfo gives for the open window.
     env.__lootSource = nil
     function env.GetLootSourceInfo() return env.__lootSource end
+    -- The first loot slot's item link.
+    env.__lootLink = nil
+    function env.GetLootSlotLink() return env.__lootLink end
+    -- Spell names, by ID, as this client gives them (probed 2026-09-28).
+    env.__spellNames = { [2575] = "Mining", [2576] = "Mining", [2366] = "Herbalism", [2369] = "Herbalism", [133] = "Fireball" }
+    env.C_Spell = { GetSpellName = function(id) return env.__spellNames[id] end }
 
     -- Skills: { name, isHeader, rank, isExpanded (headers only, default true) }.
     env.__skills = {

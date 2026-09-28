@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
--- Whether a spawn is shown on the world map or the minimap. The one place
+-- Whether a place is shown on the world map or the minimap. The one place
 -- every filter is applied, so the two maps can never disagree about what a
 -- setting means.
 
@@ -9,12 +9,10 @@ ns.Filter = Filter
 
 local function filters(pinSize)
     return {
-        kinds = { herb = true, ore = true, pool = true, chest = true },
+        kinds = { herb = true, ore = true },
         hidden = {},
         hideUngatherable = true,
         hideGrey = false,
-        onlyConfirmed = false,
-        showMissing = false,
         pinSize = pinSize,
     }
 end
@@ -24,12 +22,6 @@ ns.AddDefaults({
     minimap = filters(10),
 })
 
---- Whether the game has shown this spawn is real: the player gathered it,
--- or a recording baked into the release did. vMaNGOS alone is a guess.
-function Filter.Confirmed(spawn)
-    return ns.db.gathered[spawn.key] ~= nil or ns.confirmed[spawn.key] == true
-end
-
 --- Whether `spawn` is shown on `where`: "worldmap" or "minimap".
 function Filter.Shows(where, spawn)
     local settings = ns.settings
@@ -37,19 +29,9 @@ function Filter.Shows(where, spawn)
         return false
     end
 
-    local node = ns.Nodes[spawn.entry]
-    if not node then
-        return false
-    end
-
+    local node = ns.Spawns.Node(spawn)
     local chosen = settings[where]
-    if not chosen.kinds[node.kind] or chosen.hidden[node.name] then
-        return false
-    end
-    if chosen.onlyConfirmed and not Filter.Confirmed(spawn) then
-        return false
-    end
-    if ns.db.missing[spawn.key] and not chosen.showMissing then
+    if not node.kind or not chosen.kinds[node.kind] or chosen.hidden[node.name] then
         return false
     end
 
@@ -66,7 +48,7 @@ function Filter.Shows(where, spawn)
     return true
 end
 
---- The members of `stack` (a spot's spawns) shown on `where`, in its order.
+--- The members of `stack` (a spot's places) shown on `where`, in its order.
 function Filter.Shown(where, stack)
     local shown = {}
     for _, spawn in ipairs(stack) do

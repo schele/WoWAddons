@@ -1,16 +1,20 @@
 local helpers = require("helpers")
 
-local A = "0:1731:-10603.8:1154.0"
-local E = "0:180582:-10620.0:1170.0"
-
 local function guid(entry)
     return string.format("GameObject-0-6782-0-79720-%d-00003A1A8E", entry)
 end
 
-local function loot(env, entry)
+local function cast(env, spellID)
+    helpers.fire(env, "UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-3-0-0-0-0-0", spellID)
+end
+
+local function loot(env, entry, link)
     env.__lootSource = guid(entry)
+    env.__lootLink = link
     helpers.fire(env, "LOOT_OPENED")
 end
+
+local HERE = "0:1731:-10603.8:1154.0"
 
 describe("reading a loot window's source", function()
     it("takes the object's entry from its GUID", function()
@@ -22,59 +26,95 @@ describe("reading a loot window's source", function()
 end)
 
 describe("a gather", function()
-    it("counts the spawn it was taken from", function()
+    it("of a listed vein makes a new place where the player stands", function()
         local ns, env = helpers.loggedIn()
+        cast(env, 2576)
         loot(env, 1731)
-        local point = ns.db.gathered[A]
+        local point = ns.db.gathered[HERE]
         assertEqual(1, point.count)
+        assertEqual("ore", point.kind)
         assertEqual(env.__time, point.last)
-        assertFalse(point.new)
-        assertEqual(1731, point.entry)
+        assertEqual(HERE, ns.Spawns.ByKey(HERE).key, "and the maps can draw it")
     end)
 
-    it("counts again next time, but not twice for one window", function()
+    it("of a listed herb counts with no Herbalism cast seen", function()
         local ns, env = helpers.loggedIn()
-        loot(env, 1731)
+        loot(env, 1617)
+        assertEqual("herb", ns.db.gathered["0:1617:-10603.8:1154.0"].kind)
+    end)
+
+    it("of an unlisted object counts after Mining, named after its loot", function()
+        local ns, env = helpers.loggedIn()
+        cast(env, 2576)
         env.__now = env.__now + 2
-        loot(env, 1731)
-        assertEqual(1, ns.db.gathered[A].count, "reopened within 5 seconds")
-        env.__now = env.__now + 6
-        loot(env, 1731)
-        assertEqual(2, ns.db.gathered[A].count)
+        loot(env, 424242, "|cffffffff|Hitem:9999::::::::20:::::::|h[Strange Ore]|h|r")
+        local point = ns.db.gathered["0:424242:-10603.8:1154.0"]
+        assertEqual("ore", point.kind)
+        assertEqual(9999, point.item)
+        assertEqual("Strange Ore", point.itemName)
     end)
 
-    it("makes a new point where the data has no spawn", function()
-        local ns, env = helpers.loggedIn(function(env) env.__position = { -10300.04, 900.06, 0, 0 } end)
-        loot(env, 1731)
-        local key = "0:1731:-10300.0:900.1"
-        assertEqual(1, ns.db.gathered[key].count)
-        assertTrue(ns.db.gathered[key].new)
-        assertEqual(key, ns.Spawns.ByKey(key).key, "and the maps can draw it")
-    end)
-
-    it("counts a pool from the shore, up to 30 yards off", function()
+    it("of an unlisted object counts after Herbalism as a herb", function()
         local ns, env = helpers.loggedIn()
-        loot(env, 180582)
-        assertEqual(1, ns.db.gathered[E].count)
+        cast(env, 2369)
+        loot(env, 424243)
+        assertEqual("herb", ns.db.gathered["0:424243:-10603.8:1154.0"].kind)
     end)
 
-    it("never makes a new point for a pool", function()
-        local ns, env = helpers.loggedIn(function(env) env.__position = { -10300, 900, 0, 0 } end)
-        loot(env, 180582)
+    it("of an unlisted object is recorded even when the client hides the loot link", function()
+        local ns, env = helpers.loggedIn()
+        env.GetLootSlotLink = function() error("secret") end
+        cast(env, 2576)
+        loot(env, 424242)
+        local point = ns.db.gathered["0:424242:-10603.8:1154.0"]
+        assertEqual("ore", point.kind)
+        assertNil(point.itemName)
+    end)
+
+    it("is not an unlisted object with no gather cast, or one more than 3 seconds old", function()
+        local ns, env = helpers.loggedIn()
+        loot(env, 424242)
+        cast(env, 133) -- Fireball
+        loot(env, 424242)
+        cast(env, 2576)
+        env.__now = env.__now + 4
+        loot(env, 424242)
         assertNil(next(ns.db.gathered))
     end)
 
-    it("works on Kalimdor too", function()
-        local ns, env = helpers.loggedIn(function(env) env.__position = { 100.0, 200.0, 0, 1 } end)
-        loot(env, 1618)
-        assertEqual(1, ns.db.gathered["1:1618:100.0:200.0"].count)
+    it("ignores another unit's cast", function()
+        local ns, env = helpers.loggedIn()
+        helpers.fire(env, "UNIT_SPELLCAST_SUCCEEDED", "party1", "Cast", 2576)
+        loot(env, 424242)
+        assertNil(next(ns.db.gathered))
     end)
 
-    it("ignores corpses, unknown objects, instances and a hidden position", function()
+    it("counts one vein mined three times once", function()
+        local ns, env = helpers.loggedIn()
+        for _ = 1, 3 do
+            cast(env, 2576)
+            loot(env, 1731)
+            env.__now = env.__now + 8
+        end
+        assertEqual(1, ns.db.gathered[HERE].count)
+        env.__now = env.__now + 60
+        cast(env, 2576)
+        loot(env, 1731)
+        assertEqual(2, ns.db.gathered[HERE].count, "the next visit counts")
+    end)
+
+    it("joins an earlier place of the same entry within 15 yards", function()
+        local ns, env = helpers.loggedIn(helpers.withGathers)
+        env.__position = { -10610.0, 1150.0, 0, 0 }
+        loot(env, 1731)
+        assertEqual(2, ns.db.gathered[helpers.A].count)
+        assertEqual(7, #ns.Spawns.All(0) + #ns.Spawns.All(1), "no new place")
+    end)
+
+    it("ignores corpses, instances and a hidden position", function()
         local ns, env = helpers.loggedIn()
         env.__lootSource = "Creature-0-6782-0-79720-1731-00003A1A8E"
         helpers.fire(env, "LOOT_OPENED")
-        loot(env, 424242)
         env.__position = { -10603.8, 1154.0, 0, 36 }
         loot(env, 1731)
         env.__position = nil
@@ -84,14 +124,6 @@ describe("a gather", function()
         assertNil(next(ns.db.gathered))
     end)
 
-    it("repairs a saved point with no count", function()
-        local ns, env = helpers.loggedIn(function(env)
-            env.GatherMapDB = { gathered = { [A] = { continent = 0, entry = 1731, x = -10603.8, y = 1154.0 } } }
-        end)
-        loot(env, 1731)
-        assertEqual(1, ns.db.gathered[A].count)
-    end)
-
     it("redraws the pins", function()
         local ns, env = helpers.loggedIn()
         local count = 0
@@ -99,75 +131,49 @@ describe("a gather", function()
         loot(env, 1731)
         assertEqual(1, count)
     end)
-
-    it("clears a not-here mark on the spawn it was taken from", function()
-        local ns, env = helpers.loggedIn()
-        ns.db.missing[A] = 1
-        loot(env, 1731)
-        assertNil(ns.db.missing[A])
-    end)
 end)
 
-describe("marking a spawn not here", function()
-    it("toggles, stamped with the time, and redraws", function()
-        local ns, env = helpers.loggedIn()
+describe("forgetting a spot", function()
+    it("takes its places out of the saved gathers and the index, and redraws", function()
+        local ns = helpers.loggedIn(helpers.withGathers)
         local count = 0
         ns.OnRefresh(function() count = count + 1 end)
-        local spawn = ns.Spawns.ByKey(A)
-        assertTrue(ns.Recorder.ToggleMissing(spawn))
-        assertEqual(env.__time, ns.db.missing[A])
-        assertFalse(ns.Recorder.ToggleMissing(spawn))
-        assertNil(ns.db.missing[A])
-        assertEqual(2, count)
-    end)
-
-    it("marks a whole spot if any of it is unmarked, else clears it, with one redraw each", function()
-        local ns, env = helpers.loggedIn()
-        local count = 0
-        ns.OnRefresh(function() count = count + 1 end)
-        local C, C2 = "0:3764:-10610.0:1160.0", "0:1733:-10610.0:1160.0"
-        local members = ns.Spawns.ByKey(C).stack
-        ns.db.missing[C] = 5
-        assertTrue(ns.Recorder.ToggleMissingAll(members))
-        assertEqual(env.__time, ns.db.missing[C])
-        assertEqual(env.__time, ns.db.missing[C2])
+        local tin = ns.Spawns.ByKey(helpers.C)
+        ns.Recorder.Forget({ tin, ns.Spawns.ByKey(helpers.S) })
+        assertNil(ns.db.gathered[helpers.C])
+        assertNil(ns.db.gathered[helpers.S])
+        assertNil(ns.Spawns.ByKey(helpers.C))
         assertEqual(1, count)
-        assertFalse(ns.Recorder.ToggleMissingAll(members))
-        assertNil(ns.db.missing[C])
-        assertNil(ns.db.missing[C2])
-        assertEqual(2, count)
     end)
 
-    it("matches a gather to its own entry at a shared spot", function()
+    it("lets the next gather there count straight away", function()
         local ns, env = helpers.loggedIn()
-        loot(env, 1733)
-        assertEqual(1, ns.db.gathered["0:1733:-10610.0:1160.0"].count)
-        assertNil(ns.db.gathered["0:3764:-10610.0:1160.0"])
+        loot(env, 1731)
+        ns.Recorder.Forget({ ns.Spawns.ByKey(HERE) })
+        loot(env, 1731)
+        assertEqual(1, ns.db.gathered[HERE].count)
     end)
 end)
 
 describe("/gmap reset gathered", function()
-    it("asks first, then forgets on a second go within 10 seconds", function()
-        local ns, env = helpers.loggedIn()
-        loot(env, 1731)
+    it("asks first, then forgets everything on a second go within 10 seconds", function()
+        local ns, env = helpers.loggedIn(helpers.withGathers)
         helpers.command(env, "reset gathered")
-        assertEqual(1, ns.db.gathered[A].count, "not yet")
+        assertTrue(ns.db.gathered[helpers.A] ~= nil, "not yet")
         assertMatch("again within 10 seconds", helpers.printed(env))
         env.__now = env.__now + 3
-        ns.db.missing["0:2843:-10700.0:1300.0"] = 1
         helpers.command(env, "reset gathered")
         assertNil(next(ns.db.gathered))
-        assertNil(next(ns.db.missing), "the not-here marks go too")
+        assertEqual(0, #ns.Spawns.All(0))
         assertMatch("Forgot every place", helpers.printed(env))
     end)
 
     it("asks again when the second go comes too late", function()
-        local ns, env = helpers.loggedIn()
-        loot(env, 1731)
+        local ns, env = helpers.loggedIn(helpers.withGathers)
         helpers.command(env, "reset gathered")
         env.__now = env.__now + 11
         helpers.command(env, "reset gathered")
-        assertEqual(1, ns.db.gathered[A].count)
+        assertTrue(ns.db.gathered[helpers.A] ~= nil)
     end)
 
     it("says how to use it without 'gathered'", function()

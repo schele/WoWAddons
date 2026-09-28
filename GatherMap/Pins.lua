@@ -1,23 +1,17 @@
 local addonName, ns = ...
 
 -- A pin, the same on the world map and the minimap, one per spot however
--- many spawns share it: the node's icon, a gold edge where the player has
--- gathered, dimmed where only vMaNGOS says so, a tooltip, and a
--- Shift-right-click for "not here".
+-- many places share it: the icon of what grows there with a gold edge, a
+-- tooltip, and a Shift-right-click to forget the spot.
 
 local Pins = {}
 ns.Pins = Pins
-
--- A spawn only the database has is a guess: WoW Forever is not vanilla.
-Pins.DIM = 0.55
 
 -- For nodes with no loot to take an icon from, and herbs or ore whose item
 -- the client does not know.
 Pins.KIND_ICONS = {
     herb = "Interface\\Icons\\INV_Misc_Herb_07",
     ore = "Interface\\Icons\\INV_Ore_Copper_01",
-    pool = "Interface\\Icons\\INV_Misc_Fish_02",
-    chest = "Interface\\Icons\\INV_Box_01",
 }
 
 local GOLD = { 1, 0.82, 0 }
@@ -44,22 +38,18 @@ local function joinNames(names)
     return table.concat(names, ", ", 1, #names - 1) .. " or " .. names[#names]
 end
 
---- The tooltip for a pin's `members`, the spawns at its spot it shows: their
--- names, each one's skill, then one line for the spot and one for "not here".
+--- The tooltip for a pin's `members`, the places at its spot it shows:
+-- their names, each one's skill, how often, and how to forget the spot.
 function Pins.ShowTooltip(owner, members)
-    if not GameTooltip then
+    if not GameTooltip or #members == 0 then
         return
     end
-    local names, nodes = {}, {}
+    local names, nodes, count = {}, {}, 0
     for _, spawn in ipairs(members) do
-        local node = ns.Nodes[spawn.entry]
-        if node then
-            nodes[#nodes + 1] = node
-            names[#names + 1] = node.name
-        end
-    end
-    if #nodes == 0 then
-        return
+        local node = ns.Spawns.Node(spawn)
+        nodes[#nodes + 1] = node
+        names[#names + 1] = node.name
+        count = count + ((spawn.point and spawn.point.count) or 0)
     end
 
     GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
@@ -70,48 +60,16 @@ function Pins.ShowTooltip(owner, members)
             GameTooltip:AddLine(string.format("%s %d", ns.Skills.LABEL[node.kind], node.skill), rgb[1], rgb[2], rgb[3])
         end
     end
-
-    local count, confirmed, marked = nil, false, true
-    for _, spawn in ipairs(members) do
-        local point = ns.db.gathered[spawn.key]
-        if type(point) == "table" and point.count then
-            count = (count or 0) + point.count
-        end
-        if ns.confirmed[spawn.key] then
-            confirmed = true
-        end
-        if not ns.db.missing[spawn.key] then
-            marked = false
-        end
-    end
-
-    if count then
-        GameTooltip:AddLine(string.format("Gathered here %d %s", count, count == 1 and "time" or "times"), 1, 1, 1)
-    elseif confirmed then
-        GameTooltip:AddLine("Confirmed in WoW Forever", 1, 1, 1)
-    else
-        GameTooltip:AddLine("From the classic database, not seen in WoW Forever yet", 0.7, 0.7, 0.7)
-    end
-
-    if marked then
-        GameTooltip:AddLine("Marked not here. Shift-right-click to undo.", 1, 0.5, 0.25)
-    else
-        GameTooltip:AddLine("Shift-right-click: not here", 0.5, 0.5, 0.5)
-    end
+    GameTooltip:AddLine(string.format("Gathered here %d %s", count, count == 1 and "time" or "times"), 1, 1, 1)
+    GameTooltip:AddLine("Shift-right-click: forget this place", 0.5, 0.5, 0.5)
     GameTooltip:Show()
 end
 
--- The pin under the cursor may be drawn for another spot, or gone, once the
--- maps redraw, so the tooltip follows the spot rather than the frame.
-local function toggleMissing(pin)
-    local stack = pin.spawn.stack
-    ns.Recorder.ToggleMissingAll(pin.members)
-    if not GameTooltip then
-        return
-    end
-    if pin:IsShown() and pin.spawn and pin.spawn.stack == stack then
-        Pins.ShowTooltip(pin, pin.members)
-    else
+-- The pin under the cursor is gone once the maps redraw, and so is its
+-- tooltip.
+local function forget(pin)
+    ns.Recorder.Forget(pin.members)
+    if GameTooltip then
         GameTooltip:Hide()
     end
 end
@@ -122,7 +80,7 @@ local function shiftDown()
     end, false)
 end
 
---- A pin on `parent`. Shift-right-click marks it "not here"; a plain
+--- A pin on `parent`. Shift-right-click forgets its spot; a plain
 -- right-click calls `onRightClick(pin)`, if given. Left clicks go through to
 -- whatever is beneath.
 function Pins.Create(parent, onRightClick)
@@ -160,7 +118,7 @@ function Pins.Create(parent, onRightClick)
         end
         if shiftDown() then
             if self.members then
-                toggleMissing(self)
+                forget(self)
             end
         elseif onRightClick then
             onRightClick(self)
@@ -170,26 +128,13 @@ function Pins.Create(parent, onRightClick)
 end
 
 --- Point `pin` at a spot's `members` shown (at least one), `size` pixels
--- across, and show it. It is drawn as the first member confirmed in game,
--- else the first; gold-edged if the player gathered any, full strength if
--- any is confirmed.
+-- across, drawn as the first, and show it.
 function Pins.Set(pin, members, size)
-    local spawn, gathered
-    for _, member in ipairs(members) do
-        if not spawn and ns.Filter.Confirmed(member) then
-            spawn = member
-        end
-        gathered = gathered or ns.db.gathered[member.key] ~= nil
-    end
-    local confirmed = spawn ~= nil
-    spawn = spawn or members[1]
-
-    pin.spawn = spawn
+    pin.spawn = members[1]
     pin.members = members
     pin:SetSize(size, size)
-    pin.icon:SetTexture(Pins.Icon(ns.Nodes[spawn.entry]))
-    pin.edge:SetShown(gathered)
-    pin:SetAlpha(confirmed and 1 or Pins.DIM)
+    pin.icon:SetTexture(Pins.Icon(ns.Spawns.Node(members[1])))
+    pin.edge:Show()
     pin:Show()
 end
 

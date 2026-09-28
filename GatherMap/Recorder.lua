@@ -1,19 +1,24 @@
 local addonName, ns = ...
 
--- Turns a loot window from a herb, vein, chest or pool into "gathered here":
--- the loot's source is the object's GUID, whose sixth field is its entry,
--- and the spawn is the nearest of that entry to the player.
+-- Turns a gather into a place: a loot window from a GameObject that is a
+-- listed herb or vein, or that opens just after the player's Mining or
+-- Herbalism cast. The object's entry is the sixth field of the loot's source
+-- GUID; the place is where the player stands.
 
 local Recorder = {}
 ns.Recorder = Recorder
 
--- How far off a gathered node's spawn can be. A player stands at a herb,
--- vein or chest; they fish a pool from 10 to 20 yards away.
+-- The gather spells, by the ID whose name the game gives them: mining a vein
+-- casts 2576, named "Mining" like 2575 (probed 2026-09-28). The herb cast is
+-- expected to be named "Herbalism" like 2366; listed herbs count regardless.
+Recorder.SPELLS = { [2575] = "ore", [2366] = "herb" }
+-- How long after a gather cast its loot window can open, in seconds.
+Recorder.SPELL_WINDOW = 3
+-- A place gathered again within this many seconds is the same visit: a vein
+-- is mined several times, each with its own loot window.
+Recorder.VISIT = 60
+-- How far from an earlier place of the same entry a gather joins it, in yards.
 Recorder.REACH = 15
-Recorder.POOL_REACH = 30
--- A loot window on the same spawn again within this many seconds is the
--- same gather, reopened.
-Recorder.REPEAT = 5
 
 function Recorder.EntryFromGUID(guid)
     if type(guid) ~= "string" then
@@ -23,59 +28,78 @@ function Recorder.EntryFromGUID(guid)
     return entry and tonumber(entry)
 end
 
-local lastKey, lastTime
+local function spellName(id)
+    return ns.Guarded(function()
+        if C_Spell and C_Spell.GetSpellName then
+            return C_Spell.GetSpellName(id)
+        end
+        return (GetSpellInfo(id))
+    end)
+end
 
-local function record(spawn, isNew)
-    local now = GetTime()
-    if spawn.key == lastKey and now - lastTime < Recorder.REPEAT then
+-- Spell name -> kind, read from the game the first time it has them.
+local kindByName
+
+local function kindOfSpell(spellID)
+    if Recorder.SPELLS[spellID] then
+        return Recorder.SPELLS[spellID]
+    end
+    if not kindByName then
+        local names, any = {}, false
+        for id, kind in pairs(Recorder.SPELLS) do
+            local name = spellName(id)
+            if name then
+                names[name] = kind
+                any = true
+            end
+        end
+        kindByName = any and names or nil
+    end
+    local name = kindByName and spellName(spellID)
+    return name and kindByName[name]
+end
+
+local lastKind, lastCast
+
+function Recorder.SpellSucceeded(unit, spellID)
+    if unit ~= "player" then
         return
     end
-    lastKey, lastTime = spawn.key, now
-
-    local point = ns.db.gathered[spawn.key]
-    if type(point) ~= "table" then
-        point = { continent = spawn.continent, entry = spawn.entry, x = spawn.x, y = spawn.y, new = isNew }
-        ns.db.gathered[spawn.key] = point
+    local kind = kindOfSpell(spellID)
+    if kind then
+        lastKind, lastCast = kind, GetTime()
     end
-    point.count = (point.count or 0) + 1
-    point.last = time()
-    -- Something grew here after all.
-    ns.db.missing[spawn.key] = nil
-    ns.Refresh()
 end
 
---- Mark `spawn` "not here", or take the mark off. True when now marked.
-function Recorder.ToggleMissing(spawn)
-    local marked = not ns.db.missing[spawn.key]
-    ns.db.missing[spawn.key] = marked and time() or nil
-    ns.Refresh()
-    return marked
-end
-
---- The same for a spot's spawns together: all marked if any was not, else
--- all cleared. True when now marked.
-function Recorder.ToggleMissingAll(members)
-    local marked = false
-    for _, spawn in ipairs(members) do
-        if not ns.db.missing[spawn.key] then
-            marked = true
+--- The first loot slot's item: its ID and name, or nil if the client will not say.
+local function lootItem()
+    return ns.Guarded(function()
+        local link = GetLootSlotLink(1)
+        if type(link) ~= "string" then
+            return nil
         end
-    end
-    for _, spawn in ipairs(members) do
-        ns.db.missing[spawn.key] = marked and time() or nil
-    end
-    ns.Refresh()
-    return marked
+        return { item = tonumber(link:match("item:(%d+)")), name = link:match("%[(.-)%]") }
+    end)
 end
 
---- A loot window opened. Counted when it came from a node GatherMap knows,
--- on one of the two continents, and the client says where the player is.
+-- Place key -> GetTime() of its last counted gather.
+local lastSeen = {}
+
 function Recorder.LootOpened()
     local entry = Recorder.EntryFromGUID(ns.Guarded(function()
         return (GetLootSourceInfo(1))
     end))
-    local node = entry and ns.Nodes[entry]
-    if not node then
+    if not entry then
+        return
+    end
+
+    local now = GetTime()
+    local listed = ns.Nodes[entry]
+    local kind = listed and ns.Spawns.KINDS[listed.kind] and listed.kind or nil
+    if not kind and lastCast and now - lastCast <= Recorder.SPELL_WINDOW then
+        kind = lastKind
+    end
+    if not kind then
         return
     end
 
@@ -84,26 +108,50 @@ function Recorder.LootOpened()
         return
     end
 
-    if node.kind == "pool" then
-        local spawn = ns.Spawns.Nearest(continent, entry, x, y, Recorder.POOL_REACH)
-        if spawn then
-            record(spawn, false)
-        end
-        return
-    end
-
     local spawn = ns.Spawns.Nearest(continent, entry, x, y, Recorder.REACH)
     if spawn then
-        record(spawn, false)
+        if lastSeen[spawn.key] and now - lastSeen[spawn.key] < Recorder.VISIT then
+            return
+        end
     else
-        record(ns.Spawns.AddPoint(continent, entry, x, y), true)
+        local point = { continent = continent, entry = entry, kind = kind, count = 0 }
+        if not listed then
+            local loot = lootItem()
+            if loot then
+                point.item, point.itemName = loot.item, loot.name
+            end
+        end
+        spawn = ns.Spawns.AddPoint(continent, entry, x, y, point)
+        point.x, point.y = spawn.x, spawn.y
+        ns.db.gathered[spawn.key] = point
     end
+
+    lastSeen[spawn.key] = now
+    spawn.point.count = (spawn.point.count or 0) + 1
+    spawn.point.last = time()
+    ns.Refresh()
+end
+
+--- Forget the places in `members` (a spot's, as a pin shows them): out of
+-- the saved gathers and off both maps.
+function Recorder.Forget(members)
+    for _, spawn in ipairs(members) do
+        ns.db.gathered[spawn.key] = nil
+        lastSeen[spawn.key] = nil
+        ns.Spawns.Remove(spawn)
+    end
+    ns.Refresh()
 end
 
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("LOOT_OPENED")
-frame:SetScript("OnEvent", function()
-    ns.Guarded(Recorder.LootOpened)
+frame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+frame:SetScript("OnEvent", function(_, event, unit, _, spellID)
+    if event == "UNIT_SPELLCAST_SUCCEEDED" then
+        ns.Guarded(function() Recorder.SpellSucceeded(unit, spellID) end)
+    else
+        ns.Guarded(Recorder.LootOpened)
+    end
 end)
 
 local resetAsked
@@ -120,15 +168,14 @@ ns.RegisterCommand("reset", "Forget every place you have gathered: /gmap reset g
         for key in pairs(ns.db.gathered) do
             ns.db.gathered[key] = nil
         end
-        for key in pairs(ns.db.missing) do
-            ns.db.missing[key] = nil
-        end
-        ns.Print("Forgot every place you have gathered, and every spawn marked not here.")
+        lastSeen = {}
+        ns.Spawns.Clear()
+        ns.Print("Forgot every place you have gathered.")
         ns.Refresh()
         return
     end
 
     resetAsked = now
-    ns.Print("This forgets every place you have gathered and every spawn marked not here, on every character. "
+    ns.Print("This forgets every place you have gathered, on every character. "
         .. "Type /gmap reset gathered again within 10 seconds to do it.")
 end)

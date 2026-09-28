@@ -30,14 +30,14 @@ describe("the settings page", function()
 
     it("shows what is saved", function()
         local ns, env = helpers.loggedIn()
-        ns.settings.minimap.kinds.chest = false
+        ns.settings.minimap.kinds.ore = false
         ns.settings.worldmap.hidden.Silverleaf = true
         ns.settings.minimap.hideGrey = true
         ns.settings.worldmap.pinSize = 16
         local panel = ns.SettingsPanel
         panel.panel:Show()
-        assertFalse(panel.kinds.chest.buttons.minimap:GetChecked())
-        assertTrue(panel.kinds.chest.buttons.worldmap:GetChecked())
+        assertFalse(panel.kinds.ore.buttons.minimap:GetChecked())
+        assertTrue(panel.kinds.ore.buttons.worldmap:GetChecked())
         assertFalse(panel.nodes.Silverleaf.buttons.worldmap:GetChecked())
         assertTrue(panel.nodes.Silverleaf.buttons.minimap:GetChecked())
         assertTrue(panel.filters.hideGrey.buttons.minimap:GetChecked())
@@ -74,18 +74,16 @@ describe("the page's switches", function()
         assertNil(ns.settings.worldmap.hidden["Copper Vein"])
     end)
 
-    it("set the skill and source filters per map", function()
+    it("set the skill filters per map", function()
         local ns, env, panel = opened()
         click(panel.filters.hideUngatherable.buttons.minimap)
         click(panel.filters.hideGrey.buttons.worldmap)
-        click(panel.filters.onlyConfirmed.buttons.minimap)
-        click(panel.filters.showMissing.buttons.worldmap)
         assertFalse(ns.settings.minimap.hideUngatherable)
+        assertTrue(ns.settings.worldmap.hideUngatherable)
         assertTrue(ns.settings.worldmap.hideGrey)
-        assertTrue(ns.settings.minimap.onlyConfirmed)
-        assertFalse(ns.settings.worldmap.onlyConfirmed)
-        assertTrue(ns.settings.worldmap.showMissing)
-        assertFalse(ns.settings.minimap.showMissing)
+        assertFalse(ns.settings.minimap.hideGrey)
+        assertNil(panel.filters.onlyConfirmed)
+        assertNil(panel.filters.showMissing)
     end)
 
     it("size the pins", function()
@@ -103,7 +101,17 @@ describe("a kind's checklist", function()
         assertEqual("Peacebloom,Silverleaf,Earthroot,Stranglekelp", table.concat(names, ","))
         ns.SettingsPanel.panel:Show()
         assertEqual("Earthroot (15)", ns.SettingsPanel.nodes.Earthroot.label:GetText())
-        assertEqual("Battered Chest", ns.SettingsPanel.nodes["Battered Chest"].label:GetText())
+        assertNil(ns.SettingsPanel.kinds.pool)
+        assertNil(ns.SettingsPanel.kinds.chest)
+    end)
+
+    it("lists the unlisted nodes the player gathered too, by their loot's name", function()
+        local ns = helpers.loggedIn(helpers.withGathers)
+        local names = {}
+        for _, node in ipairs(ns.SettingsPanel.NodeNames("ore")) do names[#names + 1] = node.name end
+        assertEqual("Strange Ore,Copper Vein,Tin Vein,Silver Vein", table.concat(names, ","))
+        ns.SettingsPanel.panel:Show()
+        assertEqual("Strange Ore", ns.SettingsPanel.nodes["Strange Ore"].label:GetText())
     end)
 
     it("is folded away until its kind is opened", function()

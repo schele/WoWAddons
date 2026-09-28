@@ -1,9 +1,17 @@
 local helpers = require("helpers")
 
-local A = "0:1731:-10603.8:1154.0"
+local A = helpers.A
+
+--- A setup for loggedIn: the standard saved gathers, then `setup`, if given.
+local function withGathers(setup)
+    return function(env)
+        helpers.withGathers(env)
+        if setup then setup(env) end
+    end
+end
 
 local function opened(setup)
-    local ns, env = helpers.loggedIn(setup)
+    local ns, env = helpers.loggedIn(withGathers(setup))
     env.WorldMapFrame:Show()
     return ns, env
 end
@@ -25,16 +33,16 @@ end
 
 describe("the world map", function()
     it("joins the map as a data provider", function()
-        local ns, env = helpers.loggedIn()
+        local ns, env = helpers.loggedIn(helpers.withGathers)
         assertEqual(1, #env.__providers)
     end)
 
-    it("draws every spawn inside the open map", function()
+    it("draws every place inside the open map", function()
         local ns = opened()
-        assertEqual("1731,1731,2843,3764,180582", shownEntries(ns), "Silverleaf lies off this map")
+        assertEqual("1731,1731,3764,424242", shownEntries(ns), "Silverleaf lies off this map")
     end)
 
-    it("puts a pin where its spawn is on the canvas", function()
+    it("puts a pin where its place is on the canvas", function()
         local ns, env = opened()
         local point, relativeTo, relativePoint, x, y = pinFor(ns, A):GetPoint(1)
         assertEqual("CENTER", point)
@@ -56,9 +64,12 @@ describe("the world map", function()
 
     it("follows the filters", function()
         local ns = opened()
+        ns.settings.worldmap.hidden["Copper Vein"] = true
+        ns.Refresh()
+        assertEqual("3764,424242", shownEntries(ns))
         ns.settings.worldmap.kinds.ore = false
         ns.Refresh()
-        assertEqual("2843,180582", shownEntries(ns))
+        assertEqual("", shownEntries(ns))
     end)
 
     it("shows nothing on a map it cannot place", function()
@@ -68,7 +79,7 @@ describe("the world map", function()
     end)
 
     it("draws nothing while the map is closed", function()
-        local ns, env = helpers.loggedIn()
+        local ns, env = helpers.loggedIn(helpers.withGathers)
         ns.Refresh()
         assertEqual("", shownEntries(ns))
     end)
@@ -78,13 +89,13 @@ describe("the world map", function()
         env.__position = { -10300.0, 1500.0, 0, 0 }
         env.__lootSource = "GameObject-0-6782-0-79720-1731-00003A1A8E"
         helpers.fire(env, "LOOT_OPENED")
-        assertEqual("1731,1731,1731,2843,3764,180582", shownEntries(ns))
+        assertEqual("1731,1731,1731,3764,424242", shownEntries(ns))
     end)
 
     it("draws no more than its limit of pins", function()
         local ns = opened(function(env) end)
         for index = 1, ns.WorldMap.MAX + 50 do
-            ns.Spawns.AddPoint(0, 1731, -10500 - index * 0.2, 1500)
+            ns.Spawns.AddPoint(0, 1731, -10500 - index * 0.2, 1500, { continent = 0, entry = 1731, kind = "ore", count = 1 })
         end
         ns.Refresh()
         assertEqual(ns.WorldMap.MAX, #ns.WorldMap.Shown())
@@ -94,17 +105,18 @@ describe("the world map", function()
         local ns, env = helpers.loadAddon()
         local map = env.WorldMapFrame
         env.WorldMapFrame = nil
+        helpers.withGathers(env)
         helpers.login(ns, env)
         assertEqual(0, #env.__providers)
         env.WorldMapFrame = map
         helpers.fire(env, "ADDON_LOADED", "Blizzard_WorldMap")
         assertEqual(1, #env.__providers)
         map:Show()
-        assertEqual("1731,1731,2843,3764,180582", shownEntries(ns))
+        assertEqual("1731,1731,3764,424242", shownEntries(ns))
     end)
 
     it("loads on a client without the map framework", function()
-        local ns, env = helpers.loggedIn(function(env) env.MapCanvasDataProviderMixin = nil end)
+        local ns, env = helpers.loggedIn(withGathers(function(env) env.MapCanvasDataProviderMixin = nil end))
         assertEqual(0, #env.__providers)
         ns.Refresh()
     end)
@@ -114,72 +126,63 @@ describe("a pin", function()
     it("shows its node's loot as its icon, or its kind's", function()
         local ns = opened()
         assertEqual(1000 + 2770, pinFor(ns, A).icon:GetTexture())
-        assertEqual(ns.Pins.KIND_ICONS.chest, pinFor(ns, "0:2843:-10700.0:1300.0").icon:GetTexture())
+        local key = ns.Spawns.AddPoint(0, 555, -10500.0, 1500.0, { continent = 0, entry = 555, kind = "herb", count = 1 }).key
+        ns.Refresh()
+        assertEqual(ns.Pins.KIND_ICONS.herb, pinFor(ns, key).icon:GetTexture(), "an unlisted herb whose loot is not known")
     end)
 
-    it("names the node, its skill in its colour, and that only the database has it", function()
+    it("names the node, its skill in its colour, and how often, with a gold edge", function()
         local ns, env = opened()
         local pin = pinFor(ns, A)
         pin.scripts.OnEnter(pin)
         assertEqual("Copper Vein", env.GameTooltip.text)
         assertEqual("Mining 1", env.GameTooltip.lines[1].text)
         assertEqual(0.25, env.GameTooltip.lines[1].color[1], "green at 70")
-        assertEqual("From the classic database, not seen in WoW Forever yet", env.GameTooltip.lines[2].text)
-        assertEqual("Shift-right-click: not here", env.GameTooltip.lines[3].text)
-        assertFalse(pin.edge:IsShown())
-        assertEqual(ns.Pins.DIM, pin:GetAlpha(), "a database guess is drawn dimmed")
-    end)
-
-    it("draws a spawn confirmed in the release at full strength", function()
-        local ns, env = opened()
-        local pin = pinFor(ns, "0:3764:-10610.0:1160.0")
+        assertEqual("Gathered here 1 time", env.GameTooltip.lines[2].text)
+        assertEqual("Shift-right-click: forget this place", env.GameTooltip.lines[3].text)
+        assertEqual(3, #env.GameTooltip.lines)
+        assertTrue(pin.edge:IsShown())
         assertEqual(1, pin:GetAlpha())
-        assertFalse(pin.edge:IsShown(), "the gold edge is for the player's own gathers")
-        pin.scripts.OnEnter(pin)
-        assertEqual("Confirmed in WoW Forever", env.GameTooltip.lines[2].text)
     end)
 
-    it("marks its spawn not here on a Shift-right-click, and the pin goes", function()
+    it("forgets a spot on a Shift-right-click, and the pin and tooltip go", function()
         local ns, env = opened()
-        local pin = pinFor(ns, A)
+        local pin = pinFor(ns, helpers.A)
         pin.scripts.OnEnter(pin)
         env.__modifiers.shift = true
         pin.scripts.OnMouseUp(pin, "RightButton")
-        assertEqual(env.__time, ns.db.missing[A])
-        assertEqual("1731,2843,3764,180582", shownEntries(ns))
-        assertFalse(env.GameTooltip:IsShown(), "no tooltip left for a pin that has gone")
+        assertNil(ns.db.gathered[helpers.A])
+        assertEqual("1731,3764,424242", shownEntries(ns))
+        assertFalse(env.GameTooltip:IsShown())
     end)
 
-    it("shows marked spawns when asked, and a Shift-right-click takes the mark off", function()
+    it("says how often and how to forget, and names an unlisted node after its loot", function()
         local ns, env = opened()
-        ns.db.missing[A] = 1
-        ns.settings.worldmap.showMissing = true
-        ns.Refresh()
-        local pin = pinFor(ns, A)
+        local pin = pinFor(ns, helpers.E)
         pin.scripts.OnEnter(pin)
-        assertEqual("Marked not here. Shift-right-click to undo.", env.GameTooltip.lines[3].text)
-        env.__modifiers.shift = true
-        pin.scripts.OnMouseUp(pin, "RightButton")
-        assertNil(ns.db.missing[A])
-        assertEqual("Shift-right-click: not here", env.GameTooltip.lines[3].text, "the tooltip keeps up")
+        assertEqual("Strange Ore", env.GameTooltip.text)
+        assertEqual("Gathered here 1 time", env.GameTooltip.lines[1].text)
+        assertEqual("Shift-right-click: forget this place", env.GameTooltip.lines[2].text)
+        assertEqual(1000 + 9999, pin.icon:GetTexture())
+        assertTrue(pin.edge:IsShown())
     end)
 
     it("ignores a left click, and lets the map have it", function()
         local ns, env = opened()
         local pin = pinFor(ns, A)
         pin.scripts.OnMouseUp(pin, "LeftButton")
-        assertNil(ns.db.missing[A])
+        assertTrue(ns.db.gathered[A] ~= nil)
         assertEqual(1, pin.passThrough and #pin.passThrough)
         assertEqual("LeftButton", pin.passThrough[1])
         assertTrue(pin.mouseEnabled, "it still takes the mouse, for its tooltip")
     end)
 
-    it("zooms the map out on a plain right-click, as the map would, and marks nothing", function()
+    it("zooms the map out on a plain right-click, as the map would, and forgets nothing", function()
         local ns, env = opened()
         local pin = pinFor(ns, A)
         pin.scripts.OnMouseUp(pin, "RightButton")
         assertEqual(1, env.__navigatedToParent)
-        assertNil(ns.db.missing[A])
+        assertTrue(ns.db.gathered[A] ~= nil)
         env.__modifiers.shift = true
         pin.scripts.OnMouseUp(pin, "RightButton")
         assertEqual(1, env.__navigatedToParent, "not with Shift held")
@@ -192,23 +195,22 @@ describe("a pin", function()
         pin.scripts.OnMouseUp(pin, "RightButton")
         env.WorldMapFrame.NavigateToParentMap = function() error("secret") end
         pin.scripts.OnMouseUp(pin, "RightButton")
-        assertNil(ns.db.missing[A])
+        assertTrue(ns.db.gathered[A] ~= nil)
     end)
 
-    it("says how often the player gathered there, with a gold edge", function()
+    it("says how often the player gathered there", function()
         local ns, env = opened()
-        ns.db.gathered[A] = { continent = 0, entry = 1731, x = -10603.8, y = 1154.0, count = 3 }
+        ns.db.gathered[A].count = 3
         ns.Refresh()
         local pin = pinFor(ns, A)
         pin.scripts.OnEnter(pin)
         assertEqual("Gathered here 3 times", env.GameTooltip.lines[2].text)
-        assertTrue(pin.edge:IsShown())
     end)
 end)
 
-describe("a spot with several spawns", function()
-    local C = "0:3764:-10610.0:1160.0"
-    local C2 = "0:1733:-10610.0:1160.0"
+describe("a spot with several places", function()
+    local C = helpers.C
+    local S = helpers.S
 
     -- Mining 100, so the Silver Vein beside the Tin shows too.
     local function skilled(setup)
@@ -226,38 +228,38 @@ describe("a spot with several spawns", function()
         return found
     end
 
-    it("is one pin, for the confirmed member, carrying every member shown", function()
+    it("is one pin, for the first member, carrying every member shown", function()
         local ns = skilled()
         local pins = pinsAtC(ns)
         assertEqual(1, #pins)
-        assertEqual(C, pins[1].spawn.key, "the Tin is confirmed, the Silver not")
+        assertEqual(S, pins[1].spawn.key, "saved gathers load in key order: the Silver, then the Tin")
         assertEqual(2, #pins[1].members)
-        assertEqual(C2, pins[1].members[2].key)
-        assertEqual(1, pins[1]:GetAlpha(), "one confirmed member is enough")
-        assertEqual(5, #ns.WorldMap.Shown(), "pins, not spawns")
+        assertEqual(C, pins[1].members[2].key)
+        assertEqual(4, #ns.WorldMap.Shown(), "pins, not places")
     end)
 
     it("names every member, each skill, and one line for the spot", function()
         local ns, env = skilled()
         local pin = pinsAtC(ns)[1]
         pin.scripts.OnEnter(pin)
-        assertEqual("Tin Vein or Silver Vein", env.GameTooltip.text)
-        assertEqual("Mining 65", env.GameTooltip.lines[1].text)
-        assertEqual("Mining 75", env.GameTooltip.lines[2].text)
-        assertEqual("Confirmed in WoW Forever", env.GameTooltip.lines[3].text)
-        assertEqual("Shift-right-click: not here", env.GameTooltip.lines[4].text)
+        assertEqual("Silver Vein or Tin Vein", env.GameTooltip.text)
+        assertEqual("Mining 75", env.GameTooltip.lines[1].text)
+        assertEqual("Mining 65", env.GameTooltip.lines[2].text)
+        assertEqual("Gathered here 2 times", env.GameTooltip.lines[3].text)
+        assertEqual("Shift-right-click: forget this place", env.GameTooltip.lines[4].text)
         assertEqual(4, #env.GameTooltip.lines)
     end)
 
-    it("names three as A, B or C, with no skill line for a member that needs none", function()
+    it("names three as A, B or C, with no skill line for a member that has none", function()
         local ns, env = skilled()
-        ns.Spawns.AddPoint(0, 180582, -10610.0, 1160.0)
+        ns.Spawns.AddPoint(0, 424243, -10610.0, 1160.0,
+            { continent = 0, entry = 424243, kind = "ore", count = 1, item = 9998, itemName = "Odd Ore" })
         ns.Refresh()
         local pin = pinsAtC(ns)[1]
         pin.scripts.OnEnter(pin)
-        assertEqual("Tin Vein, Silver Vein or Oily Blackmouth School", env.GameTooltip.text)
-        assertEqual("Mining 75", env.GameTooltip.lines[2].text)
-        assertEqual("Confirmed in WoW Forever", env.GameTooltip.lines[3].text)
+        assertEqual("Silver Vein, Tin Vein or Odd Ore", env.GameTooltip.text)
+        assertEqual("Mining 65", env.GameTooltip.lines[2].text)
+        assertEqual("Gathered here 3 times", env.GameTooltip.lines[3].text)
         assertEqual(4, #env.GameTooltip.lines)
     end)
 
@@ -267,10 +269,18 @@ describe("a spot with several spawns", function()
         ns.Refresh()
         local pins = pinsAtC(ns)
         assertEqual(1, #pins)
-        assertEqual(C2, pins[1].spawn.key)
+        assertEqual(S, pins[1].spawn.key)
         assertEqual(1, #pins[1].members)
         assertEqual(1000 + 2775, pins[1].icon:GetTexture())
-        assertEqual(ns.Pins.DIM, pins[1]:GetAlpha(), "only the database has the Silver")
+    end)
+
+    it("leaves a Tin pin there when the Silver is beyond the skill", function()
+        local ns = opened()
+        local pins = pinsAtC(ns)
+        assertEqual(1, #pins)
+        assertEqual(C, pins[1].spawn.key)
+        assertEqual(1, #pins[1].members)
+        assertEqual(1000 + 2771, pins[1].icon:GetTexture())
     end)
 
     it("is not drawn when every member is hidden", function()
@@ -281,51 +291,33 @@ describe("a spot with several spawns", function()
         assertEqual(0, #pinsAtC(ns))
     end)
 
-    it("marks every member not here on a Shift-right-click, and a second clears them", function()
+    it("forgets every member shown on a Shift-right-click", function()
         local ns, env = skilled()
-        ns.settings.worldmap.showMissing = true
-        ns.Refresh()
         env.__modifiers.shift = true
         local pin = pinsAtC(ns)[1]
         pin.scripts.OnEnter(pin)
         pin.scripts.OnMouseUp(pin, "RightButton")
-        assertEqual(env.__time, ns.db.missing[C])
-        assertEqual(env.__time, ns.db.missing[C2])
-        assertEqual("Marked not here. Shift-right-click to undo.", env.GameTooltip.lines[4].text)
-        pin = pinsAtC(ns)[1]
-        pin.scripts.OnMouseUp(pin, "RightButton")
-        assertNil(ns.db.missing[C])
-        assertNil(ns.db.missing[C2])
-        assertEqual("Shift-right-click: not here", env.GameTooltip.lines[4].text)
+        assertNil(ns.db.gathered[C])
+        assertNil(ns.db.gathered[S])
+        assertEqual(0, #pinsAtC(ns))
+        assertFalse(env.GameTooltip:IsShown())
     end)
 
-    it("says marked only when every member shown is", function()
+    it("counts a new gather of any member in the spot's total", function()
         local ns, env = skilled()
-        ns.db.missing[C] = 1
-        ns.settings.worldmap.showMissing = true
-        ns.Refresh()
-        local pin = pinsAtC(ns)[1]
-        pin.scripts.OnEnter(pin)
-        assertEqual("Shift-right-click: not here", env.GameTooltip.lines[4].text)
-    end)
-
-    it("takes the gold edge when the player gathers any member", function()
-        local ns, env = skilled()
-        assertFalse(pinsAtC(ns)[1].edge:IsShown())
         env.__lootSource = "GameObject-0-6782-0-79720-1733-00003A1A8E"
         helpers.fire(env, "LOOT_OPENED")
+        assertEqual(2, ns.db.gathered[S].count, "the Silver 8.6 yards off, not a new place")
         local pin = pinsAtC(ns)[1]
-        assertTrue(pin.edge:IsShown())
-        assertEqual(C, pin.spawn.key, "still the first confirmed member")
         pin.scripts.OnEnter(pin)
-        assertEqual("Gathered here 1 time", env.GameTooltip.lines[3].text)
+        assertEqual("Gathered here 3 times", env.GameTooltip.lines[3].text)
     end)
 
     it("adds up the counts of every member gathered", function()
         local ns, env = skilled(function(env)
             env.GatherMapDB = { gathered = {
                 [C] = { continent = 0, entry = 3764, x = -10610.0, y = 1160.0, count = 2 },
-                [C2] = { continent = 0, entry = 1733, x = -10610.0, y = 1160.0, count = 3 },
+                [S] = { continent = 0, entry = 1733, x = -10610.0, y = 1160.0, count = 3 },
             } }
         end)
         local pin = pinsAtC(ns)[1]
@@ -336,13 +328,13 @@ end)
 
 describe("/gmap where", function()
     it("prints the game's place for the player beside GatherMap's", function()
-        local ns, env = helpers.loggedIn()
+        local ns, env = helpers.loggedIn(helpers.withGathers)
         helpers.command(env, "where")
         assertMatch("Map 1436%. Game: 0%.846, 0%.604%. GatherMap: 0%.846, 0%.604%.", helpers.printed(env))
     end)
 
     it("says so where the game will not tell", function()
-        local ns, env = helpers.loggedIn(function(env) env.__playerMap = 947 end)
+        local ns, env = helpers.loggedIn(withGathers(function(env) env.__playerMap = 947 end))
         helpers.command(env, "where")
         assertMatch("will not say", helpers.printed(env))
     end)

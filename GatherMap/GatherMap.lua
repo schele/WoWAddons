@@ -45,33 +45,12 @@ function ns.Guarded(fn, whenUnknown)
     return whenUnknown
 end
 
--- The catalog and the spawns, handed over by the generated Data files as
--- they load. Spawns.lua turns the flat lists into its index at login.
+-- The herbs and veins known by name, handed over by Data/Nodes.lua.
 ns.Nodes = {}
-ns.rawSpawns = {}
--- Spawns players gathered in WoW Forever, baked into the release.
-ns.confirmed = {}
-
-function ns.AddConfirmed(keys)
-    for _, key in ipairs(keys) do
-        ns.confirmed[key] = true
-    end
-end
 
 function ns.AddNodes(nodes)
     for entry, node in pairs(nodes) do
         ns.Nodes[entry] = node
-    end
-end
-
-function ns.AddSpawns(continent, flat)
-    local list = ns.rawSpawns[continent]
-    if not list then
-        list = {}
-        ns.rawSpawns[continent] = list
-    end
-    for index = 1, #flat do
-        list[#list + 1] = flat[index]
     end
 end
 
@@ -82,9 +61,8 @@ local function ensureDatabase()
     if type(GatherMapDB.gathered) ~= "table" then
         GatherMapDB.gathered = {}
     end
-    if type(GatherMapDB.missing) ~= "table" then
-        GatherMapDB.missing = {}
-    end
+    -- The first GatherMap's "not here" marks: nothing uses them now.
+    GatherMapDB.missing = nil
     ns.db = GatherMapDB
 
     if type(GatherMapSettings) ~= "table" then

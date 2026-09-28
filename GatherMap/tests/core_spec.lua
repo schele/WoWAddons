@@ -7,31 +7,32 @@ describe("the saved variables", function()
         assertEqual(env.GatherMapSettings, ns.settings)
         assertEqual(env.GatherMapDB, ns.db)
         assertEqual("table", type(ns.db.gathered))
-        assertEqual("table", type(ns.db.missing))
     end)
 
     it("keep what was saved", function()
         local ns = helpers.loggedIn(function(env)
             env.GatherMapSettings = { enabled = false }
-            env.GatherMapDB = { gathered = { x = { count = 2 } } }
+            env.GatherMapDB = { gathered = { [helpers.A] = helpers.point(helpers.A, { count = 2 }) } }
         end)
         assertFalse(ns.settings.enabled)
-        assertEqual(2, ns.db.gathered.x.count)
+        assertEqual(2, ns.db.gathered[helpers.A].count)
     end)
 
     it("replace a saved value that is not a table", function()
         local ns = helpers.loggedIn(function(env) env.GatherMapDB = "broken" end)
         assertEqual("table", type(ns.db.gathered))
     end)
+
+    it("drop the first GatherMap's not-here marks", function()
+        local ns = helpers.loggedIn(function(env) env.GatherMapDB = { gathered = {}, missing = { x = 1 } } end)
+        assertNil(ns.db.missing)
+    end)
 end)
 
 describe("the data files", function()
-    it("hand over the catalog and the spawns", function()
+    it("hand over the node list", function()
         local ns = helpers.loadAddon()
         assertEqual("Copper Vein", ns.Nodes[1731].name)
-        assertEqual(1731, ns.rawSpawns[0][1])
-        assertEqual(1618, ns.rawSpawns[1][1])
-        assertTrue(ns.confirmed["0:3764:-10610.0:1160.0"])
     end)
 end)
 

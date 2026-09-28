@@ -11,8 +11,8 @@ local PANEL_WIDTH = 560
 local COLUMN = 30 -- one checkbox column
 local LABEL_X = PADDING + COLUMN * 2 + 6
 local WHERES = { "worldmap", "minimap" }
-local KINDS = { "herb", "ore", "pool", "chest" }
-local KIND_LABEL = { herb = "Herbs", ore = "Ore", pool = "Fishing pools", chest = "Chests" }
+local KINDS = { "herb", "ore" }
+local KIND_LABEL = { herb = "Herbs", ore = "Ore" }
 
 local Panel = {}
 ns.SettingsPanel = Panel
@@ -27,10 +27,18 @@ local startY
 --- Every node name of `kind` once, by required skill, then name.
 function Panel.NodeNames(kind)
     local seen, names = {}, {}
-    for _, node in pairs(ns.Nodes) do
-        if node.kind == kind and not seen[node.name] then
+    local function take(node)
+        if node.kind == kind and node.name and not seen[node.name] then
             seen[node.name] = true
             table.insert(names, { name = node.name, skill = node.skill })
+        end
+    end
+    for _, node in pairs(ns.Nodes) do
+        take(node)
+    end
+    for _, continent in ipairs({ 0, 1 }) do
+        for _, spawn in ipairs(ns.Spawns.All(continent)) do
+            take(ns.Spawns.Node(spawn))
         end
     end
     table.sort(names, function(a, b)
@@ -229,9 +237,8 @@ local function ensureBuilt()
     hint:SetWidth(PANEL_WIDTH - PADDING * 2)
     hint:SetJustifyH("LEFT")
     hint:SetText("Each row has two boxes: the world map, then the minimap. "
-        .. "Open a kind with + to pick its nodes one by one. Dimmed pins come from "
-        .. "the classic database and are not seen in WoW Forever yet; Shift-right-click "
-        .. "a pin where nothing grows to mark it not here.")
+        .. "Open a kind with + to pick its nodes one by one. Pins are the places you "
+        .. "have mined or herbed; Shift-right-click a pin to forget it.")
 
     startY = -PADDING - 84 -- below the title and the three-line hint
 
@@ -253,8 +260,6 @@ local function ensureBuilt()
     end
     addFilter("hideUngatherable", "Hide nodes my skill cannot gather yet")
     addFilter("hideGrey", "Hide grey nodes (no skill-ups left)")
-    addFilter("onlyConfirmed", "Only places confirmed in game (yours, or from the release)")
-    addFilter("showMissing", "Show spawns marked not here")
     addSize("worldmap", "World map pin size", 8, 24)
     addSize("minimap", "Minimap pin size", 6, 20)
 

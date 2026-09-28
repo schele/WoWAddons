@@ -24,7 +24,7 @@ local function describePin(label, pin)
     ns.Guarded(function()
         local point, relativeTo, relativePoint, x, y = pin:GetPoint(1)
         say("%s: %s shown=%s visible=%s size=%.0f scale=%.2f alpha=%.2f level=%s strata=%s at %s %.0f,%.0f texture=%s",
-            label, pin.spawn and ns.Nodes[pin.spawn.entry] and ns.Nodes[pin.spawn.entry].name or "?",
+            label, pin.spawn and ns.Spawns.Node(pin.spawn).name or "?",
             tostring(pin:IsShown()), tostring(pin.IsVisible and pin:IsVisible()), pin:GetWidth() or 0,
             pin:GetScale() or 0, pin:GetAlpha() or 0, tostring(pin:GetFrameLevel()),
             tostring(pin.GetFrameStrata and pin:GetFrameStrata()), tostring(relativePoint), x or 0, y or 0,
@@ -33,9 +33,8 @@ local function describePin(label, pin)
 end
 
 function ns.Debug()
-    say("Data: %d node types; spawns %d Eastern Kingdoms, %d Kalimdor; %d confirmed; %d gathered, %d marked not here.",
-        count(ns.Nodes), #ns.Spawns.All(0), #ns.Spawns.All(1), count(ns.confirmed),
-        count(ns.db.gathered), count(ns.db.missing))
+    say("Data: %d node types listed; %d places gathered: %d Eastern Kingdoms, %d Kalimdor.",
+        count(ns.Nodes), count(ns.db.gathered), #ns.Spawns.All(0), #ns.Spawns.All(1))
     say("Pins %s. Skills: Herbalism %d, Mining %d.", ns.settings.enabled and "shown" or "HIDDEN",
         ns.Skills.Get("herb"), ns.Skills.Get("ore"))
 
@@ -69,7 +68,7 @@ function ns.Debug()
     describePin("First world map pin", ns.WorldMap.Shown()[1])
 end
 
-ns.RegisterCommand("debug", "Show what GatherMap has, step by step, to find why pins are missing", function()
+ns.RegisterCommand("debug", "Show what GatherMap has, step by step, to find why pins do not show", function()
     local ok, err = pcall(ns.Debug)
     if not ok then
         ns.Print("Debug stopped: " .. tostring(err))
