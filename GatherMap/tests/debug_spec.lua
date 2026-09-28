@@ -14,6 +14,14 @@ describe("/gmap debug", function()
         assertMatch("First world map pin: ", printed)
     end)
 
+    it("says a skill it cannot find is unknown", function()
+        local ns, env = helpers.loggedIn(function(env)
+            env.__skills = { { "Professions", true }, { "Mining", false, 70 } }
+        end)
+        helpers.command(env, "debug")
+        assertMatch("Skills: Herbalism unknown, Mining 70%.", helpers.printed(env))
+    end)
+
     it("keeps going when the client refuses", function()
         local ns, env = helpers.loggedIn()
         env.UnitPosition = function() error("secret") end

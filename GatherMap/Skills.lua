@@ -33,6 +33,9 @@ Skills.RGB = {
 }
 
 local ranks = { herb = 0, ore = 0 }
+-- Whether each profession's line was listed by the last read that worked.
+-- Until one has, neither is known, and the skill filters leave its nodes be.
+local known = { herb = false, ore = false }
 
 --- Read both skills again. A refusal leaves them as they were, and so does
 -- a collapsed header: the lines under it are not listed, and reading that as
@@ -40,6 +43,7 @@ local ranks = { herb = 0, ore = 0 }
 function Skills.Read()
     ns.Guarded(function()
         local found = { herb = 0, ore = 0 }
+        local listed = { herb = false, ore = false }
         local collapsed = false
         for index = 1, GetNumSkillLines() do
             local name, isHeader, isExpanded, rank = GetSkillLineInfo(index)
@@ -49,21 +53,29 @@ function Skills.Read()
                 end
             elseif kindOf[name] then
                 found[kindOf[name]] = rank or 0
+                listed[kindOf[name]] = true
             end
         end
         if collapsed then
-            for kind, rank in pairs(found) do
-                if rank == 0 then
+            for kind in pairs(found) do
+                if not listed[kind] then
                     found[kind] = ranks[kind]
+                    listed[kind] = known[kind]
                 end
             end
         end
-        ranks = found
+        ranks, known = found, listed
     end)
 end
 
 function Skills.Get(kind)
     return ranks[kind] or 0
+end
+
+--- Whether the player's `kind` skill was found: its line listed by the last
+-- read that worked.
+function Skills.Known(kind)
+    return known[kind] == true
 end
 
 --- How a node needing `required` looks at `skill`: "red" cannot be

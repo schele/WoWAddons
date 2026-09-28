@@ -16,6 +16,10 @@ local function say(format, ...)
     ns.Print(string.format(format, ...))
 end
 
+local function skill(kind)
+    return ns.Skills.Known(kind) and tostring(ns.Skills.Get(kind)) or "unknown"
+end
+
 local function describePin(label, pin)
     if not pin then
         say("%s: none", label)
@@ -35,8 +39,8 @@ end
 function ns.Debug()
     say("Data: %d node types listed; %d places gathered: %d Eastern Kingdoms, %d Kalimdor.",
         count(ns.Nodes), count(ns.db.gathered), #ns.Spawns.All(0), #ns.Spawns.All(1))
-    say("Pins %s. Skills: Herbalism %d, Mining %d.", ns.settings.enabled and "shown" or "HIDDEN",
-        ns.Skills.Get("herb"), ns.Skills.Get("ore"))
+    say("Pins %s. Skills: Herbalism %s, Mining %s.", ns.settings.enabled and "shown" or "HIDDEN",
+        skill("herb"), skill("ore"))
 
     ns.Guarded(function()
         local x, y, _, continent = UnitPosition("player")

@@ -55,11 +55,42 @@ describe("the filter", function()
     it("never hides an unlisted node for skill, having none", function()
         local ns = helpers.loggedIn(function(env)
             helpers.withGathers(env)
-            env.__skills = { { "Professions", true } }
+            env.__skills[3] = { "Mining", false, 300 }
         end)
         ns.settings.worldmap.hideGrey = true
         assertTrue(shows(ns, "worldmap", helpers.E))
-        assertFalse(shows(ns, "worldmap", helpers.A))
+        assertFalse(shows(ns, "worldmap", helpers.A), "Copper is grey at 300")
+    end)
+
+    it("shows every node of a kind whose skill is not known", function()
+        local ns = helpers.loggedIn(function(env)
+            helpers.withGathers(env)
+            env.__skills = { { "Professions", true }, { "Herbalism", false, 50 } }
+        end)
+        assertTrue(ns.settings.worldmap.hideUngatherable)
+        assertTrue(shows(ns, "worldmap", helpers.A), "Copper, with no Mining listed")
+        assertTrue(shows(ns, "worldmap", helpers.S), "and Silver")
+        ns.settings.worldmap.hideGrey = true
+        assertTrue(shows(ns, "worldmap", helpers.A))
+    end)
+
+    it("shows every node when the skill list raises at login", function()
+        local ns = helpers.loggedIn(function(env)
+            helpers.withGathers(env)
+            env.GetSkillLineInfo = function() error("secret") end
+        end)
+        assertTrue(shows(ns, "worldmap", helpers.A))
+        assertTrue(shows(ns, "worldmap", helpers.S))
+        assertTrue(shows(ns, "minimap", helpers.S))
+    end)
+
+    it("still hides what a known skill cannot gather", function()
+        local ns = helpers.loggedIn(function(env)
+            helpers.withGathers(env)
+            env.__skills[3] = { "Mining", false, 50 }
+        end)
+        assertFalse(shows(ns, "worldmap", helpers.S), "Silver needs 75, Mining is 50")
+        assertTrue(shows(ns, "worldmap", helpers.A))
     end)
 
     it("gives the members of a spot it shows, in order", function()

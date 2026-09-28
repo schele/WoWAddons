@@ -35,7 +35,8 @@ function Filter.Shows(where, spawn)
         return false
     end
 
-    if node.skill then
+    -- A skill the client has not shown is no reason to hide anything.
+    if node.skill and ns.Skills.Known(node.kind) then
         local color = ns.Skills.Color(node.skill, ns.Skills.Get(node.kind))
         if chosen.hideUngatherable and color == "red" then
             return false

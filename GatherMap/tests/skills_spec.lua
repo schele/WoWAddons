@@ -22,6 +22,37 @@ describe("the player's skills", function()
         assertEqual(0, ns.Skills.Get("pool"))
     end)
 
+    it("are known when their line is listed, and unknown when it is not", function()
+        local ns, env = helpers.loggedIn(function(env)
+            env.__skills = { { "Professions", true }, { "Mining", false, 70 } }
+        end)
+        assertTrue(ns.Skills.Known("ore"))
+        assertFalse(ns.Skills.Known("herb"))
+        env.__skills = { { "Professions", true }, { "Herbalism", false, 5 } }
+        ns.Skills.Read()
+        assertFalse(ns.Skills.Known("ore"), "Mining unlearned")
+        assertTrue(ns.Skills.Known("herb"))
+    end)
+
+    it("are unknown when the client refuses from the start", function()
+        local ns = helpers.loggedIn(function(env)
+            env.GetSkillLineInfo = function() error("secret") end
+        end)
+        assertFalse(ns.Skills.Known("ore"))
+        assertFalse(ns.Skills.Known("herb"))
+    end)
+
+    it("stay known while a header is collapsed and hides them, and after a refusal", function()
+        local ns, env = helpers.loggedIn()
+        env.__skills = { { "Professions", true, nil, false } }
+        ns.Skills.Read()
+        assertTrue(ns.Skills.Known("ore"))
+        assertTrue(ns.Skills.Known("herb"))
+        env.GetSkillLineInfo = function() error("secret") end
+        ns.Skills.Read()
+        assertTrue(ns.Skills.Known("ore"))
+    end)
+
     it("are read again when they change, and the pins redrawn", function()
         local ns, env = helpers.loggedIn()
         local count = 0
