@@ -4,7 +4,7 @@
 
 **Goal:** A new addon, GatherMap, that pins herbs, ore, fishing pools and treasure chests on the world map and minimap, from a shipped vMaNGOS spawn database plus the places the player gathers, with filters per map.
 
-**Architecture:** A Node build script turns vMaNGOS's SQLite dump into generated Lua data files (a node catalog and flat spawn lists in world yards). In game, a spawn index (200-yard grid) feeds a shared filter, which the world map (a Blizzard map data provider drawing our own pins on the canvas) and the minimap (a 5 Hz ticker) both use. A recorder turns `LOOT_OPENED` into "gathered here" counts. The addon shell (defaults, commands, login hooks, settings page, minimap button) follows FishScale's.
+**Architecture:** vMaNGOS is vanilla and WoW Forever is not (BossLoot's lesson), so the game is the authority: Task 0 checks real gathers against the database before any code, pins say whether the game has confirmed them, a spawn can be marked "not here", and players' saved-variables files are baked into releases. A Node build script turns vMaNGOS's SQLite dump plus those recordings into generated Lua data files (a node catalog, flat spawn lists in world yards, confirmed keys). In game, a spawn index (200-yard grid) feeds a shared filter, which the world map (a Blizzard map data provider drawing our own pins on the canvas) and the minimap (a 5 Hz ticker) both use. A recorder turns `LOOT_OPENED` into "gathered here" counts. The addon shell (defaults, commands, login hooks, settings page, minimap button) follows FishScale's.
 
 **Tech Stack:** Lua 5.1 (WoW client 1.60, interface 16001), tested with the repo's own spec runner on Lua 5.4; Node 24 (`node:sqlite`, `node:test`) for the build.
 
@@ -13,7 +13,10 @@
 ## Global Constraints
 
 - Client `_classic_beta_`, `## Interface: 11509, 16001`, like every addon here.
-- Saved variables, both per account: `GatherMapDB` (`gathered`) and `GatherMapSettings` (filters, button).
+- Saved variables, both per account: `GatherMapDB` (`gathered`, `missing`) and `GatherMapSettings` (filters, button).
+- Three kinds of pin: gathered by you (full, gold edge), confirmed in a baked recording (full), database only (alpha 0.55, "From the classic database, not seen in WoW Forever yet").
+- A spawn in `GatherMapDB.missing` is hidden unless `showMissing`; gathering there clears the mark.
+- vMaNGOS database: `db_latest` release of github.com/vmangos/core, `db-sqlite-<commit>.zip`; checked with 13b49dc. It never goes in the repo.
 - Kinds are exactly `"herb"`, `"ore"`, `"pool"`, `"chest"`; maps are exactly `"worldmap"` and `"minimap"`.
 - Continents are instance IDs `0` (Eastern Kingdoms) and `1` (Kalimdor); nothing else is recorded or drawn.
 - Spawn key: `string.format("%d:%d:%.1f:%.1f", continent, entry, x, y)`; world positions rounded to 0.1 yard.
@@ -64,6 +67,63 @@ GatherMap/
   tools/                 build-data.mjs, nodes.json, lib/nodes.mjs, lib/lua.mjs, test/*.test.mjs
 ```
 
+### Task 0: Check vMaNGOS against the real game (go / no-go)
+
+No addon code until this passes. It is a check, not a build: the script is
+throwaway and lives in the session scratchpad (`$SCRATCH`).
+
+**Files:** none in the repo; the result goes into the spec's "Check result".
+
+- [ ] **Step 1: Get the database** (done 2026-09-28: 13b49dc in `$SCRATCH/vmangos/sqlite-dump/mangos.sqlite`)
+
+```bash
+gh release download db_latest -R vmangos/core -p "db-sqlite-*.zip" -D "$SCRATCH/vmangos" --clobber
+unzip -o -q "$SCRATCH/vmangos/"db-sqlite-*.zip -d "$SCRATCH/vmangos"
+```
+
+- [ ] **Step 2: The player logs real gathers**
+
+The player pastes once in game, then gathers 5-10 herbs or veins:
+
+```
+/run local f=CreateFrame("Frame") f:RegisterEvent("LOOT_OPENED") f:SetScript("OnEvent",function() local g=GetLootSourceInfo(1) local x,y=UnitPosition("player") print(g and g:match("-(%d+)-%x+$"),string.format("%.1f %.1f",x,y)) end)
+```
+
+Each gather prints `entry x y`. Collect the lines into `$SCRATCH/gathers.txt`, one per line.
+
+- [ ] **Step 3: Compare them with the database**
+
+`$SCRATCH/vmangos/check.mjs`:
+
+```js
+import { DatabaseSync } from 'node:sqlite';
+import { readFileSync } from 'node:fs';
+const [dbPath, gathersPath, continent = '0'] = process.argv.slice(2);
+const db = new DatabaseSync(dbPath, { readOnly: true });
+const nearest = db.prepare(`select id, position_x x, position_y y,
+  ((position_x - ?) * (position_x - ?) + (position_y - ?) * (position_y - ?)) d2
+  from gameobject where map = ? and id = ? and patch_min <= 10 and 10 <= patch_max order by d2 limit 1`);
+let matched = 0, total = 0;
+for (const line of readFileSync(gathersPath, 'utf8').split(/\r?\n/).filter(Boolean)) {
+  const [entry, x, y] = line.trim().split(/\s+/).map(Number);
+  const row = nearest.get(x, x, y, y, Number(continent), entry);
+  const yards = row ? Math.sqrt(row.d2) : Infinity;
+  total++;
+  if (yards <= 15) matched++;
+  console.log(`${entry} at ${x}, ${y}: nearest spawn ${yards.toFixed(1)} yards`);
+}
+console.log(`${matched} of ${total} within 15 yards`);
+```
+
+Run: `node --no-warnings "$SCRATCH/vmangos/check.mjs" "$SCRATCH/vmangos/sqlite-dump/mangos.sqlite" "$SCRATCH/gathers.txt"`
+
+- [ ] **Step 4: Decide**
+
+- **Go** if at least 80% are within 15 yards: write the numbers into the spec's "Check result" and carry on with Task 1.
+- **No-go** otherwise: stop, show the player the list, and rethink the design (e.g. recordings only, no database) before any code.
+
+---
+
 Run every GatherMap test from the repo root with:
 
 ```powershell
@@ -80,12 +140,13 @@ It runs the Lua specs and, once `tools/test` exists, the Node tests.
 - Create: `GatherMap/tools/nodes.json`
 - Create: `GatherMap/tools/lib/nodes.mjs`
 - Create: `GatherMap/tools/lib/lua.mjs`
+- Create: `GatherMap/tools/lib/recordings.mjs`, `GatherMap/tools/recordings/README.md`
 - Create: `GatherMap/tools/build-data.mjs`
-- Test: `GatherMap/tools/test/fixture.mjs`, `GatherMap/tools/test/nodes.test.mjs`, `GatherMap/tools/test/lua.test.mjs`
+- Test: `GatherMap/tools/test/fixture.mjs`, `GatherMap/tools/test/nodes.test.mjs`, `GatherMap/tools/test/lua.test.mjs`, `GatherMap/tools/test/recordings.test.mjs`
 
 **Interfaces:**
-- Consumes: `luaString(value)` and `updateToc(tocText, files)` from `BossLoot/tools/lib/lua.mjs`.
-- Produces: `catalog(db, lists) -> { nodes: [{ entry, kind, name, skill?, item? }], errors: string[] }`; `spawns(db, nodes) -> Map<continent, [{ entry, x, y }]>`; `nodesFile(nodes) -> string`; `spawnFiles(byContinent) -> [{ file, text }]`. The generated Lua calls `ns.AddNodes({ [entry] = { kind =, name =, skill =, item = } })` and `ns.AddSpawns(continent, { entry, x, y, ... })` (Task 2 defines both).
+- Consumes: `luaString(value)` and `updateToc(tocText, files)` from `BossLoot/tools/lib/lua.mjs`; `parseSavedVariables(text) -> { [global]: value }` from `BossLoot/tools/lib/savedvars.mjs`.
+- Produces: `catalog(db, lists) -> { nodes: [{ entry, kind, name, skill?, item? }], errors: string[] }`; `spawns(db, nodes) -> Map<continent, [{ entry, x, y }]>`; `spawnKey(continent, entry, x, y) -> string` (same as Lua's `Spawns.Key`); `readRecordings(dir) -> { recorders: [{ file, gathered, missing }], warnings }`; `applyRecordings(byContinent, nodes, recorders) -> { confirmed: string[], added, dropped }` (mutates `byContinent`); `nodesFile(nodes)`, `spawnFiles(byContinent) -> [{ file, text }]`, `confirmedFile(keys) -> string`. The generated Lua calls `ns.AddNodes({ [entry] = { kind =, name =, skill =, item = } })`, `ns.AddSpawns(continent, { entry, x, y, ... })` and `ns.AddConfirmed({ key, ... })` (Task 2 defines all three).
 
 - [ ] **Step 1: Write the node lists**
 
@@ -381,7 +442,236 @@ export function spawnFiles(byContinent) {
 Run: `cd GatherMap; node --no-warnings --test "tools/test/*.test.mjs"; cd ..`
 Expected: PASS, 9 tests.
 
-- [ ] **Step 6: Write the build script**
+- [ ] **Step 6: Write the failing recordings tests**
+
+`GatherMap/tools/test/recordings.test.mjs`:
+
+```js
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { readRecordings, applyRecordings, spawnKey } from '../lib/recordings.mjs';
+import { confirmedFile } from '../lib/lua.mjs';
+
+const NODES = [{ entry: 1731, kind: 'ore' }, { entry: 180582, kind: 'pool' }];
+const world = () => new Map([
+  [0, [{ entry: 1731, x: -10133.8, y: 793.8 }, { entry: 1731, x: -10008.9, y: 878.7 }]],
+  [1, []],
+]);
+
+test('keys match the addon\'s Spawns.Key', () => {
+  assert.equal(spawnKey(0, 1731, -10603.8, 1154), '0:1731:-10603.8:1154.0');
+});
+
+test('saved-variables files are read, one recorder each; a broken one is a warning', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'gathermap-'));
+  try {
+    writeFileSync(join(dir, 'a.lua'), [
+      'GatherMapDB = {',
+      '["gathered"] = { ["0:1731:-10133.8:793.8"] = { ["continent"] = 0, ["entry"] = 1731, ["x"] = -10133.8, ["y"] = 793.8, ["count"] = 2, }, },',
+      '["missing"] = { ["0:1731:-10008.9:878.7"] = 1790000000, },',
+      '}',
+      'GatherMapSettings = { ["enabled"] = true, }',
+    ].join('\n'));
+    writeFileSync(join(dir, 'b.lua'), 'GatherMapDB = { [');
+    writeFileSync(join(dir, 'c.lua'), 'BossLootDB = {}');
+    writeFileSync(join(dir, 'notes.txt'), 'ignored');
+    const { recorders, warnings } = readRecordings(dir);
+    assert.equal(recorders.length, 1);
+    assert.equal(recorders[0].file, 'a.lua');
+    assert.equal(recorders[0].gathered['0:1731:-10133.8:793.8'].count, 2);
+    assert.equal(recorders[0].missing['0:1731:-10008.9:878.7'], 1790000000);
+    assert.equal(warnings.length, 2);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a missing folder is no recordings', () => {
+  assert.deepEqual(readRecordings(join(tmpdir(), 'no-such-gathermap-folder')), { recorders: [], warnings: [] });
+});
+
+test('gathered database spawns are confirmed', () => {
+  const byContinent = world();
+  const { confirmed } = applyRecordings(byContinent, NODES, [
+    { gathered: { '0:1731:-10133.8:793.8': { continent: 0, entry: 1731, x: -10133.8, y: 793.8, count: 1 } }, missing: {} },
+  ]);
+  assert.deepEqual(confirmed, ['0:1731:-10133.8:793.8']);
+});
+
+test('a new point joins the spawns, confirmed; one near an existing spawn confirms that instead', () => {
+  const byContinent = world();
+  const { confirmed, added } = applyRecordings(byContinent, NODES, [
+    { gathered: {
+      '0:1731:-10300.0:900.1': { continent: 0, entry: 1731, x: -10300.04, y: 900.06, count: 1, new: true },
+      '0:1731:-10130.0:790.0': { continent: 0, entry: 1731, x: -10130, y: 790, count: 1, new: true },
+      '0:424242:1.0:2.0': { continent: 0, entry: 424242, x: 1, y: 2, count: 1, new: true },
+      '36:1731:1.0:2.0': { continent: 36, entry: 1731, x: 1, y: 2, count: 1, new: true },
+      bad: { continent: 0, entry: 1731, new: true },
+    }, missing: {} },
+  ]);
+  assert.equal(added, 1);
+  assert.equal(byContinent.get(0).length, 3);
+  assert.deepEqual(byContinent.get(0)[2], { entry: 1731, x: -10300, y: 900.1 });
+  assert.deepEqual(confirmed, ['0:1731:-10133.8:793.8', '0:1731:-10300.0:900.1']);
+});
+
+test('two recorders with the same new point add it once', () => {
+  const byContinent = world();
+  const point = { continent: 0, entry: 1731, x: -10300, y: 900, count: 1, new: true };
+  const { added } = applyRecordings(byContinent, NODES, [
+    { gathered: { '0:1731:-10300.0:900.0': point }, missing: {} },
+    { gathered: { '0:1731:-10301.0:901.0': { ...point, x: -10301, y: 901 } }, missing: {} },
+  ]);
+  assert.equal(added, 1);
+});
+
+test('a spawn marked not here is dropped, unless someone gathered it', () => {
+  const byContinent = world();
+  const { dropped } = applyRecordings(byContinent, NODES, [
+    { gathered: {}, missing: { '0:1731:-10008.9:878.7': 1, '0:1731:-10133.8:793.8': 1 } },
+    { gathered: { '0:1731:-10133.8:793.8': { continent: 0, entry: 1731, x: -10133.8, y: 793.8, count: 1 } }, missing: {} },
+  ]);
+  assert.equal(dropped, 1);
+  assert.deepEqual(byContinent.get(0).map((s) => s.x), [-10133.8]);
+});
+
+test('the confirmed file hands the keys to ns.AddConfirmed', () => {
+  const text = confirmedFile(['0:1731:-10133.8:793.8']);
+  assert.match(text, /ns\.AddConfirmed\(\{\n    "0:1731:-10133\.8:793\.8",\n\}\)/);
+  assert.match(confirmedFile([]), /ns\.AddConfirmed\(\{\n\}\)/);
+});
+```
+
+- [ ] **Step 7: Run them to see them fail**
+
+Run: `cd GatherMap; node --no-warnings --test "tools/test/*.test.mjs"; cd ..`
+Expected: FAIL, `Cannot find module '../lib/recordings.mjs'`.
+
+- [ ] **Step 8: Write the recordings library and the confirmed file**
+
+`GatherMap/tools/lib/recordings.mjs`:
+
+```js
+// Gathers players recorded in WoW Forever, from saved-variables files put in
+// tools/recordings/, baked into the release: the game is the authority,
+// vMaNGOS only a first guess (BossLoot's lesson).
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { parseSavedVariables } from '../../../BossLoot/tools/lib/savedvars.mjs';
+
+export const REACH = 15;
+
+const round1 = (value) => Math.round(value * 10) / 10;
+
+// The same key as the addon's Spawns.Key: "%d:%d:%.1f:%.1f".
+export function spawnKey(continent, entry, x, y) {
+  return `${continent}:${entry}:${x.toFixed(1)}:${y.toFixed(1)}`;
+}
+
+/** Each file's GatherMapDB, in file-name order. */
+export function readRecordings(dir) {
+  if (!existsSync(dir)) return { recorders: [], warnings: [] };
+  const recorders = [];
+  const warnings = [];
+  for (const file of readdirSync(dir).filter((name) => name.endsWith('.lua')).sort()) {
+    let vars;
+    try {
+      vars = parseSavedVariables(readFileSync(join(dir, file), 'utf8'));
+    } catch (error) {
+      warnings.push(`${file}: ${error.message}`);
+      continue;
+    }
+    const db = vars.GatherMapDB;
+    if (!db || typeof db !== 'object') {
+      warnings.push(`${file}: no GatherMap recordings`);
+      continue;
+    }
+    recorders.push({ file, gathered: db.gathered ?? {}, missing: db.missing ?? {} });
+  }
+  return { recorders, warnings };
+}
+
+/**
+ * Fold the recordings into the database's spawns, in place: new points join,
+ * spawns marked "not here" by someone and gathered by no one leave. Returns
+ * the keys of every spawn someone gathered, sorted.
+ */
+export function applyRecordings(byContinent, nodes, recorders) {
+  const known = new Set(nodes.map((node) => node.entry));
+  const gathered = new Set();
+  const missing = new Set();
+  for (const recorder of recorders) {
+    for (const key of Object.keys(recorder.gathered)) gathered.add(key);
+    for (const key of Object.keys(recorder.missing)) missing.add(key);
+  }
+
+  let dropped = 0;
+  for (const [continent, list] of byContinent) {
+    const kept = list.filter((s) => {
+      const key = spawnKey(continent, s.entry, s.x, s.y);
+      return !(missing.has(key) && !gathered.has(key));
+    });
+    dropped += list.length - kept.length;
+    byContinent.set(continent, kept);
+  }
+
+  const confirmed = new Set();
+  let added = 0;
+  for (const recorder of recorders) {
+    for (const [key, point] of Object.entries(recorder.gathered)) {
+      const list = byContinent.get(point?.continent);
+      if (!list || !known.has(point.entry) || typeof point.x !== 'number' || typeof point.y !== 'number') continue;
+      const x = round1(point.x);
+      const y = round1(point.y);
+      const near = list.find((s) => s.entry === point.entry && Math.hypot(s.x - x, s.y - y) <= REACH);
+      if (near) {
+        confirmed.add(spawnKey(point.continent, near.entry, near.x, near.y));
+      } else if (point.new) {
+        list.push({ entry: point.entry, x, y });
+        confirmed.add(spawnKey(point.continent, point.entry, x, y));
+        added++;
+      } else {
+        confirmed.add(key);
+      }
+    }
+  }
+
+  return { confirmed: [...confirmed].sort(), added, dropped };
+}
+```
+
+Append to `GatherMap/tools/lib/lua.mjs`:
+
+```js
+export function confirmedFile(keys) {
+  const lines = [HEADER, '-- Spawns players have gathered in WoW Forever, from tools/recordings/.', 'local _, ns = ...', '', 'ns.AddConfirmed({'];
+  for (const key of keys) lines.push(`    ${luaString(key)},`);
+  lines.push('})', '');
+  return lines.join('\n');
+}
+```
+
+(The HEADER comment and the new comment line both start with `--`, so the Lua file still loads.)
+
+`GatherMap/tools/recordings/README.md`:
+
+```markdown
+Saved-variables files with GatherMap recordings go here, to be baked into
+the next release: `WTF/Account/<name>/SavedVariables/GatherMap.lua`, renamed
+to anything ending in `.lua` (one per player). The build reads them all:
+their new points join the spawns, their gathers mark spawns confirmed, and a
+spawn someone marked "not here" and nobody gathered is left out.
+```
+
+- [ ] **Step 9: Run the tests to see them pass**
+
+Run: `cd GatherMap; node --no-warnings --test "tools/test/*.test.mjs"; cd ..`
+Expected: PASS, 17 tests.
+
+- [ ] **Step 10: Write the build script**
 
 `GatherMap/tools/build-data.mjs`:
 
@@ -398,7 +688,8 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { catalog, spawns } from './lib/nodes.mjs';
-import { nodesFile, spawnFiles } from './lib/lua.mjs';
+import { nodesFile, spawnFiles, confirmedFile } from './lib/lua.mjs';
+import { readRecordings, applyRecordings } from './lib/recordings.mjs';
 import { updateToc } from '../../BossLoot/tools/lib/lua.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -417,6 +708,13 @@ const { nodes: all, errors } = catalog(db, lists);
 for (const error of errors) console.error(`error ${error}`);
 
 const byContinent = spawns(db, all);
+
+// What players recorded in WoW Forever outranks vMaNGOS.
+const { recorders, warnings: recordingWarnings } = readRecordings(join(here, 'recordings'));
+for (const warning of recordingWarnings) console.warn(`warn  ${warning}`);
+const { confirmed, added, dropped } = applyRecordings(byContinent, all, recorders);
+console.log(`ok    ${recorders.length} recordings: ${confirmed.length} confirmed, ${added} new, ${dropped} not there`);
+
 const spawned = new Set([...byContinent.values()].flat().map((s) => s.entry));
 const nodes = all.filter((node) => spawned.has(node.entry));
 
@@ -436,6 +734,8 @@ for (const { file, text } of spawnFiles(byContinent)) {
   writeFileSync(join(dataDir, file), text);
   files.push(file);
 }
+writeFileSync(join(dataDir, 'Confirmed.lua'), confirmedFile(confirmed));
+files.push('Confirmed.lua');
 
 const tocPath = join(addon, 'GatherMap.toc');
 writeFileSync(tocPath, updateToc(readFileSync(tocPath, 'utf8'), files));
@@ -453,11 +753,11 @@ if (errors.length) {
 
 (It needs `GatherMap.toc`, which Task 2 creates; the real run is Task 10.)
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
 git add GatherMap/tools
-git commit -m "GatherMap: the build that turns vMaNGOS into node and spawn data
+git commit -m "GatherMap: the build that turns vMaNGOS and players' recordings into node and spawn data
 
 Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ```
@@ -473,7 +773,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Test: `GatherMap/tests/core_spec.lua`
 
 **Interfaces:**
-- Produces: `ns.PREFIX`, `ns.AddDefaults(table)`, `ns.Print(msg)`, `ns.Guarded(fn, whenUnknown)`, `ns.RegisterCommand(name, help, handler(rest))`, `ns.OnLogin(fn)`, `ns.OnRefresh(fn)`, `ns.Refresh()`, `ns.SetEnabled(bool)`, `ns.Nodes` (entry -> node), `ns.rawSpawns` (continent -> flat list), `ns.AddNodes(t)`, `ns.AddSpawns(continent, flat)`, `ns.db` (= `GatherMapDB`, with `gathered`), `ns.settings` (= `GatherMapSettings`, with `enabled`). `ns.OpenSettings` is optional (Task 8): a bare `/gmap` calls it when present.
+- Produces: `ns.PREFIX`, `ns.AddDefaults(table)`, `ns.Print(msg)`, `ns.Guarded(fn, whenUnknown)`, `ns.RegisterCommand(name, help, handler(rest))`, `ns.OnLogin(fn)`, `ns.OnRefresh(fn)`, `ns.Refresh()`, `ns.SetEnabled(bool)`, `ns.Nodes` (entry -> node), `ns.rawSpawns` (continent -> flat list), `ns.confirmed` (key -> true), `ns.AddNodes(t)`, `ns.AddSpawns(continent, flat)`, `ns.AddConfirmed(keys)`, `ns.db` (= `GatherMapDB`, with `gathered` and `missing`), `ns.settings` (= `GatherMapSettings`, with `enabled`). `ns.OpenSettings` is optional (Task 8): a bare `/gmap` calls it when present.
 - Test helpers: `helpers.loadAddon()`, `helpers.loggedIn(setup)`, `helpers.login(ns, env)`, `helpers.fire(env, event, ...)`, `helpers.command(env, text)`, `helpers.printed(env)`, `helpers.FILES`.
 
 - [ ] **Step 1: Write the TOC**
@@ -541,6 +841,8 @@ local function makeWidget(kind, parent)
     function widget:GetHeight() return self.height or 0 end
     function widget:SetScale(value) self.scale = value end
     function widget:GetScale() return self.scale end
+    function widget:SetAlpha(value) self.alpha = value end
+    function widget:GetAlpha() return self.alpha or 1 end
     function widget:GetParent() return self.parent end
     function widget:SetFrameStrata(value) self.strata = value end
     function widget:SetFrameLevel(value) self.frameLevel = value end
@@ -803,6 +1105,11 @@ ns.AddSpawns(0, {
 ns.AddSpawns(1, {
     1618, 100.0, 200.0,
 })
+
+-- C, the Tin Vein, confirmed by a baked recording.
+ns.AddConfirmed({
+    "0:3764:-10610.0:1160.0",
+})
 ```
 
 `GatherMap/tests/helpers.lua`:
@@ -878,6 +1185,7 @@ describe("the saved variables", function()
         assertEqual(env.GatherMapSettings, ns.settings)
         assertEqual(env.GatherMapDB, ns.db)
         assertEqual("table", type(ns.db.gathered))
+        assertEqual("table", type(ns.db.missing))
     end)
 
     it("keep what was saved", function()
@@ -901,6 +1209,7 @@ describe("the data files", function()
         assertEqual("Copper Vein", ns.Nodes[1731].name)
         assertEqual(1731, ns.rawSpawns[0][1])
         assertEqual(1618, ns.rawSpawns[1][1])
+        assertTrue(ns.confirmed["0:3764:-10610.0:1160.0"])
     end)
 end)
 
@@ -1016,6 +1325,14 @@ end
 -- they load. Spawns.lua turns the flat lists into its index at login.
 ns.Nodes = {}
 ns.rawSpawns = {}
+-- Spawns players gathered in WoW Forever, baked into the release.
+ns.confirmed = {}
+
+function ns.AddConfirmed(keys)
+    for _, key in ipairs(keys) do
+        ns.confirmed[key] = true
+    end
+end
 
 function ns.AddNodes(nodes)
     for entry, node in pairs(nodes) do
@@ -1040,6 +1357,9 @@ local function ensureDatabase()
     end
     if type(GatherMapDB.gathered) ~= "table" then
         GatherMapDB.gathered = {}
+    end
+    if type(GatherMapDB.missing) ~= "table" then
+        GatherMapDB.missing = {}
     end
     ns.db = GatherMapDB
 
@@ -1581,7 +1901,8 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Consumes: `ns.Guarded`, `ns.OnLogin`, `ns.Refresh`, `ns.AddDefaults`, `ns.Nodes`, `ns.settings`, `ns.db.gathered`; a spawn's `entry` and `key`.
 - Produces:
   - `ns.Skills.Read()`, `ns.Skills.Get(kind) -> number`, `ns.Skills.Color(required, skill) -> "red"|"orange"|"yellow"|"green"|"grey"`, `ns.Skills.RGB[color] -> { r, g, b }`, `ns.Skills.LABEL[kind] -> "Herbalism"|"Mining"`.
-  - Settings `ns.settings.worldmap` and `ns.settings.minimap`, each `{ kinds = { herb, ore, pool, chest }, hidden = { [name] = true }, hideUngatherable, hideGrey, onlyGathered, pinSize }` (pinSize 12 world map, 10 minimap).
+  - Settings `ns.settings.worldmap` and `ns.settings.minimap`, each `{ kinds = { herb, ore, pool, chest }, hidden = { [name] = true }, hideUngatherable, hideGrey, onlyConfirmed, showMissing, pinSize }` (pinSize 12 world map, 10 minimap).
+  - `ns.Filter.Confirmed(spawn) -> boolean` (gathered by you, or in `ns.confirmed`).
   - `ns.Filter.Shows(where, spawn) -> boolean`.
 
 - [ ] **Step 1: Write the failing specs**
@@ -1722,12 +2043,32 @@ describe("the filter", function()
         assertFalse(shows(ns, "worldmap", A), "no Mining: the vein is out of reach")
     end)
 
-    it("shows only gathered spawns when asked", function()
+    it("shows only spawns confirmed in game when asked: yours, or the release's", function()
         local ns = helpers.loggedIn()
-        ns.settings.worldmap.onlyGathered = true
-        assertFalse(shows(ns, "worldmap", A))
+        ns.settings.worldmap.onlyConfirmed = true
+        assertFalse(shows(ns, "worldmap", A), "only the database has it")
+        assertTrue(shows(ns, "worldmap", C), "a baked recording confirmed it")
         ns.db.gathered[A] = { continent = 0, entry = 1731, x = -10603.8, y = 1154.0, count = 1 }
         assertTrue(shows(ns, "worldmap", A))
+        assertTrue(shows(ns, "minimap", E), "the minimap's own setting is still off")
+    end)
+
+    it("tells confirmed spawns apart", function()
+        local ns = helpers.loggedIn()
+        assertFalse(ns.Filter.Confirmed(ns.Spawns.ByKey(A)))
+        assertTrue(ns.Filter.Confirmed(ns.Spawns.ByKey(C)))
+        ns.db.gathered[A] = { count = 1 }
+        assertTrue(ns.Filter.Confirmed(ns.Spawns.ByKey(A)))
+    end)
+
+    it("hides a spawn marked not here, unless asked to show those", function()
+        local ns = helpers.loggedIn()
+        ns.db.missing[A] = 1790000000
+        assertFalse(shows(ns, "worldmap", A))
+        assertFalse(shows(ns, "minimap", A))
+        ns.settings.minimap.showMissing = true
+        assertTrue(shows(ns, "minimap", A))
+        assertFalse(shows(ns, "worldmap", A))
     end)
 
     it("shows nothing for an object the catalog does not know", function()
@@ -1858,7 +2199,8 @@ local function filters(pinSize)
         hidden = {},
         hideUngatherable = true,
         hideGrey = false,
-        onlyGathered = false,
+        onlyConfirmed = false,
+        showMissing = false,
         pinSize = pinSize,
     }
 end
@@ -1867,6 +2209,12 @@ ns.AddDefaults({
     worldmap = filters(12),
     minimap = filters(10),
 })
+
+--- Whether the game has shown this spawn is real: the player gathered it,
+-- or a recording baked into the release did. vMaNGOS alone is a guess.
+function Filter.Confirmed(spawn)
+    return ns.db.gathered[spawn.key] ~= nil or ns.confirmed[spawn.key] == true
+end
 
 --- Whether `spawn` is shown on `where`: "worldmap" or "minimap".
 function Filter.Shows(where, spawn)
@@ -1884,7 +2232,10 @@ function Filter.Shows(where, spawn)
     if not chosen.kinds[node.kind] or chosen.hidden[node.name] then
         return false
     end
-    if chosen.onlyGathered and not ns.db.gathered[spawn.key] then
+    if chosen.onlyConfirmed and not Filter.Confirmed(spawn) then
+        return false
+    end
+    if ns.db.missing[spawn.key] and not chosen.showMissing then
         return false
     end
 
@@ -1927,7 +2278,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `ns.Spawns.Nearest`, `ns.Spawns.AddPoint`, `ns.Nodes`, `ns.db.gathered`, `ns.Refresh`, `ns.Guarded`, `ns.RegisterCommand`, `ns.Print`.
-- Produces: `ns.Recorder.EntryFromGUID(guid) -> number|nil`, `ns.Recorder.LootOpened()`, `ns.Recorder.REACH` (15), `POOL_REACH` (30), `REPEAT` (5). A gathered point: `ns.db.gathered[key] = { continent, entry, x, y, count, last, new }`. Command `/gmap reset gathered`.
+- Produces: `ns.Recorder.EntryFromGUID(guid) -> number|nil`, `ns.Recorder.LootOpened()`, `ns.Recorder.ToggleMissing(spawn) -> boolean` (true when now marked), `ns.Recorder.REACH` (15), `POOL_REACH` (30), `REPEAT` (5). A gathered point: `ns.db.gathered[key] = { continent, entry, x, y, count, last, new }`. Command `/gmap reset gathered`.
 
 - [ ] **Step 1: Write the failing spec**
 
@@ -2035,6 +2386,27 @@ describe("a gather", function()
         loot(env, 1731)
         assertEqual(1, count)
     end)
+
+    it("clears a not-here mark on the spawn it was taken from", function()
+        local ns, env = helpers.loggedIn()
+        ns.db.missing[A] = 1
+        loot(env, 1731)
+        assertNil(ns.db.missing[A])
+    end)
+end)
+
+describe("marking a spawn not here", function()
+    it("toggles, stamped with the time, and redraws", function()
+        local ns, env = helpers.loggedIn()
+        local count = 0
+        ns.OnRefresh(function() count = count + 1 end)
+        local spawn = ns.Spawns.ByKey(A)
+        assertTrue(ns.Recorder.ToggleMissing(spawn))
+        assertEqual(env.__time, ns.db.missing[A])
+        assertFalse(ns.Recorder.ToggleMissing(spawn))
+        assertNil(ns.db.missing[A])
+        assertEqual(2, count)
+    end)
 end)
 
 describe("/gmap reset gathered", function()
@@ -2045,8 +2417,10 @@ describe("/gmap reset gathered", function()
         assertEqual(1, ns.db.gathered[A].count, "not yet")
         assertMatch("again within 10 seconds", helpers.printed(env))
         env.__now = env.__now + 3
+        ns.db.missing["0:2843:-10700.0:1300.0"] = 1
         helpers.command(env, "reset gathered")
         assertNil(next(ns.db.gathered))
+        assertNil(next(ns.db.missing), "the not-here marks go too")
         assertMatch("Forgot every place", helpers.printed(env))
     end)
 
@@ -2118,7 +2492,17 @@ local function record(spawn, isNew)
     end
     point.count = (point.count or 0) + 1
     point.last = time()
+    -- Something grew here after all.
+    ns.db.missing[spawn.key] = nil
     ns.Refresh()
+end
+
+--- Mark `spawn` "not here", or take the mark off. True when now marked.
+function Recorder.ToggleMissing(spawn)
+    local marked = not ns.db.missing[spawn.key]
+    ns.db.missing[spawn.key] = marked and time() or nil
+    ns.Refresh()
+    return marked
 end
 
 --- A loot window opened. Counted when it came from a node GatherMap knows,
@@ -2173,13 +2557,16 @@ ns.RegisterCommand("reset", "Forget every place you have gathered: /gmap reset g
         for key in pairs(ns.db.gathered) do
             ns.db.gathered[key] = nil
         end
-        ns.Print("Forgot every place you have gathered.")
+        for key in pairs(ns.db.missing) do
+            ns.db.missing[key] = nil
+        end
+        ns.Print("Forgot every place you have gathered, and every spawn marked not here.")
         ns.Refresh()
         return
     end
 
     resetAsked = now
-    ns.Print("This forgets every place you have gathered, on every character. "
+    ns.Print("This forgets every place you have gathered and every spawn marked not here, on every character. "
         .. "Type /gmap reset gathered again within 10 seconds to do it.")
 end)
 ```
@@ -2208,9 +2595,9 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Test: `GatherMap/tests/worldmap_spec.lua`
 
 **Interfaces:**
-- Consumes: `ns.Geometry.MapRect`, `ns.Geometry.ToMap`, `ns.Spawns.All`, `ns.Spawns.version`, `ns.Filter.Shows`, `ns.Skills.*`, `ns.Nodes`, `ns.db.gathered`, `ns.settings.worldmap.pinSize`, `ns.OnLogin`, `ns.OnRefresh`, `ns.RegisterCommand`.
+- Consumes: `ns.Geometry.MapRect`, `ns.Geometry.ToMap`, `ns.Spawns.All`, `ns.Spawns.version`, `ns.Filter.Shows`, `ns.Filter.Confirmed`, `ns.Recorder.ToggleMissing`, `ns.db.missing`, `ns.Skills.*`, `ns.Nodes`, `ns.db.gathered`, `ns.settings.worldmap.pinSize`, `ns.OnLogin`, `ns.OnRefresh`, `ns.RegisterCommand`.
 - Produces:
-  - `ns.Pins.KIND_ICONS[kind]`, `ns.Pins.Icon(node) -> texture`, `ns.Pins.ShowTooltip(owner, spawn)`, `ns.Pins.Create(parent) -> pin` (pin has `.icon`, `.edge`, `.spawn`), `ns.Pins.Set(pin, spawn, size)`, `ns.Pins.Pool(parent) -> pool` with `pool:Begin()`, `pool:Acquire() -> pin`, `pool:Finish()`, `pool.used`, `pool.pins`.
+  - `ns.Pins.DIM` (0.55, the alpha of a database-only pin), `ns.Pins.KIND_ICONS[kind]`, `ns.Pins.Icon(node) -> texture`, `ns.Pins.ShowTooltip(owner, spawn)`, `ns.Pins.Create(parent) -> pin` (pin has `.icon`, `.edge`, `.spawn`), `ns.Pins.Set(pin, spawn, size)`, `ns.Pins.Pool(parent) -> pool` with `pool:Begin()`, `pool:Acquire() -> pin`, `pool:Finish()`, `pool.used`, `pool.pins`.
   - `ns.WorldMap.SpawnsOn(uiMapID) -> { { spawn, x, y }, ... }`, `ns.WorldMap.Refresh()`, `ns.WorldMap.Shown() -> pin[]`, `ns.WorldMap.MAX` (2000). Command `/gmap where`.
 
 - [ ] **Step 1: Write the failing spec**
@@ -2337,15 +2724,56 @@ describe("a pin", function()
         assertEqual(ns.Pins.KIND_ICONS.chest, pinFor(ns, "0:2843:-10700.0:1300.0").icon:GetTexture())
     end)
 
-    it("names the node, its skill in its colour, and that it is a known spawn", function()
+    it("names the node, its skill in its colour, and that only the database has it", function()
         local ns, env = opened()
         local pin = pinFor(ns, A)
         pin.scripts.OnEnter(pin)
         assertEqual("Copper Vein", env.GameTooltip.text)
         assertEqual("Mining 1", env.GameTooltip.lines[1].text)
         assertEqual(0.25, env.GameTooltip.lines[1].color[1], "green at 70")
-        assertEqual("Known spawn", env.GameTooltip.lines[2].text)
+        assertEqual("From the classic database, not seen in WoW Forever yet", env.GameTooltip.lines[2].text)
+        assertEqual("Right-click: not here", env.GameTooltip.lines[3].text)
         assertFalse(pin.edge:IsShown())
+        assertEqual(ns.Pins.DIM, pin:GetAlpha(), "a database guess is drawn dimmed")
+    end)
+
+    it("draws a spawn confirmed in the release at full strength", function()
+        local ns, env = opened()
+        local pin = pinFor(ns, "0:3764:-10610.0:1160.0")
+        assertEqual(1, pin:GetAlpha())
+        assertFalse(pin.edge:IsShown(), "the gold edge is for the player's own gathers")
+        pin.scripts.OnEnter(pin)
+        assertEqual("Confirmed in WoW Forever", env.GameTooltip.lines[2].text)
+    end)
+
+    it("marks its spawn not here on a right-click, and the pin goes", function()
+        local ns, env = opened()
+        local pin = pinFor(ns, A)
+        pin.scripts.OnEnter(pin)
+        pin.scripts.OnMouseUp(pin, "RightButton")
+        assertEqual(env.__time, ns.db.missing[A])
+        assertEqual("1731,2843,3764,180582", shownEntries(ns))
+        assertFalse(env.GameTooltip:IsShown(), "no tooltip left for a pin that has gone")
+    end)
+
+    it("shows marked spawns when asked, and a right-click takes the mark off", function()
+        local ns, env = opened()
+        ns.db.missing[A] = 1
+        ns.settings.worldmap.showMissing = true
+        ns.Refresh()
+        local pin = pinFor(ns, A)
+        pin.scripts.OnEnter(pin)
+        assertEqual("Marked not here. Right-click to undo.", env.GameTooltip.lines[3].text)
+        pin.scripts.OnMouseUp(pin, "RightButton")
+        assertNil(ns.db.missing[A])
+        assertEqual("Right-click: not here", env.GameTooltip.lines[3].text, "the tooltip keeps up")
+    end)
+
+    it("ignores a left click", function()
+        local ns, env = opened()
+        local pin = pinFor(ns, A)
+        pin.scripts.OnMouseUp(pin, "LeftButton")
+        assertNil(ns.db.missing[A])
     end)
 
     it("says how often the player gathered there, with a gold edge", function()
@@ -2387,10 +2815,14 @@ Expected: FAIL, `cannot open Pins.lua`.
 local addonName, ns = ...
 
 -- A pin, the same on the world map and the minimap: the node's icon, a gold
--- edge where the player has gathered, and a tooltip.
+-- edge where the player has gathered, dimmed where only vMaNGOS says so, a
+-- tooltip, and a right-click for "not here".
 
 local Pins = {}
 ns.Pins = Pins
+
+-- A spawn only the database has is a guess: WoW Forever is not vanilla.
+Pins.DIM = 0.55
 
 -- For nodes with no loot to take an icon from, and herbs or ore whose item
 -- the client does not know.
@@ -2433,10 +2865,33 @@ function Pins.ShowTooltip(owner, spawn)
     local point = ns.db.gathered[spawn.key]
     if type(point) == "table" and point.count then
         GameTooltip:AddLine(string.format("Gathered here %d %s", point.count, point.count == 1 and "time" or "times"), 1, 1, 1)
+    elseif ns.confirmed[spawn.key] then
+        GameTooltip:AddLine("Confirmed in WoW Forever", 1, 1, 1)
     else
-        GameTooltip:AddLine("Known spawn", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("From the classic database, not seen in WoW Forever yet", 0.7, 0.7, 0.7)
+    end
+
+    if ns.db.missing[spawn.key] then
+        GameTooltip:AddLine("Marked not here. Right-click to undo.", 1, 0.5, 0.25)
+    else
+        GameTooltip:AddLine("Right-click: not here", 0.5, 0.5, 0.5)
     end
     GameTooltip:Show()
+end
+
+-- The pin under the cursor may be drawn for another spawn, or gone, once
+-- the maps redraw, so the tooltip follows the spawn rather than the frame.
+local function toggleMissing(pin)
+    local spawn = pin.spawn
+    ns.Recorder.ToggleMissing(spawn)
+    if not GameTooltip then
+        return
+    end
+    if pin:IsShown() and pin.spawn == spawn then
+        Pins.ShowTooltip(pin, spawn)
+    else
+        GameTooltip:Hide()
+    end
 end
 
 function Pins.Create(parent)
@@ -2466,6 +2921,11 @@ function Pins.Create(parent)
             GameTooltip:Hide()
         end
     end)
+    pin:SetScript("OnMouseUp", function(self, mouseButton)
+        if mouseButton == "RightButton" and self.spawn then
+            toggleMissing(self)
+        end
+    end)
     return pin
 end
 
@@ -2475,6 +2935,7 @@ function Pins.Set(pin, spawn, size)
     pin:SetSize(size, size)
     pin.icon:SetTexture(Pins.Icon(ns.Nodes[spawn.entry]))
     pin.edge:SetShown(ns.db.gathered[spawn.key] ~= nil)
+    pin:SetAlpha(ns.Filter.Confirmed(spawn) and 1 or Pins.DIM)
     pin:Show()
 end
 
@@ -2895,7 +3356,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `ns.settings.enabled`, `ns.settings.worldmap|minimap` (Task 4's fields), `ns.Nodes`, `ns.SetEnabled`, `ns.Refresh`, `ns.RegisterCommand`, `ns.OnLogin`, `ns.Print`.
-- Produces: `ns.OpenSettings()`, `ns.ToggleSettings()`, `ns.SettingsPanel` with `.panel`, `.logo`, `.enabled` (CheckButton), `.kinds[kind]` and `.nodes[name]` (pairs: `{ buttons = { worldmap, minimap }, label, toggle?, all?, none? }`), `.filters.hideUngatherable|hideGrey|onlyGathered` (pairs), `.sizes.worldmap|minimap` (sliders), `.NodeNames(kind) -> { { name, skill }, ... }`, `.Refresh()`. Command `/gmap settings`; a bare `/gmap` opens the page.
+- Produces: `ns.OpenSettings()`, `ns.ToggleSettings()`, `ns.SettingsPanel` with `.panel`, `.logo`, `.enabled` (CheckButton), `.kinds[kind]` and `.nodes[name]` (pairs: `{ buttons = { worldmap, minimap }, label, toggle?, all?, none? }`), `.filters.hideUngatherable|hideGrey|onlyConfirmed|showMissing` (pairs), `.sizes.worldmap|minimap` (sliders), `.NodeNames(kind) -> { { name, skill }, ... }`, `.Refresh()`. Command `/gmap settings`; a bare `/gmap` opens the page.
 
 - [ ] **Step 1: Write the failing spec**
 
@@ -2982,11 +3443,14 @@ describe("the page's switches", function()
         local ns, env, panel = opened()
         click(panel.filters.hideUngatherable.buttons.minimap)
         click(panel.filters.hideGrey.buttons.worldmap)
-        click(panel.filters.onlyGathered.buttons.minimap)
+        click(panel.filters.onlyConfirmed.buttons.minimap)
+        click(panel.filters.showMissing.buttons.worldmap)
         assertFalse(ns.settings.minimap.hideUngatherable)
         assertTrue(ns.settings.worldmap.hideGrey)
-        assertTrue(ns.settings.minimap.onlyGathered)
-        assertFalse(ns.settings.worldmap.onlyGathered)
+        assertTrue(ns.settings.minimap.onlyConfirmed)
+        assertFalse(ns.settings.worldmap.onlyConfirmed)
+        assertTrue(ns.settings.worldmap.showMissing)
+        assertFalse(ns.settings.minimap.showMissing)
     end)
 
     it("size the pins", function()
@@ -3271,9 +3735,11 @@ local function ensureBuilt()
     hint:SetWidth(PANEL_WIDTH - PADDING * 2)
     hint:SetJustifyH("LEFT")
     hint:SetText("Each row has two boxes: the world map, then the minimap. "
-        .. "Open a kind with + to pick its nodes one by one.")
+        .. "Open a kind with + to pick its nodes one by one. Dimmed pins come from "
+        .. "the classic database and are not seen in WoW Forever yet; right-click "
+        .. "a pin where nothing grows to mark it not here.")
 
-    startY = -PADDING - 64
+    startY = -PADDING - 84 -- below the title and the three-line hint
 
     local enabled = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
     place(enabled, PADDING)
@@ -3293,7 +3759,8 @@ local function ensureBuilt()
     end
     addFilter("hideUngatherable", "Hide nodes my skill cannot gather yet")
     addFilter("hideGrey", "Hide grey nodes (no skill-ups left)")
-    addFilter("onlyGathered", "Only where I have gathered")
+    addFilter("onlyConfirmed", "Only places confirmed in game (yours, or from the release)")
+    addFilter("showMissing", "Show spawns marked not here")
     addSize("worldmap", "World map pin size", 8, 24)
     addSize("minimap", "Minimap pin size", 6, 20)
 
@@ -3717,13 +4184,20 @@ Expected: `written`. Then `git status --short` shows only `GatherMap/icon.tga`, 
 
 - [ ] **Step 2: Get the vMaNGOS database and build the data**
 
+Task 0 already downloaded it; only if `$SCRATCH/vmangos/sqlite-dump/mangos.sqlite` is gone:
+
 ```bash
-gh release download db_latest -R vmangos/core -p "db-sqlite-*.zip" -D "$SCRATCH/vmangos"
-unzip -o "$SCRATCH/vmangos/"db-sqlite-*.zip -d "$SCRATCH/vmangos"
+gh release download db_latest -R vmangos/core -p "db-sqlite-*.zip" -D "$SCRATCH/vmangos" --clobber
+unzip -o -q "$SCRATCH/vmangos/"db-sqlite-*.zip -d "$SCRATCH/vmangos"
+```
+
+Then build:
+
+```bash
 node GatherMap/tools/build-data.mjs "$SCRATCH/vmangos/sqlite-dump/mangos.sqlite"
 ```
 
-(`$SCRATCH` is the session scratchpad directory; the database never goes in the repo.)
+(`$SCRATCH` is the session scratchpad directory; the database never goes in the repo.) Expect `ok    0 recordings: 0 confirmed, 0 new, 0 not there` until someone sends one.
 
 Expected: `ok` lines with a count per kind (tens of herbs, about 20 ore, a dozen or so pools, the chests) and per continent (thousands each), and no `error` line. Fix any `warn "<name>" in nodes.json has no spawns` by checking the database's spelling:
 
@@ -3745,14 +4219,25 @@ minimap, with filters for each.
 
 ## What it shows
 
-- **Every known spawn**, shipped with the addon, from the
-  [vMaNGOS](https://github.com/vmangos/core) vanilla database at patch 1.12.
-- **Where you have gathered.** Every herb, vein, chest or pool you loot is
-  counted on its spawn, and those pins get a gold edge. A spawn the database
-  does not have is added where you stood. Saved per account.
+- **Where you have gathered**, with a gold edge. Every herb, vein, chest or
+  pool you loot is counted on its spawn; one the database does not have is
+  added where you stood. Saved per account.
+- **Spawns confirmed in WoW Forever**, at full strength: gathered by players
+  whose recordings went into this release.
+- **Every other spawn the classic database knows**, dimmed. They come from
+  the [vMaNGOS](https://github.com/vmangos/core) vanilla database at patch
+  1.12, and WoW Forever is not vanilla, so treat them as a good guess.
 
-Hover a pin for its name, the skill it needs (in its skill-up colour) and how
-often you have gathered there.
+Hover a pin for its name, the skill it needs (in its skill-up colour) and
+which of the three it is. **Right-click a pin where nothing grows** to mark it
+not here: it is hidden on every character, and gathering there later takes
+the mark off.
+
+## Sending your recordings
+
+Your gathers and "not here" marks make the next release better for everyone.
+Send `WTF/Account/<name>/SavedVariables/GatherMap.lua`; it goes in
+`tools/recordings/` and the build bakes it in.
 
 ## Filters
 
@@ -3762,7 +4247,8 @@ Each has a box for the world map and one for the minimap, in `/gmap`:
   one by one, or **All** / **None**.
 - Hide nodes your skill cannot gather yet (on by default).
 - Hide grey nodes, the ones that give no more skill-ups.
-- Only where I have gathered.
+- Only places confirmed in game (yours, or from the release).
+- Show spawns marked not here, to take a mark back off.
 - Pin size.
 
 If you have collapsed the Professions header in your skill list, GatherMap
@@ -3776,7 +4262,7 @@ keeps the skills it last saw until you open it again.
 | `/gmap toggle` | Show or hide every pin |
 | `/gmap minimap` | Hide or show the minimap button |
 | `/gmap where` | Where the game and GatherMap put you on the map |
-| `/gmap reset gathered` | Forget every place you have gathered (asks first) |
+| `/gmap reset gathered` | Forget every place you have gathered and every "not here" mark (asks first) |
 | `/gmap help` | List the commands |
 
 The minimap button: click to show or hide every pin, right-click for the
@@ -3792,7 +4278,8 @@ unzip it outside the repo, and from the repo root:
 
 The one file edited by hand is `tools/nodes.json`: the herb and ore names with
 the skill each needs, and the chest names. A vein or deposit it does not list
-fails the build. The data is derived from GPL material.
+fails the build. Saved-variables files in `tools/recordings/` are baked in
+on every build. The data is derived from GPL material.
 
 ## Install
 
@@ -3832,7 +4319,9 @@ Hand the user this list and wait for their answers; fix anything that fails with
 2. `/gmap where` in Westfall and Elwynn: the Game and GatherMap numbers match to 3 decimals.
 3. World map on Westfall: copper and tin pins where veins really are; hover one for its tooltip; zoom the map in (pins stay the same size); open Eastern Kingdoms (pins shown, map still responsive).
 4. Minimap: pins around you, moving as you ride and in a fight; change minimap zoom; indoors (a cave) the range narrows.
-5. Gather a node: its pin gets the gold edge, and the tooltip says "Gathered here 1 time".
+5. Gather a node: its pin goes from dimmed to full with a gold edge, and the tooltip says "Gathered here 1 time".
+5b. Find a dimmed pin where nothing grows, right-click it: it disappears from both maps; turn on "Show spawns marked not here" and right-click it again to take the mark off.
+5c. `/reload`, then check `WTF/Account/<name>/SavedVariables/GatherMap.lua` holds `gathered` and `missing`; copy it to `GatherMap/tools/recordings/`, rebuild, and see `1 recordings: N confirmed` (remove it again unless the player wants it in the release).
 6. `/gmap`: the page, each filter on each map, a kind's + checklist, All / None, both pin sizes.
 7. Right-click the minimap button opens the settings; click hides and shows every pin.
 ```
