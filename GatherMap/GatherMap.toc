@@ -15,4 +15,5 @@ Skills.lua
 Filter.lua
 Recorder.lua
 Pins.lua
+MinimapPins.lua
 WorldMap.lua

@@ -13,6 +13,7 @@ M.FILES = {
     "Filter.lua",
     "Recorder.lua",
     "Pins.lua",
+    "MinimapPins.lua",
     "WorldMap.lua",
 }
 
