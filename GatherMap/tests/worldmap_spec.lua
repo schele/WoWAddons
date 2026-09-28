@@ -135,6 +135,15 @@ describe("the world map", function()
         assertEqual(env.Minimap:GetFrameLevel() + 5, pin:GetFrameLevel())
     end)
 
+    it("never raises into the map's own code, opening or changing maps", function()
+        local ns, env = helpers.loggedIn(helpers.withGathers)
+        env.WorldMapFrame:GetCanvas().GetWidth = function() error("secret") end
+        env.WorldMapFrame:Show()
+        env.__changeMap(1436)
+        env.__zoomMap(2)
+        env.__providers[1]:RefreshAllData()
+    end)
+
     it("loads on a client without the map framework", function()
         local ns, env = helpers.loggedIn(withGathers(function(env) env.MapCanvasDataProviderMixin = nil end))
         assertEqual(0, #env.__providers)

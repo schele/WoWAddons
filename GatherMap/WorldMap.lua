@@ -106,12 +106,15 @@ local function attach()
     -- A plain right-click on a pin does what it would have done on the map.
     pool = ns.Pins.Pool(WorldMapFrame:GetCanvas(), zoomOut, level)
     provider = CreateFromMixins(MapCanvasDataProviderMixin)
-    function provider:RefreshAllData() WorldMap.Refresh() end
+    -- The map calls these from its own code: an error of ours must not land
+    -- there.
+    local function refresh() ns.Guarded(WorldMap.Refresh) end
+    function provider:RefreshAllData() refresh() end
     function provider:RemoveAllData() pool:Begin(); pool:Finish() end
-    function provider:OnMapChanged() WorldMap.Refresh() end
-    function provider:OnCanvasScaleChanged() WorldMap.Refresh() end
+    function provider:OnMapChanged() refresh() end
+    function provider:OnCanvasScaleChanged() refresh() end
     WorldMapFrame:AddDataProvider(provider)
-    WorldMapFrame:HookScript("OnShow", WorldMap.Refresh)
+    WorldMapFrame:HookScript("OnShow", refresh)
 end
 
 ns.OnLogin(function()

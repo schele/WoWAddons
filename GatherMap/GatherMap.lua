@@ -81,8 +81,9 @@ function ns.OnRefresh(fn)
 end
 
 function ns.Refresh()
+    -- One refresher that raises must not stop the rest.
     for _, fn in ipairs(refreshers) do
-        fn()
+        ns.Guarded(fn)
     end
 end
 

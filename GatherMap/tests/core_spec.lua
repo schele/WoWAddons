@@ -58,6 +58,15 @@ describe("refreshing", function()
         assertEqual(11, count)
     end)
 
+    it("runs every refresher, even after one that raises", function()
+        local ns = helpers.loggedIn()
+        local ran = false
+        ns.OnRefresh(function() error("broken") end)
+        ns.OnRefresh(function() ran = true end)
+        ns.Refresh()
+        assertTrue(ran)
+    end)
+
     it("happens when pins are turned off or on", function()
         local ns = helpers.loggedIn()
         local count = 0
