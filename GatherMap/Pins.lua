@@ -151,5 +151,14 @@ function Pins.Pool(parent)
         end
     end
 
+    --- The pins handed out since Begin, in order.
+    function pool:Shown()
+        local shown = {}
+        for index = 1, self.used do
+            shown[index] = self.pins[index]
+        end
+        return shown
+    end
+
     return pool
 end

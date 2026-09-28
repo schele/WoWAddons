@@ -69,13 +69,7 @@ end
 
 --- The pins on the map now.
 function WorldMap.Shown()
-    local shown = {}
-    if pool then
-        for index = 1, pool.used do
-            shown[index] = pool.pins[index]
-        end
-    end
-    return shown
+    return pool and pool:Shown() or {}
 end
 
 local function attach()
