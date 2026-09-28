@@ -7,6 +7,8 @@ local M = {}
 M.FILES = {
     "GatherMap.lua",
     "tests/fixture_data.lua",
+    "Geometry.lua",
+    "Spawns.lua",
 }
 
 --- Load the addon's files into a stubbed environment, the way WoW would:

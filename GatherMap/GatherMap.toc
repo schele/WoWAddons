@@ -9,3 +9,5 @@
 GatherMap.lua
 # BEGIN GENERATED DATA
 # END GENERATED DATA
+Geometry.lua
+Spawns.lua
