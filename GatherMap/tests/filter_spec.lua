@@ -48,11 +48,11 @@ describe("the filter", function()
     end)
 
     it("hides grey nodes when asked", function()
-        local ns = helpers.loggedIn(function(env) env.__skills[3] = { "Mining", false, 200 } end)
+        local ns = helpers.loggedIn(function(env) env.__skills[3] = { "Mining", false, 150 } end)
         assertTrue(shows(ns, "minimap", A))
         ns.settings.minimap.hideGrey = true
-        assertFalse(shows(ns, "minimap", A), "Copper is grey at 200")
-        assertTrue(shows(ns, "minimap", C), "Tin is green at 200")
+        assertFalse(shows(ns, "minimap", A), "Copper is grey at 150")
+        assertTrue(shows(ns, "minimap", C), "Tin is green at 150")
     end)
 
     it("never hides pools or chests for skill", function()
