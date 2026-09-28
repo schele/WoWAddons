@@ -44,19 +44,28 @@ does not list is still recorded (see below).
 ## Recording
 
 1. `UNIT_SPELLCAST_SUCCEEDED` with unit `"player"`: if the spell's name is
-   the game's own name for Mining (spell 2575) or Herb Gathering (spell
-   2366), read through `C_Spell.GetSpellName` or `GetSpellInfo`, remember
-   the kind (`ore` or `herb`) and `GetTime()`.
-2. `LOOT_OPENED` within 3 seconds of that: `GetLootSourceInfo(1)` must be a
-   `GameObject` GUID; its sixth field is the entry. Anything else (a corpse,
-   a chest, fishing, loot with no gather spell before it) is ignored.
+   the game's own name for spell 2575 or spell 2366, read through
+   `C_Spell.GetSpellName` or `GetSpellInfo`, remember the kind (2575: `ore`,
+   2366: `herb`) and `GetTime()`. On this client (probed 2026-09-28) 2575 is
+   "Mining" and 2366 "Herbalism"; mining a vein casts 2576, named "Mining",
+   so the names match. The herb cast is not yet seen (no Herbalism on the
+   probing character) and is expected to be named "Herbalism" the same way.
+2. `LOOT_OPENED`: `GetLootSourceInfo(1)` must be a `GameObject` GUID; its
+   sixth field is the entry. It is a gather when either the entry is a
+   listed herb or ore (the list gives the kind), or a gather spell (step 1)
+   succeeded within the last 3 seconds (the spell gives the kind). Anything
+   else (a corpse, a chest, fishing, an unlisted object with no gather spell
+   before it) is ignored.
 3. Position: `UnitPosition("player")`, continent 0 or 1 only.
 4. Within 15 yards of an earlier point of the same entry: that point's
    `count` goes up. Otherwise a new point.
 5. The point keeps what the list cannot supply: `kind` from the spell, and
    `item`/`itemName` from `GetLootSlotLink(1)`'s item, so an unlisted node
    still has an icon and a name.
-6. One loot window counts once (the 5-second repeat rule stays).
+6. One visit counts once: a vein is mined several times, each with its own
+   loot window (probed: three `Mining` casts on one Copper Vein), so a
+   gather on the same point within 60 seconds of the last is not counted
+   again.
 
 ```lua
 GatherMapDB = {
@@ -95,15 +104,18 @@ removed.
 
 ## Checked before code
 
-A `/run` probe in game: `UNIT_SPELLCAST_SUCCEEDED` fires for the player on
-Mining and Herb Gathering with the spell's ID, and the names of 2575 and
-2366 as this client gives them. If it does not, recording falls back to the
-list alone (option A) and this section is revised.
+A `/run` probe in game, 2026-09-28: 2575 is named "Mining" and 2366
+"Herbalism"; `UNIT_SPELLCAST_SUCCEEDED` fires for the player with spell 2576
+"Mining" on every mining of a Copper Vein (three per vein). Herbs are not
+probed yet; listed herbs are recorded regardless of the spell (Recording,
+step 2), so only unlisted herbs depend on the unprobed name.
 
 ## Testing
 
 Lua specs as now, rewritten for the new recording: a gather after Mining
-counts; loot with no gather spell, or more than 3 seconds later, does not;
+counts; a listed herb counts with no spell; an unlisted object with no
+gather spell, or more than 3 seconds after it, does not; mining the same
+vein three times within 60 seconds counts once;
 an unlisted entry is recorded with its loot's name and icon; old saved
 pool/chest points are dropped; Shift-right-click forgets a spot; the
 filters and both maps draw only gathered points. In game: the probe above,
