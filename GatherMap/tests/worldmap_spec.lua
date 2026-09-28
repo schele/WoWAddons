@@ -332,6 +332,17 @@ describe("a spot with several places", function()
         assertFalse(env.GameTooltip:IsShown())
     end)
 
+    it("forgets the whole spot on a Shift-right-click, members hidden too", function()
+        local ns, env = opened()
+        env.__modifiers.shift = true
+        local pin = pinsAtC(ns)[1]
+        assertEqual(1, #pin.members, "Silver is out of reach at Mining 70")
+        pin.scripts.OnMouseUp(pin, "RightButton")
+        assertNil(ns.db.gathered[C])
+        assertNil(ns.db.gathered[S])
+        assertNil(ns.Spawns.ByKey(S))
+    end)
+
     it("counts a new gather of any member in the spot's total", function()
         local ns, env = skilled()
         env.__lootSource = "GameObject-0-6782-0-79720-1733-00003A1A8E"

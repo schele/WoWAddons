@@ -64,6 +64,32 @@ describe("the index of gathered places", function()
     end)
 end)
 
+describe("a saved point under a key its place does not give", function()
+    local ODD = "0:1731:-10603.75:1154.0"
+
+    it("moves to its place's key", function()
+        local ns = helpers.loggedIn(function(env)
+            env.GatherMapDB = { gathered = { [ODD] = helpers.point(helpers.A, { count = 2 }) } }
+        end)
+        assertNil(ns.db.gathered[ODD])
+        assertEqual(2, ns.db.gathered[helpers.A].count)
+        assertTrue(ns.Spawns.ByKey(helpers.A).point == ns.db.gathered[helpers.A])
+    end)
+
+    it("joins a point already at that key, adding its count", function()
+        local ns = helpers.loggedIn(function(env)
+            env.GatherMapDB = { gathered = {
+                [ODD] = helpers.point(helpers.A, { count = 2 }),
+                [helpers.A] = helpers.point(helpers.A, { count = 3 }),
+            } }
+        end)
+        assertNil(ns.db.gathered[ODD])
+        assertEqual(5, ns.db.gathered[helpers.A].count)
+        assertTrue(ns.Spawns.ByKey(helpers.A).point == ns.db.gathered[helpers.A])
+        assertEqual(1, #ns.Spawns.All(0))
+    end)
+end)
+
 describe("what a place is", function()
     it("comes from the node list when the entry is listed", function()
         local ns = helpers.loggedIn(helpers.withGathers)

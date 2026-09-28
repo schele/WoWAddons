@@ -97,7 +97,8 @@ function Recorder.LootOpened()
     local listed = ns.Nodes[entry]
     local kind = listed and ns.Spawns.KINDS[listed.kind] and listed.kind or nil
     if not kind and lastCast and now - lastCast <= Recorder.SPELL_WINDOW then
-        kind = lastKind
+        -- One cast, one loot window: the next unlisted one needs its own.
+        kind, lastCast = lastKind, nil
     end
     if not kind then
         return

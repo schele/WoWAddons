@@ -82,6 +82,16 @@ describe("a gather", function()
         assertNil(next(ns.db.gathered))
     end)
 
+    it("lets one gather cast through only one unlisted loot window", function()
+        local ns, env = helpers.loggedIn()
+        cast(env, 2576)
+        loot(env, 424242)
+        env.__now = env.__now + 1
+        loot(env, 424243)
+        assertTrue(ns.db.gathered["0:424242:-10603.8:1154.0"] ~= nil)
+        assertNil(ns.db.gathered["0:424243:-10603.8:1154.0"], "the cast was used up")
+    end)
+
     it("ignores another unit's cast", function()
         local ns, env = helpers.loggedIn()
         helpers.fire(env, "UNIT_SPELLCAST_SUCCEEDED", "party1", "Cast", 2576)

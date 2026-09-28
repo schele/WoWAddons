@@ -65,10 +65,15 @@ function Pins.ShowTooltip(owner, members)
     GameTooltip:Show()
 end
 
--- The pin under the cursor is gone once the maps redraw, and so is its
--- tooltip.
+-- The whole spot goes, members the filters hide included. The pin under the
+-- cursor is gone once the maps redraw, and so is its tooltip.
 local function forget(pin)
-    ns.Recorder.Forget(pin.members)
+    -- A copy: forgetting takes each place out of the stack itself.
+    local places = {}
+    for index, spawn in ipairs(pin.spawn.stack) do
+        places[index] = spawn
+    end
+    ns.Recorder.Forget(places)
     if GameTooltip then
         GameTooltip:Hide()
     end

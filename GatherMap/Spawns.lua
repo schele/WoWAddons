@@ -87,6 +87,24 @@ local function kindOf(point)
     return Spawns.KINDS[kind] and kind or nil
 end
 
+--- Index the saved `point` under `key`: under its place's key, moved there
+-- if saved under another. Where a point is saved at that key already, it
+-- stays, and gains the moved point's count.
+local function load(key, point)
+    local x, y = round(point.x), round(point.y)
+    local placeKey = Spawns.Key(point.continent, point.entry, x, y)
+    if placeKey ~= key then
+        ns.db.gathered[key] = nil
+        local there = ns.db.gathered[placeKey]
+        if type(there) == "table" then
+            there.count = (there.count or 0) + (point.count or 0)
+            return
+        end
+        ns.db.gathered[placeKey] = point
+    end
+    add(point.continent, point.entry, x, y, point)
+end
+
 --- Index the saved gathers, in key order. Once, at login. A point that
 -- cannot be placed, or is no herb or ore, is dropped from the saved
 -- variables.
@@ -103,7 +121,7 @@ function Spawns.Load()
         if kind and type(point.continent) == "number" and type(point.x) == "number" and type(point.y) == "number" then
             point.kind = kind
             point.new = nil
-            add(point.continent, point.entry, round(point.x), round(point.y), point)
+            load(key, point)
         else
             ns.db.gathered[key] = nil
         end
