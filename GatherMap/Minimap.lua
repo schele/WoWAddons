@@ -60,10 +60,21 @@ local function showTooltip(self)
         return
     end
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetText("GatherMap: pins " .. (ns.settings.enabled and "|cff40ff40shown|r" or "|cffff4040hidden|r"))
+    local function state(on)
+        return on and "|cff40ff40shown|r" or "|cffff4040hidden|r"
+    end
+    GameTooltip:SetText("GatherMap: pins " .. state(ns.settings.enabled)
+        .. ", minimap pins " .. state(ns.settings.minimap.show))
     GameTooltip:AddLine("Click to show or hide every pin.", 1, 1, 1)
+    GameTooltip:AddLine("Shift-click to show or hide the minimap's pins.", 1, 1, 1)
     GameTooltip:AddLine("Right-click for the settings, drag to move.", 1, 1, 1)
     GameTooltip:Show()
+end
+
+local function shiftDown()
+    return ns.Guarded(function()
+        return IsShiftKeyDown() and true or false
+    end, false)
 end
 
 local function onClick(self, mouseButton)
@@ -71,8 +82,13 @@ local function onClick(self, mouseButton)
         ns.ToggleSettings()
         return
     end
-    ns.SetEnabled(not ns.settings.enabled)
-    ns.Print(ns.settings.enabled and "Pins shown." or "Pins hidden.")
+    if shiftDown() then
+        ns.Filter.SetShown("minimap", not ns.settings.minimap.show)
+        ns.Print(ns.settings.minimap.show and "Minimap pins shown." or "Minimap pins hidden.")
+    else
+        ns.SetEnabled(not ns.settings.enabled)
+        ns.Print(ns.settings.enabled and "Pins shown." or "Pins hidden.")
+    end
     if GameTooltip and GameTooltip:GetOwner() == self then
         showTooltip(self)
     end

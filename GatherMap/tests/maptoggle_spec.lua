@@ -1,0 +1,111 @@
+local helpers = require("helpers")
+
+local function shows(ns, where)
+    return ns.Filter.Shows(where, ns.Spawns.ByKey(helpers.A))
+end
+
+describe("each map's own switch", function()
+    it("is on for both maps to begin with", function()
+        local ns = helpers.loggedIn(helpers.withGathers)
+        assertTrue(ns.settings.worldmap.show)
+        assertTrue(ns.settings.minimap.show)
+    end)
+
+    it("hides the pins on its map and leaves the other alone, and redraws", function()
+        local ns = helpers.loggedIn(helpers.withGathers)
+        local count = 0
+        ns.OnRefresh(function() count = count + 1 end)
+        ns.Filter.SetShown("minimap", false)
+        assertFalse(shows(ns, "minimap"))
+        assertTrue(shows(ns, "worldmap"))
+        assertEqual(1, count)
+        ns.Filter.SetShown("minimap", true)
+        assertTrue(shows(ns, "minimap"))
+    end)
+
+    it("is kept once saved", function()
+        local ns = helpers.loggedIn(function(env)
+            helpers.withGathers(env)
+            env.GatherMapSettings = { worldmap = { show = false } }
+        end)
+        assertFalse(shows(ns, "worldmap"))
+        assertTrue(shows(ns, "minimap"))
+    end)
+
+    it("still gives way to the switch for every pin", function()
+        local ns = helpers.loggedIn(helpers.withGathers)
+        ns.SetEnabled(false)
+        assertFalse(shows(ns, "worldmap"))
+        assertFalse(shows(ns, "minimap"))
+    end)
+end)
+
+describe("/gmap toggle", function()
+    it("turns the world map's pins off and on with 'map', and says so", function()
+        local ns, env = helpers.loggedIn()
+        helpers.command(env, "toggle map")
+        assertFalse(ns.settings.worldmap.show)
+        assertTrue(ns.settings.minimap.show)
+        assertMatch("World map pins hidden", helpers.printed(env))
+        helpers.command(env, "toggle map")
+        assertTrue(ns.settings.worldmap.show)
+        assertMatch("World map pins shown", helpers.printed(env))
+    end)
+
+    it("turns the minimap's pins off with 'minimap'", function()
+        local ns, env = helpers.loggedIn()
+        helpers.command(env, "toggle minimap")
+        assertFalse(ns.settings.minimap.show)
+        assertTrue(ns.settings.worldmap.show)
+        assertMatch("Minimap pins hidden", helpers.printed(env))
+    end)
+
+    it("still turns every pin off and on alone", function()
+        local ns, env = helpers.loggedIn()
+        helpers.command(env, "toggle")
+        assertFalse(ns.settings.enabled)
+        assertTrue(ns.settings.minimap.show)
+    end)
+
+    it("says how to use it for anything else", function()
+        local ns, env = helpers.loggedIn()
+        helpers.command(env, "toggle moon")
+        assertMatch("/gmap toggle map", helpers.printed(env))
+        assertTrue(ns.settings.enabled)
+    end)
+end)
+
+describe("the minimap button", function()
+    it("toggles only the minimap's pins on a Shift-click, and says so in its tooltip", function()
+        local ns, env = helpers.loggedIn()
+        local button = ns.MinimapButton.Button()
+        button.scripts.OnEnter(button)
+        assertMatch("Shift%-click", table.concat((function()
+            local texts = {}
+            for _, line in ipairs(env.GameTooltip.lines or {}) do texts[#texts + 1] = line.text end
+            return texts
+        end)(), "\n"))
+        env.__modifiers.shift = true
+        button.scripts.OnClick(button, "LeftButton")
+        assertFalse(ns.settings.minimap.show)
+        assertTrue(ns.settings.enabled, "the switch for every pin stays on")
+        assertTrue(ns.settings.worldmap.show)
+        assertMatch("minimap pins |cffff4040hidden", env.GameTooltip.text, "the tooltip under the cursor keeps up")
+    end)
+end)
+
+describe("the settings page", function()
+    it("has a box per map for showing pins", function()
+        local ns, env = helpers.loggedIn()
+        ns.settings.worldmap.show = false
+        local panel = ns.SettingsPanel
+        panel.panel:Show()
+        local pair = panel.filters.show
+        assertFalse(pair.buttons.worldmap:GetChecked())
+        assertTrue(pair.buttons.minimap:GetChecked())
+        pair.buttons.minimap:SetChecked(false)
+        pair.buttons.minimap.scripts.OnClick(pair.buttons.minimap)
+        assertFalse(ns.settings.minimap.show)
+        assertTrue(panel.enabled:GetChecked(), "the box for every pin is still there")
+    end)
+end)

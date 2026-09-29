@@ -22,6 +22,8 @@ does what it would on the map itself.
 
 Each has a box for the world map and one for the minimap, in `/gmap`:
 
+- Show pins on this map: turn the world map's or the minimap's pins off
+  on their own.
 - Herbs, ore; open a kind with **+** to pick its nodes one by one, or
   **All** / **None**.
 - Hide nodes your skill cannot gather yet (on by default).
@@ -37,14 +39,16 @@ keeps the skills it last saw until you open it again.
 |---|---|
 | `/gmap` | Open the settings |
 | `/gmap toggle` | Show or hide every pin |
+| `/gmap toggle map` | Show or hide the world map's pins |
+| `/gmap toggle minimap` | Show or hide the minimap's pins |
 | `/gmap minimap` | Hide or show the minimap button |
 | `/gmap where` | Where the game and GatherMap put you on the map |
 | `/gmap debug` | What GatherMap has, step by step, if pins are missing |
 | `/gmap reset gathered` | Forget every place you have gathered (asks first) |
 | `/gmap help` | List the commands |
 
-The minimap button: click to show or hide every pin, right-click for the
-settings, drag to move it.
+The minimap button: click to show or hide every pin, Shift-click for just
+the minimap's pins, right-click for the settings, drag to move it.
 
 ## Install
 

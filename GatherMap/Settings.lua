@@ -255,6 +255,8 @@ local function ensureBuilt()
         text("Mini", PADDING + COLUMN, 0, "GameFontNormalSmall"),
     } })
 
+    addFilter("show", "Show pins on this map")
+
     for _, kind in ipairs(KINDS) do
         addKind(kind)
     end

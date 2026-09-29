@@ -9,6 +9,8 @@ ns.Filter = Filter
 
 local function filters(pinSize)
     return {
+        -- This map's own switch; `enabled` is the one for every pin.
+        show = true,
         kinds = { herb = true, ore = true },
         hidden = {},
         hideUngatherable = true,
@@ -22,6 +24,12 @@ ns.AddDefaults({
     minimap = filters(10),
 })
 
+--- Turn the pins on one map, "worldmap" or "minimap", on or off.
+function Filter.SetShown(where, value)
+    ns.settings[where].show = value and true or false
+    ns.Refresh()
+end
+
 --- Whether `spawn` is shown on `where`: "worldmap" or "minimap".
 function Filter.Shows(where, spawn)
     local settings = ns.settings
@@ -29,8 +37,12 @@ function Filter.Shows(where, spawn)
         return false
     end
 
-    local node = ns.Spawns.Node(spawn)
     local chosen = settings[where]
+    if not chosen.show then
+        return false
+    end
+
+    local node = ns.Spawns.Node(spawn)
     if not node.kind or not chosen.kinds[node.kind] or chosen.hidden[node.name] then
         return false
     end

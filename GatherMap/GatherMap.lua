@@ -143,9 +143,27 @@ SLASH_GATHERMAP1 = "/gathermap"
 SLASH_GATHERMAP2 = "/gmap"
 SlashCmdList.GATHERMAP = runCommand
 
-ns.RegisterCommand("toggle", "Show or hide every pin", function()
-    ns.SetEnabled(not ns.settings.enabled)
-    ns.Print(ns.settings.enabled and "Pins shown." or "Pins hidden.")
+-- What `/gmap toggle <word>` switches: one map's pins.
+local MAPS = {
+    map = { where = "worldmap", label = "World map" },
+    worldmap = { where = "worldmap", label = "World map" },
+    minimap = { where = "minimap", label = "Minimap" },
+}
+
+ns.RegisterCommand("toggle", "Show or hide every pin; /gmap toggle map or minimap for one map", function(rest)
+    rest = (rest or ""):lower()
+    if rest == "" then
+        ns.SetEnabled(not ns.settings.enabled)
+        ns.Print(ns.settings.enabled and "Pins shown." or "Pins hidden.")
+        return
+    end
+    local map = MAPS[rest]
+    if not map then
+        ns.Print("/gmap toggle shows or hides every pin; /gmap toggle map or /gmap toggle minimap, one map's.")
+        return
+    end
+    ns.Filter.SetShown(map.where, not ns.settings[map.where].show)
+    ns.Print(string.format("%s pins %s.", map.label, ns.settings[map.where].show and "shown" or "hidden"))
 end)
 
 -- Work to do once the player is in the world and the database exists.
