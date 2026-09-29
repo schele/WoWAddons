@@ -128,6 +128,20 @@ describe("the minimap pins", function()
         assertNear(-16.2 * scale, y)
     end)
 
+    it("sit on whole screen pixels, so the gold edge keeps its width as they glide", function()
+        local ns, env = refreshed(function(env)
+            env.GetPhysicalScreenSize = function() return 1920, 1080 end
+        end)
+        local perUnit = 1080 / 768 -- screen pixels per UI unit at scale 1
+        for _, pin in ipairs(ns.MinimapPins.Shown()) do
+            local _, _, _, x, y = pin:GetPoint(1)
+            assertNear(math.floor(x * perUnit + 0.5), x * perUnit, 1e-6, "x on a whole pixel")
+            assertNear(math.floor(y * perUnit + 0.5), y * perUnit, 1e-6, "y on a whole pixel")
+        end
+        local _, _, _, x = pinFor(ns, C):GetPoint(1)
+        assertNear(-6 * 140 / (466 + 2 / 3), x, 0.5 / perUnit, "within half a pixel of where it belongs")
+    end)
+
     it("fall back to UnitPosition where the game gives no map position", function()
         local ns, env = refreshed()
         env.C_Map.GetPlayerMapPosition = function() return nil end

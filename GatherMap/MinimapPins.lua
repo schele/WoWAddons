@@ -57,6 +57,22 @@ local function view()
     }
 end
 
+--- `value`, in `frame`'s UI units, moved to the nearest whole screen pixel.
+-- The game snaps each edge of a texture to a pixel on its own, so a pin
+-- gliding by fractions of a pixel draws its 1-pixel gold edge 0, 1 or 2
+-- pixels wide from frame to frame: it flickers. On whole pixels both edges
+-- move together. Unchanged where the client will not give its screen size.
+local function onPixel(frame, value)
+    local perUnit = ns.Guarded(function()
+        local _, height = GetPhysicalScreenSize()
+        return frame:GetEffectiveScale() * height / 768
+    end)
+    if type(perUnit) ~= "number" or perUnit <= 0 then
+        return value
+    end
+    return math.floor(value * perUnit + 0.5) / perUnit
+end
+
 --- Put the pins chosen last where their places are now. Every frame: the
 -- minimap scrolls smoothly as the player moves, so pins placed only when
 -- chosen would lag behind it and jump. A pin that has slipped past the rim
@@ -79,7 +95,7 @@ function MinimapPins.Place()
                 if dx * dx + dy * dy <= limit then
                     local right, up = ns.Geometry.MinimapOffset(at.x, at.y, spawn.x, spawn.y, at.facing, at.rotate)
                     pin:ClearAllPoints()
-                    pin:SetPoint("CENTER", Minimap, "CENTER", right * at.scale, up * at.scale)
+                    pin:SetPoint("CENTER", Minimap, "CENTER", onPixel(pin, right * at.scale), onPixel(pin, up * at.scale))
                     pin:Show()
                 else
                     pin:Hide()
