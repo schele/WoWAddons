@@ -43,6 +43,11 @@ function Geometry.ToMap(rect, x, y)
     return (y - rect.y0) / (rect.y1 - rect.y0), (x - rect.x0) / (rect.x1 - rect.x0)
 end
 
+--- The world position of a point on the map `rect` describes: ToMap's inverse.
+function Geometry.ToWorld(rect, mapX, mapY)
+    return rect.x0 + (rect.x1 - rect.x0) * mapY, rect.y0 + (rect.y1 - rect.y0) * mapX
+end
+
 function Geometry.MinimapDiameter(zoom, indoors)
     local sizes = indoors and Geometry.INDOOR or Geometry.OUTDOOR
     return sizes[(zoom or 0) + 1] or sizes[1]

@@ -13,11 +13,34 @@ MinimapPins.MAX = 100
 
 local pool
 
+--- Where the player is, in world yards, as smoothly as the game says it.
+-- UnitPosition steps: running, it changed on only 29-44 frames in 120, while
+-- the map position changed on all 120 (probed 2026-09-29). So the map
+-- position, put back into yards with the map's corners, and UnitPosition
+-- only where the game gives no map position.
+local function playerPosition()
+    local fromMap = ns.Guarded(function()
+        local mapID = C_Map.GetBestMapForUnit("player")
+        local rect = ns.Geometry.MapRect(mapID)
+        local at = rect and C_Map.GetPlayerMapPosition(mapID, "player")
+        if not at or type(at.x) ~= "number" then
+            return nil
+        end
+        local x, y = ns.Geometry.ToWorld(rect, at.x, at.y)
+        return { x = x, y = y, continent = rect.continent }
+    end)
+    if fromMap then
+        return fromMap.x, fromMap.y, fromMap.continent
+    end
+    local x, y, _, continent = UnitPosition("player")
+    return x, y, continent
+end
+
 --- Where the minimap is looking from, as the pins need it: the player's
 -- place and the map's scale. Nil when the client will not say where the
 -- player is.
 local function view()
-    local x, y, _, continent = UnitPosition("player")
+    local x, y, continent = playerPosition()
     if type(x) ~= "number" then
         return nil
     end

@@ -114,6 +114,29 @@ describe("the minimap pins", function()
         assertEqual(1, #pinFor(ns, C).points, "moved, not stacked with a second point")
     end)
 
+    it("follow the map position, which moves every frame, not UnitPosition, which steps", function()
+        local ns, env = refreshed()
+        local tick = ns.MinimapPins.ticker.scripts.OnUpdate
+        local scale = 140 / (466 + 2 / 3)
+        -- The map position has the player 10 yards north already; UnitPosition
+        -- has not caught up (probed 2026-09-29: it changes on 1 frame in 3-4).
+        local mapNorth = env.CreateVector2D((1154.0 - 2000) / (1000 - 2000), (-10593.8 + 10000) / (-11000 + 10000))
+        env.C_Map.GetPlayerMapPosition = function() return mapNorth end
+        tick(ns.MinimapPins.ticker, 0.016)
+        local _, _, _, x, y = pinFor(ns, C):GetPoint(1)
+        assertNear(-6 * scale, x)
+        assertNear(-16.2 * scale, y)
+    end)
+
+    it("fall back to UnitPosition where the game gives no map position", function()
+        local ns, env = refreshed()
+        env.C_Map.GetPlayerMapPosition = function() return nil end
+        env.__position = { -10593.8, 1154.0, 0, 0 }
+        ns.MinimapPins.ticker.scripts.OnUpdate(ns.MinimapPins.ticker, 0.016)
+        local _, _, _, _, y = pinFor(ns, C):GetPoint(1)
+        assertNear(-16.2 * 140 / (466 + 2 / 3), y)
+    end)
+
     it("hide a pin that has slipped past the rim between choices", function()
         local ns, env = refreshed()
         local tick = ns.MinimapPins.ticker.scripts.OnUpdate
