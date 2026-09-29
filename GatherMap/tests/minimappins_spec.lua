@@ -91,13 +91,37 @@ describe("the minimap pins", function()
         assertEqual("", entries(ns))
     end)
 
-    it("move five times a second, not every frame", function()
+    it("are chosen afresh five times a second, not every frame", function()
         local ns, env = helpers.loggedIn(helpers.withGathers)
         local tick = ns.MinimapPins.ticker.scripts.OnUpdate
         tick(ns.MinimapPins.ticker, 0.1)
         assertEqual("", entries(ns), "not yet")
         tick(ns.MinimapPins.ticker, 0.1)
         assertEqual("1731,3764,424242", entries(ns))
+    end)
+
+    it("follow the player every frame, between those choices", function()
+        local ns, env = refreshed()
+        local tick = ns.MinimapPins.ticker.scripts.OnUpdate
+        local scale = 140 / (466 + 2 / 3)
+        -- Ten yards north: the tin, 6.2 yards south of the player, is now
+        -- 16.2 yards south, a frame later, long before the next choice.
+        env.__position = { -10593.8, 1154.0, 0, 0 }
+        tick(ns.MinimapPins.ticker, 0.016)
+        local _, _, _, x, y = pinFor(ns, C):GetPoint(1)
+        assertNear(-6 * scale, x)
+        assertNear(-16.2 * scale, y)
+        assertEqual(1, #pinFor(ns, C).points, "moved, not stacked with a second point")
+    end)
+
+    it("hide a pin that has slipped past the rim between choices", function()
+        local ns, env = refreshed()
+        local tick = ns.MinimapPins.ticker.scripts.OnUpdate
+        -- 60 yards east: the unlisted ore 175 yards off is now past the rim.
+        env.__position = { -10603.8, 1094.0, 0, 0 }
+        tick(ns.MinimapPins.ticker, 0.016)
+        assertFalse(pinFor(ns, helpers.E):IsShown())
+        assertTrue(pinFor(ns, C):IsShown())
     end)
 
     it("draw one pin where several places share a spot", function()
