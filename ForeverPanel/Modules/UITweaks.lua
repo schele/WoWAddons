@@ -10,6 +10,7 @@ ns.AddDefaults({
         showStatusText = true,
         statusTextSize = 14,
         showSellPrice = true,
+        showQuestXP = true,
     },
 })
 
@@ -308,6 +309,126 @@ ns.RegisterSetting({
     section = "extras",
     name = "Show sell prices on quest rewards",
     tooltip = "Adds the vendor price to item tooltips that leave it out, such as quest rewards.",
+})
+
+--------------------------------------------------------------------------------
+-- XP on quests
+--------------------------------------------------------------------------------
+
+-- The quest window's pages that know what a quest gives: the button taking
+-- the quest, and the one across the bar from it. The client has the XP but
+-- never shows it, so it goes on the bar between the two, where it does not
+-- depend on how the client lays out the rewards above.
+local QUEST_PAGES = {
+    QUEST_DETAIL = { "QuestFrameAcceptButton", "QuestFrameDeclineButton" },
+    QUEST_COMPLETE = { "QuestFrameCompleteQuestButton", "QuestFrameCancelButton" },
+}
+
+local questXPLabels = {}
+-- The page on screen, so the setting can take effect on it at once.
+local openQuestPage
+
+--- What a quest gives, as "+1,234 XP (8.2% of level)", or nil for nothing.
+-- The share of a level is left out when there is no level to share.
+local function formatQuestXP(xp, xpMax)
+    xp = tonumber(xp) or 0
+    if xp <= 0 then
+        return nil
+    end
+
+    local group = BreakUpLargeNumbers or tostring
+    local text = "+" .. group(xp) .. " XP"
+
+    xpMax = tonumber(xpMax) or 0
+    if xpMax > 0 then
+        text = text .. string.format(" (%.1f%% of level)", xp / xpMax * 100)
+    end
+    return text
+end
+
+ns.FormatQuestXP = formatQuestXP
+
+--- The line beside a page's button, made the first time it has something to
+-- say. A child of the button, so it hides with the page.
+local function questXPLabel(page)
+    if questXPLabels[page] then
+        return questXPLabels[page]
+    end
+
+    local names = QUEST_PAGES[page]
+    local button, across = _G[names[1]], _G[names[2]]
+    if type(button) ~= "table" or not button.CreateFontString then
+        return nil
+    end
+
+    local label = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    label:SetPoint("LEFT", button, "RIGHT", 8, 0)
+    if type(across) == "table" then
+        label:SetPoint("RIGHT", across, "LEFT", -8, 0)
+        label:SetJustifyH("CENTER")
+    else
+        label:SetJustifyH("LEFT")
+    end
+    -- Cut short rather than wrapped onto the buttons, on a narrow window.
+    label:SetWordWrap(false)
+
+    questXPLabels[page] = label
+    return label
+end
+
+local function questXPText()
+    if not (ns.db and ns.db.ui.showQuestXP and GetRewardXP) then
+        return nil
+    end
+    if IsXPUserDisabled and IsXPUserDisabled() then
+        return nil
+    end
+    return formatQuestXP(GetRewardXP(), UnitXPMax and UnitXPMax("player"))
+end
+
+local function showQuestXP(page)
+    local text = questXPText()
+    local label = text and questXPLabel(page) or questXPLabels[page]
+    if not label then
+        return
+    end
+
+    label:SetText(text or "")
+    label:SetShown(text ~= nil)
+end
+
+local function applyQuestXP()
+    for page, label in pairs(questXPLabels) do
+        if page ~= openQuestPage then
+            label:Hide()
+        end
+    end
+    if openQuestPage then
+        showQuestXP(openQuestPage)
+    end
+end
+
+local questEvents = CreateFrame("Frame")
+questEvents:RegisterEvent("QUEST_DETAIL")
+questEvents:RegisterEvent("QUEST_COMPLETE")
+questEvents:RegisterEvent("QUEST_FINISHED")
+questEvents:SetScript("OnEvent", function(self, event)
+    if QUEST_PAGES[event] then
+        openQuestPage = event
+        showQuestXP(event)
+    else
+        openQuestPage = nil
+    end
+end)
+
+ns.RegisterSetting({
+    store = "ui",
+    key = "showQuestXP",
+    type = "checkbox",
+    section = "extras",
+    name = "Show the XP a quest gives",
+    tooltip = "Beside the Accept and Complete Quest buttons, with how much of a level it is.",
+    onChange = applyQuestXP,
 })
 
 --------------------------------------------------------------------------------

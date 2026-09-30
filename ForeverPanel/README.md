@@ -17,9 +17,11 @@ top-anchored Blizzard frames move down with it instead of being covered.
 Right-click anywhere on the bar for `Settings...` and `Reset module order`.
 
 The settings panel carries every option, including a switch per module to hide
-one without removing it, and three tweaks to Blizzard's own UI: hiding the
+one without removing it, and four tweaks to Blizzard's own UI: hiding the
 gryphons either side of the action bar, turning on the game's health and
-mana numbers on the unit frames, and showing the sell price on quest rewards.
+mana numbers on the unit frames, showing the sell price on quest rewards, and
+showing the XP a quest gives (`+1,234 XP (8.2% of level)`) beside the quest
+window's Accept and Complete Quest buttons.
 
 Modules are rearranged by dragging them along the bar. The bar reorders live
 while you hold one, so it is its own drag preview, and the layout is saved

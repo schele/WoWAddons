@@ -322,3 +322,147 @@ describe("sell prices beside the client's own", function()
         assertMatch("^Sell Price %(each%): 3|T", tooltip.added[1])
     end)
 end)
+
+describe("the XP a quest gives", function()
+    -- The quest window's buttons, as the client names them: the XP goes on
+    -- the bar between the one that takes the quest and the one across.
+    local function questWindow(env, rewardXP)
+        local buttons = {}
+        for _, name in ipairs({
+            "QuestFrameAcceptButton", "QuestFrameDeclineButton",
+            "QuestFrameCompleteQuestButton", "QuestFrameCancelButton",
+        }) do
+            buttons[name] = env.CreateFrame("Button", name)
+        end
+        env.GetRewardXP = function()
+            return rewardXP
+        end
+        return buttons
+    end
+
+    -- The line the XP is written on, beside a button, if it has one yet.
+    local function label(button)
+        return button.children[#button.children]
+    end
+
+    -- What that line says, or nil when it is not showing.
+    local function shownText(button)
+        local text = label(button)
+        return text and text:IsShown() and text:GetText() or nil
+    end
+
+    local function loggedInAt(xpMax)
+        local ns, env = helpers.loadAddon()
+        env.xp, env.xpMax = 500, xpMax
+        helpers.login(ns, env)
+        return ns, env
+    end
+
+    it("shows beside Accept when a quest is offered, the setting defaulting on", function()
+        local ns, env = loggedInAt(15000)
+        local buttons = questWindow(env, 1234)
+
+        helpers.fire(env, "QUEST_DETAIL")
+
+        assertEqual("+1,234 XP (8.2% of level)", shownText(buttons.QuestFrameAcceptButton))
+    end)
+
+    it("fills the gap between the two buttons", function()
+        local ns, env = loggedInAt(15000)
+        local buttons = questWindow(env, 1234)
+
+        helpers.fire(env, "QUEST_DETAIL")
+
+        local text = label(buttons.QuestFrameAcceptButton)
+        local _, leftOf = text:GetPoint(1)
+        local _, rightOf = text:GetPoint(2)
+        assertEqual(buttons.QuestFrameAcceptButton, leftOf)
+        assertEqual(buttons.QuestFrameDeclineButton, rightOf)
+    end)
+
+    it("shows beside Complete Quest when one is handed in", function()
+        local ns, env = loggedInAt(15000)
+        local buttons = questWindow(env, 1234)
+
+        helpers.fire(env, "QUEST_COMPLETE")
+
+        assertEqual("+1,234 XP (8.2% of level)", shownText(buttons.QuestFrameCompleteQuestButton))
+    end)
+
+    it("clears what the last quest gave when the next gives nothing", function()
+        local ns, env = loggedInAt(15000)
+        local buttons = questWindow(env, 1234)
+        helpers.fire(env, "QUEST_COMPLETE")
+
+        env.GetRewardXP = function() return 0 end
+        helpers.fire(env, "QUEST_COMPLETE")
+
+        assertNil(shownText(buttons.QuestFrameCompleteQuestButton))
+    end)
+
+    it("says nothing for a quest that gives no XP, as at max level", function()
+        local ns, env = loggedInAt(0)
+        local buttons = questWindow(env, 0)
+
+        helpers.fire(env, "QUEST_COMPLETE")
+
+        assertNil(shownText(buttons.QuestFrameCompleteQuestButton))
+    end)
+
+    it("says nothing with XP gain turned off", function()
+        local ns, env = loggedInAt(15000)
+        local buttons = questWindow(env, 1234)
+        env.xpDisabled = true
+
+        helpers.fire(env, "QUEST_DETAIL")
+
+        assertNil(shownText(buttons.QuestFrameAcceptButton))
+    end)
+
+    it("stops when turned off, and comes back when turned on", function()
+        local ns, env = loggedInAt(15000)
+        local buttons = questWindow(env, 1234)
+        helpers.fire(env, "QUEST_DETAIL")
+        local accept = buttons.QuestFrameAcceptButton
+
+        ns.SetSettingValue(settingFor(ns, "ui", "showQuestXP"), false)
+        assertNil(shownText(accept), "hidden at once")
+        helpers.fire(env, "QUEST_DETAIL")
+        assertNil(shownText(accept), "and on the next quest")
+
+        ns.SetSettingValue(settingFor(ns, "ui", "showQuestXP"), true)
+        assertEqual("+1,234 XP (8.2% of level)", shownText(accept), "back on the quest still open")
+    end)
+
+    it("does not bring back a closed quest's XP when turned on", function()
+        local ns, env = loggedInAt(15000)
+        local buttons = questWindow(env, 1234)
+        ns.SetSettingValue(settingFor(ns, "ui", "showQuestXP"), false)
+        helpers.fire(env, "QUEST_DETAIL")
+        helpers.fire(env, "QUEST_FINISHED")
+
+        ns.SetSettingValue(settingFor(ns, "ui", "showQuestXP"), true)
+
+        assertNil(shownText(buttons.QuestFrameAcceptButton))
+    end)
+
+    it("does nothing, and does not fail, on a client without the XP or the buttons", function()
+        local ns, env = loggedInAt(15000)
+        helpers.fire(env, "QUEST_DETAIL")
+
+        local buttons = questWindow(env, 1234)
+        env.GetRewardXP = nil
+        helpers.fire(env, "QUEST_COMPLETE")
+
+        assertNil(shownText(buttons.QuestFrameCompleteQuestButton))
+    end)
+
+    it("leaves out the share of a level when there is no level to share", function()
+        local ns = helpers.loadAddon()
+
+        assertEqual("+1,234 XP", ns.FormatQuestXP(1234, 0))
+        assertEqual("+250 XP (25.0% of level)", ns.FormatQuestXP(250, 1000))
+        assertNil(ns.FormatQuestXP(0, 1000))
+        assertNil(ns.FormatQuestXP(nil, 1000))
+    end)
+end)

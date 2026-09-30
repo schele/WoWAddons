@@ -203,6 +203,7 @@ local function makeWidget(kind, parent)
     end
 
     function widget:SetJustifyH() end
+    function widget:SetWordWrap() end
     function widget:SetColorTexture(r, g, b, a)
         self.colorTexture = { r, g, b, a }
         self.gradient = nil
