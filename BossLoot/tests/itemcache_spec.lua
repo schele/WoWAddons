@@ -51,6 +51,13 @@ describe("an item loaded in an earlier session", function()
         assertEqual("|Hitem:11684|h[Ironfoe]|h", env.__modifiedClicks[1])
     end)
 
+    it("is not dimmed in the classic list: the game has described it", function()
+        local ns, env = session(savedWithIronfoe())
+        local r = row(ns, env)
+        ns.LootRow.Render(r, { id = 11684, chance = 1, classic = true })
+        assertEqual(1, r.alpha)
+    end)
+
     it("is found by a search on its name", function()
         local saved = savedWithIronfoe()
         local ns, env = helpers.loadAddon(nil, function(env) env.BossLootDB = saved end)

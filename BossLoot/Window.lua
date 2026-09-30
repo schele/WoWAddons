@@ -58,7 +58,7 @@ local EMPTY_TEXT = "Nothing but world drops and quest items."
 
 -- Above the vanilla list, once recordings come first.
 local CLASSIC_HEADING = "Classic loot"
-local CLASSIC_NOTE = "Not seen on WoW Forever yet"
+local CLASSIC_NOTE = "Not seen here yet"
 
 -- What the boss column calls the two notable lists.
 local NOTABLE_NAMES = { trash = "From trash", objects = "Chests & objects" }
@@ -244,7 +244,8 @@ end
 
 --- A boss's or notable list's loot: what was recorded, most seen first, with
 -- how often; then, under a heading on a line of its own in a grid of
--- `perLine` columns, the vanilla list, dimmed, less what was recorded.
+-- `perLine` columns, the vanilla list less what was recorded. Its rows are
+-- marked `classic`; LootRow dims those the game has never described.
 function Window.LootEntries(instance, selection, perLine)
     perLine = perLine or 2
     local entries = {}

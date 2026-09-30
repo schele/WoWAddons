@@ -38,7 +38,11 @@ WoW Forever reworked dungeon loot, so BossLoot records what really drops as
 you play: each boss's and mob's loot (with how many kills), chests, quest
 rewards, merchant goods and what your professions make. A boss's recorded
 drops come first, with how often they were seen (`3/5` is three drops in five
-kills), and the vanilla list follows, dimmed, under "Classic loot". Instances
+kills), and the vanilla list follows under "Classic loot": what has not been
+seen dropping there yet. Only the items the game has never described are
+dimmed, since WoW Forever may not have them at all. The recorder sees the
+loot windows you open, so an item won on a roll from a corpse someone else
+opened is not counted. Instances
 BossLoot does not know are listed once recorded, with the bosses the game
 named. `/bl probe` checks the client has what the recorder needs; `/bl
 recorded` counts what you have recorded. To bake recordings into a release,

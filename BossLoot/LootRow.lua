@@ -12,7 +12,7 @@ LootRow.HEIGHT = 30
 
 local ICON_SIZE = 26
 local CHANCE_WIDTH = 48
-local CLASSIC_ALPHA = 0.45 -- a vanilla row, not seen on WoW Forever yet
+local CLASSIC_ALPHA = 0.45 -- a vanilla row the game has never described
 local UNKNOWN_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 -- What the client itself knows about an item, or nil if it has not loaded it.
@@ -376,7 +376,10 @@ end
 
 function LootRow.Render(row, entry)
     row.entry = entry
-    row:SetAlpha(entry.classic and CLASSIC_ALPHA or 1)
+    -- A vanilla row is dimmed only while the server has never described its
+    -- item: WoW Forever says "no such item" for the ones it does not have.
+    -- One it has described is on WoW Forever, just not seen dropping here.
+    row:SetAlpha(entry.classic and not fromServer(entry.id) and CLASSIC_ALPHA or 1)
     if entry.heading or entry.blank then
         row.link = nil
         row.icon:Hide()
