@@ -270,3 +270,46 @@ describe("the older client's calls", function()
         assertMatch("Sold 1 item for 15c%.", helpers.printed(env))
     end)
 end)
+
+describe("a server that answers a sale late", function()
+    it("still counts the sale once the answer comes", function()
+        local _, env = ready()
+        env.__slowSales = true
+        helpers.put(env, 0, 1, 3300)
+        helpers.put(env, 0, 2, 7073)
+
+        helpers.openMerchant(env)
+        env.__runAllTimers()
+
+        assertNil(env.__slots["0:1"])
+        assertNil(env.__slots["0:2"])
+        assertMatch("Sold 2 items for 21c%.", helpers.printed(env))
+    end)
+
+    it("repairs with the gold of a sale answered late", function()
+        local _, env = ready()
+        env.__slowSales = true
+        helpers.put(env, 1, 1, 1411) -- 1g 23s 45c
+        env.__money, env.__repairCost = 0, 10000
+
+        helpers.openMerchant(env)
+        env.__runAllTimers()
+
+        assertEqual(1, env.__repairs)
+        assertMatch("Sold 1 item for 1g 23s 45c%. Repaired for 1g%.", helpers.printed(env))
+    end)
+
+    it("gives up on a sale the server never answers, and sells the rest", function()
+        local _, env = ready()
+        env.__slowSales = true
+        env.__lostSales[3300] = true
+        helpers.put(env, 0, 1, 3300)
+        helpers.put(env, 0, 2, 7073)
+
+        helpers.openMerchant(env)
+        env.__runAllTimers()
+
+        assertEqual(2, #env.__sales)
+        assertMatch("Sold 1 item for 6c%.", helpers.printed(env))
+    end)
+end)

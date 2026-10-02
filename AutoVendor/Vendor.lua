@@ -10,6 +10,10 @@ ns.Vendor = Vendor
 -- busy") and leaves greys behind.
 Vendor.PAUSE = 0.2
 
+-- A sale is only asked for; the slot empties when the server answers. It may
+-- wait this many pauses (about a second) before it is given up uncounted.
+Vendor.MAX_WAITS = 5
+
 -- The visit under way, or nil. Each step is handed the visit it belongs to,
 -- so one queued before a close does nothing in the visit after it.
 local visit
@@ -28,14 +32,28 @@ local function tried(entry)
     return entry.bag .. ":" .. entry.slot .. ":" .. entry.itemID
 end
 
---- Count the last sale if its slot no longer holds the item.
+--- Settle the sale in flight: count it once its slot has emptied, drop it
+-- if the merchant handed it back or the server never answered. False while
+-- it is still on its way, so nothing new is sold and the repair waits for
+-- its gold.
 local function settle(current)
     local last = current.pending
+    if not last then
+        return true
+    end
+
+    local state = ns.Bags.SlotState(last.bag, last.slot, last.itemID)
+    if state == "busy" and last.waits < Vendor.MAX_WAITS then
+        last.waits = last.waits + 1
+        return false
+    end
+
     current.pending = nil
-    if last and ns.Bags.ItemAt(last.bag, last.slot) ~= last.itemID then
+    if state == "gone" then
         current.items = current.items + last.count
         current.copper = current.copper + last.price * last.count
     end
+    return true
 end
 
 local function nextJunk(current)
@@ -104,7 +122,17 @@ local function step(current)
         return
     end
 
-    settle(current)
+    local function again()
+        C_Timer.After(Vendor.PAUSE, function()
+            step(current)
+        end)
+    end
+
+    if not settle(current) then
+        again()
+        return
+    end
+
     local entry = nextJunk(current)
     if not entry then
         finish(current, true)
@@ -112,11 +140,10 @@ local function step(current)
     end
 
     current.tried[tried(entry)] = true
+    entry.waits = 0
     current.pending = entry
     sell(entry.bag, entry.slot)
-    C_Timer.After(Vendor.PAUSE, function()
-        step(current)
-    end)
+    again()
 end
 
 function Vendor.Open()

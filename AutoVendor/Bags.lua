@@ -96,11 +96,20 @@ function Bags.Junk(keep)
     return junk
 end
 
---- The item ID in a slot, or nil when it is empty: how a sale is seen to
--- have gone through.
-function Bags.ItemAt(bag, slot)
+--- Where a sale of `itemID` from a slot stands: "gone" once the slot no
+-- longer holds it, "busy" while it is locked on its way to the merchant,
+-- "there" when it is back in hand because the merchant refused it. The
+-- comparison happens inside the guard, and a slot that will not answer
+-- reads "there", so a sale is never counted on a guess.
+function Bags.SlotState(bag, slot, itemID)
     return ns.Guarded(function()
         local item = slotItem(bag, slot)
-        return item and item.itemID or nil
-    end, nil)
+        if not item or item.itemID ~= itemID then
+            return "gone"
+        end
+        if item.locked then
+            return "busy"
+        end
+        return "there"
+    end, "there")
 end

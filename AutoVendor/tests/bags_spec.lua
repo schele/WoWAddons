@@ -80,18 +80,39 @@ describe("a slot the client will not read", function()
     end)
 end)
 
-describe("what a slot holds", function()
-    it("is its item's ID", function()
+describe("where a sale stands", function()
+    it("is gone once the slot is empty", function()
+        local ns = helpers.loadAddon()
+
+        assertEqual("gone", ns.Bags.SlotState(1, 2, 3300))
+    end)
+
+    it("is gone once the slot holds something else", function()
+        local ns, env = helpers.loadAddon()
+        helpers.put(env, 1, 2, 7073)
+
+        assertEqual("gone", ns.Bags.SlotState(1, 2, 3300))
+    end)
+
+    it("is busy while the item is locked on its way", function()
+        local ns, env = helpers.loadAddon()
+        helpers.put(env, 1, 2, 3300, 1, true)
+
+        assertEqual("busy", ns.Bags.SlotState(1, 2, 3300))
+    end)
+
+    it("is there when the item is back in hand", function()
         local ns, env = helpers.loadAddon()
         helpers.put(env, 1, 2, 3300)
 
-        assertEqual(3300, ns.Bags.ItemAt(1, 2))
+        assertEqual("there", ns.Bags.SlotState(1, 2, 3300))
     end)
 
-    it("is nil when it is empty", function()
-        local ns = helpers.loadAddon()
+    it("is there when the slot will not answer, so nothing is counted on a guess", function()
+        local ns, env = helpers.loadAddon()
+        env.__raisingSlots["1:2"] = true
 
-        assertNil(ns.Bags.ItemAt(1, 2))
+        assertEqual("there", ns.Bags.SlotState(1, 2, 3300))
     end)
 end)
 

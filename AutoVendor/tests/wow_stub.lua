@@ -63,10 +63,13 @@ function stub.newEnv(saved)
         end,
     }
     --- One round: the timers queued so far, not the ones they queue.
+    -- The server's answers to sales made before this round land after its
+    -- timers have run, so a step always looks before the answer arrives.
     function env.__runTimers()
-        local pending = env.__timers
-        env.__timers = {}
+        local pending, replies = env.__timers, env.__replies
+        env.__timers, env.__replies = {}, {}
         for _, fn in ipairs(pending) do fn() end
+        for _, fn in ipairs(replies) do fn() end
     end
     --- Every round until nothing is queued.
     function env.__runAllTimers()
@@ -108,6 +111,11 @@ function stub.newEnv(saved)
     env.__repairs = 0
     -- Items the merchant will not take, without saying so.
     env.__refused = {}
+    -- A server that answers sales late (see UseContainerItem), and sales it
+    -- never answers at all, whose slots stay locked.
+    env.__slowSales = false
+    env.__lostSales = {}
+    env.__replies = {}
     env.__sales = {}
     env.__log = {}
 
@@ -144,6 +152,18 @@ function stub.newEnv(saved)
             table.insert(env.__log, "sell " .. key)
             local held = env.__slots[key]
             if not (env.__merchantOpen and held) or env.__refused[held.itemID] then
+                return
+            end
+            if env.__slowSales then
+                -- The slot locks at once; the sale lands when the server
+                -- answers, at the end of the next round of timers.
+                held.locked = true
+                if env.__lostSales[held.itemID] then return end
+                local price = env.__items[held.itemID].price * held.count
+                table.insert(env.__replies, function()
+                    env.__money = env.__money + price
+                    env.__slots[key] = nil
+                end)
                 return
             end
             env.__money = env.__money + env.__items[held.itemID].price * held.count

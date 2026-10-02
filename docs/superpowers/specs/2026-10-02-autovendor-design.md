@@ -41,8 +41,11 @@ White items, trade goods and everything better are never sold.
 - Each step reads the bags afresh and sells the first junk slot it has not
   already tried, so loot arriving mid-visit is picked up and nothing is tried
   twice.
-- A sale counts only once its slot no longer holds that item, checked at the
-  next step. The line reports what left the bags, not what was asked for.
+- A sale is only asked for: the slot empties when the server answers. The
+  next item waits until it has (up to about a second, five pauses), and a sale
+  counts only once its slot no longer holds the item. One the merchant hands
+  back, or the server never answers, is dropped uncounted. The line reports
+  what left the bags, and the repair waits for the junk's gold.
 - **Closing the merchant stops it.** The line then reports what had sold, and
   no repair happens (there is no merchant to repair at).
 - The merchant opening again starts a new visit. A second open signal during
@@ -130,6 +133,8 @@ tab. After the build, at a merchant on Forever:
 3. Repair goes through, and "not enough gold" shows when it should.
 4. For the record: whether the merchant window has its own "Sell All Junk"
    button.
+5. Gold before and after a visit matches the line.
+6. Going from one merchant straight to another still sells at the second.
 
 The answers go into this section.
 
