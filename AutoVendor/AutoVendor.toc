@@ -6,3 +6,4 @@
 ## SavedVariables: AutoVendorDB
 
 AutoVendor.lua
+Bags.lua
