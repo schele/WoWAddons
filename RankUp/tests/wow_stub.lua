@@ -206,6 +206,12 @@ function stub.newEnv()
 
     env.__cursor = nil
     function env.ClearCursor() env.__cursor = nil end
+    -- What is on the cursor: a spell's kind, its book index and book type
+    -- (unused here), then its ID, as the client gives them.
+    function env.GetCursorInfo()
+        local held = env.__cursor
+        if held then return held.kind, nil, nil, held.id end
+    end
 
     -- Placing swaps the cursor and the slot, as a drag does; refused in
     -- combat, as the client refuses it.

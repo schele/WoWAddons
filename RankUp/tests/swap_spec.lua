@@ -119,3 +119,17 @@ describe("upgrading on the older client", function()
         assertEqual(5189, holds(env, 3))
     end)
 end)
+
+describe("a rank the client will not pick up", function()
+    it("leaves the button as it was, and names it", function()
+        local ns, env = helpers.loadAddon()
+        env.C_Spell.PickupSpell = function() end
+        helpers.place(env, 3, 5188)
+
+        ns.Swap.Run()
+
+        assertEqual(5188, holds(env, 3))
+        assertMatch("could not upgrade Healing Touch on action slot 3", helpers.printed(env))
+        assertFalse(helpers.printed(env):find("Rank 5", 1, true), "reported as upgraded")
+    end)
+end)

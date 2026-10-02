@@ -15,28 +15,34 @@ local function pickup(spellID)
     end
 end
 
-local function slotSet(groups)
-    local set = {}
-    for _, group in ipairs(groups) do
-        for _, slot in ipairs(group.slots) do
-            set[slot] = true
-        end
-    end
-    return set
+--- Whether the cursor holds `spellID`. Placing with nothing on it would
+-- empty the button and throw the old rank away. A client that names no
+-- spell ID for the cursor is taken at its word that it holds a spell.
+local function holding(spellID)
+    return ns.Guarded(function()
+        local kind, _, _, id = GetCursorInfo()
+        return kind == "spell" and (type(id) ~= "number" or id == spellID)
+    end, false)
 end
 
---- Say what changed, spell by spell. A slot still outdated afterwards is
--- named rather than counted: a placing the client ignored is not done.
-local function report(before, after)
-    local left = slotSet(after)
+local function slotHolds(slot, spellID)
+    return ns.Guarded(function()
+        local kind, id = GetActionInfo(slot)
+        return kind == "spell" and id == spellID
+    end, false)
+end
 
-    for _, group in ipairs(before) do
+--- Say what changed, spell by spell. Only a slot that now holds the new
+-- rank counts as done; any other is named, since a placing the client
+-- ignored, or one that left the slot empty, is not an upgrade.
+local function report(groups)
+    for _, group in ipairs(groups) do
         local done = 0
         for _, slot in ipairs(group.slots) do
-            if left[slot] then
-                ns.Print(string.format("could not upgrade %s on action slot %d", group.name, slot))
-            else
+            if slotHolds(slot, group.toID) then
                 done = done + 1
+            else
+                ns.Print(string.format("could not upgrade %s on action slot %d", group.name, slot))
             end
         end
 
@@ -64,12 +70,14 @@ function Swap.Run()
             end
             ClearCursor()
             pickup(group.toID)
-            PlaceAction(slot)
+            if holding(group.toID) then
+                PlaceAction(slot)
+            end
             -- Placing hands back the old rank on the cursor; this drops it.
             ClearCursor()
         end
     end
 
-    report(groups, ns.Ranks.Outdated())
+    report(groups)
     return true
 end
