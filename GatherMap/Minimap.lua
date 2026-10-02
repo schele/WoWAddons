@@ -145,11 +145,20 @@ ns.OnLogin(function()
     end
 end)
 
-ns.RegisterCommand("minimap", "Hide or show the minimap button", function()
-    ns.settings.button.hide = not ns.settings.button.hide
+--- Hide the button, or show it again; remembered. The settings page is told,
+-- so its checkbox follows a change made by command.
+function MinimapButton.SetHidden(hide)
+    ns.settings.button.hide = hide and true or false
     if button then
         button:SetShown(not ns.settings.button.hide)
     end
+    if ns.SettingsPanel then
+        ns.SettingsPanel.Refresh()
+    end
+end
+
+ns.RegisterCommand("minimap", "Hide or show the minimap button", function()
+    MinimapButton.SetHidden(not ns.settings.button.hide)
     if ns.settings.button.hide then
         ns.Print("Minimap button hidden. /gmap minimap brings it back.")
     else

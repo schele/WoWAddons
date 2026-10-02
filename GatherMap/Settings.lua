@@ -183,6 +183,7 @@ function Panel.Refresh()
         return
     end
     Panel.enabled:SetChecked(ns.settings.enabled)
+    Panel.minimap:SetChecked(not ns.settings.button.hide)
     for _, pair in ipairs(pairs_) do
         for where, check in pairs(pair.buttons) do
             check:SetChecked(pair.get(where))
@@ -264,6 +265,16 @@ local function ensureBuilt()
     addFilter("hideGrey", "Hide grey nodes (no skill-ups left)")
     addSize("worldmap", "World map pin size", 8, 24)
     addSize("minimap", "Minimap pin size", 6, 20)
+
+    -- Stored as "hide", shown as "Show": the box is ticked while it shows.
+    local minimap = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
+    place(minimap, PADDING)
+    minimap:SetScript("OnClick", function(self)
+        ns.MinimapButton.SetHidden(not self:GetChecked())
+    end)
+    Panel.minimap = minimap
+    Panel.minimapLabel = text("Show the minimap button", PADDING + COLUMN, -5)
+    table.insert(rows, { height = ROW_HEIGHT + 6, frames = { minimap, Panel.minimapLabel } })
 
     Panel.Refresh()
     layout()
