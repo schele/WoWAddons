@@ -1,6 +1,7 @@
 -- A minimal stand-in for the WoW API, enough to load LFGBoard outside the
 -- game: frames, timers, chat, the player, talents, the group finder,
--- sounds and links. It records what was done so tests can assert on it.
+-- sounds, links and the options window. It records what was done so tests
+-- can assert on it.
 
 local stub = {}
 
@@ -132,6 +133,27 @@ function stub.newEnv(saved)
     env.Minimap.width = 140
     env.GameTooltip = makeWidget(env, "GameTooltip", env.UIParent)
 
+    -- The game's options window and the game menu, both closed to begin with.
+    env.SettingsPanel = makeWidget(env, "Frame", env.UIParent)
+    env.SettingsPanel.shown = false
+    env.GameMenuFrame = makeWidget(env, "Frame", env.UIParent)
+    env.GameMenuFrame.shown = false
+    function env.HideUIPanel(frame)
+        if frame and frame.Hide then frame:Hide() end
+    end
+    env.Settings = {
+        RegisterCanvasLayoutCategory = function(frame, name)
+            return { name = name, frame = frame, GetID = function() return "category-id" end }
+        end,
+        RegisterAddOnCategory = function(category) env.__settingsCategory = category end,
+        OpenToCategory = function(id) env.__openedCategory = id end,
+    }
+    env.C_AddOns = {
+        GetAddOnMetadata = function(_, field)
+            return field == "Version" and "9.9.9" or nil
+        end,
+    }
+
     function env.print(...)
         local pieces = {}
         for index = 1, select("#", ...) do
@@ -181,6 +203,12 @@ function stub.newEnv(saved)
         if unit == "player" then return env.__player.class, env.__player.classFile end
     end
     function env.IsInGroup() return env.__inGroup end
+
+    -- Quests the player has handed in, by ID.
+    env.__completedQuests = {}
+    env.C_QuestLog = {
+        IsQuestFlaggedCompleted = function(id) return env.__completedQuests[id] == true end,
+    }
 
     -- Talent trees with each talent's rank. A tab's info puts an ID before
     -- the name, as newer clients do; __talentNameFirst gives the name first.

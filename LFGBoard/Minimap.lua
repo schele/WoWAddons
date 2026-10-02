@@ -1,7 +1,7 @@
 local addonName, ns = ...
 
--- A round button on the minimap's rim: click to open the board, drag to
--- slide it round the rim. Built as BankBags' is.
+-- A round button on the minimap's rim: click to open the board, right-click
+-- for the settings, drag to slide it round the rim. Built as BankBags' is.
 
 local MinimapButton = {}
 ns.MinimapButton = MinimapButton
@@ -61,8 +61,19 @@ local function showTooltip(self)
     end
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:SetText("LFG Board")
-    GameTooltip:AddLine("Click to open the board, drag to move.", 1, 1, 1)
+    GameTooltip:AddLine("Click to open the board.", 1, 1, 1)
+    GameTooltip:AddLine("Right-click for the settings, drag to move.", 1, 1, 1)
     GameTooltip:Show()
+end
+
+-- Left for the board, the thing the button is for; right for the settings,
+-- as GatherMap's.
+local function onClick(_, mouseButton)
+    if mouseButton == "RightButton" then
+        ns.ToggleSettings()
+        return
+    end
+    ns.Window.Toggle()
 end
 
 local function create()
@@ -70,7 +81,7 @@ local function create()
     button:SetSize(SIZE, SIZE)
     button:SetFrameStrata("MEDIUM")
     button:SetFrameLevel(8)
-    button:RegisterForClicks("LeftButtonUp")
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
     button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
@@ -92,9 +103,7 @@ local function create()
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
     border:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
 
-    button:SetScript("OnClick", function()
-        ns.Window.Toggle()
-    end)
+    button:SetScript("OnClick", onClick)
     button:SetScript("OnDragStart", function(self)
         self:SetScript("OnUpdate", followCursor)
     end)
@@ -122,8 +131,8 @@ ns.OnLogin(function()
     end
 end)
 
---- Hide the button, or show it again; remembered. The board is told, so its
--- switch follows a change made by command.
+--- Hide the button, or show it again; remembered. The board and the settings
+-- page are told, so their switches follow a change made by command.
 function MinimapButton.SetHidden(hide)
     ns.db.minimap.hide = hide and true or false
     if button then

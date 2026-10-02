@@ -16,3 +16,4 @@ Alerts.lua
 Chat.lua
 Window.lua
 Minimap.lua
+Settings.lua

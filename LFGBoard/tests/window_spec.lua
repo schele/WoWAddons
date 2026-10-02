@@ -261,12 +261,12 @@ describe("the party column", function()
 end)
 
 describe("the minimap switch", function()
-    it("sits in the row of switches, after Alerts, labelled 'Minimap button'", function()
+    it("sits last in the row of switches, labelled 'Minimap button'", function()
         local _, _, frame = opened()
 
         assertEqual("Minimap button", frame.minimap.label:GetText())
         local _, _, _, x, y = frame.minimap:GetPoint()
-        assertEqual(500, x)
+        assertEqual(562, x)
         assertEqual(-64, y)
     end)
 
@@ -304,5 +304,100 @@ describe("the minimap switch", function()
 
         helpers.command(env, "minimap")
         assertTrue(frame.minimap:GetChecked(), "ticked after showing by command")
+    end)
+end)
+
+describe("the completed quests switch", function()
+    local DEFIAS = "LF2M |cffffff00|Hquest:155:18|h[The Defias Brotherhood]|h|r"
+
+    it("sits in the row of switches after Alerts, labelled 'Hide done quests', ticked to begin with", function()
+        local ns, _, frame = opened()
+
+        assertEqual("Hide done quests", frame.completed.label:GetText())
+        local _, _, _, x, y = frame.completed:GetPoint()
+        assertEqual(426, x)
+        assertEqual(-64, y)
+        assertTrue(frame.completed:GetChecked())
+        assertTrue(ns.db.hideCompleted)
+    end)
+
+    it("shows a group for a completed quest when unticked, and remembers", function()
+        local ns, env, frame = opened()
+        env.__completedQuests[155] = true
+        helpers.say(env, "Brakk", DEFIAS)
+        assertFalse(frame.rows[1]:IsShown())
+
+        frame.completed:Click()
+
+        assertTrue(frame.rows[1]:IsShown())
+        assertFalse(ns.db.hideCompleted)
+    end)
+
+    it("leaves room for each switch's label before the next, and all before Refresh", function()
+        local _, _, frame = opened()
+        -- Wider than the small font draws: six pixels a letter, the box 24.
+        local switches = { frame.roles.tank, frame.roles.healer, frame.roles.dps,
+            frame.near, frame.alerts, frame.completed, frame.minimap }
+        local refreshX = select(4, frame.refresh:GetPoint())
+        for index, box in ipairs(switches) do
+            local x = select(4, box:GetPoint())
+            local ends = x + 24 + #box.label:GetText() * 6
+            local nextX = switches[index + 1] and select(4, switches[index + 1]:GetPoint()) or refreshX
+            assertTrue(ends < nextX, box.label:GetText() .. " runs into what follows it")
+        end
+    end)
+end)
+
+describe("the classes on a row", function()
+    local function view(ns, text)
+        return ns.Posts.View(ns.Posts.AddChat({ name = "X", text = text, time = 1000 }))
+    end
+
+    it("are carried from what was said to the row", function()
+        local ns = helpers.loggedIn()
+        local got = view(ns, "LF1M DM need mage no hunters")
+        assertTrue(got.wantClasses.MAGE)
+        assertTrue(got.refuseClasses.HUNTER)
+    end)
+
+    it("name the classes asked for in their colours, and the ones turned away dimmed after no", function()
+        local ns = helpers.loggedIn()
+        assertEqual("|cff69ccf0Mage|r |cff808080no Hunter|r", ns.Window.Classes(view(ns, "LF1M DM need mage no hunters")))
+        assertEqual("|cffffffffPriest|r |cffff7d0aDruid|r",
+            ns.Window.Classes(view(ns, "LF1M DM need healer, priest or druid")))
+        assertEqual("", ns.Window.Classes(view(ns, "LF1M DM need tank")))
+    end)
+
+    it("go on a line of their own under the count and roles", function()
+        local _, env, frame = opened()
+        helpers.say(env, "Garrok", "LF1M DM need mage no hunters")
+
+        local row = frame.rows[1]
+        assertEqual("4/5", row.party:GetText())
+        assertTrue(row.classes:IsShown())
+        assertMatch("Mage", row.classes:GetText())
+        assertEqual(5, select(5, row.party:GetPoint()), "the count moved up to make room")
+        assertEqual(-7, select(5, row.classes:GetPoint()))
+    end)
+
+    it("leave the count where it was when none are named", function()
+        local _, env, frame = opened()
+        helpers.say(env, "Garrok", "LF1M DM need heals")
+
+        local row = frame.rows[1]
+        assertEqual("4/5, needs H", row.party:GetText())
+        assertFalse(row.classes:IsShown())
+        assertEqual(0, select(5, row.party:GetPoint()))
+    end)
+
+    it("sit beside a listed group's squares, as its count does", function()
+        local _, env, frame = opened()
+        helpers.list(env, 1, "Garrok", 10, GARROK_PARTY)
+        helpers.searched(env)
+        helpers.say(env, "Garrok", "LF2M DM need mage")
+
+        local row = frame.rows[1]
+        assertEqual(select(4, row.party:GetPoint()), select(4, row.classes:GetPoint()))
+        assertEqual(row.party.width, row.classes.width)
     end)
 end)

@@ -95,10 +95,21 @@ function ns.Roles()
     return roles
 end
 
---- Something on the board changed: redraw it, if there is one.
+--- Switch one of this character's roles ("tank", "healer", "dps") on or off.
+-- The board and the settings page both write through here.
+function ns.SetRole(role, on)
+    ns.Roles()[role] = on and true or false
+    ns.Changed()
+end
+
+--- Something on the board changed: redraw it, and the settings page, so
+-- each shows a switch flipped on the other.
 function ns.Changed()
     if ns.Window and ns.Window.Refresh then
         ns.Window.Refresh()
+    end
+    if ns.SettingsPanel then
+        ns.SettingsPanel.Refresh()
     end
 end
 

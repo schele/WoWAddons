@@ -2,7 +2,9 @@
 
 The groups that want you, on one board: recruiting posts from chat and the
 listings in the game's group finder, filtered to the roles you play and the
-dungeons near your level. Open it with the minimap button or `/lfgb`.
+dungeons near your level. Open it with the minimap button or `/lfgb`;
+right-click the button, or `/lfgb settings`, for its page in the game's
+options.
 
 ```
  When  Who            For              Said                     Party
@@ -27,6 +29,14 @@ A row drops off ten minutes after it was last seen, at once when its poster
 says `full`, `filled`, `nvm` or `no longer`, and at once when a listed group
 fills or delists.
 
+From what a chat post says, the Party column gives how many are in the
+group (`LF1M` or `need 1 more` for a dungeon or quest is 4/5; a written
+`3/5` or `35/40` is taken as it is; a raid's `LF2M` gives no count), the
+roles it asks for, and under them the classes it asks for (`LF hunter`,
+`need a priest`) in their colours and the ones it turns away (`no hunters`,
+`rogue full`) dimmed after "no". Nothing in a link counts, and where a post
+is not clear the board says nothing rather than guess.
+
 ## Filters
 
 - **Tabs:** All, Dungeons, Quests, Raids, each with a count. Posts for
@@ -38,16 +48,24 @@ fills or delists.
   off is hidden; one that does not say stays.
 - **Near my level:** hides dungeons and raids more than 3 levels outside
   their range.
+- **Hide done quests:** hides a quest group whose linked quests you have
+  all handed in. A quest named only in words cannot be checked, so it stays.
+  On to begin with.
+
+The same switches, and the minimap button's, are on LFGBoard's page in the
+game's options (Options, AddOns).
 
 A green edge marks a group that asks for one of your roles.
 
 ## Alerts
 
 When someone posts in chat for a dungeon, raid or quest near your level and
-asks for one of your roles, you hear a sound and get one chat line with a
-**[Whisper]** link. Once per person and dungeon, never while you are in a
-group, never for a post the board cannot place ("Other"), and off with the
-board's Alerts switch. A Refresh never alerts: you are already looking.
+asks for one of your roles or your class, you hear a sound and get one chat
+line with a **[Whisper]** link. Once per person and dungeon, never while you
+are in a group, never for a post the board cannot place ("Other") or one it
+hides as a done quest, never for a group that says it is full (`5/5`), turns
+your class away, or asks only for other classes, and off with the board's
+Alerts switch. A Refresh never alerts: you are already looking.
 
 ## Whisper
 
@@ -65,6 +83,7 @@ group wants.
 |---|---|
 | `/lfgb` | Open or close the board |
 | `/lfgb minimap` | Hide or show the minimap button |
+| `/lfgb settings` | Open the settings page |
 | `/lfgb finder` | Print what the group finder gives, to check it is being read |
 | `/lfgb help` | The commands |
 

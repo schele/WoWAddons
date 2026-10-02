@@ -53,6 +53,9 @@ function Posts.AddChat(message)
         activity = parsed.activity,
         roles = parsed.roles,
         size = parsed.size,
+        quests = parsed.quests,
+        wantClasses = parsed.wantClasses,
+        refuseClasses = parsed.refuseClasses,
         text = message.text,
         time = message.time,
     }
@@ -172,6 +175,11 @@ function Posts.View(row)
         text = chat and chat.text or finder.comment,
         time = chat and chat.time or finder.time,
         source = (chat and finder) and "both" or (finder and "finder" or "chat"),
+        -- Only chat links a quest; a finder listing names a zone.
+        quests = chat and chat.quests or nil,
+        -- Only what was said names classes.
+        wantClasses = chat and chat.wantClasses or nil,
+        refuseClasses = chat and chat.refuseClasses or nil,
     }
     if finder then
         view.members = finder.members
@@ -202,8 +210,44 @@ function Posts.WantsMe(view, roles)
     return false
 end
 
+--- Whether the player has handed in quest `id`. Unknown counts as not:
+-- a row wrongly shown costs less than one wrongly hidden.
+local function questDone(id)
+    return ns.Guarded(function()
+        if C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted then
+            return C_QuestLog.IsQuestFlaggedCompleted(id) and true or false
+        end
+        if IsQuestFlaggedCompleted then
+            return IsQuestFlaggedCompleted(id) and true or false
+        end
+        if GetQuestsCompleted then
+            local done = GetQuestsCompleted()
+            return type(done) == "table" and done[id] and true or false
+        end
+        return false
+    end, false)
+end
+
+--- Whether a view is a quest group for quests the player has completed:
+-- every quest it links handed in. One named only in words cannot be told,
+-- and a dungeon group linking a quest is still a dungeon run.
+function Posts.ForCompletedQuests(view)
+    if view.kind ~= "quest" or not view.quests then
+        return false
+    end
+    for _, id in ipairs(view.quests) do
+        if not questDone(id) then
+            return false
+        end
+    end
+    return true
+end
+
 --- Whether a view passes every filter but the tab.
 local function passes(view, filter)
+    if filter.hideCompleted and Posts.ForCompletedQuests(view) then
+        return false
+    end
     if filter.activity and view.activity ~= filter.activity then
         return false
     end

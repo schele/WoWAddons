@@ -13,6 +13,13 @@ ns.AddDefaults({
 
 local LINK_COLOR = "ff66ccff"
 
+--- Turn alerts on or off; remembered. The board's switch and the settings
+-- page both write through here.
+function Alerts.SetEnabled(on)
+    ns.db.alerts = on and true or false
+    ns.Changed()
+end
+
 -- "person|activity" already alerted for, and the view each link opens, so
 -- a link still works after its row has dropped off the board.
 local alerted = {}
@@ -48,19 +55,38 @@ local function forWhat(view)
     return view.kind == "quest" and "a quest group" or "a group"
 end
 
---- Alert for `view` if it explicitly wants one of your roles near your
--- level, you are not in a group, and it is new. True when it did.
+--- Whether a view says it has no places left: "5/5".
+local function full(view)
+    return view.size ~= nil and view.size.have >= view.size.of
+end
+
+--- Alert for `view` if it explicitly wants one of your roles or your class
+-- near your level, does not turn your class away or ask only for others,
+-- has room, you are not in a group, and it is new. True when it did.
 function Alerts.Consider(view)
     -- A group for something the board does not know is as likely Trade
     -- talk as a group, so it is shown but never sounded.
-    if not (view and ns.db and ns.db.alerts) or view.kind == "other" or inGroup() then
+    if not (view and ns.db and ns.db.alerts) or view.kind == "other" or inGroup() or full(view) then
+        return false
+    end
+    local className, class = UnitClass("player")
+    if class and view.refuseClasses and view.refuseClasses[class] then
+        return false
+    end
+    -- Asking for classes and not this one says no, whatever the roles.
+    if view.wantClasses and not (class and view.wantClasses[class]) then
         return false
     end
     local mine = ns.Roles()
-    if not ns.Posts.WantsMe(view, mine) then
+    local byRole = ns.Posts.WantsMe(view, mine)
+    if not byRole and not view.wantClasses then
         return false
     end
     if view.activity and not ns.Activities.Near(view.activity, UnitLevel("player")) then
+        return false
+    end
+    -- Hidden from the board, so not sounded either.
+    if ns.db.hideCompleted and ns.Posts.ForCompletedQuests(view) then
         return false
     end
 
@@ -72,8 +98,8 @@ function Alerts.Consider(view)
     linked[view.key] = view
 
     sound()
-    ns.Print(string.format("%s wants a %s for %s. %s",
-        view.name, ns.Whisper.Roles(view.roles, mine), forWhat(view), Alerts.Link(view)))
+    local what = byRole and ns.Whisper.Roles(view.roles, mine) or className or "player"
+    ns.Print(string.format("%s wants a %s for %s. %s", view.name, what, forWhat(view), Alerts.Link(view)))
     return true
 end
 

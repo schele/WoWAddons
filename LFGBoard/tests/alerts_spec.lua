@@ -105,3 +105,47 @@ describe("an alert for something the board does not know", function()
         assertFalse(ns.Alerts.Consider(posted(ns, "Garrok", "LFM new dungeon Blackroot need tank")))
     end)
 end)
+
+describe("an alert for a quest you have completed", function()
+    local DEFIAS = "LF1M need tank |cffffff00|Hquest:155:18|h[The Defias Brotherhood]|h|r"
+
+    it("does not come while completed quests are hidden", function()
+        local ns, env = helpers.loggedIn()
+        env.__completedQuests[155] = true
+
+        assertFalse(ns.Alerts.Consider(posted(ns, "Brakk", DEFIAS)))
+        assertEqual(0, #env.__sounds)
+    end)
+
+    it("comes when they are shown", function()
+        local ns, env = helpers.loggedIn()
+        env.__completedQuests[155] = true
+        ns.db.hideCompleted = false
+
+        assertTrue(ns.Alerts.Consider(posted(ns, "Brakk", DEFIAS)))
+    end)
+end)
+
+describe("an alert and the classes a group asks for", function()
+    -- The player is a druid.
+    it("does not come when the group turns your class away", function()
+        local ns = helpers.loggedIn()
+        assertFalse(ns.Alerts.Consider(posted(ns, "Garrok", "LF1M DM need tank no druids")))
+    end)
+
+    it("does not come when the group asks only for classes that are not yours", function()
+        local ns = helpers.loggedIn()
+        assertFalse(ns.Alerts.Consider(posted(ns, "Garrok", "LF1M DM need tank, warrior or paladin")))
+    end)
+
+    it("comes when the group asks for your class, though it names no role", function()
+        local ns, env = helpers.loggedIn()
+        assertTrue(ns.Alerts.Consider(posted(ns, "Garrok", "LF1M DM need druid")))
+        assertMatch("Garrok wants a Druid for Deadmines%.", helpers.printed(env))
+    end)
+
+    it("does not come for a group that says it is full", function()
+        local ns = helpers.loggedIn()
+        assertFalse(ns.Alerts.Consider(posted(ns, "Garrok", "LFM DM 5/5 need tank")))
+    end)
+end)

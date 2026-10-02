@@ -300,3 +300,74 @@ describe("a group wanting you", function()
         assertFalse(ns.Posts.WantsMe({ roles = nil }, mine))
     end)
 end)
+
+describe("completed quests", function()
+    local DEFIAS = "LF2M |cffffff00|Hquest:155:18|h[The Defias Brotherhood]|h|r"
+    local HIDING = { tab = "all", roles = helpers.ALL.roles, hideCompleted = true }
+
+    it("hide a quest group whose linked quest you have completed, when asked", function()
+        local ns, env = helpers.loadAddon()
+        env.__completedQuests[155] = true
+        chat(ns, "Brakk", DEFIAS)
+
+        assertEqual(0, #visible(ns, HIDING))
+        assertEqual(0, ns.Posts.Counts(HIDING).quest)
+        assertEqual(1, #visible(ns), "shown when not asked")
+    end)
+
+    it("keep a quest group whose quest you have not completed", function()
+        local ns = helpers.loadAddon()
+        chat(ns, "Brakk", DEFIAS)
+
+        assertEqual(1, #visible(ns, HIDING))
+    end)
+
+    it("keep a quest group with one of its linked quests still to do", function()
+        local ns, env = helpers.loadAddon()
+        env.__completedQuests[155] = true
+        chat(ns, "Brakk", DEFIAS .. " |cffffff00|Hquest:166:22|h[The Defias Brotherhood]|h|r")
+
+        assertEqual(1, #visible(ns, HIDING))
+    end)
+
+    it("keep a quest group that names its quest only in words", function()
+        local ns = helpers.loadAddon()
+        chat(ns, "Brakk", "LF2M quest Hogger")
+
+        assertEqual(1, #visible(ns, HIDING))
+    end)
+
+    it("keep a dungeon group, though it links a quest you have done", function()
+        local ns, env = helpers.loadAddon()
+        env.__completedQuests[155] = true
+        chat(ns, "Garrok", "LFM DM |cffffff00|Hquest:155:18|h[The Defias Brotherhood]|h|r")
+
+        assertEqual(1, #visible(ns, HIDING))
+    end)
+
+    it("are read through the older calls on a client without C_QuestLog's", function()
+        local ns, env = helpers.loadAddon()
+        env.C_QuestLog = nil
+        function env.IsQuestFlaggedCompleted(id) return id == 155 end
+        chat(ns, "Brakk", DEFIAS)
+
+        assertEqual(0, #visible(ns, HIDING))
+    end)
+
+    it("are read from the completed list when that is all the client has", function()
+        local ns, env = helpers.loadAddon()
+        env.C_QuestLog = nil
+        function env.GetQuestsCompleted() return { [155] = true } end
+        chat(ns, "Brakk", DEFIAS)
+
+        assertEqual(0, #visible(ns, HIDING))
+    end)
+
+    it("count as not completed when the client will not say", function()
+        local ns, env = helpers.loadAddon()
+        env.C_QuestLog.IsQuestFlaggedCompleted = function() error("secret") end
+        chat(ns, "Brakk", DEFIAS)
+
+        assertEqual(1, #visible(ns, HIDING))
+    end)
+end)

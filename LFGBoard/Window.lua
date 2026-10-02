@@ -10,6 +10,8 @@ ns.Window = Window
 ns.AddDefaults({
     window = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 0 },
     nearLevel = true,
+    -- Quest groups for quests already handed in are no use to the player.
+    hideCompleted = true,
 })
 
 local WIDTH, HEIGHT = 820, 460
@@ -46,6 +48,7 @@ function Window.Filter()
         activity = picked,
         roles = ns.Roles(),
         nearLevel = ns.db.nearLevel,
+        hideCompleted = ns.db.hideCompleted,
         level = UnitLevel("player"),
     }
 end
@@ -114,6 +117,39 @@ function Window.Party(view)
     return table.concat(parts, ", ")
 end
 
+-- Classes in the order the game lists them, and the English names for a
+-- client that does not give its own.
+local CLASS_ORDER = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
+local CLASS_NAMES = {
+    WARRIOR = "Warrior", PALADIN = "Paladin", HUNTER = "Hunter", ROGUE = "Rogue", PRIEST = "Priest",
+    SHAMAN = "Shaman", MAGE = "Mage", WARLOCK = "Warlock", DRUID = "Druid",
+}
+local REFUSED_HEX = "ff808080"
+
+local function className(class)
+    local names = LOCALIZED_CLASS_NAMES_MALE
+    local name = names and names[class]
+    return type(name) == "string" and name or CLASS_NAMES[class]
+end
+
+--- The classes a row asks for, each in its colour, then the ones it turns
+-- away, dimmed after "no". Empty when it names none.
+function Window.Classes(view)
+    local parts = {}
+    for _, class in ipairs(CLASS_ORDER) do
+        if view.wantClasses and view.wantClasses[class] then
+            local hex = classHex(class)
+            parts[#parts + 1] = hex and ("|c" .. hex .. className(class) .. "|r") or className(class)
+        end
+    end
+    for _, class in ipairs(CLASS_ORDER) do
+        if view.refuseClasses and view.refuseClasses[class] then
+            parts[#parts + 1] = "|c" .. REFUSED_HEX .. "no " .. className(class) .. "|r"
+        end
+    end
+    return table.concat(parts, " ")
+end
+
 local function makeRow(index)
     local row = CreateFrame("Frame", nil, frame)
     row:SetSize(WIDTH - 32, ROW_HEIGHT)
@@ -138,6 +174,8 @@ local function makeRow(index)
     row.what = text(WHAT_X, 0, 124)
     row.said = text(SAID_X, 0, 210)
     row.party = text(PARTY_X, 0, PARTY_WIDTH)
+    -- Under the count and roles, as the source is under the name.
+    row.classes = text(PARTY_X, -7, PARTY_WIDTH)
 
     row.slots = {}
     for slot = 1, 5 do
@@ -189,10 +227,20 @@ local function fill(row, view, now, mine)
         end
     end
 
+    -- With classes to name, the count and roles move up a line's half to
+    -- make room for them below, both beside the squares when there are any.
+    local classes = Window.Classes(view)
+    local x = squares and (PARTY_X + SQUARES_WIDTH) or PARTY_X
+    local width = squares and (PARTY_WIDTH - SQUARES_WIDTH) or PARTY_WIDTH
     row.party:ClearAllPoints()
-    row.party:SetPoint("LEFT", row, "LEFT", squares and (PARTY_X + SQUARES_WIDTH) or PARTY_X, 0)
-    row.party:SetWidth(squares and (PARTY_WIDTH - SQUARES_WIDTH) or PARTY_WIDTH)
+    row.party:SetPoint("LEFT", row, "LEFT", x, classes ~= "" and 5 or 0)
+    row.party:SetWidth(width)
     row.party:SetText(Window.Party(view))
+    row.classes:ClearAllPoints()
+    row.classes:SetPoint("LEFT", row, "LEFT", x, -7)
+    row.classes:SetWidth(width)
+    row.classes:SetText(classes)
+    row.classes:SetShown(classes ~= "")
     row:Show()
 end
 
@@ -273,22 +321,25 @@ local function create()
     end)
     frame.picker:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
+    -- Seven switches between the left edge and Refresh: each placed just past
+    -- the last one's label, which leaves little to spare.
     frame.roles = {}
     for index, info in ipairs(ROLE_SWITCHES) do
-        frame.roles[info.key] = checkbox(info.label, 16 + (index - 1) * 84, -64, function(checked)
-            ns.Roles()[info.key] = checked
-            Window.Refresh()
+        frame.roles[info.key] = checkbox(info.label, 16 + (index - 1) * 70, -64, function(checked)
+            ns.SetRole(info.key, checked)
         end)
     end
-    frame.near = checkbox("Near my level", 280, -64, function(checked)
-        ns.db.nearLevel = checked
-        Window.Refresh()
+    frame.near = checkbox("Near my level", 232, -64, function(checked)
+        Window.SetNearLevel(checked)
     end)
-    frame.alerts = checkbox("Alerts", 420, -64, function(checked)
-        ns.db.alerts = checked
+    frame.alerts = checkbox("Alerts", 350, -64, function(checked)
+        ns.Alerts.SetEnabled(checked)
     end)
-    -- Ticked while the button shows; the board is the only page this addon has.
-    frame.minimap = checkbox("Minimap button", 500, -64, function(checked)
+    frame.completed = checkbox("Hide done quests", 426, -64, function(checked)
+        Window.SetHideCompleted(checked)
+    end)
+    -- Ticked while the button shows. The settings page has the same box.
+    frame.minimap = checkbox("Minimap button", 562, -64, function(checked)
         ns.MinimapButton.SetHidden(not checked)
     end)
     frame.refresh = button("Refresh", 96, WIDTH - 116, -62, function()
@@ -311,6 +362,20 @@ local function create()
     end)
     table.insert(UISpecialFrames, "LFGBoardFrame")
     frame:Hide()
+end
+
+--- Hide dungeons and raids far from the player's level, or show them;
+-- remembered. The board's switch and the settings page both write here.
+function Window.SetNearLevel(on)
+    ns.db.nearLevel = on and true or false
+    ns.Changed()
+end
+
+--- Hide quest groups for quests the player has handed in, or show them;
+-- remembered. The board's switch and the settings page both write here.
+function Window.SetHideCompleted(on)
+    ns.db.hideCompleted = on and true or false
+    ns.Changed()
 end
 
 --- Step the dungeon picker through Any and the activities on the board.
@@ -347,6 +412,7 @@ function Window.Refresh()
     end
     frame.near:SetChecked(ns.db.nearLevel)
     frame.alerts:SetChecked(ns.db.alerts)
+    frame.completed:SetChecked(ns.db.hideCompleted)
     frame.minimap:SetChecked(not ns.db.minimap.hide)
     frame.refresh:SetEnabled(ns.Finder.Available())
 
@@ -372,6 +438,14 @@ function Window.Toggle()
         create()
     end
     frame:SetShown(not frame:IsShown())
+end
+
+--- Show the board; left open if it is open already.
+function Window.Open()
+    if not frame then
+        create()
+    end
+    frame:Show()
 end
 
 function Window.Frame()
