@@ -127,11 +127,31 @@ loader:SetScript("OnEvent", function(self)
     end
 end)
 
+-- Stored as "hide" but offered as "Show ...", so the panel inverts it. The
+-- command and the checkbox both go through here, which is what keeps the box
+-- honest when the command changes the value.
+local hideSetting = ns.RegisterSetting({
+    store = "minimap",
+    key = "hide",
+    type = "checkbox",
+    invert = true,
+    -- The foot of the extras: Minimap.lua is last in the .toc, and a group of
+    -- its own would add a divider for a single box.
+    section = "extras",
+    name = "Show the minimap button",
+    tooltip = "Shows the round button on the minimap's rim. /fp minimap does the same.",
+    onChange = function(hide)
+        if button then
+            button:SetShown(not hide)
+        end
+        if ns.Settings then
+            ns.Settings.Refresh()
+        end
+    end,
+})
+
 ns.RegisterCommand("minimap", "Hide or show the minimap button", function()
-    ns.db.minimap.hide = not ns.db.minimap.hide
-    if button then
-        button:SetShown(not ns.db.minimap.hide)
-    end
+    ns.SetSettingValue(hideSetting, not ns.db.minimap.hide)
     if ns.db.minimap.hide then
         ns.Print("Minimap button hidden. /fp minimap brings it back.")
     else

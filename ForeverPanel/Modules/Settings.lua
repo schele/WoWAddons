@@ -35,14 +35,24 @@ local function addCheckbox(setting, y, indent)
     label:SetText(setting.name)
 
     button:SetScript("OnClick", function(self)
-        ns.SetSettingValue(setting, self:GetChecked() and true or false)
+        local checked = self:GetChecked() and true or false
+        if setting.invert then
+            checked = not checked
+        end
+        ns.SetSettingValue(setting, checked)
     end)
 
     return {
         setting = setting,
         widget = button,
         Refresh = function()
-            button:SetChecked(ns.SettingValue(setting) and true or false)
+            local value = ns.SettingValue(setting) and true or false
+            -- An inverted setting is stored as the opposite of what its label
+            -- offers ("hide" behind "Show ...").
+            if setting.invert then
+                value = not value
+            end
+            button:SetChecked(value)
         end,
     }
 end

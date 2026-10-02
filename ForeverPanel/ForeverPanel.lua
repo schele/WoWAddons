@@ -46,6 +46,8 @@ local SETTING_TYPES = { checkbox = true, slider = true, keytable = true }
 --- Declare a configurable value.
 -- store/key address it inside the database (ns.db[store][key]); type is
 -- "checkbox" or "slider"; onChange runs after a change so the owner can react.
+-- invert = true on a checkbox shows it ticked while the stored value is false,
+-- for a flag stored as "hide" but offered as "Show ...".
 function ns.RegisterSetting(definition)
     assert(type(definition) == "table", "RegisterSetting expects a table")
 

@@ -362,3 +362,61 @@ describe("the panel's heading", function()
         assertTrue(ns.Settings.logo:GetWidth() > 0, "and has a size to draw at")
     end)
 end)
+
+--- The control on the panel for a store and key.
+local function controlFor(ns, store, key)
+    for _, control in ipairs(ns.Settings.controls) do
+        if control.setting.store == store and control.setting.key == key then
+            return control
+        end
+    end
+end
+
+describe("the invert option", function()
+    it("leaves an ordinary checkbox showing the stored value as it is", function()
+        local ns = loggedIn()
+        local control = controlFor(ns, "bar", "locked")
+
+        ns.db.bar.locked = true
+        ns.Settings.Refresh()
+        assertTrue(control.widget:GetChecked())
+        ns.db.bar.locked = false
+        ns.Settings.Refresh()
+        assertFalse(control.widget:GetChecked())
+
+        control.widget:SetChecked(false)
+        control.widget.scripts.OnClick(control.widget)
+        assertEqual(false, ns.db.bar.locked)
+        control.widget:SetChecked(true)
+        control.widget.scripts.OnClick(control.widget)
+        assertEqual(true, ns.db.bar.locked)
+    end)
+
+    it("shows an inverted checkbox ticked while the stored value is false", function()
+        local ns, env = helpers.loadAddon()
+        ns.RegisterSetting({
+            store = "bar", key = "locked", type = "checkbox", invert = true, name = "Unlocked",
+        })
+        helpers.login(ns, env)
+        ns.Settings.EnsureBuilt()
+        -- Sections reorder the page, so the new control is not necessarily last.
+        local last
+        for _, control in ipairs(ns.Settings.controls) do
+            if control.setting.name == "Unlocked" then
+                last = control
+            end
+        end
+        assertTrue(last ~= nil, "the new setting is on the page")
+        ns.db.bar.locked = false
+        ns.Settings.Refresh()
+        assertTrue(last.widget:GetChecked(), "stored false shows ticked")
+
+        ns.db.bar.locked = true
+        ns.Settings.Refresh()
+        assertFalse(last.widget:GetChecked())
+
+        last.widget:SetChecked(true)
+        last.widget.scripts.OnClick(last.widget)
+        assertEqual(false, ns.db.bar.locked, "a tick stores the opposite")
+    end)
+end)
