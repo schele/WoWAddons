@@ -1,20 +1,65 @@
 -- A minimal stand-in for the WoW API, enough to load AutoVendor outside the
--- game: frames, timers, bags, items, a merchant and money. It records what
--- was done so tests can assert on it.
+-- game: frames, timers, bags, items, a merchant, money and the options
+-- window. It records what was done so tests can assert on it.
 
 local stub = {}
 
-local function makeWidget(kind, parent)
+local function makeWidget(kind, parent, template)
     local widget = {
         kind = kind,
         parent = parent,
+        template = template,
         scripts = {},
         registeredEvents = {},
+        shown = true,
     }
 
     function widget:SetScript(name, fn) self.scripts[name] = fn end
+    function widget:GetScript(name) return self.scripts[name] end
+    function widget:HookScript(name, fn)
+        local existing = self.scripts[name]
+        self.scripts[name] = function(...)
+            if existing then existing(...) end
+            fn(...)
+        end
+    end
     function widget:RegisterEvent(event) self.registeredEvents[event] = true end
     function widget:UnregisterEvent(event) self.registeredEvents[event] = nil end
+
+    -- For the settings page. Showing and hiding fire their scripts, and only
+    -- on a real transition, the way the client does.
+    function widget:Show()
+        if self.shown then return end
+        self.shown = true
+        if self.scripts.OnShow then self.scripts.OnShow(self) end
+    end
+    function widget:Hide()
+        if not self.shown then return end
+        self.shown = false
+        if self.scripts.OnHide then self.scripts.OnHide(self) end
+    end
+    function widget:IsShown() return self.shown end
+    widget.points = {}
+    function widget:SetPoint(...) table.insert(self.points, { ... }) end
+    function widget:ClearAllPoints() self.points = {} end
+    function widget:SetSize(w, h) self.width, self.height = w, h end
+    function widget:SetWidth(value) self.width = value end
+    function widget:SetHeight(value) self.height = value end
+    function widget:SetJustifyH(value) self.justifyH = value end
+    function widget:SetTexture(value) self.texture = value end
+    function widget:GetTexture() return self.texture end
+    function widget:SetText(value) self.text = value end
+    function widget:GetText() return self.text end
+    function widget:SetChecked(value) self.checked = value and true or false end
+    function widget:GetChecked() return self.checked end
+    function widget:CreateTexture() return makeWidget("Texture", self) end
+    -- Remembered on the parent, so a test can find a label by its text.
+    function widget:CreateFontString()
+        local fontString = makeWidget("FontString", self)
+        self.fontStrings = self.fontStrings or {}
+        table.insert(self.fontStrings, fontString)
+        return fontString
+    end
 
     -- Test helper: drive this widget's OnEvent handler.
     function widget:Fire(event, ...)
@@ -44,13 +89,36 @@ function stub.newEnv(saved)
         table.insert(env.__printed, table.concat(pieces, " "))
     end
 
-    function env.CreateFrame(kind, name, parent)
-        local frame = makeWidget(kind or "Frame", parent)
+    function env.CreateFrame(kind, name, parent, template)
+        local frame = makeWidget(kind or "Frame", parent, template)
         frame.frameName = name
         table.insert(env.__frames, frame)
         if name then env[name] = frame end
         return frame
     end
+
+    env.UIParent = makeWidget("Frame")
+
+    -- The game's options window and the game menu, both closed to begin with.
+    env.SettingsPanel = makeWidget("Frame", env.UIParent)
+    env.SettingsPanel.shown = false
+    env.GameMenuFrame = makeWidget("Frame", env.UIParent)
+    env.GameMenuFrame.shown = false
+    function env.HideUIPanel(frame)
+        if frame and frame.Hide then frame:Hide() end
+    end
+    env.Settings = {
+        RegisterCanvasLayoutCategory = function(frame, name)
+            return { name = name, frame = frame, GetID = function() return "category-id" end }
+        end,
+        RegisterAddOnCategory = function(category) env.__settingsCategory = category end,
+        OpenToCategory = function(id) env.__openedCategory = id end,
+    }
+    env.C_AddOns = {
+        GetAddOnMetadata = function(_, field)
+            return field == "Version" and "9.9.9" or nil
+        end,
+    }
 
     -- The client runs a timer after the current chain of calls, not inside
     -- it: queued here with its delay, and run by __runTimers.

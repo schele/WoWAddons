@@ -257,6 +257,97 @@ describe("the line", function()
     end)
 end)
 
+describe("with repairs turned off", function()
+    it("still sells the junk, and the line says only what sold", function()
+        local _, env = ready()
+        helpers.command(env, "repair")
+        env.__printed = {}
+        helpers.put(env, 0, 1, 3300)
+        env.__money, env.__repairCost = 10000, 4500
+
+        helpers.openMerchant(env)
+        env.__runAllTimers()
+
+        assertEqual(0, env.__repairs)
+        assertEqual(1, #env.__sales)
+        assertMatch("^|cff66ccffAutoVendor|r Sold 1 item for 15c%.$", helpers.printed(env))
+    end)
+
+    it("says nothing when only a repair was due", function()
+        local _, env = ready()
+        helpers.command(env, "repair")
+        env.__printed = {}
+        env.__money, env.__repairCost = 50, 10200
+
+        helpers.openMerchant(env)
+        env.__runAllTimers()
+
+        assertEqual(0, env.__repairs)
+        assertEqual("", helpers.printed(env))
+    end)
+end)
+
+describe("with selling turned off", function()
+    it("sells nothing, and still repairs", function()
+        local _, env = ready()
+        helpers.command(env, "sell")
+        env.__printed = {}
+        helpers.put(env, 0, 1, 3300)
+        env.__money, env.__repairCost = 10000, 4500
+
+        helpers.openMerchant(env)
+        env.__runAllTimers()
+
+        assertEqual(0, #env.__sales)
+        assertEqual(1, env.__repairs)
+        assertMatch("^|cff66ccffAutoVendor|r Repaired for 45s%.$", helpers.printed(env))
+    end)
+end)
+
+describe("/av repair and /av sell", function()
+    it("are both on to begin with", function()
+        local ns = ready()
+        assertTrue(ns.db.repair)
+        assertTrue(ns.db.sell)
+    end)
+
+    it("turn repairs off and on again, saying which", function()
+        local ns, env = ready()
+        helpers.command(env, "repair")
+        assertFalse(ns.db.repair)
+        assertMatch("Repair at merchants: off%.", helpers.printed(env))
+        helpers.command(env, "repair")
+        assertTrue(ns.db.repair)
+        assertMatch("Repair at merchants: on%.", helpers.printed(env))
+    end)
+
+    it("turn selling off and on again, saying which", function()
+        local ns, env = ready()
+        helpers.command(env, "sell")
+        assertFalse(ns.db.sell)
+        assertMatch("Sell grey items: off%.", helpers.printed(env))
+        helpers.command(env, "sell")
+        assertTrue(ns.db.sell)
+        assertMatch("Sell grey items: on%.", helpers.printed(env))
+    end)
+
+    it("are remembered after a reload", function()
+        local _, env = ready()
+        helpers.command(env, "repair")
+        helpers.command(env, "sell")
+        local ns = helpers.reload(env)
+        assertFalse(ns.db.repair)
+        assertFalse(ns.db.sell)
+    end)
+
+    it("are in /av's help", function()
+        local _, env = ready()
+        helpers.command(env, "help")
+        assertMatch("/av repair", helpers.printed(env))
+        assertMatch("/av sell", helpers.printed(env))
+    end)
+end)
+
 describe("the older client's calls", function()
     it("sell the junk the same way", function()
         local _, env = ready()

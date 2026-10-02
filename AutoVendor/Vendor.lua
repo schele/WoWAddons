@@ -14,6 +14,13 @@ Vendor.PAUSE = 0.2
 -- wait this many pauses (about a second) before it is given up uncounted.
 Vendor.MAX_WAITS = 5
 
+-- Both halves of a visit, each with its own switch. Both on is how
+-- AutoVendor has always behaved.
+ns.AddDefaults({
+    sell = true,
+    repair = true,
+})
+
 -- The visit under way, or nil. Each step is handed the visit it belongs to,
 -- so one queued before a close does nothing in the visit after it.
 local visit
@@ -57,6 +64,9 @@ local function settle(current)
 end
 
 local function nextJunk(current)
+    if not ns.db.sell then
+        return nil
+    end
     for _, entry in ipairs(ns.Bags.Junk(ns.Keep.All())) do
         if not current.tried[tried(entry)] then
             return entry
@@ -66,8 +76,13 @@ local function nextJunk(current)
 end
 
 --- Repair if this merchant can and something needs it. The words for what
--- happened, or nil when nothing did.
+-- happened, or nil when nothing did. Turned off, it does not even look, so
+-- the line never mentions a repair the player asked not to have.
 local function repair()
+    if not ns.db.repair then
+        return nil
+    end
+
     local canRepair = ns.Guarded(function()
         return CanMerchantRepair() and true or false
     end, false)
@@ -160,6 +175,41 @@ function Vendor.Close()
         finish(visit, false)
     end
 end
+
+-- The settings page, told of every change however it was made, so a box it
+-- shows never disagrees with what a command has just set.
+local function changed()
+    if ns.SettingsPanel then
+        ns.SettingsPanel.Refresh()
+    end
+end
+
+--- Sell grey items at a merchant, or leave them be. A visit under way
+-- notices at its next step.
+function Vendor.SetSell(value)
+    ns.db.sell = value and true or false
+    changed()
+end
+
+--- Repair at a merchant that can, or leave the gear as it is.
+function Vendor.SetRepair(value)
+    ns.db.repair = value and true or false
+    changed()
+end
+
+local function onOff(value)
+    return value and "on" or "off"
+end
+
+ns.RegisterCommand("sell", "turn selling grey items on or off", function()
+    Vendor.SetSell(not ns.db.sell)
+    ns.Print("Sell grey items: " .. onOff(ns.db.sell) .. ".")
+end)
+
+ns.RegisterCommand("repair", "turn repairing at merchants on or off", function()
+    Vendor.SetRepair(not ns.db.repair)
+    ns.Print("Repair at merchants: " .. onOff(ns.db.repair) .. ".")
+end)
 
 local events = CreateFrame("Frame")
 events:RegisterEvent("MERCHANT_SHOW")

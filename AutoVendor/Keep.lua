@@ -53,6 +53,33 @@ local function shown(name)
     return "[" .. name .. "]"
 end
 
+-- The settings page, told of every change however it was made, so the list
+-- it shows never disagrees with what a command has just done.
+local function changed()
+    if ns.SettingsPanel then
+        ns.SettingsPanel.Refresh()
+    end
+end
+
+--- Never sell this item. Says so in chat.
+function Keep.Add(itemID, name)
+    ns.db.keep[itemID] = name
+    ns.Print(string.format("Keeping %s: it will not be sold.", shown(name)))
+    changed()
+end
+
+--- Sell this item again. Says so in chat. /av unkeep and the settings
+-- page's buttons both come through here.
+function Keep.Remove(itemID)
+    local kept = ns.db.keep[itemID]
+    if kept == nil then
+        return
+    end
+    ns.db.keep[itemID] = nil
+    ns.Print(string.format("No longer keeping %s.", shown(kept)))
+    changed()
+end
+
 ns.RegisterCommand("keep", "never sell an item: Shift-click it after the command", function(rest)
     local id, name = readItem(rest)
     if not id then
@@ -65,8 +92,7 @@ ns.RegisterCommand("keep", "never sell an item: Shift-click it after the command
         return
     end
 
-    ns.db.keep[id] = name
-    ns.Print(string.format("Keeping %s: it will not be sold.", shown(name)))
+    Keep.Add(id, name)
 end)
 
 ns.RegisterCommand("unkeep", "sell a kept item again: Shift-click it after the command", function(rest)
@@ -81,9 +107,7 @@ ns.RegisterCommand("unkeep", "sell a kept item again: Shift-click it after the c
         return
     end
 
-    local kept = ns.db.keep[id]
-    ns.db.keep[id] = nil
-    ns.Print(string.format("No longer keeping %s.", shown(kept)))
+    Keep.Remove(id)
 end)
 
 ns.RegisterCommand("list", "show the items that are never sold", function()

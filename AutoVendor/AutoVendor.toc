@@ -10,3 +10,4 @@ AutoVendor.lua
 Bags.lua
 Keep.lua
 Vendor.lua
+Settings.lua

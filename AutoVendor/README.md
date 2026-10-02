@@ -23,6 +23,18 @@ After selling, so the junk's gold helps pay. If this merchant can repair and
 something needs it, everything is repaired from your own gold. If you cannot
 afford it, nothing is repaired and the line says what it would cost.
 
+## Turning either off
+
+Both happen unless you say otherwise. Like the keep list, the switches are
+shared by all your characters.
+
+| Command | Does |
+|---|---|
+| `/av sell` | Turn selling grey items off, or on again |
+| `/av repair` | Turn repairing off, or on again |
+
+With repairs off, the line only says what sold.
+
 ## The keep list
 
 Items AutoVendor never sells, shared by all your characters.
@@ -36,14 +48,19 @@ Items AutoVendor never sells, shared by all your characters.
 An item number works in place of a Shift-clicked link: `/av keep 7073`.
 `/autovendor` is the same as `/av`.
 
+## The settings page
+
+`/av settings`, or Options, AddOns, AutoVendor. It has the two switches as
+checkboxes, and the keep list with a button beside each item to sell it again.
+
 ## Worth knowing
 
 The merchant's Buyback tab holds your last 12 sales. With more than 12 greys,
 the earliest cannot be bought back, so put anything you might want on the
 keep list before you visit.
 
-There is no settings panel: everything happens on its own. To pause it,
-disable AutoVendor in the AddOns list.
+To pause AutoVendor altogether, disable it in the AddOns list, or turn both
+switches off.
 
 ## Install
 

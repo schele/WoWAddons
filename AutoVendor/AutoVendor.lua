@@ -124,6 +124,13 @@ SLASH_AUTOVENDOR1 = "/autovendor"
 SLASH_AUTOVENDOR2 = "/av"
 SlashCmdList.AUTOVENDOR = runCommand
 
+-- Work to do once the player is in the world and the database exists.
+local loginHandlers = {}
+
+function ns.OnLogin(handler)
+    table.insert(loginHandlers, handler)
+end
+
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
@@ -133,5 +140,9 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
         ensureDatabase()
     elseif event == "PLAYER_LOGIN" then
         ensureDatabase()
+
+        for _, handler in ipairs(loginHandlers) do
+            handler()
+        end
     end
 end)
