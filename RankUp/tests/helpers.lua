@@ -6,6 +6,7 @@ M.FILES = {
     "RankUp.lua",
     "Ranks.lua",
     "Swap.lua",
+    "Popup.lua",
 }
 
 --- Load the addon's files into a stubbed environment, the way WoW would:
