@@ -26,6 +26,16 @@ describe("a recruiting message", function()
         assertEqual(4, got.size.have)
     end)
 
+    it("reads the places the other way round too: LFM1, LFM 2", function()
+        for text, have in pairs({ ["LFM1 SFK"] = 4, ["LFM2 DM"] = 3, ["LFM 2 DM"] = 3,
+            ["lfm 1m wc"] = 4, ["LF 3 DM"] = 2 }) do
+            local got = parse(text)
+            assertTrue(got ~= nil, text)
+            assertEqual("dungeon", got.kind, text)
+            assertEqual(have, got.size and got.size.have, text)
+        end
+    end)
+
     it("is LFM, LF more, looking for more, or LF or need with a role", function()
         for _, text in ipairs({ "LFM WC", "LF more for RFC", "looking for more SFK",
             "LF tank DM", "need heals for wc", "LF 2M DM" }) do

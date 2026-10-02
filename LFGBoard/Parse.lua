@@ -64,20 +64,22 @@ local QUEST = { quest = true, quests = true, elite = true }
 local function tokens(words)
     local list = {}
     for word in words:gmatch("%S+") do
-        list[#list + 1] = word
+        -- "LFM1" is "LF1M" written the other way round.
+        list[#list + 1] = word:gsub("^lfm(%d)m?$", "lf%1m")
     end
     return list
 end
 
---- How many places "LF2M" (or "LF 2M", "lf2") says are open, or nil.
+--- How many places "LF2M" (or "LF 2M", "lf2", "LFM 2", "LF 3") says are
+-- open, or nil.
 local function openPlaces(list, index)
     local word = list[index]
     local count = word:match("^lf(%d)m?$")
     if count then
         return tonumber(count)
     end
-    if word == "lf" and list[index + 1] then
-        count = list[index + 1]:match("^(%d)m$")
+    if (word == "lf" or word == "lfm") and list[index + 1] then
+        count = list[index + 1]:match("^(%d)m?$")
         if count then
             return tonumber(count)
         end

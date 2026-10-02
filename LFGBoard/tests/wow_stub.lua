@@ -61,6 +61,8 @@ local function makeWidget(env, kind, parent, template)
     function widget:StartMoving() self.moving = true end
     function widget:StopMovingOrSizing() self.moving = false end
     function widget:SetBackdrop(value) self.backdrop = value end
+    function widget:SetHyperlinksEnabled(value) self.hyperlinks = value and true or false end
+    function widget:SetHyperlink(link) self.hyperlink = link end
     function widget:SetBackdropColor() end
     function widget:SetBackdropBorderColor() end
     function widget:SetHighlightTexture(value) self.highlightTexture = value end
@@ -162,11 +164,25 @@ function stub.newEnv(saved)
         table.insert(env.__printed, table.concat(pieces, " "))
     end
 
+    -- Templates this client does not have: asking for one raises, as the
+    -- client's CreateFrame does.
+    env.__missingTemplates = {}
     function env.CreateFrame(kind, name, parent, template)
+        if template and env.__missingTemplates[template] then
+            error(string.format("Couldn't find inherited node '%s'", template), 2)
+        end
         local frame = makeWidget(env, kind or "Frame", parent, template)
         frame.frameName = name
         table.insert(env.__frames, frame)
         if name then env[name] = frame end
+        -- The options window's frame, as far as a test needs it: the border
+        -- with the title in its bar, the background, and the red X.
+        if template == "SettingsFrameTemplate" then
+            frame.Bg = makeWidget(env, "Frame", frame)
+            frame.NineSlice = makeWidget(env, "Frame", frame)
+            frame.NineSlice.Text = frame.NineSlice:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            frame.ClosePanelButton = makeWidget(env, "Button", frame, "UIPanelCloseButtonDefaultAnchors")
+        end
         return frame
     end
 
@@ -248,7 +264,23 @@ function stub.newEnv(saved)
     -- Chat: the box a whisper opens in, and links clicked.
     function env.ChatFrame_OpenChat(text) env.__openedChat = text end
     env.__itemRefs = {}
-    function env.SetItemRef(link) table.insert(env.__itemRefs, link) end
+    -- Every argument of each SetItemRef, for the board's links.
+    env.__itemRefCalls = {}
+    function env.SetItemRef(link, ...)
+        table.insert(env.__itemRefs, link)
+        table.insert(env.__itemRefCalls, { link, ... })
+    end
+    -- A modified click (Shift for CHATLINK) and an open chat box to put a
+    -- link in, when a test says so.
+    env.__modifiedClick = {}
+    function env.IsModifiedClick(kind) return env.__modifiedClick[kind] == true end
+    env.__chatBoxOpen = false
+    env.__inserted = {}
+    function env.ChatEdit_InsertLink(text)
+        if not env.__chatBoxOpen then return false end
+        table.insert(env.__inserted, text)
+        return true
+    end
     function env.hooksecurefunc(name, fn)
         local original = env[name]
         env[name] = function(...)

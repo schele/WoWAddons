@@ -248,9 +248,6 @@ local function passes(view, filter)
     if filter.hideCompleted and Posts.ForCompletedQuests(view) then
         return false
     end
-    if filter.activity and view.activity ~= filter.activity then
-        return false
-    end
     if view.roles and not Posts.WantsMe(view, filter.roles) then
         return false
     end
@@ -292,18 +289,3 @@ function Posts.Counts(filter)
     return counts
 end
 
---- The activities on the board, by name: what the dungeon picker steps through.
-function Posts.Activities()
-    local seen, list = {}, {}
-    for _, row in pairs(rows) do
-        local activity = Posts.View(row).activity
-        if activity and not seen[activity] then
-            seen[activity] = true
-            list[#list + 1] = activity
-        end
-    end
-    table.sort(list, function(a, b)
-        return a.name < b.name
-    end)
-    return list
-end

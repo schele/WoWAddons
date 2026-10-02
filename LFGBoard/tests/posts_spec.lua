@@ -265,29 +265,6 @@ describe("the filters", function()
         assertEqual("Brakk", rows[1].name)
         assertEqual("Garrok", rows[2].name)
     end)
-
-    it("show one activity when one is picked", function()
-        local ns = helpers.loadAddon()
-        board(ns)
-
-        local rows = visible(ns, { tab = "all", roles = helpers.ALL.roles, activity = ns.Activities.ByKey("dm") })
-
-        assertEqual(1, #rows)
-        assertEqual("Garrok", rows[1].name)
-    end)
-
-    it("list the activities on the board by name, for the picker", function()
-        local ns = helpers.loadAddon()
-        chat(ns, "Garrok", "LFM DM", 1000)
-        chat(ns, "Vexxa", "LFM SFK", 1001)
-        chat(ns, "Brakk", "LF2M quest Hogger", 1002)
-
-        local activities = ns.Posts.Activities()
-
-        assertEqual(2, #activities)
-        assertEqual("sfk", activities[1].key)
-        assertEqual("dm", activities[2].key)
-    end)
 end)
 
 describe("a group wanting you", function()

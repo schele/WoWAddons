@@ -41,8 +41,6 @@ is not clear the board says nothing rather than guess.
 
 - **Tabs:** All, Dungeons, Quests, Raids, each with a count. Posts for
   something the board does not know show under All as "Other".
-- **Dungeon:** click to step through the dungeons on the board, right-click
-  to step back.
 - **Tank, Healer, Damage:** the roles you play, kept per character. They
   start as your class allows. A group asking only for roles you have turned
   off is hidden; one that does not say stays.

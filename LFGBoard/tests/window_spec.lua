@@ -104,7 +104,7 @@ describe("the party column", function()
         end
 
         assertEqual("3/5, needs H D", party("LF2M DM need heals dps"))
-        assertEqual("?/5", party("LFM WC"))
+        assertEqual("1/5", party("LFM WC"), "the poster, at least")
         assertEqual("31/40, needs H", party("LFM MC 31/40 need heals"))
     end)
 
@@ -176,26 +176,6 @@ describe("the board's filters", function()
 
         assertFalse(frame.rows[1]:IsShown())
         assertFalse(ns.Roles().healer)
-    end)
-
-    it("step the dungeon picker through the dungeons on the board, and back to Any", function()
-        local _, env, frame = opened()
-        helpers.say(env, "Garrok", "LFM DM need tank")
-        helpers.say(env, "Vexxa", "LFM SFK need tank")
-
-        frame.picker:Click()
-        assertEqual("Dungeon: Shadowfang Keep", frame.picker:GetText())
-        assertMatch("Vexxa", frame.rows[1].who:GetText())
-        assertFalse(frame.rows[2]:IsShown())
-
-        frame.picker:Click()
-        assertEqual("Dungeon: Deadmines", frame.picker:GetText())
-
-        frame.picker:Click()
-        assertEqual("Dungeon: Any", frame.picker:GetText())
-
-        frame.picker:Click("RightButton")
-        assertEqual("Dungeon: Deadmines", frame.picker:GetText())
     end)
 end)
 
@@ -399,5 +379,130 @@ describe("the classes on a row", function()
         local row = frame.rows[1]
         assertEqual(select(4, row.party:GetPoint()), select(4, row.classes:GetPoint()))
         assertEqual(row.party.width, row.classes.width)
+    end)
+end)
+
+describe("the board's frame", function()
+    it("is the options window's own, with the name in its title bar, as BossLoot's and BankBags'", function()
+        local _, _, frame = opened()
+        assertEqual("SettingsFrameTemplate", frame.template)
+        assertEqual(frame.NineSlice.Text, frame.title)
+        assertEqual("LFG Board", frame.title:GetText())
+        assertEqual(frame.ClosePanelButton, frame.close)
+    end)
+
+    it("heads the name with LFGBoard's own icon", function()
+        local _, _, frame = opened()
+        assertEqual("Interface\\AddOns\\LFGBoard\\minimap", frame.logo:GetTexture())
+        local point, relativeTo, relativePoint = frame.logo:GetPoint()
+        assertEqual("RIGHT", point)
+        assertEqual(frame.title, relativeTo)
+        assertEqual("LEFT", relativePoint)
+    end)
+
+    it("is solid, not see-through, inside the game's border", function()
+        local _, _, frame = opened()
+        assertEqual(frame.Bg, frame.background:GetParent(), "drawn with the game's background, under all else")
+        assertEqual(1, frame.background.color[4])
+    end)
+
+    it("closes with its X", function()
+        local _, _, frame = opened()
+        frame.close.scripts.OnClick(frame.close, "LeftButton")
+        assertFalse(frame:IsShown())
+    end)
+
+    it("falls back to the dialog border, still solid, on a client without that frame", function()
+        local ns, env = helpers.loadAddon(nil, function(e) e.__missingTemplates.SettingsFrameTemplate = true end)
+        helpers.login(env)
+        helpers.command(env, "")
+        local frame = ns.Window.Frame()
+        assertTrue(frame:IsShown())
+        assertTrue(frame.backdrop ~= nil, "the dialog border")
+        assertNil(frame.backdrop.bgFile, "no see-through dialog background")
+        assertEqual(1, frame.background.color[4])
+        assertEqual("LFG Board", frame.title:GetText())
+        frame.close.scripts.OnClick(frame.close, "LeftButton")
+        assertFalse(frame:IsShown())
+    end)
+
+    it("keeps the tabs, the switches and the rows clear of the title bar", function()
+        local _, _, frame = opened()
+        assertTrue(select(5, frame.tabs.all:GetPoint()) <= -30, "the tabs")
+        assertTrue(select(5, frame.near:GetPoint()) <= -30, "the switches")
+    end)
+end)
+
+describe("links in what was said", function()
+    local DEFIAS = "|cffffff00|Hquest:155:18|h[The Defias Brotherhood]|h|r"
+
+    local function boardWithLink()
+        local ns, env, frame = opened()
+        helpers.say(env, "Garrok", "LF2M " .. DEFIAS)
+        return ns, env, frame.rows[1]
+    end
+
+    it("are live on every row", function()
+        local _, _, row = boardWithLink()
+        assertTrue(row.hyperlinks)
+    end)
+
+    it("show the quest's tooltip on hover, and hide it after", function()
+        local _, env, row = boardWithLink()
+        row.scripts.OnHyperlinkEnter(row, "quest:155:18", DEFIAS)
+        assertEqual("quest:155:18", env.GameTooltip.hyperlink)
+        assertEqual(row, env.GameTooltip.owner)
+        assertTrue(env.GameTooltip:IsShown())
+
+        row.scripts.OnHyperlinkLeave(row)
+        assertFalse(env.GameTooltip:IsShown())
+    end)
+
+    it("do not raise for a link the tooltip cannot show", function()
+        local _, env, row = boardWithLink()
+        env.GameTooltip.SetHyperlink = function() error("unknown link") end
+        row.scripts.OnHyperlinkEnter(row, "garbage:1", "[x]")
+    end)
+
+    it("do what chat does on a click", function()
+        local _, env, row = boardWithLink()
+        row.scripts.OnHyperlinkClick(row, "quest:155:18", DEFIAS, "LeftButton")
+        local call = env.__itemRefCalls[#env.__itemRefCalls]
+        assertEqual("quest:155:18", call[1])
+        assertEqual(DEFIAS, call[2])
+        assertEqual("LeftButton", call[3])
+        assertEqual(row, call[4])
+    end)
+
+    it("go into an open chat box on a Shift-click", function()
+        local _, env, row = boardWithLink()
+        env.__modifiedClick.CHATLINK = true
+        env.__chatBoxOpen = true
+        row.scripts.OnHyperlinkClick(row, "quest:155:18", DEFIAS, "LeftButton")
+        assertEqual(DEFIAS, env.__inserted[1])
+        assertEqual(0, #env.__itemRefCalls, "not opened as well")
+    end)
+
+    it("open as a click does on a Shift-click with no chat box open", function()
+        local _, env, row = boardWithLink()
+        env.__modifiedClick.CHATLINK = true
+        row.scripts.OnHyperlinkClick(row, "quest:155:18", DEFIAS, "LeftButton")
+        assertEqual(1, #env.__itemRefCalls)
+    end)
+
+    it("leave the window moving when a row is dragged, and remember where", function()
+        local ns, _, row = boardWithLink()
+        local frame = ns.Window.Frame()
+        row.scripts.OnDragStart(row)
+        assertTrue(frame.moving)
+        row.scripts.OnDragStop(row)
+        assertFalse(frame.moving)
+        assertEqual(frame:GetPoint(1), ns.db.window.point)
+    end)
+
+    it("leave the Whisper button working", function()
+        local _, env, row = boardWithLink()
+        row.whisper:Click()
+        assertMatch("Garrok", env.__openedChat or "")
     end)
 end)

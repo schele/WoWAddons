@@ -1,8 +1,7 @@
 local addonName, ns = ...
 
--- The board: tabs, the dungeon picker, the role and level switches, the
--- rows, and Refresh. Drawn again from Posts whenever anything changes while
--- it is open.
+-- The board: tabs, the role and level switches, the rows, and Refresh.
+-- Drawn again from Posts whenever anything changes while it is open.
 
 local Window = {}
 ns.Window = Window
@@ -16,6 +15,8 @@ ns.AddDefaults({
 
 local WIDTH, HEIGHT = 820, 460
 local ROW_HEIGHT = 28
+local LOGO = 16 -- the glyph before the name, sized to the title bar
+local LOGO_GAP = 6
 Window.ROWS = 12
 
 local TABS = {
@@ -40,12 +41,10 @@ local PARTY_WIDTH, SQUARES_WIDTH = 194, 96
 
 local frame
 local tab = "all"
-local picked
 
 function Window.Filter()
     return {
         tab = tab,
-        activity = picked,
         roles = ns.Roles(),
         nearLevel = ns.db.nearLevel,
         hideCompleted = ns.db.hideCompleted,
@@ -109,7 +108,8 @@ function Window.Party(view)
     if view.size then
         parts[#parts + 1] = view.size.have .. "/" .. view.size.of
     elseif view.kind == "dungeon" or view.kind == "quest" then
-        parts[#parts + 1] = "?/5"
+        -- The poster, at least: one who is looking is one in the group.
+        parts[#parts + 1] = "1/5"
     end
     if wants ~= "" then
         parts[#parts + 1] = "needs " .. wants
@@ -150,10 +150,69 @@ function Window.Classes(view)
     return table.concat(parts, " ")
 end
 
+local function savePosition(self)
+    self:StopMovingOrSizing()
+    local point, _, relativePoint, x, y = self:GetPoint(1)
+    local saved = ns.db.window
+    saved.point, saved.relativePoint, saved.x, saved.y = point, relativePoint, x, y
+end
+
+--- A link in what was said, hovered: its tooltip, as chat shows one.
+-- Guarded: the tooltip raises on a link type it does not know.
+local function showLink(row, link)
+    if not GameTooltip then
+        return
+    end
+    GameTooltip:SetOwner(row, "ANCHOR_CURSOR")
+    if pcall(GameTooltip.SetHyperlink, GameTooltip, link) then
+        GameTooltip:Show()
+    else
+        GameTooltip:Hide()
+    end
+end
+
+--- A link in what was said, clicked: what chat does. Shift puts it in an
+-- open chat box; otherwise, or with no box open, the game opens it.
+local function clickLink(row, link, text, mouseButton)
+    if IsModifiedClick and IsModifiedClick("CHATLINK") and ChatEdit_InsertLink and ChatEdit_InsertLink(text) then
+        return
+    end
+    if SetItemRef then
+        SetItemRef(link, text, mouseButton, row)
+    elseif ChatFrame_OnHyperlinkShow then
+        ChatFrame_OnHyperlinkShow(row, link, text, mouseButton)
+    end
+end
+
+--- Make the links in a row's text work as they do in chat. The row then
+-- takes the mouse, so a drag on it is handed on to the window.
+local function enableLinks(row)
+    if not row.SetHyperlinksEnabled then
+        return
+    end
+    row:SetHyperlinksEnabled(true)
+    row:EnableMouse(true)
+    row:SetScript("OnHyperlinkEnter", showLink)
+    row:SetScript("OnHyperlinkLeave", function()
+        if GameTooltip then
+            GameTooltip:Hide()
+        end
+    end)
+    row:SetScript("OnHyperlinkClick", clickLink)
+    row:RegisterForDrag("LeftButton")
+    row:SetScript("OnDragStart", function()
+        frame:StartMoving()
+    end)
+    row:SetScript("OnDragStop", function()
+        savePosition(frame)
+    end)
+end
+
 local function makeRow(index)
     local row = CreateFrame("Frame", nil, frame)
     row:SetSize(WIDTH - 32, ROW_HEIGHT)
     row:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -96 - (index - 1) * ROW_HEIGHT)
+    enableLinks(row)
 
     row.edge = row:CreateTexture(nil, "ARTWORK")
     row.edge:SetSize(3, ROW_HEIGHT - 4)
@@ -244,13 +303,6 @@ local function fill(row, view, now, mine)
     row:Show()
 end
 
-local function savePosition(self)
-    self:StopMovingOrSizing()
-    local point, _, relativePoint, x, y = self:GetPoint(1)
-    local saved = ns.db.window
-    saved.point, saved.relativePoint, saved.x, saved.y = point, relativePoint, x, y
-end
-
 local function button(label, width, x, y, onClick)
     local made = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     made:SetSize(width, 22)
@@ -273,8 +325,76 @@ local function checkbox(label, x, y, onClick)
     return box
 end
 
+--- CreateFrame with a template, or without it on a client that lacks it.
+local function createFrame(kind, name, parent, template)
+    local ok, created = pcall(CreateFrame, kind, name, parent, template)
+    if ok and created then
+        return created
+    end
+    return CreateFrame(kind, name, parent)
+end
+
+-- The window's frame, as BossLoot's and BankBags': the options window's own,
+-- the name in its title bar and its red X, so this reads as one of the
+-- game's windows. On a client without it, the dialog border, a name and a
+-- close button of our own. Solid either way: the options window and the
+-- dialog background let the world show through, which the rows of chat
+-- cannot bear.
+local function createWindowFrame()
+    local ok, made = pcall(CreateFrame, "Frame", "LFGBoardFrame", UIParent, "SettingsFrameTemplate")
+    if not (ok and made) then
+        made = createFrame("Frame", "LFGBoardFrame", UIParent, "BackdropTemplate")
+    end
+    local native = made.NineSlice and made.NineSlice.Text and made.ClosePanelButton and made.Bg
+
+    if native then
+        -- On the game's background, so under its border and title bar too.
+        made.background = made.Bg:CreateTexture(nil, "BACKGROUND", nil, 7)
+        made.background:SetAllPoints(made.Bg)
+        made.title = made.NineSlice.Text
+        made.title:ClearAllPoints()
+        made.title:SetPoint("TOP", made, "TOP", (LOGO + LOGO_GAP) / 2, -5)
+        made.close = made.ClosePanelButton
+    else
+        made.background = made:CreateTexture(nil, "BACKGROUND", nil, -8)
+        made.background:SetPoint("TOPLEFT", made, "TOPLEFT", 4, -4)
+        made.background:SetPoint("BOTTOMRIGHT", made, "BOTTOMRIGHT", -4, 4)
+        if made.SetBackdrop then
+            made:SetBackdrop({
+                edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+                edgeSize = 32,
+                insets = { left = 11, right = 12, top = 12, bottom = 11 },
+            })
+        end
+        made.title = made:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        made.title:SetPoint("TOP", made, "TOP", (LOGO + LOGO_GAP) / 2, -14)
+        made.close = createFrame("Button", nil, made, "UIPanelCloseButton")
+        made.close:SetPoint("TOPRIGHT", made, "TOPRIGHT", -4, -4)
+        if not (made.close.GetNormalTexture and made.close:GetNormalTexture()) then
+            made.close:SetText("X")
+        end
+    end
+    made.background:SetColorTexture(0.06, 0.045, 0.03, 1)
+    made.title:SetText("LFG Board")
+
+    -- The glyph alone, as the minimap button shows it, before the name: the
+    -- AddOns list icon carries a square tile that reads as a sticker here.
+    -- Drawn with the name, so over the title bar.
+    made.logo = (native and made.NineSlice or made):CreateTexture(nil, "OVERLAY")
+    made.logo:SetSize(LOGO, LOGO)
+    made.logo:SetPoint("RIGHT", made.title, "LEFT", -LOGO_GAP, 0)
+    made.logo:SetTexture("Interface\\AddOns\\LFGBoard\\minimap")
+
+    -- Our own, not the game's: that asks the window manager, which an addon
+    -- may not do in combat.
+    made.close:SetScript("OnClick", function()
+        made:Hide()
+    end)
+    return made
+end
+
 local function create()
-    frame = CreateFrame("Frame", "LFGBoardFrame", UIParent, "BackdropTemplate")
+    frame = createWindowFrame()
     frame:SetSize(WIDTH, HEIGHT)
     frame:SetFrameStrata("HIGH")
     frame:SetClampedToScreen(true)
@@ -285,28 +405,6 @@ local function create()
     frame:SetScript("OnDragStop", savePosition)
     local saved = ns.db.window
     frame:SetPoint(saved.point, UIParent, saved.relativePoint, saved.x, saved.y)
-    if frame.SetBackdrop then
-        frame:SetBackdrop({
-            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            tile = true,
-            tileSize = 32,
-            edgeSize = 32,
-            insets = { left = 11, right = 12, top = 12, bottom = 11 },
-        })
-    end
-
-    frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    frame.title:SetPoint("TOP", frame, "TOP", 0, -14)
-    frame.title:SetText("LFG Board")
-
-    -- Our own, not the game's: that asks the window manager, which an addon
-    -- may not do in combat.
-    frame.close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    frame.close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -6, -6)
-    frame.close:SetScript("OnClick", function()
-        frame:Hide()
-    end)
 
     frame.tabs = {}
     for index, info in ipairs(TABS) do
@@ -315,11 +413,6 @@ local function create()
             Window.Refresh()
         end)
     end
-
-    frame.picker = button("Dungeon: Any", 200, 460, -36, function(_, mouseButton)
-        Window.StepPicker(mouseButton == "RightButton" and -1 or 1)
-    end)
-    frame.picker:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
     -- Seven switches between the left edge and Refresh: each placed just past
     -- the last one's label, which leaves little to spare.
@@ -378,20 +471,6 @@ function Window.SetHideCompleted(on)
     ns.Changed()
 end
 
---- Step the dungeon picker through Any and the activities on the board.
-function Window.StepPicker(step)
-    local choices = ns.Posts.Activities()
-    local at = 0
-    for index, activity in ipairs(choices) do
-        if activity == picked then
-            at = index
-        end
-    end
-    at = (at + step) % (#choices + 1)
-    picked = at > 0 and choices[at] or nil
-    Window.Refresh()
-end
-
 function Window.Refresh()
     if not (frame and frame:IsShown()) then
         return
@@ -406,7 +485,6 @@ function Window.Refresh()
         tabButton:SetEnabled(info.key ~= tab)
     end
 
-    frame.picker:SetText("Dungeon: " .. (picked and ns.Activities.Display(picked) or "Any"))
     for key, box in pairs(frame.roles) do
         box:SetChecked(filter.roles[key])
     end
