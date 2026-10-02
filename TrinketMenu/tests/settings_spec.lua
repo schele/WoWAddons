@@ -132,3 +132,46 @@ describe("the lock command", function()
             "and the panel must not go stale")
     end)
 end)
+
+describe("the invert option", function()
+    it("leaves an ordinary checkbox showing the stored value as it is", function()
+        local ns = loggedIn()
+        local control = controlFor(ns, "bar", "locked")
+
+        ns.db.bar.locked = true
+        ns.SettingsPanel.Refresh()
+        assertTrue(control.widget:GetChecked())
+        ns.db.bar.locked = false
+        ns.SettingsPanel.Refresh()
+        assertFalse(control.widget:GetChecked())
+
+        control.widget:SetChecked(false)
+        control.widget.scripts.OnClick(control.widget)
+        assertEqual(false, ns.db.bar.locked)
+        control.widget:SetChecked(true)
+        control.widget.scripts.OnClick(control.widget)
+        assertEqual(true, ns.db.bar.locked)
+    end)
+
+    it("shows an inverted checkbox ticked while the stored value is false", function()
+        local ns, env = helpers.loadAddon()
+        ns.RegisterSetting({
+            store = "bar", key = "locked", type = "checkbox", invert = true, name = "Unlocked",
+        })
+        helpers.login(ns, env)
+        ns.SettingsPanel.EnsureBuilt()
+        local last = ns.SettingsPanel.controls[#ns.SettingsPanel.controls]
+        assertEqual("Unlocked", last.setting.name)
+        ns.db.bar.locked = false
+        ns.SettingsPanel.Refresh()
+        assertTrue(last.widget:GetChecked(), "stored false shows ticked")
+
+        ns.db.bar.locked = true
+        ns.SettingsPanel.Refresh()
+        assertFalse(last.widget:GetChecked())
+
+        last.widget:SetChecked(true)
+        last.widget.scripts.OnClick(last.widget)
+        assertEqual(false, ns.db.bar.locked, "a tick stores the opposite")
+    end)
+end)
