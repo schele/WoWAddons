@@ -1,0 +1,8 @@
+## Interface: 11509, 16001
+## Title: AutoVendor
+## Notes: Sells your grey items and repairs your gear whenever you open a merchant.
+## Author: You
+## Version: 0.1.0
+## SavedVariables: AutoVendorDB
+
+AutoVendor.lua
