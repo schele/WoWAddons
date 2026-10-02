@@ -9,3 +9,4 @@ RankUp.lua
 Ranks.lua
 Swap.lua
 Popup.lua
+Settings.lua

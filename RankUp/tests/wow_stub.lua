@@ -41,6 +41,7 @@ local function makeWidget(env, kind, parent, template)
     function widget:SetJustifyH(value) self.justifyH = value end
     function widget:SetWordWrap(value) self.wordWrap = value end
     function widget:SetTexture(value) self.texture = value end
+    function widget:GetTexture() return self.texture end
     function widget:CreateFontString() return makeWidget(env, "FontString", self) end
     function widget:CreateTexture() return makeWidget(env, "Texture", self) end
     -- Showing and hiding fire their scripts, and only on a real transition,
@@ -95,6 +96,19 @@ function stub.newEnv()
     env.UIParent = makeWidget(env, "Frame")
     env.UISpecialFrames = {}
     env.SlashCmdList = {}
+
+    -- The game's options window, and the addon's own .toc.
+    env.Settings = {
+        RegisterCanvasLayoutCategory = function(frame, name)
+            return { name = name, frame = frame, GetID = function() return "category-id" end }
+        end,
+        RegisterAddOnCategory = function(category) env.__settingsCategory = category end,
+    }
+    env.C_AddOns = {
+        GetAddOnMetadata = function(_, field)
+            return field == "Version" and "9.9.9" or nil
+        end,
+    }
 
     function env.print(...)
         local pieces = {}

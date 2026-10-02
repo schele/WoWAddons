@@ -80,7 +80,15 @@ local LEARN_EVENTS = { "LEARNED_SPELL_IN_TAB", "LEARNED_SPELL_IN_SKILL_LINE" }
 
 local lookedAtLogin = false
 
+-- Run once the player is in the world, for work that needs the full UI.
+local loginHandlers = {}
+
+function ns.OnLogin(handler)
+    table.insert(loginHandlers, handler)
+end
+
 local eventFrame = CreateFrame("Frame")
+eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -98,7 +106,11 @@ if not hearsLearning then
 end
 
 eventFrame:SetScript("OnEvent", function(_, event)
-    if event == "PLAYER_ENTERING_WORLD" then
+    if event == "PLAYER_LOGIN" then
+        for _, handler in ipairs(loginHandlers) do
+            handler()
+        end
+    elseif event == "PLAYER_ENTERING_WORLD" then
         -- Every loading screen fires this; only the first is the login.
         if not lookedAtLogin then
             lookedAtLogin = true
