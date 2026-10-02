@@ -5,6 +5,7 @@ local M = {}
 M.FILES = {
     "RankUp.lua",
     "Ranks.lua",
+    "Swap.lua",
 }
 
 --- Load the addon's files into a stubbed environment, the way WoW would:
