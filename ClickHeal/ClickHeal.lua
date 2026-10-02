@@ -75,6 +75,8 @@ ns.settings = settings
 -- is this addon's own: one row per slot, holding a spell name.
 local SETTING_TYPES = { checkbox = true, slider = true, spelltable = true }
 
+-- A checkbox may set invert = true: the panel then shows it ticked while the
+-- stored value is false, for a flag stored as "hide" but offered as "Show ...".
 function ns.RegisterSetting(definition)
     assert(type(definition) == "table", "RegisterSetting expects a table")
 
