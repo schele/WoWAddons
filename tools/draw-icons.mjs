@@ -1,4 +1,4 @@
-// Draws the 64x64 icons for BossLoot, FishScale, BankBags, GatherMap, RankUp and AutoVendor, and their minimap icons, in the style of
+// Draws the 64x64 icons for BossLoot, FishScale, BankBags, GatherMap, RankUp, AutoVendor and LFGBoard, and their minimap icons, in the style of
 // the others: a dark rounded tile with a soft glow in the addon's colour, a
 // thin ring, and a light, glossy symbol with a darker outline and details.
 // A minimap icon is the symbol alone, filling the frame: the minimap button
@@ -232,6 +232,19 @@ const coinDetails = union(
 );
 const coinShine = ellipse(25, 24, 5, 1.4);
 
+// LFGBoard: three figures, a group, in violet.
+const violet = {
+  dark: [14, 8, 20], glow: [70, 38, 104], ring: [170, 120, 230],
+  light: [236, 214, 255], mid: [160, 110, 220], outline: [50, 24, 78], detail: [80, 44, 120],
+};
+const group = union(
+  circle(32, 22, 6.5), roundBox(32, 40, 10, 9, 4.5), // the one in front
+  circle(18.5, 27, 5.5), roundBox(18.5, 43, 7.5, 7.5, 3.5), // and beside it
+  circle(45.5, 27, 5.5), roundBox(45.5, 43, 7.5, 7.5, 3.5),
+);
+const groupDetails = (x, y) => 1;
+const groupShine = ellipse(29.5, 19, 2.8, 1.2);
+
 const root = process.argv[2];
 writeTga(path.join(root, 'BossLoot', 'icon.tga'), draw(crimson, chest, chestDetails, chestShine));
 writeTga(path.join(root, 'BossLoot', 'minimap.tga'), draw(crimson, chest, chestDetails, chestShine, { tile: false, zoom: 1.4 }));
@@ -245,3 +258,5 @@ writeTga(path.join(root, 'GatherMap', 'minimap.tga'), draw(green, mapPin, pinDet
 console.log('written');
 writeTga(path.join(root, 'RankUp', 'icon.tga'), draw(gold, rankArrow, arrowDetails, arrowShine));
 writeTga(path.join(root, 'AutoVendor', 'icon.tga'), draw(silver, coinStack, coinDetails, coinShine));
+writeTga(path.join(root, 'LFGBoard', 'icon.tga'), draw(violet, group, groupDetails, groupShine));
+writeTga(path.join(root, 'LFGBoard', 'minimap.tga'), draw(violet, group, groupDetails, groupShine, { tile: false, zoom: 1.3 }));

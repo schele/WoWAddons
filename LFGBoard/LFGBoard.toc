@@ -1,6 +1,7 @@
 ## Interface: 11509, 16001
 ## Title: LFGBoard
 ## Notes: Groups that want you, from chat and the group finder, on one board.
+## IconTexture: Interface\AddOns\LFGBoard\icon
 ## Author: You
 ## Version: 0.1.0
 ## SavedVariables: LFGBoardDB
