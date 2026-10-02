@@ -11,6 +11,7 @@ World of Warcraft addons, one folder each.
 | [FishScale](FishScale/) | One key to cast, pick up the bobber and recast while fishing |
 | [BossLoot](BossLoot/) | Every dungeon and raid, its bosses and their loot with drop chances, plus notable trash and chest drops |
 | [GatherMap](GatherMap/) | Pins on the world map and minimap for every vein you have mined and herb you have picked |
+| [RankUp](RankUp/) | When you train a new rank, offers to put it on every action button that still holds an older one |
 
 ## Layout
 

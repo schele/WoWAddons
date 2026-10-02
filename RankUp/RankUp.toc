@@ -1,6 +1,7 @@
 ## Interface: 11509, 16001
 ## Title: RankUp
 ## Notes: Offers to put the highest rank you know on every action button that holds an older one.
+## IconTexture: Interface\AddOns\RankUp\icon
 ## Author: You
 ## Version: 0.1.0
 

@@ -1,4 +1,4 @@
-// Draws the 64x64 icons for BossLoot, FishScale, BankBags and GatherMap, and their minimap icons, in the style of
+// Draws the 64x64 icons for BossLoot, FishScale, BankBags, GatherMap and RankUp, and their minimap icons, in the style of
 // the others: a dark rounded tile with a soft glow in the addon's colour, a
 // thin ring, and a light, glossy symbol with a darker outline and details.
 // A minimap icon is the symbol alone, filling the frame: the minimap button
@@ -198,6 +198,21 @@ const pinDetails = union(
 );
 const pinShine = ellipse(26, 16.5, 5, 1.6);
 
+// RankUp: an arrow pointing up, with two rank stripes across its shaft, in gold.
+const gold = {
+  dark: [20, 15, 4], glow: [104, 80, 20], ring: [226, 186, 72],
+  light: [255, 240, 176], mid: [232, 184, 64], outline: [82, 58, 8], detail: [112, 82, 16],
+};
+const rankArrow = union(
+  triangle(32, 10, 12, 32, 52, 32), // the head
+  roundBox(32, 41, 8, 12, 2), // the shaft
+);
+const arrowDetails = union(
+  roundBox(32, 40, 8, 1.2, 0.5),
+  roundBox(32, 46, 8, 1.2, 0.5),
+);
+const arrowShine = ellipse(28, 25, 4, 1.4);
+
 const root = process.argv[2];
 writeTga(path.join(root, 'BossLoot', 'icon.tga'), draw(crimson, chest, chestDetails, chestShine));
 writeTga(path.join(root, 'BossLoot', 'minimap.tga'), draw(crimson, chest, chestDetails, chestShine, { tile: false, zoom: 1.4 }));
@@ -209,3 +224,4 @@ writeTga(path.join(root, 'BankBags', 'tab.tga'), draw(teal, safe, safeDetails, s
 writeTga(path.join(root, 'GatherMap', 'icon.tga'), draw(green, mapPin, pinDetails, pinShine));
 writeTga(path.join(root, 'GatherMap', 'minimap.tga'), draw(green, mapPin, pinDetails, pinShine, { tile: false, zoom: 1.35 }));
 console.log('written');
+writeTga(path.join(root, 'RankUp', 'icon.tga'), draw(gold, rankArrow, arrowDetails, arrowShine));
