@@ -84,8 +84,12 @@ function ns.CloseOptions()
     end
 end
 
--- The top of the saved banks' list, below the switches.
-local LIST_TOP = -PADDING - ROW_HEIGHT * 5 - 14
+-- Clear space under the description paragraph, and under the "Saved banks"
+-- heading. Everything below hangs off those two rather than a fixed height on
+-- the panel, so a paragraph that wraps to another line pushes the rows down
+-- instead of crowding them.
+local HINT_GAP = 16
+local HEADING_GAP = 10
 
 local function row(index)
     local made = Panel.rows[index]
@@ -94,7 +98,8 @@ local function row(index)
     end
     made = CreateFrame("Frame", nil, panel)
     made:SetSize(PANEL_WIDTH - PADDING * 2, ROW_HEIGHT - 4)
-    made:SetPoint("TOPLEFT", PADDING + 4, LIST_TOP - (index - 1) * (ROW_HEIGHT - 4))
+    made:SetPoint("TOPLEFT", Panel.heading, "BOTTOMLEFT", 4,
+        -HEADING_GAP - (index - 1) * (ROW_HEIGHT - 4))
 
     made.forget = CreateFrame("Button", nil, made, "UIPanelButtonTemplate")
     made.forget:SetSize(70, 20)
@@ -181,10 +186,13 @@ local function ensureBuilt()
         .. "visit a banker. Open it from the minimap button or with /bb."
     )
 
-    local y = -PADDING - ROW_HEIGHT * 2 - 8
+    Panel.hint = hint
+
+    -- Measured down from the hint's bottom edge.
+    local y = -HINT_GAP
 
     Panel.open = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    Panel.open:SetPoint("TOPLEFT", PADDING + 4, y)
+    Panel.open:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", 4, y)
     Panel.open:SetSize(160, 22)
     Panel.open:SetText("Open BankBags")
     -- Opening closes the options over it.
@@ -194,7 +202,7 @@ local function ensureBuilt()
     y = y - ROW_HEIGHT - 6
 
     Panel.minimap = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-    Panel.minimap:SetPoint("TOPLEFT", PADDING, y)
+    Panel.minimap:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", 0, y)
     -- The label belongs to the template on some clients and not others, so
     -- write our own rather than reaching for button.Text and finding nil.
     local minimapLabel = Panel.minimap:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -206,15 +214,17 @@ local function ensureBuilt()
     y = y - ROW_HEIGHT - 6
 
     local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    heading:SetPoint("TOPLEFT", PADDING, y)
+    heading:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", 0, y)
     heading:SetText("Saved banks")
+    Panel.heading = heading
 
     Panel.none = panel:CreateFontString(nil, "ARTWORK", "GameFontDisable")
-    Panel.none:SetPoint("TOPLEFT", PADDING + 4, LIST_TOP - 4)
+    Panel.none:SetPoint("TOPLEFT", heading, "BOTTOMLEFT", 4, -HEADING_GAP - 4)
     Panel.none:SetText("None yet. Visit a banker on each character to save their bank.")
 
     Panel.more = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    Panel.more:SetPoint("TOPLEFT", PADDING + 4, LIST_TOP - MAX_ROWS * (ROW_HEIGHT - 4) - 4)
+    Panel.more:SetPoint("TOPLEFT", heading, "BOTTOMLEFT", 4,
+        -HEADING_GAP - MAX_ROWS * (ROW_HEIGHT - 4) - 4)
 
     Panel.Refresh()
 end
