@@ -189,3 +189,79 @@ describe("a search you asked for", function()
         assertEqual(0, #ns.Posts.Visible(helpers.ALL))
     end)
 end)
+
+describe("the finder as Classic gives it", function()
+    it("reads members given name first, and the leader's level", function()
+        local ns, env = helpers.loadAddon()
+        env.__memberShape = "classic"
+        helpers.list(env, 1, "Garrok", 10, {
+            { name = "Garrok", role = "TANK", class = "WARRIOR", level = 22 },
+            { name = "Vexxa", role = "DAMAGER", class = "ROGUE", level = 21 },
+        })
+
+        local listing = ns.Finder.Read(1)
+
+        assertEqual("tank", listing.members[1].role)
+        assertEqual("WARRIOR", listing.members[1].class)
+        assertEqual("dps", listing.members[2].role)
+        assertEqual("WARRIOR", listing.class)
+        assertEqual(22, listing.level)
+    end)
+
+    it("takes the kind from the activity's category when its name says nothing", function()
+        local ns, env = helpers.loadAddon()
+        env.__activities[31] = { fullName = "Westfall", maxNumPlayers = 5, categoryID = 116 }
+        env.__activities[32] = { fullName = "Blackroot Hollow", maxNumPlayers = 5, categoryID = 2 }
+        helpers.list(env, 1, "Brakk", 31, {})
+        helpers.list(env, 2, "Vexxa", 32, {})
+
+        assertEqual("quest", ns.Finder.Read(1).kind)
+        assertEqual("dungeon", ns.Finder.Read(2).kind)
+        assertNil(ns.Finder.Read(2).activity)
+    end)
+
+    it("searches with the category's activities on a client that needs them", function()
+        local ns, env = helpers.loadAddon()
+        env.C_LFGList.Search = function(categoryID, activityIDs)
+            if type(activityIDs) ~= "table" then error("activityIDs expected") end
+            table.insert(env.__searches, categoryID)
+        end
+        env.C_LFGList.GetAvailableActivities = function() return { 10, 11, 12 } end
+
+        assertTrue(ns.Finder.Search("dungeon"))
+
+        assertEqual(2, env.__searches[1])
+    end)
+
+    it("says so when a search fails", function()
+        local _, env = helpers.loggedIn()
+
+        helpers.fire(env, "LFG_LIST_SEARCH_FAILED")
+
+        assertMatch("The group finder search failed", helpers.printed(env))
+    end)
+end)
+
+describe("/lfgb finder", function()
+    it("prints what the finder gives, for checking it in game", function()
+        local _, env = helpers.loggedIn()
+        helpers.list(env, 1, "Garrok", 10, GARROK_PARTY)
+
+        helpers.command(env, "finder")
+
+        local printed = helpers.printed(env)
+        assertMatch("category 2 = Dungeons", printed)
+        assertMatch("leaderName=Garrok", printed)
+        assertMatch("1=TANK", printed)
+        assertMatch("2=WARRIOR", printed)
+    end)
+
+    it("says so on a client without one", function()
+        local _, env = helpers.loggedIn()
+        env.C_LFGList = nil
+
+        helpers.command(env, "finder")
+
+        assertMatch("This client has no group finder%.", helpers.printed(env))
+    end)
+end)

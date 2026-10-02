@@ -279,7 +279,13 @@ function stub.newEnv(saved)
         GetSearchResultMemberInfo = function(id, index)
             local listing = env.__results[id]
             local member = listing and listing.members[index]
-            if member then return member.role, member.class end
+            if not member then return nil end
+            -- Classic's group browser gives the name first, then the role,
+            -- the class, its localized name and the level.
+            if env.__memberShape == "classic" then
+                return member.name or "Someone", member.role, member.class, "Localized", member.level
+            end
+            return member.role, member.class
         end,
         GetActivityInfoTable = function(id) return env.__activities[id] end,
     }
