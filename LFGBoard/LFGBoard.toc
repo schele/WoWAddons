@@ -9,3 +9,4 @@ LFGBoard.lua
 Activities.lua
 Parse.lua
 Posts.lua
+Finder.lua
