@@ -287,6 +287,10 @@ local function create()
     frame.alerts = checkbox("Alerts", 420, -64, function(checked)
         ns.db.alerts = checked
     end)
+    -- Ticked while the button shows; the board is the only page this addon has.
+    frame.minimap = checkbox("Minimap button", 500, -64, function(checked)
+        ns.MinimapButton.SetHidden(not checked)
+    end)
     frame.refresh = button("Refresh", 96, WIDTH - 116, -62, function()
         local ok, why = ns.Finder.Search(tab)
         if not ok then
@@ -343,6 +347,7 @@ function Window.Refresh()
     end
     frame.near:SetChecked(ns.db.nearLevel)
     frame.alerts:SetChecked(ns.db.alerts)
+    frame.minimap:SetChecked(not ns.db.minimap.hide)
     frame.refresh:SetEnabled(ns.Finder.Available())
 
     local views = ns.Posts.Visible(filter)

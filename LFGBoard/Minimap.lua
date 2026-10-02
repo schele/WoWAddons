@@ -122,11 +122,14 @@ ns.OnLogin(function()
     end
 end)
 
+--- Hide the button, or show it again; remembered. The board is told, so its
+-- switch follows a change made by command.
 function MinimapButton.SetHidden(hide)
     ns.db.minimap.hide = hide and true or false
     if button then
         button:SetShown(not ns.db.minimap.hide)
     end
+    ns.Changed()
 end
 
 ns.RegisterCommand("minimap", "hide or show the minimap button", function()

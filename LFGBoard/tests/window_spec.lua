@@ -259,3 +259,50 @@ describe("the party column", function()
         assertTrue(clear(frame.rows[2]), "a row with squares")
     end)
 end)
+
+describe("the minimap switch", function()
+    it("sits in the row of switches, after Alerts, labelled 'Minimap button'", function()
+        local _, _, frame = opened()
+
+        assertEqual("Minimap button", frame.minimap.label:GetText())
+        local _, _, _, x, y = frame.minimap:GetPoint()
+        assertEqual(500, x)
+        assertEqual(-64, y)
+    end)
+
+    it("is ticked while the button shows, and unticked once it is hidden", function()
+        local ns, _, frame = opened()
+        assertTrue(frame.minimap:GetChecked())
+
+        ns.MinimapButton.SetHidden(true)
+
+        assertFalse(frame.minimap:GetChecked())
+    end)
+
+    it("starts unticked when the saved choice is hidden", function()
+        local _, _, frame = opened({ minimap = { hide = true } })
+        assertFalse(frame.minimap:GetChecked())
+    end)
+
+    it("hides the button when unticked, shows it when ticked, and remembers", function()
+        local ns, _, frame = opened()
+
+        frame.minimap:Click()
+        assertFalse(ns.MinimapButton.Button():IsShown())
+        assertTrue(ns.db.minimap.hide)
+
+        frame.minimap:Click()
+        assertTrue(ns.MinimapButton.Button():IsShown())
+        assertFalse(ns.db.minimap.hide)
+    end)
+
+    it("follows /lfgb minimap", function()
+        local _, env, frame = opened()
+
+        helpers.command(env, "minimap")
+        assertFalse(frame.minimap:GetChecked(), "unticked after hiding by command")
+
+        helpers.command(env, "minimap")
+        assertTrue(frame.minimap:GetChecked(), "ticked after showing by command")
+    end)
+end)
