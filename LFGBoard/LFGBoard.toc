@@ -14,3 +14,4 @@ Whisper.lua
 Alerts.lua
 Chat.lua
 Window.lua
+Minimap.lua

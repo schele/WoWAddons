@@ -12,6 +12,7 @@ M.FILES = {
     "Alerts.lua",
     "Chat.lua",
     "Window.lua",
+    "Minimap.lua",
 }
 
 -- A filter that shows every row.
