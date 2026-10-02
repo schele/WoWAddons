@@ -43,10 +43,11 @@ A green edge marks a group that asks for one of your roles.
 
 ## Alerts
 
-When a group asks for one of your roles in a dungeon near your level, you
-hear a sound and get one chat line with a **[Whisper]** link. Once per
-person and dungeon, never while you are in a group, and off with the
-board's Alerts switch.
+When someone posts in chat for a dungeon, raid or quest near your level and
+asks for one of your roles, you hear a sound and get one chat line with a
+**[Whisper]** link. Once per person and dungeon, never while you are in a
+group, never for a post the board cannot place ("Other"), and off with the
+board's Alerts switch. A Refresh never alerts: you are already looking.
 
 ## Whisper
 
@@ -64,6 +65,7 @@ group wants.
 |---|---|
 | `/lfgb` | Open or close the board |
 | `/lfgb minimap` | Hide or show the minimap button |
+| `/lfgb finder` | Print what the group finder gives, to check it is being read |
 | `/lfgb help` | The commands |
 
 ## Install

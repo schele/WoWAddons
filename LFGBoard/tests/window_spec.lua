@@ -240,3 +240,22 @@ describe("the board's place", function()
         assertEqual(-50, ns.db.window.y)
     end)
 end)
+
+describe("the party column", function()
+    local function clear(row)
+        local right = row.party.points[1][4] + row.party.width
+        local whisperLeft = row.width + row.whisper.points[1][4] - row.whisper.width
+        return right <= whisperLeft
+    end
+
+    it("stays clear of the Whisper button, beside squares or not", function()
+        local _, env, frame = opened()
+        helpers.list(env, 1, "Garrok", 10, GARROK_PARTY)
+        helpers.searched(env)
+        helpers.later(env, 1)
+        helpers.say(env, "Vexxa", "LF2M SFK need heals dps")
+
+        assertTrue(clear(frame.rows[1]), "a row from chat")
+        assertTrue(clear(frame.rows[2]), "a row with squares")
+    end)
+end)

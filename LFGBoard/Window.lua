@@ -31,7 +31,10 @@ local ROLE_LETTERS = { tank = "T", healer = "H", dps = "D" }
 local SOURCES = { chat = "chat only", finder = "group finder", both = "group finder + chat" }
 
 -- Where the columns start, from a row's left edge.
-local AGE_X, WHO_X, WHAT_X, SAID_X, PARTY_X = 8, 50, 172, 300, 560
+local AGE_X, WHO_X, WHAT_X, SAID_X, PARTY_X = 8, 50, 172, 300, 516
+-- The party column ends where the Whisper button begins, beside the squares
+-- or not, so "room for T H D" keeps its last letter.
+local PARTY_WIDTH, SQUARES_WIDTH = 194, 96
 
 local frame
 local tab = "all"
@@ -133,8 +136,8 @@ local function makeRow(index)
     row.who = text(WHO_X, 5, 118)
     row.source = text(WHO_X, -7, 118, "GameFontDisableSmall")
     row.what = text(WHAT_X, 0, 124)
-    row.said = text(SAID_X, 0, 256)
-    row.party = text(PARTY_X, 0, 140)
+    row.said = text(SAID_X, 0, 210)
+    row.party = text(PARTY_X, 0, PARTY_WIDTH)
 
     row.slots = {}
     for slot = 1, 5 do
@@ -187,7 +190,8 @@ local function fill(row, view, now, mine)
     end
 
     row.party:ClearAllPoints()
-    row.party:SetPoint("LEFT", row, "LEFT", squares and (PARTY_X + 96) or PARTY_X, 0)
+    row.party:SetPoint("LEFT", row, "LEFT", squares and (PARTY_X + SQUARES_WIDTH) or PARTY_X, 0)
+    row.party:SetWidth(squares and (PARTY_WIDTH - SQUARES_WIDTH) or PARTY_WIDTH)
     row.party:SetText(Window.Party(view))
     row:Show()
 end
