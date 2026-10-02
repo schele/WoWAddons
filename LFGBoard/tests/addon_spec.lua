@@ -126,3 +126,16 @@ describe("a change to the board", function()
         ns.Changed()
     end)
 end)
+
+describe("the player on a realm with a space in its name", function()
+    it("is known in chat, where the space is left out", function()
+        local ns, env = helpers.loggedIn()
+        env.__player.realm = "Living Flame"
+
+        assertTrue(ns.IsMe("Skyler-LivingFlame"))
+
+        env.GetNormalizedRealmName = function() return "LivingFlame" end
+        assertTrue(ns.IsMe("Skyler-LivingFlame"))
+        assertEqual("Skyler-LivingFlame", ns.Me())
+    end)
+end)

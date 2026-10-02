@@ -273,6 +273,7 @@ function stub.newEnv(saved)
                 name = "",
                 numMembers = #listing.members,
                 isDelisted = listing.delisted == true,
+                hasSelf = listing.hasSelf == true,
             }
         end,
         GetSearchResultMemberInfo = function(id, index)

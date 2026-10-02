@@ -167,3 +167,25 @@ describe("the finder's results", function()
         assertTrue(ns.Finder.Available())
     end)
 end)
+
+describe("a search you asked for", function()
+    it("sounds no alerts: you are already looking", function()
+        local _, env = helpers.loggedIn()
+        helpers.list(env, 1, "Garrok", 10, GARROK_PARTY)
+
+        helpers.searched(env)
+
+        assertEqual(0, #env.__sounds)
+    end)
+
+    it("leaves your own listing off the board, and a group you are in", function()
+        local ns, env = helpers.loggedIn()
+        helpers.list(env, 1, "Skyler", 10, { { role = "TANK", class = "DRUID" } })
+        helpers.list(env, 2, "Garrok", 10, GARROK_PARTY)
+        env.__results[2].hasSelf = true
+
+        helpers.searched(env)
+
+        assertEqual(0, #ns.Posts.Visible(helpers.ALL))
+    end)
+end)

@@ -67,12 +67,18 @@ function M.guild(env, sender, text, guid)
     M.fire(env, "CHAT_MSG_GUILD", text, sender, "Common", "", sender, "", 0, 0, "", 0, 1, guid)
 end
 
---- A group finder listing. `members` are { role = "TANK", class = "WARRIOR" }.
+--- A group finder listing. `members` are { role = "TANK", class = "WARRIOR" },
+-- copied, so a test that grows one listing's party leaves the table it
+-- passed alone for the next.
 function M.list(env, id, leader, activityID, members, comment, delisted)
+    local copied = {}
+    for index, member in ipairs(members) do
+        copied[index] = member
+    end
     env.__results[id] = {
         leader = leader,
         activityID = activityID,
-        members = members,
+        members = copied,
         comment = comment or "",
         delisted = delisted,
     }

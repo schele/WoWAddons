@@ -87,6 +87,10 @@ function Finder.Read(resultID)
         if type(info) ~= "table" or type(info.leaderName) ~= "string" then
             return nil
         end
+        -- Your own listing, or a group you are already in, is not one to join.
+        if info.hasSelf or ns.IsMe(info.leaderName) then
+            return nil
+        end
 
         local name, max = activityOf(info)
         local activity = type(name) == "string" and ns.Activities.Find(name) or nil
@@ -137,13 +141,10 @@ function Finder.Results()
     end, {})
 end
 
+-- No alerts from a search: whoever searched is already looking at the
+-- groups, and one Refresh would sound once for every one of them.
 local function received()
-    local changed = ns.Posts.SetListings(Finder.Results(), GetTime())
-    if ns.Alerts then
-        for _, row in ipairs(changed) do
-            ns.Alerts.Consider(ns.Posts.View(row))
-        end
-    end
+    ns.Posts.SetListings(Finder.Results(), GetTime())
     ns.Changed()
 end
 

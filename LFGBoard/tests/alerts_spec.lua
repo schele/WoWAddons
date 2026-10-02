@@ -97,3 +97,11 @@ describe("an alert's link", function()
         assertEqual("item:1234", env.__itemRefs[1])
     end)
 end)
+
+describe("an alert for something the board does not know", function()
+    it("does not come, however it asks", function()
+        local ns = helpers.loggedIn()
+
+        assertFalse(ns.Alerts.Consider(posted(ns, "Garrok", "LFM new dungeon Blackroot need tank")))
+    end)
+end)

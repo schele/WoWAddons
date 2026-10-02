@@ -51,7 +51,9 @@ end
 --- Alert for `view` if it explicitly wants one of your roles near your
 -- level, you are not in a group, and it is new. True when it did.
 function Alerts.Consider(view)
-    if not (view and ns.db and ns.db.alerts) or inGroup() then
+    -- A group for something the board does not know is as likely Trade
+    -- talk as a group, so it is shown but never sounded.
+    if not (view and ns.db and ns.db.alerts) or view.kind == "other" or inGroup() then
         return false
     end
     local mine = ns.Roles()

@@ -52,9 +52,13 @@ local function ensureDatabase()
     ns.db = LFGBoardDB
 end
 
---- This character, as its roles are saved: "Name-Realm".
+--- This character as chat names it: "Name-Realm", the realm without its
+-- spaces ("Living Flame" is "LivingFlame"). Its roles are saved under it.
 function ns.Me()
-    local realm = GetRealmName and GetRealmName() or "?"
+    local realm = GetNormalizedRealmName and GetNormalizedRealmName()
+    if type(realm) ~= "string" or realm == "" then
+        realm = (GetRealmName and GetRealmName() or "?"):gsub("%s", "")
+    end
     return string.format("%s-%s", UnitName("player") or "?", realm)
 end
 
