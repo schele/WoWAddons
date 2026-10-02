@@ -1,0 +1,7 @@
+## Interface: 11509, 16001
+## Title: MailHandler
+## Notes: Tick the mails you want and open only those.
+## Author: You
+## Version: 0.1.0
+
+MailHandler.lua
