@@ -14,6 +14,7 @@ World of Warcraft addons, one folder each.
 | [RankUp](RankUp/) | When you train a new rank, offers to put it on every action button that still holds an older one |
 | [AutoVendor](AutoVendor/) | Sells your grey items and repairs your gear whenever you open a merchant, with a keep list for greys you want |
 | [LFGBoard](LFGBoard/) | Groups that want you, from chat and the group finder, filtered to your roles and level, with a whisper ready to send |
+| [MailHandler](MailHandler/) | A checkbox on every mail, and Open beside Open All to take only the ticked ones |
 
 ## Layout
 

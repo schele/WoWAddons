@@ -41,7 +41,9 @@ The agreed mockup is the inbox from Carl's screenshot with the four
 ## Open
 
 **Open (N)** is greyed out while nothing is ticked. Clicked, it works
-through the ticked mails, top to bottom, one step at a time:
+through the ticked mails from the bottom up (oldest first), one step at a
+time, so a mail the game removes once empty never moves the ones still to
+do:
 
 1. The mail's gold, if any (`TakeInboxMoney`).
 2. Each of its items, one at a time (`TakeInboxItem`).
