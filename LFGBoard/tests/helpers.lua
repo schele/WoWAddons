@@ -6,6 +6,7 @@ M.FILES = {
     "LFGBoard.lua",
     "Activities.lua",
     "Parse.lua",
+    "Posts.lua",
 }
 
 -- A filter that shows every row.
