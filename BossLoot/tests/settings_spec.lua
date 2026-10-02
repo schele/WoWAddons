@@ -99,3 +99,28 @@ describe("closing the page", function()
         assertFalse(env.GameMenuFrame:IsShown())
     end)
 end)
+
+describe("the page's layout", function()
+    -- The hint wraps to as many lines as the font needs. Rows placed at a
+    -- fixed height on the panel let its last line crowd what came next.
+    it("hangs the first row off the bottom of the hint, with room to breathe", function()
+        local ns, env, panel = opened()
+        local point, relativeTo, relativePoint, x, y = panel.open:GetPoint(1)
+        assertEqual("TOPLEFT", point)
+        assertTrue(relativeTo == panel.hint, "anchored to the hint")
+        assertEqual("BOTTOMLEFT", relativePoint)
+        assertTrue(y <= -16, "at least 16px below the hint")
+    end)
+
+    it("keeps every row below it off the hint too, in order", function()
+        local ns, env, panel = opened()
+        local previous = 0
+        for _, widget in ipairs({ panel.open, panel.minimap, panel.debug, panel.unhide }) do
+            local _, relativeTo, _, _, y = widget:GetPoint(1)
+            assertTrue(relativeTo == panel.hint, "anchored to the hint")
+            assertTrue(y < previous, "below the row before")
+            previous = y
+        end
+        assertEqual(0, select(4, panel.minimap:GetPoint(1)), "checkboxes line up with the hint, as before")
+    end)
+end)

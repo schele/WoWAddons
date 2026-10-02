@@ -8,6 +8,8 @@ local PADDING = 16
 local LOGO_SIZE = 24
 local ROW_HEIGHT = 30
 local PANEL_WIDTH = 400
+-- Clear space between the description paragraph and the first row under it.
+local HINT_GAP = 16
 
 local Panel = {}
 ns.SettingsPanel = Panel
@@ -84,7 +86,7 @@ end
 
 local function addCheckbox(text, y, onClick)
     local button = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-    button:SetPoint("TOPLEFT", PADDING, y)
+    button:SetPoint("TOPLEFT", Panel.hint, "BOTTOMLEFT", 0, y)
 
     -- The label belongs to the template on some clients and not others, so
     -- write our own rather than reaching for button.Text and finding nil.
@@ -100,7 +102,7 @@ end
 
 local function addButton(text, width, y, onClick)
     local button = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    button:SetPoint("TOPLEFT", PADDING + 4, y)
+    button:SetPoint("TOPLEFT", Panel.hint, "BOTTOMLEFT", 4, y)
     button:SetSize(width, 22)
     button:SetText(text)
     button:SetScript("OnClick", onClick)
@@ -157,7 +159,11 @@ local function ensureBuilt()
         .. "from the minimap button or with /bl."
     )
 
-    local y = -PADDING - ROW_HEIGHT * 2 - 8
+    -- Rows hang off the bottom of the hint rather than a fixed height on the
+    -- panel, so a hint that wraps to another line pushes them down instead of
+    -- crowding them. Each y is measured down from the hint's bottom edge.
+    Panel.hint = hint
+    local y = -HINT_GAP
 
     -- Opening closes the options over it.
     Panel.open = addButton("Open BossLoot", 160, y, function()
