@@ -143,3 +143,46 @@ describe("the panel's heading", function()
         assertTrue(ns.SettingsPanel.logo:GetWidth() > 0, "and has a size to draw at")
     end)
 end)
+
+describe("the invert option", function()
+    it("leaves an ordinary checkbox showing the stored value as it is", function()
+        local ns = loggedIn()
+        local control = controlFor(ns, "chat", "shorten")
+
+        ns.db.chat.shorten = true
+        ns.SettingsPanel.Refresh()
+        assertTrue(control.widget:GetChecked())
+        ns.db.chat.shorten = false
+        ns.SettingsPanel.Refresh()
+        assertFalse(control.widget:GetChecked())
+
+        control.widget:SetChecked(false)
+        control.widget.scripts.OnClick(control.widget)
+        assertEqual(false, ns.db.chat.shorten)
+        control.widget:SetChecked(true)
+        control.widget.scripts.OnClick(control.widget)
+        assertEqual(true, ns.db.chat.shorten)
+    end)
+
+    it("shows an inverted checkbox ticked while the stored value is false", function()
+        local ns, env = helpers.loadAddon()
+        ns.RegisterSetting({
+            store = "chat", key = "shorten", type = "checkbox", invert = true, name = "Unshorten",
+        })
+        helpers.login(ns, env)
+        ns.SettingsPanel.EnsureBuilt()
+        local last = ns.SettingsPanel.controls[#ns.SettingsPanel.controls]
+        assertEqual("Unshorten", last.setting.name)
+        ns.db.chat.shorten = false
+        ns.SettingsPanel.Refresh()
+        assertTrue(last.widget:GetChecked(), "stored false shows ticked")
+
+        ns.db.chat.shorten = true
+        ns.SettingsPanel.Refresh()
+        assertFalse(last.widget:GetChecked())
+
+        last.widget:SetChecked(true)
+        last.widget.scripts.OnClick(last.widget)
+        assertEqual(false, ns.db.chat.shorten, "a tick stores the opposite")
+    end)
+end)
