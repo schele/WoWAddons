@@ -104,7 +104,8 @@ finder window searches.
 For each listed group: the leader, the activity, the comment, and each
 member's class and role (and level, where the finder gives it). A group that
 reaches 5 of 5, or delists, is removed as soon as the game reports it. A new
-search replaces the finder rows from the last one; chat rows are untouched.
+search replaces the finder rows from the last one; chat rows are untouched. A finder row also
+drops off 10 minutes after the search that last saw it.
 
 A finder listing and a chat message from the same leader share one row: the
 finder's party, the chat message's words and time.
@@ -161,7 +162,8 @@ Enter sends it, or it can be edited first:
   `affli`). Left out with no points spent.
 - **Roles:** your roles that the row wants, joined by "or"; all your roles
   when it does not say. Words: `tank`, `healer`, `dps`.
-- **Activity:** the row's name; "your group" for Other.
+- **Activity:** the row's name; "your quest group" for a quest group,
+  "your group" for Other.
 
 ## Alerts
 
@@ -189,6 +191,7 @@ Near my level:
 | `Finder.lua` | The group finder: Refresh's search, reading results and members, updates, removal |
 | `Whisper.lua` | The message and opening chat with it |
 | `Alerts.lua` | When to alert, the sound, the chat line and its link |
+| `Chat.lua` | Listening to the channels and guild chat, and sweeping out rows past ten minutes |
 | `Window.lua` | The board: tabs, picker, switches, rows, Refresh |
 | `Minimap.lua` | The minimap button |
 
@@ -203,7 +206,7 @@ the board still works from chat alone.
 ```
 LFGBoardDB = {
     window = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 0 },
-    minimap = { angle = 170, hide = false },
+    minimap = { angle = 125, hide = false },
     alerts = true,
     nearLevel = true,
     roles = { ["Skyler-Aldira"] = { tank = true, healer = false, dps = true } },
