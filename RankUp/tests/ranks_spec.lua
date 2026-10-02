@@ -145,3 +145,38 @@ describe("the older client's spell calls", function()
         assertEqual("Rank 5", groups[1].toRank)
     end)
 end)
+
+describe("a name that answers with a lower rank than the button's", function()
+    -- A client listing every rank might answer a name with the first it
+    -- finds. Putting that on the bar would be a downgrade called an upgrade.
+    local function answeringRankOne(env)
+        local real = env.C_Spell.GetSpellInfo
+        env.C_Spell.GetSpellInfo = function(identifier)
+            if type(identifier) == "string" then
+                return real(5185)
+            end
+            return real(identifier)
+        end
+    end
+
+    it("is not taken for a higher one", function()
+        local ns, env = helpers.loadAddon()
+        answeringRankOne(env)
+        helpers.place(env, 3, 5188) -- Rank 4
+
+        assertEqual(0, #ns.Ranks.Outdated())
+    end)
+
+    it("does not stop a rank with no number in its words from counting", function()
+        local ns, env = helpers.loadAddon()
+        env.__spells[7620] = { name = "Fishing", rank = 1, words = "Apprentice" }
+        env.__spells[7731] = { name = "Fishing", rank = 2, words = "Journeyman" }
+        env.__known[7620], env.__known[7731] = true, true
+        helpers.place(env, 9, 7620)
+
+        local groups = ns.Ranks.Outdated()
+
+        assertEqual(1, #groups)
+        assertEqual("Journeyman", groups[1].toRank)
+    end)
+end)

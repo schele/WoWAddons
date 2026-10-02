@@ -44,24 +44,6 @@ local function topRank(name)
     return nil
 end
 
---- What an outdated slot holds, { id, name, top }, or nil. One guarded read,
--- so a client that raises on any part of it costs that slot and no other.
-local function readSlot(slot)
-    return ns.Guarded(function()
-        local kind, id = GetActionInfo(slot)
-        if kind ~= "spell" or type(id) ~= "number" then
-            return nil
-        end
-
-        local name = nameOf(id)
-        local top = type(name) == "string" and topRank(name) or nil
-        if type(top) == "number" and top ~= id then
-            return { id = id, name = name, top = top }
-        end
-        return nil
-    end, nil)
-end
-
 --- A spell's rank as the client words it ("Rank 5"), or nil for a spell
 -- with none.
 function Ranks.RankText(spellID)
@@ -84,6 +66,33 @@ end
 local function rankNumber(text)
     local digits = type(text) == "string" and text:match("%d+")
     return digits and tonumber(digits) or math.huge
+end
+
+--- Whether `top` is a lower or the same rank as `id`, by the numbers in
+-- their words. A client listing every rank might answer a name with the
+-- first it finds, and putting that on the bar would be a downgrade. Words
+-- without a number ("Journeyman") cannot be compared, so they never block.
+local function notHigher(id, top)
+    local from, to = rankNumber(Ranks.RankText(id)), rankNumber(Ranks.RankText(top))
+    return from ~= math.huge and to ~= math.huge and to <= from
+end
+
+--- What an outdated slot holds, { id, name, top }, or nil. One guarded read,
+-- so a client that raises on any part of it costs that slot and no other.
+local function readSlot(slot)
+    return ns.Guarded(function()
+        local kind, id = GetActionInfo(slot)
+        if kind ~= "spell" or type(id) ~= "number" then
+            return nil
+        end
+
+        local name = nameOf(id)
+        local top = type(name) == "string" and topRank(name) or nil
+        if type(top) == "number" and top ~= id and not notHigher(id, top) then
+            return { id = id, name = name, top = top }
+        end
+        return nil
+    end, nil)
 end
 
 --- Every outdated button, grouped by spell and sorted by its name. Empty

@@ -172,6 +172,7 @@ function stub.newEnv()
         end,
         GetSpellSubtext = function(id)
             local spell = env.__spells[id]
+            if spell and spell.words then return spell.words end
             if spell and spell.rank then return "Rank " .. spell.rank end
             return ""
         end,
