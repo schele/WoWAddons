@@ -7,9 +7,12 @@ local addonName, ns = ...
 local Buttons = {}
 ns.Buttons = Buttons
 
-local BUTTON_WIDTH, BUTTON_HEIGHT = 96, 22
+local BUTTON_WIDTH, BUTTON_HEIGHT = 80, 22
 -- How far Open and Open All sit either side of where Open All was.
-local SHIFT = 50
+local SHIFT = 42
+-- How far each mail's icon, and the text hung off it, moves right so its
+-- box is clear of the frame's border.
+local ROOM = 20
 
 local created = false
 local boxes = {}
@@ -24,6 +27,57 @@ local function pageOffset()
     return ((type(page) == "number" and page or 1) - 1) * rowsPerPage()
 end
 
+local function leftAnchored(point)
+    return point == "TOPLEFT" or point == "LEFT" or point == "BOTTOMLEFT"
+end
+
+local function shiftRight(region)
+    local point, relative, relativePoint, x, y = region:GetPoint(1)
+    region:ClearAllPoints()
+    region:SetPoint(point, relative, relativePoint, (x or 0) + ROOM, y or 0)
+end
+
+-- Moves the icon right by ROOM, and with it the row's text, which hangs off
+-- the row rather than the icon. The text is narrowed as far, so it still
+-- ends short of the days left on the right. Text hung off moved text moves
+-- with it and is only narrowed.
+local function makeRoom(rowFrame, icon)
+    if icon:GetPoint(1) then
+        shiftRight(icon)
+    end
+    if not rowFrame.GetRegions then
+        return
+    end
+
+    local texts = {}
+    for _, region in ipairs({ rowFrame:GetRegions() }) do
+        if region:GetObjectType() == "FontString" and region:GetNumPoints() == 1 then
+            table.insert(texts, region)
+        end
+    end
+
+    local moved = {}
+    local changed = true
+    while changed do
+        changed = false
+        for _, text in ipairs(texts) do
+            local point, relative = text:GetPoint(1)
+            if not moved[text] and leftAnchored(point)
+                and (relative == rowFrame or moved[relative]) then
+                if relative == rowFrame then
+                    shiftRight(text)
+                end
+                local width = text:GetWidth()
+                if width > ROOM then
+                    text:SetWidth(width - ROOM)
+                end
+                moved[text] = true
+                changed = true
+            end
+        end
+    end
+end
+
 local function makeBox(row)
     local rowFrame = _G["MailItem" .. row]
     if not rowFrame then
@@ -32,15 +86,29 @@ local function makeBox(row)
     local box = CreateFrame("CheckButton", nil, rowFrame, "UICheckButtonTemplate")
     box:SetSize(22, 22)
     local icon = _G["MailItem" .. row .. "Button"]
-    box:SetPoint("RIGHT", icon or rowFrame, "LEFT", -1, 0)
+    if icon then
+        makeRoom(rowFrame, icon)
+    end
+    box:SetPoint("RIGHT", icon or rowFrame, "LEFT", -2, 0)
     box:SetScript("OnClick", function(self)
         ns.Ticks.Set(self.key, self:GetChecked())
     end)
     return box
 end
 
+-- The small font, so the text of two buttons that fit where one did clears
+-- Prev and Next.
+local function smallText(button)
+    if GameFontNormalSmall and button.SetNormalFontObject then
+        button:SetNormalFontObject(GameFontNormalSmall)
+        button:SetHighlightFontObject(GameFontHighlightSmall)
+        button:SetDisabledFontObject(GameFontDisableSmall)
+    end
+end
+
 local function panelButton(name, text, onClick)
     local made = CreateFrame("Button", name, InboxFrame, "UIPanelButtonTemplate")
+    smallText(made)
     made:SetSize(BUTTON_WIDTH, BUTTON_HEIGHT)
     made:SetText(text)
     made:SetScript("OnClick", onClick)
@@ -85,6 +153,7 @@ function Buttons.Create()
         x, y = x or 0, y or 0
         native:ClearAllPoints()
         native:SetWidth(BUTTON_WIDTH)
+        smallText(native)
         native:SetPoint(point, relative, relativePoint, x + SHIFT, y)
         openButton:SetPoint(point, relative, relativePoint, x - SHIFT, y)
     else

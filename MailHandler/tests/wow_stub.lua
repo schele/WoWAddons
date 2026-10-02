@@ -33,7 +33,18 @@ local function makeWidget(env, kind, parent, template)
     function widget:GetParent() return self.parent end
     function widget:SetText(value) self.text = value end
     function widget:GetText() return self.text end
-    function widget:CreateFontString() return makeWidget(env, "FontString", self) end
+    function widget:CreateFontString()
+        local text = makeWidget(env, "FontString", self)
+        self.regions = self.regions or {}
+        table.insert(self.regions, text)
+        return text
+    end
+    function widget:GetRegions() return table.unpack(self.regions or {}) end
+    function widget:GetObjectType() return self.kind end
+    function widget:SetNormalFontObject(font) self.fonts = self.fonts or {}; self.fonts.normal = font end
+    function widget:SetHighlightFontObject(font) self.fonts = self.fonts or {}; self.fonts.highlight = font end
+    function widget:SetDisabledFontObject(font) self.fonts = self.fonts or {}; self.fonts.disabled = font end
+    function widget:GetNumPoints() return #self.points end
     function widget:SetChecked(value) self.checked = value and true or false end
     function widget:GetChecked() return self.checked end
     function widget:SetEnabled(value) self.enabled = value and true or false end
@@ -104,11 +115,27 @@ function stub.newEnv()
     env.INBOXITEMS_TO_DISPLAY = 7
     env.ATTACHMENTS_MAX_RECEIVE = 12
     env.UIParent = makeWidget(env, "Frame")
+    env.GameFontNormalSmall = { name = "GameFontNormalSmall" }
+    env.GameFontHighlightSmall = { name = "GameFontHighlightSmall" }
+    env.GameFontDisableSmall = { name = "GameFontDisableSmall" }
     env.InboxFrame = makeWidget(env, "Frame", env.UIParent)
     env.InboxFrame.pageNum = 1
     for row = 1, 7 do
         env["MailItem" .. row] = makeWidget(env, "Frame", env.InboxFrame)
         env["MailItem" .. row .. "Button"] = makeWidget(env, "Button", env["MailItem" .. row])
+        env["MailItem" .. row .. "Button"]:SetPoint("TOPLEFT", env["MailItem" .. row], "TOPLEFT", 0, 0)
+        -- The text hangs off the row, not the icon, as the game's does.
+        local sender = env["MailItem" .. row]:CreateFontString()
+        sender:SetPoint("TOPLEFT", env["MailItem" .. row], "TOPLEFT", 44, -2)
+        sender:SetWidth(225)
+        env["MailItem" .. row .. "Sender"] = sender
+        local subject = env["MailItem" .. row]:CreateFontString()
+        subject:SetPoint("TOPLEFT", sender, "BOTTOMLEFT", 0, -1)
+        subject:SetWidth(240)
+        env["MailItem" .. row .. "Subject"] = subject
+        local expires = env["MailItem" .. row]:CreateFontString()
+        expires:SetPoint("TOPRIGHT", env["MailItem" .. row], "TOPRIGHT", -4, -2)
+        env["MailItem" .. row .. "ExpireTime"] = expires
     end
     env.InboxPrevPageButton = makeWidget(env, "Button", env.InboxFrame)
     env.OpenAllMail = makeWidget(env, "Button", env.InboxFrame, "UIPanelButtonTemplate")

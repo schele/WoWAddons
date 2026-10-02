@@ -20,6 +20,49 @@ describe("the boxes", function()
         assertFalse(parts.boxes[4]:IsShown())
     end)
 
+    it("get room of their own: each icon moves right to make it", function()
+        local _, env = opened(1)
+        local point, relative, relativePoint, x = env.MailItem1Button:GetPoint(1)
+
+        assertEqual("TOPLEFT", point)
+        assertEqual(env.MailItem1, relative)
+        assertEqual("TOPLEFT", relativePoint)
+        assertTrue(x >= 20)
+    end)
+
+    it("move the row's text right as far as the icon, so the icon does not cover it", function()
+        local _, env = opened(1)
+        local iconX = select(4, env.MailItem1Button:GetPoint(1))
+        local point, relative, relativePoint, x, y = env.MailItem1Sender:GetPoint(1)
+
+        assertEqual("TOPLEFT", point)
+        assertEqual(env.MailItem1, relative)
+        assertEqual("TOPLEFT", relativePoint)
+        assertEqual(44 + iconX, x)
+        assertEqual(-2, y)
+    end)
+
+    it("narrow that text as far, so it ends where it did", function()
+        local _, env = opened(1)
+        local iconX = select(4, env.MailItem1Button:GetPoint(1))
+
+        assertEqual(225 - iconX, env.MailItem1Sender:GetWidth())
+    end)
+
+    it("narrow text hung off moved text, which moves with it, without moving it twice", function()
+        local _, env = opened(1)
+        local iconX = select(4, env.MailItem1Button:GetPoint(1))
+
+        assertEqual(0, select(4, env.MailItem1Subject:GetPoint(1)))
+        assertEqual(240 - iconX, env.MailItem1Subject:GetWidth())
+    end)
+
+    it("leave text hung off the row's right where it is", function()
+        local _, env = opened(1)
+
+        assertEqual(-4, select(4, env.MailItem1ExpireTime:GetPoint(1)))
+    end)
+
     it("follow a page change", function()
         local ns, env, parts = opened(9)
 
@@ -102,10 +145,20 @@ describe("Open All", function()
 
         local _, _, _, x = env.OpenAllMail:GetPoint(1)
         local _, _, _, openX = parts.open:GetPoint(1)
-        assertEqual(50, x)
-        assertEqual(-50, openX)
+        assertEqual(42, x)
+        assertEqual(-42, openX)
         assertTrue(env.OpenAllMail:IsShown())
         assertNil(parts.openAll)
+    end)
+
+    it("and Open use the small font, so their text clears Prev and Next", function()
+        local _, env, parts = opened(3)
+
+        for _, button in ipairs({ parts.open, env.OpenAllMail }) do
+            assertEqual(env.GameFontNormalSmall, button.fonts.normal)
+            assertEqual(env.GameFontHighlightSmall, button.fonts.highlight)
+            assertEqual(env.GameFontDisableSmall, button.fonts.disabled)
+        end
     end)
 
     it("is MailHandler's own where the game has none, and opens every mail", function()
