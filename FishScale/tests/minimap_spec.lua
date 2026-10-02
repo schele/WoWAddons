@@ -82,3 +82,67 @@ describe("the minimap button", function()
         assertTrue(ns.MinimapButton.Button():IsShown())
     end)
 end)
+
+describe("the minimap checkbox", function()
+    --- The settings page on screen, with the box to hand.
+    local function page()
+        local ns, env = withMinimap()
+        ns.SettingsPanel.panel:Show()
+        return ns, env, ns.SettingsPanel.minimap
+    end
+
+    local function click(box)
+        box:SetChecked(not box:GetChecked())
+        box.scripts.OnClick(box)
+    end
+
+    it("is on the page, labelled 'Show the minimap button', and ticked while the button shows", function()
+        local ns, env, box = page()
+        assertTrue(box ~= nil, "the box is on the page")
+        assertTrue(box:GetChecked())
+        local labelled = false
+        for _, fontString in ipairs(box.fontStrings or {}) do
+            labelled = labelled or fontString.text == "Show the minimap button"
+        end
+        assertTrue(labelled, "with its label")
+    end)
+
+    it("starts unticked when the saved choice is hidden", function()
+        local ns, env = helpers.loadAddon()
+        env.Minimap = env.CreateFrame("Frame", nil, env.UIParent)
+        env.Minimap:SetSize(140, 140)
+        env.FishScaleDB = { minimap = { hide = true } }
+        helpers.login(ns, env)
+        ns.SettingsPanel.panel:Show()
+        assertFalse(ns.SettingsPanel.minimap:GetChecked())
+    end)
+
+    it("hides the button at once when unticked, and remembers", function()
+        local ns, env, box = page()
+        click(box)
+        assertFalse(ns.MinimapButton.Button():IsShown())
+        assertTrue(ns.db.minimap.hide)
+    end)
+
+    it("shows the button again when ticked", function()
+        local ns, env, box = page()
+        click(box)
+        click(box)
+        assertTrue(ns.MinimapButton.Button():IsShown())
+        assertFalse(ns.db.minimap.hide)
+    end)
+
+    it("follows /fs minimap", function()
+        local ns, env, box = page()
+        helpers.command(env, "minimap")
+        assertFalse(box:GetChecked(), "unticked after hiding by command")
+        helpers.command(env, "minimap")
+        assertTrue(box:GetChecked(), "ticked after showing by command")
+    end)
+
+    it("leaves the command saying what it did", function()
+        local ns, env = page()
+        helpers.command(env, "minimap")
+        assertMatch("/fs minimap brings it back", table.concat(env.__said, "\n"))
+    end)
+end)

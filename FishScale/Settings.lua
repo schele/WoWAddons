@@ -131,6 +131,7 @@ function Panel.Refresh()
     Panel.enabled:SetChecked(db.enabled)
     Panel.withoutPole:SetChecked(db.withoutPole)
     Panel.autoLoot:SetChecked(db.autoLoot)
+    Panel.minimap:SetChecked(not ns.db.minimap.hide)
     if not capturing then
         Panel.key:SetText(db.key)
     end
@@ -186,6 +187,12 @@ local function ensureBuilt()
 
     Panel.autoLoot = addCheckbox("Turn auto loot on while fishing", y, PADDING, function(value)
         ns.Fishing.SetAutoLoot(value)
+    end)
+    y = y - ROW_HEIGHT
+
+    -- Stored as "hide", shown as "Show": the box is ticked while it shows.
+    Panel.minimap = addCheckbox("Show the minimap button", y, PADDING, function(value)
+        ns.MinimapButton.SetHidden(not value)
     end)
 
     Panel.Refresh()

@@ -64,7 +64,13 @@ local function makeWidget(kind, parent, template)
             fn(...)
         end
     end
-    function widget:CreateFontString() return makeWidget("FontString", self) end
+    -- Remembered on the parent, so a test can find a label by its text.
+    function widget:CreateFontString()
+        local fontString = makeWidget("FontString", self)
+        self.fontStrings = self.fontStrings or {}
+        table.insert(self.fontStrings, fontString)
+        return fontString
+    end
     function widget:SetWidth(value) self.width = value end
     function widget:SetJustifyH(value) self.justifyH = value end
     function widget:SetAllPoints() end
