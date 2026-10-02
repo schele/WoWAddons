@@ -6,6 +6,7 @@ M.FILES = {
     "MailHandler.lua",
     "Inbox.lua",
     "Ticks.lua",
+    "Opener.lua",
 }
 
 --- Load the addon's files into a stubbed client, in .toc order. `prepare`
