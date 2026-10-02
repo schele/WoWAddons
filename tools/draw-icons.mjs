@@ -2,7 +2,9 @@
 // the others: a dark rounded tile with a soft glow in the addon's colour, a
 // thin ring, and a light, glossy symbol with a darker outline and details.
 // A minimap icon is the symbol alone, filling the frame: the minimap button
-// supplies its own dark disc and gold ring.
+// supplies its own dark disc and gold ring. A logo is drawn the same way, for
+// an addon with a settings page but no minimap button: its heading wants the
+// symbol without the tile.
 // Usage, from the repo root: node tools/draw-icons.mjs .
 import fs from 'node:fs';
 import path from 'node:path';
@@ -269,7 +271,10 @@ writeTga(path.join(root, 'GatherMap', 'icon.tga'), draw(green, mapPin, pinDetail
 writeTga(path.join(root, 'GatherMap', 'minimap.tga'), draw(green, mapPin, pinDetails, pinShine, { tile: false, zoom: 1.35 }));
 console.log('written');
 writeTga(path.join(root, 'RankUp', 'icon.tga'), draw(gold, rankArrow, arrowDetails, arrowShine));
+writeTga(path.join(root, 'RankUp', 'logo.tga'), draw(gold, rankArrow, arrowDetails, arrowShine, { tile: false, zoom: 1.35 }));
 writeTga(path.join(root, 'AutoVendor', 'icon.tga'), draw(silver, coinStack, coinDetails, coinShine));
+writeTga(path.join(root, 'AutoVendor', 'logo.tga'), draw(silver, coinStack, coinDetails, coinShine, { tile: false, zoom: 1.4 }));
 writeTga(path.join(root, 'LFGBoard', 'icon.tga'), draw(violet, group, groupDetails, groupShine));
 writeTga(path.join(root, 'LFGBoard', 'minimap.tga'), draw(violet, group, groupDetails, groupShine, { tile: false, zoom: 1.3 }));
 writeTga(path.join(root, 'MailHandler', 'icon.tga'), draw(blue, envelope, envelopeDetails, envelopeShine));
+writeTga(path.join(root, 'MailHandler', 'logo.tga'), draw(blue, envelope, envelopeDetails, envelopeShine, { tile: false, zoom: 1.4 }));
