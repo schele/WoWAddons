@@ -15,6 +15,13 @@ local BOX_HEIGHT = 24
 -- crowding the line the hint sits on just below it.
 local LOGO_SIZE = 24
 
+-- The description paragraph: where its top sits on the page, the clear space
+-- under it before the columns, and a generous guess at its height for a
+-- client that will not measure it (three lines of GameFontHighlightSmall).
+local HINT_TOP = PADDING + ROW_HEIGHT
+local HINT_GAP = 16
+local HINT_FALLBACK_HEIGHT = 42
+
 local COLUMN_WIDTH = 280
 local PANEL_WIDTH = COLUMN_WIDTH * 2
 
@@ -23,11 +30,11 @@ ns.SettingsPanel = Panel
 Panel.controls = {}
 Panel.headings = {}
 
-local panel, content, category, built
+local panel, content, hint, category, built
 
 local function addCheckbox(setting, y, x)
     local button = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
-    button:SetPoint("TOPLEFT", x, y)
+    button:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", x, y)
 
     -- The label belongs to the template on some clients and not others, so
     -- write our own rather than reaching for button.Text and finding nil.
@@ -60,7 +67,7 @@ end
 
 local function addSlider(setting, y, x)
     local slider = CreateFrame("Slider", nil, content, "OptionsSliderTemplate")
-    slider:SetPoint("TOPLEFT", x, y - SLIDER_EXTRA)
+    slider:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", x, y - SLIDER_EXTRA)
     slider:SetMinMaxValues(setting.min, setting.max)
     slider:SetValueStep(setting.step or 1)
     slider:SetObeyStepOnDrag(true)
@@ -414,7 +421,8 @@ local function addSpellTable(setting, y, x)
     local function placeRow(row, position)
         row:ClearAllPoints()
         row:SetPoint(
-            "TOPLEFT", x + 20, y - ROW_HEIGHT - (position - 1) * BOX_HEIGHT
+            "TOPLEFT", hint, "BOTTOMLEFT",
+            x + 20, y - ROW_HEIGHT - (position - 1) * BOX_HEIGHT
         )
     end
 
@@ -427,14 +435,14 @@ local function addSpellTable(setting, y, x)
     end
 
     local heading = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    heading:SetPoint("TOPLEFT", x, y)
+    heading:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", x, y)
     heading:SetText(setting.name)
 
     for index = 1, rows do
         local top = y - ROW_HEIGHT - (index - 1) * BOX_HEIGHT
 
         local number = content:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-        number:SetPoint("TOPLEFT", x, top - 4)
+        number:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", x, top - 4)
         number:SetText(tostring(index))
         numbers[index] = number
 
@@ -594,6 +602,26 @@ function Panel.Refresh()
     refreshing = false
 end
 
+-- How far below the hint's bottom edge the longer column ends. Set once the
+-- page is built.
+local columnsBottom
+
+--- Make the scrolling content as tall as the longer column, so the scroll
+-- range ends just past the last setting rather than at some guess. The hint's
+-- own height is measured, since the columns hang off it; a client that will
+-- not measure it gets a generous guess instead. Run again each time the page
+-- shows, in case the text had not been laid out yet when it was built.
+local function fitContent()
+    if not columnsBottom or content == panel then
+        return
+    end
+    local hintHeight = hint.GetStringHeight and hint:GetStringHeight() or 0
+    if not hintHeight or hintHeight < 1 then
+        hintHeight = HINT_FALLBACK_HEIGHT
+    end
+    content:SetHeight(HINT_TOP + hintHeight - columnsBottom + PADDING)
+end
+
 local function ensureBuilt()
     if built or not panel then
         return
@@ -661,8 +689,8 @@ local function ensureBuilt()
     version:SetPoint("LEFT", title, "RIGHT", 8, -2)
     version:SetText("Version " .. ((metadata and metadata(addonName, "Version")) or "unknown"))
 
-    local hint = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    hint:SetPoint("TOPLEFT", PADDING, -PADDING - ROW_HEIGHT)
+    hint = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    hint:SetPoint("TOPLEFT", PADDING, -HINT_TOP)
     hint:SetWidth(PANEL_WIDTH - PADDING * 2)
     hint:SetJustifyH("LEFT")
     hint:SetText(
@@ -671,11 +699,19 @@ local function ensureBuilt()
         .. "re-point a spell button while you are fighting."
     )
 
+    Panel.hint = hint
+
     -- Two columns, each falling down its own side independently. A setting
     -- names the column it belongs to; anything that names none goes left,
     -- which is every setting declared before columns existed.
-    local top = -PADDING - ROW_HEIGHT * 2
-    local columnX = { left = PADDING, right = PADDING + COLUMN_WIDTH }
+    --
+    -- Both hang off the bottom of the hint rather than a fixed height on the
+    -- page: the hint wraps to however many lines the font needs, and a fixed
+    -- offset let its last line crowd what came next. x and y are measured
+    -- from the hint's bottom-left corner, which sits at PADDING like the
+    -- left column always did.
+    local top = -HINT_GAP
+    local columnX = { left = 0, right = COLUMN_WIDTH }
     local y = { left = top, right = top }
 
     for _, setting in ipairs(ns.settings) do
@@ -687,7 +723,7 @@ local function ensureBuilt()
         -- puts a setting in never appears at all.
         if ns.columns[column] and not Panel.headings[column] then
             local heading = content:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-            heading:SetPoint("TOPLEFT", x, y[column])
+            heading:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", x, y[column])
             heading:SetText(ns.columns[column])
             Panel.headings[column] = heading
             y[column] = y[column] - ROW_HEIGHT
@@ -708,11 +744,8 @@ local function ensureBuilt()
         table.insert(Panel.controls, control)
     end
 
-    -- As tall as the longer column, so the scroll range ends just past the
-    -- last setting rather than at some guess.
-    if content ~= panel then
-        content:SetHeight(-math.min(y.left, y.right) + PADDING)
-    end
+    columnsBottom = math.min(y.left, y.right)
+    fitContent()
 
     Panel.Refresh()
 end
@@ -728,6 +761,7 @@ local function register()
 
     panel:SetScript("OnShow", function()
         ensureBuilt()
+        fitContent()
         Panel.Refresh()
     end)
 

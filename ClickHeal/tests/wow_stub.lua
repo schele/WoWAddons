@@ -202,6 +202,9 @@ local function makeWidget(kind, parent, template, env)
         if handler then handler(self) end
     end
     function widget:GetText() return self.text end
+    -- What the client measures a wrapped font string at; zero until a test
+    -- says otherwise, as a client that has not laid the text out yet would.
+    function widget:GetStringHeight() return self.stringHeight or 0 end
     function widget:GetName() return self.frameName end
     function widget:GetObjectType() return self.kind end
     function widget:SetTextColor(r, g, b) self.textColor = { r, g, b } end

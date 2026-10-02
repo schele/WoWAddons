@@ -179,7 +179,7 @@ end)
 
 describe("the two columns", function()
     local function xOf(control)
-        local _, x = control.widget:GetPoint()
+        local _, _, _, x = control.widget:GetPoint()
         return x
     end
 
@@ -219,8 +219,8 @@ describe("the two columns", function()
         -- one, not below everything already stacked there.
         local ns = loggedIn()
         local _, _, slotsY = nil, nil, nil
-        local _, _, y = controlFor(ns, "bar", "slots").widget:GetPoint()
-        local _, _, rightY = controlFor(ns, "bar", "selfBottom").widget:GetPoint()
+        local _, _, _, _, y = controlFor(ns, "bar", "slots").widget:GetPoint()
+        local _, _, _, _, rightY = controlFor(ns, "bar", "selfBottom").widget:GetPoint()
 
         assertTrue(rightY > y - 100,
             "the right column is near the top, not far below the spell table")
@@ -228,10 +228,47 @@ describe("the two columns", function()
 
     it("heads the column above the first control in it", function()
         local ns = loggedIn()
-        local _, _, headingY = ns.SettingsPanel.headings.right:GetPoint()
-        local _, _, firstY = controlFor(ns, "bar", "selfBottom").widget:GetPoint()
+        local _, _, _, _, headingY = ns.SettingsPanel.headings.right:GetPoint()
+        local _, _, _, _, firstY = controlFor(ns, "bar", "selfBottom").widget:GetPoint()
 
         assertTrue(headingY > firstY, "the title sits above what it titles")
+    end)
+end)
+
+describe("the panel's layout", function()
+    -- The hint wraps to as many lines as the font needs. Rows placed at a
+    -- fixed height on the panel let its last line crowd what came next.
+    it("hangs the first thing in each column off the bottom of the hint, with room to breathe", function()
+        local ns = loggedIn()
+        local hint = ns.SettingsPanel.hint
+        local first = {
+            ns.SettingsPanel.controls[1].widget,
+            ns.SettingsPanel.headings.right,
+        }
+        if ns.SettingsPanel.headings.left then
+            first[1] = ns.SettingsPanel.headings.left
+        end
+        for _, widget in ipairs(first) do
+            local point, relativeTo, relativePoint, _, y = widget:GetPoint(1)
+            assertEqual("TOPLEFT", point)
+            assertTrue(relativeTo == hint, "anchored to the hint")
+            assertEqual("BOTTOMLEFT", relativePoint)
+            assertTrue(y <= -16, "at least 16px below the hint")
+        end
+    end)
+
+    it("keeps the left column lined up with the hint, as before", function()
+        local ns = loggedIn()
+        local _, _, _, x = controlFor(ns, "bar", "slots").widget:GetPoint(1)
+        assertEqual(0, x)
+    end)
+
+    it("hangs every control off the hint", function()
+        local ns = loggedIn()
+        for _, control in ipairs(ns.SettingsPanel.controls) do
+            local _, relativeTo = control.widget:GetPoint(1)
+            assertTrue(relativeTo == ns.SettingsPanel.hint, control.setting.key)
+        end
     end)
 end)
 
@@ -782,14 +819,14 @@ describe("dragging a slot row to reorder it", function()
 
         local pitch = ns.SettingsPanel.ROW_PITCH
         local row = rows(ns)[3]
-        local before = select(3, rows(ns)[1]:GetPoint())
+        local before = select(5, rows(ns)[1]:GetPoint())
 
         row.top = STRIP_TOP - 2 * pitch
         row.scripts.OnDragStart(row)
         env.__cursorY = STRIP_TOP - pitch / 2
         row.scripts.OnUpdate(row)
 
-        local during = select(3, rows(ns)[1]:GetPoint())
+        local during = select(5, rows(ns)[1]:GetPoint())
         assertTrue(during < before, "row 1 moved down to open the gap at the top")
     end)
 
@@ -800,10 +837,10 @@ describe("dragging a slot row to reorder it", function()
         local ns, env = loggedIn()
         filled(ns, { "Rejuvenation", "Healing Touch", "Mark of the Wild" })
 
-        local before = select(3, rows(ns)[1]:GetPoint())
+        local before = select(5, rows(ns)[1]:GetPoint())
         dragOnto(ns, env, 1, 1)
 
-        assertEqual(before, select(3, rows(ns)[1]:GetPoint()))
+        assertEqual(before, select(5, rows(ns)[1]:GetPoint()))
     end)
 
     it("lifts the dragged row above the ones it passes over", function()
@@ -904,7 +941,24 @@ describe("scrolling the settings", function()
             end
         end
 
-        assertTrue(ns.SettingsPanel.content:GetHeight() > -lowest)
+        -- Those offsets are from the hint's bottom edge, and the hint itself
+        -- starts 46px down the page.
+        assertTrue(ns.SettingsPanel.content:GetHeight() > 46 - lowest)
+    end)
+
+    it("makes the scroll range as tall as the hint really is", function()
+        -- The columns hang off the hint, so a hint that wraps to another line
+        -- pushes them all down, and the scroll range has to follow.
+        local ns = loggedIn()
+        local panel, content = ns.SettingsPanel.panel, ns.SettingsPanel.content
+        local function shownWith(height)
+            ns.SettingsPanel.hint.stringHeight = height
+            panel:Hide()
+            panel:Show()
+            return content:GetHeight()
+        end
+        assertEqual(50, shownWith(80) - shownWith(30), "a taller hint, a longer page")
+        assertTrue(shownWith(0) > 0, "and a guess when the client will not measure it")
     end)
 
     it("keeps the picker out of the scroll frame, so a low row's list is not cut off", function()
