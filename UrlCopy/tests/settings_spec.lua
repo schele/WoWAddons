@@ -144,6 +144,34 @@ describe("the panel's heading", function()
     end)
 end)
 
+describe("the panel's layout", function()
+    -- The hint wraps to as many lines as the font needs. Rows placed at a
+    -- fixed height on the panel let its last line crowd the first checkbox.
+    it("hangs the first row off the bottom of the hint, with room to breathe", function()
+        local ns = loggedIn()
+        local hint = ns.SettingsPanel.hint
+        local point, relativeTo, relativePoint, x, y =
+            ns.SettingsPanel.controls[1].widget:GetPoint(1)
+
+        assertEqual("TOPLEFT", point)
+        assertTrue(relativeTo == hint, "anchored to the hint")
+        assertEqual("BOTTOMLEFT", relativePoint)
+        assertEqual(0, x, "lined up with the hint's left edge")
+        assertTrue(y <= -16, "at least 16px below the hint")
+    end)
+
+    it("keeps every row below the hint, in order", function()
+        local ns = loggedIn()
+        local previous = 0
+        for _, control in ipairs(ns.SettingsPanel.controls) do
+            local _, relativeTo, _, _, y = control.widget:GetPoint(1)
+            assertTrue(relativeTo == ns.SettingsPanel.hint, control.setting.key)
+            assertTrue(y < previous, control.setting.key .. " below the one before")
+            previous = y
+        end
+    end)
+end)
+
 describe("the invert option", function()
     it("leaves an ordinary checkbox showing the stored value as it is", function()
         local ns = loggedIn()

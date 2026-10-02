@@ -11,6 +11,8 @@ local LOGO_SIZE = 24
 local ROW_HEIGHT = 30
 local SLIDER_EXTRA = 24
 local PANEL_WIDTH = 400
+-- Clear space between the description paragraph and the first row under it.
+local HINT_GAP = 16
 
 local Panel = {}
 ns.SettingsPanel = Panel
@@ -18,9 +20,9 @@ Panel.controls = {}
 
 local panel, category, built
 
-local function addCheckbox(setting, y)
+local function addCheckbox(setting, anchor, y)
     local button = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-    button:SetPoint("TOPLEFT", PADDING, y)
+    button:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, y)
 
     -- The label belongs to the template on some clients and not others, so
     -- write our own rather than reaching for button.Text and finding nil.
@@ -51,9 +53,9 @@ local function addCheckbox(setting, y)
     }
 end
 
-local function addSlider(setting, y)
+local function addSlider(setting, anchor, y)
     local slider = CreateFrame("Slider", nil, panel, "OptionsSliderTemplate")
-    slider:SetPoint("TOPLEFT", PADDING, y - SLIDER_EXTRA)
+    slider:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, y - SLIDER_EXTRA)
     slider:SetMinMaxValues(setting.min, setting.max)
     slider:SetValueStep(setting.step or 1)
     slider:SetObeyStepOnDrag(true)
@@ -144,15 +146,20 @@ local function ensureBuilt()
         .. "addon can take you: Ctrl+C from there."
     )
 
-    local y = -PADDING - ROW_HEIGHT * 2
+    -- Rows hang off the bottom of the hint rather than a fixed height on the
+    -- panel: the hint wraps to however many lines the font needs, and a fixed
+    -- offset let its last line crowd the first checkbox. Each y is measured
+    -- down from the hint's bottom edge.
+    Panel.hint = hint
+    local y = -HINT_GAP
 
     for _, setting in ipairs(ns.settings) do
         local control
         if setting.type == "slider" then
-            control = addSlider(setting, y)
+            control = addSlider(setting, hint, y)
             y = y - ROW_HEIGHT - SLIDER_EXTRA
         else
-            control = addCheckbox(setting, y)
+            control = addCheckbox(setting, hint, y)
             y = y - ROW_HEIGHT
         end
 
