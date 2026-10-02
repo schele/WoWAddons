@@ -1,16 +1,19 @@
 local addonName, ns = ...
 
--- The player's portrait, kept a few pixels under the bar. The game saves where
--- the portrait goes to the account, measured in a way that lands it at a
--- different height on a screen of another shape, so one placed right on a
--- laptop overlaps the bar on a desktop. Here only its height is decided, from
--- the bar's bottom edge, on whatever screen this is; left and right stay where
--- the game's layout put them.
+-- The player's portrait, kept a few pixels under the bar and from the left
+-- edge. The game saves where the portrait goes to the account, measured from
+-- the middle of the screen, so it lands somewhere else on a screen of another
+-- shape or scale: placed right on a laptop, it overlaps the bar and sits near
+-- the middle on a 4K desktop. Here both are decided from the screen's own
+-- edges, on whatever screen this is. With the left edge turned off, left and
+-- right stay where the game's layout put them.
 
 ns.AddDefaults({
     ui = {
         portraitBelowBar = true,
         portraitGap = 4,
+        portraitAtLeft = true,
+        portraitLeftGap = 4,
     },
 })
 
@@ -91,16 +94,22 @@ local function apply()
         return
     end
 
+    local atLeft = ns.db.ui.portraitAtLeft
     local bottom, left = barBottom(), frame:GetLeft()
     local uiTop = UIParent:GetTop()
-    if not (bottom and left and uiTop) then
+    if not (bottom and uiTop and (atLeft or left)) then
         return
     end
 
     -- Every number in the portrait's own scale, which Edit Mode can change.
     local scale = frame:GetEffectiveScale()
     local uiScale = UIParent:GetEffectiveScale()
-    local x = left - (UIParent:GetLeft() or 0) * uiScale / scale
+    local x
+    if atLeft then
+        x = ns.db.ui.portraitLeftGap * uiScale / scale
+    else
+        x = left - (UIParent:GetLeft() or 0) * uiScale / scale
+    end
     local top = bottom - ns.db.ui.portraitGap * uiScale
     local y = (top - uiTop * uiScale) / scale
 
@@ -154,7 +163,7 @@ ns.RegisterSetting({
     -- The left column is full; this would run off the bottom of the page.
     column = 2,
     name = "Keep the portrait under the bar",
-    tooltip = "The same gap on every screen. Left and right stay where you put it.",
+    tooltip = "The same gap on every screen.",
     onChange = apply,
 })
 
@@ -168,6 +177,31 @@ ns.RegisterSetting({
     name = "Gap under the bar",
     min = 0,
     max = 40,
+    onChange = apply,
+})
+
+ns.RegisterSetting({
+    store = "ui",
+    key = "portraitAtLeft",
+    type = "checkbox",
+    parent = "ui.portraitBelowBar",
+    section = "layout",
+    column = 2,
+    name = "Keep it at the left edge",
+    tooltip = "The same place on every screen. Turned off, left and right stay where Edit Mode put it.",
+    onChange = apply,
+})
+
+ns.RegisterSetting({
+    store = "ui",
+    key = "portraitLeftGap",
+    type = "slider",
+    parent = "ui.portraitBelowBar",
+    section = "layout",
+    column = 2,
+    name = "Gap from the left edge",
+    min = 0,
+    max = 200,
     onChange = apply,
 })
 

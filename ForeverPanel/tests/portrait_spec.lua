@@ -35,13 +35,39 @@ local function placed(env)
 end
 
 describe("the portrait under the bar", function()
-    it("sits a few pixels under the bar, where the game's layout had it left and right", function()
+    it("sits a few pixels under the bar and from the left edge", function()
         local _, env = loggedIn()
 
         local point, relative, relativePoint, x, y = placed(env)
         assertEqual("TOPLEFT", point)
         assertEqual(env.UIParent, relative)
         assertEqual("TOPLEFT", relativePoint)
+        assertEqual(4, x)
+        assertEqual(-4, y)
+    end)
+
+    it("keeps to the left edge wherever the game's layout put it, as on a wider screen", function()
+        local _, env = loggedIn(function(_, e) e.PlayerFrame.left = 905 end)
+
+        local _, _, _, x = placed(env)
+        assertEqual(4, x)
+    end)
+
+    it("follows the left gap setting", function()
+        local ns, env = loggedIn()
+
+        ns.SetSettingValue(settingFor(ns, "ui", "portraitLeftGap"), 20)
+
+        local _, _, _, x = placed(env)
+        assertEqual(20, x)
+    end)
+
+    it("leaves left and right where the game's layout had them, with the left edge turned off", function()
+        local ns, env = loggedIn()
+
+        ns.SetSettingValue(settingFor(ns, "ui", "portraitAtLeft"), false)
+
+        local _, _, _, x, y = placed(env)
         assertEqual(40, x)
         assertEqual(-4, y)
     end)
@@ -67,7 +93,7 @@ describe("the portrait under the bar", function()
         end)
 
         local _, _, _, x, y = placed(env)
-        assertEqual(32, x)
+        assertNear(4 / 1.25, x, 0.001, "4 screen pixels from the edge, in its own scale")
         assertEqual(-4 / 1.25, y)
     end)
 
@@ -95,7 +121,7 @@ describe("the portrait under the bar", function()
         helpers.fire(env, "PLAYER_REGEN_ENABLED")
 
         local _, _, _, movedX, movedY = placed(env)
-        assertEqual(40, movedX)
+        assertEqual(4, movedX, "at the left edge")
         assertEqual(-4, movedY)
     end)
 

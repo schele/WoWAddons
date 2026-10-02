@@ -22,10 +22,12 @@ gryphons either side of the action bar, turning on the game's health and
 mana numbers on the unit frames, showing the sell price on quest rewards, and
 showing the XP a quest gives (`+1,234 XP (8.2% of level)`) beside the quest
 window's Accept and Complete Quest buttons, and keeping the player portrait
-a set gap under the bar. The game saves the portrait's place to the account,
-so one placed right on a laptop can overlap the bar on a desktop; ForeverPanel
-decides only its height, from the bar, on each screen, and leaves left and
-right where you put it (in Edit Mode, which it stays out of while open). The
+a set gap under the bar and from the left edge. The game saves the portrait's
+place to the account, measured from the middle of the screen, so one placed
+right on a laptop can overlap the bar, and sit near the middle, on a 4K
+desktop; ForeverPanel decides both from the screen's own edges, on each screen
+(and stays out of Edit Mode while it is open). Turn off "Keep it at the left
+edge" to leave left and right where Edit Mode put them. The
 chat box gets the same: its bottom a set gap over the highest action bar under
 it (a druid's form bar, when there is one), its left edge and size as you
 set them.
