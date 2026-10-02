@@ -224,7 +224,8 @@ column rests on it:
 
 1. Refresh searches the finder from the button, and the board shows the
    listed groups with their members' classes and roles (and whether the
-   finder gives levels).
+   finder gives levels). Then `/lfgb finder` prints what the finder
+   gave, raw; that output comes back with the answers.
 2. A listed group that fills or delists leaves the board.
 3. Chat posts appear, with the right activity and roles, and old ones go.
 4. Whisper opens chat with the message typed, and the alert's [Whisper]
