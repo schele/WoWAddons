@@ -10,3 +10,4 @@ Inbox.lua
 Ticks.lua
 Opener.lua
 Buttons.lua
+Settings.lua

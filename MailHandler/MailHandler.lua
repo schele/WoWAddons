@@ -57,3 +57,18 @@ function ns.Changed()
         ns.Buttons.Refresh()
     end
 end
+
+-- Run once the player is in the world, for work that needs the full UI.
+local loginHandlers = {}
+
+function ns.OnLogin(handler)
+    table.insert(loginHandlers, handler)
+end
+
+local loginFrame = CreateFrame("Frame")
+loginFrame:RegisterEvent("PLAYER_LOGIN")
+loginFrame:SetScript("OnEvent", function()
+    for _, handler in ipairs(loginHandlers) do
+        handler()
+    end
+end)

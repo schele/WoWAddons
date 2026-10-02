@@ -8,6 +8,7 @@ M.FILES = {
     "Ticks.lua",
     "Opener.lua",
     "Buttons.lua",
+    "Settings.lua",
 }
 
 --- Load the addon's files into a stubbed client, in .toc order. `prepare`
@@ -65,6 +66,10 @@ function M.redraw(env)
     else
         env.InboxFrame:Update()
     end
+end
+
+function M.login(env)
+    M.fire(env, "PLAYER_LOGIN")
 end
 
 function M.openMailbox(env)

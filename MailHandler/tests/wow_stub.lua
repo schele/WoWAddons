@@ -49,9 +49,26 @@ local function makeWidget(env, kind, parent, template)
     function widget:GetChecked() return self.checked end
     function widget:SetEnabled(value) self.enabled = value and true or false end
     function widget:IsEnabled() return self.enabled end
-    function widget:Show() self.shown = true end
-    function widget:Hide() self.shown = false end
-    function widget:SetShown(value) self.shown = value and true or false end
+    -- Showing and hiding fire their scripts, and only on a real transition,
+    -- the way the client does.
+    function widget:Show()
+        if self.shown then return end
+        self.shown = true
+        if self.scripts.OnShow then self.scripts.OnShow(self) end
+    end
+    function widget:Hide()
+        if not self.shown then return end
+        self.shown = false
+        if self.scripts.OnHide then self.scripts.OnHide(self) end
+    end
+    function widget:SetShown(value)
+        if value then self:Show() else self:Hide() end
+    end
+    -- For the settings page.
+    function widget:CreateTexture() return makeWidget(env, "Texture", self) end
+    function widget:SetTexture(value) self.texture = value end
+    function widget:GetTexture() return self.texture end
+    function widget:SetJustifyH(value) self.justifyH = value end
     function widget:IsShown() return self.shown end
 
     -- Test helper: drive this widget's OnEvent handler.
@@ -109,6 +126,19 @@ function stub.newEnv()
             return table.unpack(results)
         end
     end
+
+    -- The game's options window, and the addon's own .toc.
+    env.Settings = {
+        RegisterCanvasLayoutCategory = function(frame, name)
+            return { name = name, frame = frame, GetID = function() return "category-id" end }
+        end,
+        RegisterAddOnCategory = function(category) env.__settingsCategory = category end,
+    }
+    env.C_AddOns = {
+        GetAddOnMetadata = function(_, field)
+            return field == "Version" and "9.9.9" or nil
+        end,
+    }
 
     -- The game's inbox: seven rows a page, each with its icon button, the
     -- page buttons and Open All at the bottom.
