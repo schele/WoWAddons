@@ -10,3 +10,4 @@ Activities.lua
 Parse.lua
 Posts.lua
 Finder.lua
+Whisper.lua

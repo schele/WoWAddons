@@ -8,6 +8,7 @@ M.FILES = {
     "Parse.lua",
     "Posts.lua",
     "Finder.lua",
+    "Whisper.lua",
 }
 
 -- A filter that shows every row.
