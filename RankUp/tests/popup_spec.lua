@@ -129,3 +129,16 @@ describe("the popup and combat", function()
         assertTrue(ns.Popup.IsShown())
     end)
 end)
+
+describe("a long line in the popup", function()
+    it("stays on its own line rather than wrapping over the next", function()
+        local ns = helpers.loadAddon()
+
+        ns.Popup.Show({
+            { name = "Faerie Fire (Feral)", fromRank = "Rank 3", toRank = "Rank 4", toID = 1, slots = { 1, 2 } },
+            HEALING_TOUCH,
+        })
+
+        assertEqual(false, ns.Popup.frame.lines[1].wordWrap)
+    end)
+end)

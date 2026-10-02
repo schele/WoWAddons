@@ -10,7 +10,8 @@ local addonName, ns = ...
 local Popup = {}
 ns.Popup = Popup
 
-local WIDTH = 340
+-- Wide enough for "Faerie Fire (Feral): Rank 3 -> Rank 4 (12 buttons)".
+local WIDTH = 380
 local LINE_HEIGHT = 18
 -- Above the first line: the border and the title. Below the last: the
 -- buttons and the border.
@@ -34,6 +35,8 @@ local function line(index)
         made:SetPoint("TOPLEFT", frame, "TOPLEFT", 24, -TOP - (index - 1) * LINE_HEIGHT)
         made:SetWidth(WIDTH - 48)
         made:SetJustifyH("LEFT")
+        -- Lines sit a fixed step apart: a wrapped one would run over the next.
+        made:SetWordWrap(false)
         frame.lines[index] = made
     end
     return made

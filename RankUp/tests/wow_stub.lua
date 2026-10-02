@@ -39,6 +39,7 @@ local function makeWidget(env, kind, parent, template)
     function widget:SetText(value) self.text = value end
     function widget:GetText() return self.text end
     function widget:SetJustifyH(value) self.justifyH = value end
+    function widget:SetWordWrap(value) self.wordWrap = value end
     function widget:SetTexture(value) self.texture = value end
     function widget:CreateFontString() return makeWidget(env, "FontString", self) end
     function widget:CreateTexture() return makeWidget(env, "Texture", self) end
