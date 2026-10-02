@@ -12,6 +12,7 @@ World of Warcraft addons, one folder each.
 | [BossLoot](BossLoot/) | Every dungeon and raid, its bosses and their loot with drop chances, plus notable trash and chest drops |
 | [GatherMap](GatherMap/) | Pins on the world map and minimap for every vein you have mined and herb you have picked |
 | [RankUp](RankUp/) | When you train a new rank, offers to put it on every action button that still holds an older one |
+| [AutoVendor](AutoVendor/) | Sells your grey items and repairs your gear whenever you open a merchant, with a keep list for greys you want |
 
 ## Layout
 

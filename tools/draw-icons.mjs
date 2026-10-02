@@ -1,4 +1,4 @@
-// Draws the 64x64 icons for BossLoot, FishScale, BankBags, GatherMap and RankUp, and their minimap icons, in the style of
+// Draws the 64x64 icons for BossLoot, FishScale, BankBags, GatherMap, RankUp and AutoVendor, and their minimap icons, in the style of
 // the others: a dark rounded tile with a soft glow in the addon's colour, a
 // thin ring, and a light, glossy symbol with a darker outline and details.
 // A minimap icon is the symbol alone, filling the frame: the minimap button
@@ -213,6 +213,25 @@ const arrowDetails = union(
 );
 const arrowShine = ellipse(28, 25, 4, 1.4);
 
+// AutoVendor: a short stack of coins seen from the side, in silver.
+const silver = {
+  dark: [12, 14, 18], glow: [66, 74, 88], ring: [178, 188, 204],
+  light: [246, 248, 252], mid: [170, 178, 194], outline: [46, 52, 62], detail: [92, 100, 116],
+};
+const coinStack = union(
+  ellipse(32, 42, 18, 7), // the bottom coin's underside
+  roundBox(32, 34, 18, 8, 0.5), // the stack's side
+  ellipse(32, 26, 18, 7), // the top coin's face
+);
+const coinDetails = union(
+  (x, y) => Math.abs(ellipse(32, 26, 18, 7)(x, y)) - 0.9, // the top face's rim
+  (x, y) => Math.abs(ellipse(32, 26, 11, 4.2)(x, y)) - 0.8, // the face's inner ring
+  // the seams between three coins: the front halves of two lower rims
+  (x, y) => (y < 32 ? 20 : Math.abs(ellipse(32, 32, 18, 7)(x, y)) - 0.8),
+  (x, y) => (y < 37 ? 20 : Math.abs(ellipse(32, 37, 18, 7)(x, y)) - 0.8),
+);
+const coinShine = ellipse(25, 24, 5, 1.4);
+
 const root = process.argv[2];
 writeTga(path.join(root, 'BossLoot', 'icon.tga'), draw(crimson, chest, chestDetails, chestShine));
 writeTga(path.join(root, 'BossLoot', 'minimap.tga'), draw(crimson, chest, chestDetails, chestShine, { tile: false, zoom: 1.4 }));
@@ -225,3 +244,4 @@ writeTga(path.join(root, 'GatherMap', 'icon.tga'), draw(green, mapPin, pinDetail
 writeTga(path.join(root, 'GatherMap', 'minimap.tga'), draw(green, mapPin, pinDetails, pinShine, { tile: false, zoom: 1.35 }));
 console.log('written');
 writeTga(path.join(root, 'RankUp', 'icon.tga'), draw(gold, rankArrow, arrowDetails, arrowShine));
+writeTga(path.join(root, 'AutoVendor', 'icon.tga'), draw(silver, coinStack, coinDetails, coinShine));
