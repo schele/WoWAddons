@@ -5,6 +5,7 @@ local M = {}
 M.FILES = {
     "MailHandler.lua",
     "Inbox.lua",
+    "Ticks.lua",
 }
 
 --- Load the addon's files into a stubbed client, in .toc order. `prepare`
