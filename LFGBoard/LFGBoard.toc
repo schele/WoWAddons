@@ -6,3 +6,4 @@
 ## SavedVariables: LFGBoardDB
 
 LFGBoard.lua
+Activities.lua
