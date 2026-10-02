@@ -12,3 +12,4 @@ Posts.lua
 Finder.lua
 Whisper.lua
 Alerts.lua
+Chat.lua
