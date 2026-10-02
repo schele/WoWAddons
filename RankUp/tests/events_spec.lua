@@ -198,3 +198,37 @@ describe("looking and combat", function()
         assertEqual("Healing Touch: Rank 2 -> Rank 5 (1 button)", ns.Popup.frame.lines[1]:GetText())
     end)
 end)
+
+describe("a client with neither name for the event", function()
+    local function withoutLearnEvents(e)
+        e.__unknownEvents.LEARNED_SPELL_IN_TAB = true
+        e.__unknownEvents.LEARNED_SPELL_IN_SKILL_LINE = true
+    end
+
+    it("looks when the spellbook changes instead", function()
+        local ns, env = helpers.loadAddon(withoutLearnEvents)
+        env.__known[5189] = nil
+        helpers.place(env, 3, 5188)
+        helpers.login(env)
+        env.__known[5189] = true
+
+        helpers.fire(env, "SPELLS_CHANGED")
+        env.__runTimers()
+
+        assertTrue(ns.Popup.IsShown())
+    end)
+end)
+
+describe("a client that has a name for the event", function()
+    it("does not look on every spellbook change", function()
+        -- The spellbook changes for more than learning; a shapeshift can do
+        -- it. Looking then would bring Not now's popup straight back.
+        local _, env = helpers.loadAddon()
+        helpers.login(env)
+        helpers.place(env, 3, 5188)
+
+        helpers.fire(env, "SPELLS_CHANGED")
+
+        assertEqual(0, #env.__timers)
+    end)
+end)

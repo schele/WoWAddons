@@ -84,8 +84,17 @@ local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+local hearsLearning = false
 for _, event in ipairs(LEARN_EVENTS) do
-    pcall(eventFrame.RegisterEvent, eventFrame, event)
+    if pcall(eventFrame.RegisterEvent, eventFrame, event) then
+        hearsLearning = true
+    end
+end
+-- A client with neither name still says when its spellbook changes. That
+-- happens for more than learning (a shapeshift can do it), so it stands in
+-- only when there is nothing better, through the same wait.
+if not hearsLearning then
+    eventFrame:RegisterEvent("SPELLS_CHANGED")
 end
 
 eventFrame:SetScript("OnEvent", function(_, event)
