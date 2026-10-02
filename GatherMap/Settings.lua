@@ -13,16 +13,21 @@ local LABEL_X = PADDING + COLUMN * 2 + 6
 local WHERES = { "worldmap", "minimap" }
 local KINDS = { "herb", "ore" }
 local KIND_LABEL = { herb = "Herbs", ore = "Ore" }
+-- The description paragraph: where its top sits on the page, the clear space
+-- under it before the first row, and a generous guess at its height for a
+-- client that will not measure it (three lines of GameFontHighlightSmall).
+local HINT_TOP = PADDING + 30
+local HINT_GAP = 16
+local HINT_FALLBACK_HEIGHT = 42
 
 local Panel = {}
 ns.SettingsPanel = Panel
 Panel.kinds, Panel.nodes, Panel.filters, Panel.sizes = {}, {}, {}, {}
 
-local panel, category, built, content
+local panel, category, built, content, hint
 local rows = {}   -- in page order: { height, frames, visible }
 local pairs_ = {} -- every checkbox pair, for Refresh
 local expanded = {}
-local startY
 
 --- Every node name of `kind` once, by required skill, then name.
 function Panel.NodeNames(kind)
@@ -50,23 +55,37 @@ function Panel.NodeNames(kind)
     return names
 end
 
---- Stack the rows that are showing, top to bottom.
+--- Stack the rows that are showing, top to bottom, hanging off the bottom of
+-- the hint rather than a fixed height on the page: the hint wraps to however
+-- many lines the font needs, and a fixed offset let its last line crowd the
+-- first row. Frames keep their x from the page's left edge (gmX); the hint
+-- sits at PADDING, so that is taken off.
 local function layout()
-    local y = startY
+    local y = -HINT_GAP
     for _, row in ipairs(rows) do
         local show = not row.visible or row.visible()
         for _, frame in ipairs(row.frames) do
             frame:SetShown(show)
             if show then
                 frame:ClearAllPoints()
-                frame:SetPoint("TOPLEFT", content, "TOPLEFT", frame.gmX, y + frame.gmY)
+                frame:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", frame.gmX - PADDING, y + frame.gmY)
             end
         end
         if show then
             y = y - row.height
         end
     end
-    content:SetHeight(-y + PADDING)
+    -- The scroll child's height: the hint's top, the hint itself, then the
+    -- rows below it. Measured, not assumed, so a hint that wraps to another
+    -- line cannot push the last row out of reach of the scroll bar.
+    local hintHeight = hint.GetStringHeight and hint:GetStringHeight() or 0
+    if not hintHeight or hintHeight < 1 then
+        hintHeight = HINT_FALLBACK_HEIGHT
+    end
+    content:SetHeight(HINT_TOP + hintHeight - y + PADDING)
+    if Panel.fitScrollBar then
+        Panel.fitScrollBar()
+    end
 end
 
 local function place(frame, x, y)
@@ -210,6 +229,23 @@ local function ensureBuilt()
         -- Room on the right for the template's scroll bar.
         scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, -4)
         scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -28, 4)
+        -- The bar only while there is something to scroll: an opened kind can
+        -- make the page too tall, closing it fits again. The template's own
+        -- scrollBarHideable is not honoured on every client, so this runs
+        -- after its handler, which shows the bar greyed out.
+        local function fitScrollBar()
+            local bar = scroll.ScrollBar
+            if bar and scroll.GetVerticalScrollRange then
+                local needed = (scroll:GetVerticalScrollRange() or 0) > 0
+                bar:SetShown(needed)
+                if not needed and scroll.SetVerticalScroll then
+                    scroll:SetVerticalScroll(0)
+                end
+            end
+        end
+        scroll:HookScript("OnScrollRangeChanged", fitScrollBar)
+        scroll:HookScript("OnShow", fitScrollBar)
+        Panel.fitScrollBar = fitScrollBar
         content = CreateFrame("Frame", nil, scroll)
         content:SetSize(PANEL_WIDTH, 1)
         scroll:SetScrollChild(content)
@@ -233,15 +269,15 @@ local function ensureBuilt()
     version:SetPoint("LEFT", title, "RIGHT", 8, -2)
     version:SetText("Version " .. ((metadata and metadata(addonName, "Version")) or "unknown"))
 
-    local hint = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    hint:SetPoint("TOPLEFT", PADDING, -PADDING - 30)
+    hint = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    hint:SetPoint("TOPLEFT", PADDING, -HINT_TOP)
     hint:SetWidth(PANEL_WIDTH - PADDING * 2)
     hint:SetJustifyH("LEFT")
     hint:SetText("Each row has two boxes: the world map, then the minimap. "
         .. "Open a kind with + to pick its nodes one by one. Pins are the places you "
         .. "have mined or herbed; Shift-right-click a pin to forget it.")
 
-    startY = -PADDING - 84 -- below the title and the three-line hint
+    Panel.hint = hint
 
     local enabled = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
     place(enabled, PADDING)

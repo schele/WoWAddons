@@ -67,6 +67,9 @@ local function makeWidget(kind, parent)
     function widget:SetTexCoord(...) self.texCoord = { ... } end
     function widget:SetText(value) self.text = value end
     function widget:GetText() return self.text end
+    -- What the client measures a wrapped font string at; zero until a test
+    -- says otherwise, as a client that has not laid the text out yet would.
+    function widget:GetStringHeight() return self.stringHeight or 0 end
     function widget:SetTextColor(r, g, b) self.textColor = { r, g, b } end
     function widget:SetJustifyH(value) self.justifyH = value end
     function widget:SetChecked(value) self.checked = value and true or false end
@@ -132,6 +135,14 @@ function stub.newEnv()
     function env.CreateFrame(kind, name, parent)
         local frame = makeWidget(kind or "Frame", parent)
         frame.frameName = name
+        -- A scroll frame's template brings its bar; the test sets how far
+        -- there is to scroll and fires OnScrollRangeChanged, as the client does.
+        if kind == "ScrollFrame" then
+            frame.ScrollBar = makeWidget("Slider", frame)
+            frame.scrollRange = 0
+            function frame:GetVerticalScrollRange() return self.scrollRange end
+            function frame:SetVerticalScroll(value) self.verticalScroll = value end
+        end
         table.insert(env.__frames, frame)
         if name then env[name] = frame end
         return frame

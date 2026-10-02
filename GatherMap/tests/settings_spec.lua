@@ -137,3 +137,67 @@ describe("a kind's checklist", function()
         assertTrue(panel.nodes["Tin Vein"].buttons.minimap:GetChecked())
     end)
 end)
+
+describe("the page's layout", function()
+    -- The hint wraps to as many lines as the font needs. Rows placed at a
+    -- fixed height on the page let its last line crowd the first checkbox.
+    it("hangs the first row off the bottom of the hint, with room to breathe", function()
+        local ns, env, panel = opened()
+        local point, relativeTo, relativePoint, x, y = panel.enabled:GetPoint(1)
+        assertEqual("TOPLEFT", point)
+        assertTrue(relativeTo == panel.hint, "anchored to the hint")
+        assertEqual("BOTTOMLEFT", relativePoint)
+        assertEqual(0, x, "the checkbox lines up with the hint, as before")
+        assertTrue(y <= -16, "at least 16px below the hint")
+    end)
+
+    it("keeps the rows below it in order, and their labels beside them", function()
+        local ns, env, panel = opened()
+        local _, _, _, _, enabledY = panel.enabled:GetPoint(1)
+        local _, to, _, x, y = panel.filters.show.buttons.worldmap:GetPoint(1)
+        assertTrue(to == panel.hint)
+        assertEqual(0, x)
+        assertTrue(y < enabledY, "below the first row")
+        local _, _, _, labelX, labelY = panel.filters.show.label:GetPoint(1)
+        assertEqual(30 * 2 + 6, labelX, "past both checkbox columns, as before")
+        assertEqual(y - 5, labelY, "on the same row")
+    end)
+
+    it("makes the scrolling page as tall as the hint really is", function()
+        local ns, env, panel = opened()
+        local content = panel.hint:GetParent()
+        local toggle = panel.kinds.herb.toggle
+        local function relaid(height)
+            panel.hint.stringHeight = height
+            toggle.scripts.OnClick(toggle)
+            toggle.scripts.OnClick(toggle)
+            return content:GetHeight()
+        end
+        assertEqual(50, relaid(80) - relaid(30), "a taller hint, a taller page")
+        assertTrue(relaid(0) > 0, "and a guess when the client will not measure it")
+    end)
+
+    it("hides the scroll bar while everything fits, and brings it back when not", function()
+        local _, _, panel = opened()
+        local scroll = panel.hint:GetParent():GetParent()
+        local function rangeChanged(range)
+            scroll.scrollRange = range
+            -- The template's own handler shows the bar, greyed out, first.
+            scroll.ScrollBar:Show()
+            scroll.scripts.OnScrollRangeChanged(scroll, 0, range)
+        end
+
+        rangeChanged(0)
+        assertFalse(scroll.ScrollBar:IsShown())
+
+        rangeChanged(120)
+        assertTrue(scroll.ScrollBar:IsShown())
+    end)
+
+    it("hides the scroll bar on a page that fits from the moment it opens", function()
+        local _, _, panel = opened()
+        local scroll = panel.hint:GetParent():GetParent()
+
+        assertFalse(scroll.ScrollBar:IsShown())
+    end)
+end)
