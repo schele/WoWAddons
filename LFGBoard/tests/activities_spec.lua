@@ -92,3 +92,14 @@ describe("an activity", function()
         end
     end)
 end)
+
+describe("a message naming more than one thing", function()
+    it("is for the dungeon it names first", function()
+        local ns = helpers.loadAddon()
+
+        assertEqual("sm", keyOf(ns, "LFM SM need heals, DM me"))
+        assertEqual("zf", keyOf(ns, "LFM ZF need tank, dm me"))
+        assertEqual("wc", keyOf(ns, "LFM WC then DM"))
+        assertEqual("dm", keyOf(ns, "LFM DM need tank, then WC"))
+    end)
+end)

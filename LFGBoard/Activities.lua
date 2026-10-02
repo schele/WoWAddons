@@ -70,15 +70,18 @@ local function allPhrases()
     return phrases
 end
 
---- The activity a text names, or nil.
+--- The activity a text names first, or nil: "LFM ZF, dm me" is for
+-- Zul'Farrak. Where two phrases start at the same word, the longer one.
 function Activities.Find(text)
     local words = Activities.Normalize(text)
+    local best, bestAt, bestLength
     for _, phrase in ipairs(allPhrases()) do
-        if words:find(phrase.text, 1, true) then
-            return phrase.activity
+        local at = words:find(phrase.text, 1, true)
+        if at and (not bestAt or at < bestAt or (at == bestAt and #phrase.text > bestLength)) then
+            best, bestAt, bestLength = phrase.activity, at, #phrase.text
         end
     end
-    return nil
+    return best
 end
 
 function Activities.ByKey(key)
