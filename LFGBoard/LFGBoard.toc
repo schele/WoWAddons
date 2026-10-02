@@ -13,3 +13,4 @@ Finder.lua
 Whisper.lua
 Alerts.lua
 Chat.lua
+Window.lua

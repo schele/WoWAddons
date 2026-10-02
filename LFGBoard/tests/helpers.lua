@@ -11,6 +11,7 @@ M.FILES = {
     "Whisper.lua",
     "Alerts.lua",
     "Chat.lua",
+    "Window.lua",
 }
 
 -- A filter that shows every row.
