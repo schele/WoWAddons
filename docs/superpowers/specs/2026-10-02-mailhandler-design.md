@@ -93,8 +93,11 @@ Plus `README.md`, `icon.tga` (an envelope, drawn by `tools/draw-icons.mjs`)
 and a row in the root README's table.
 
 The rows are the game's `MailItem1` to `MailItem7`; the checkboxes are laid
-on them after each `InboxFrame_Update`, read against
-`InboxFrame.pageNum`. Every client call tries the namespaced API first where
+on them after each redraw, read against `InboxFrame.pageNum`: Classic
+Era's `InboxFrame_Update`, or Forever's `InboxFrame:Update()` (its mail
+frame is the mainline one). A mail the game removes once empty is noticed
+at its own place, which does not move while working bottom up, and the
+ticks of the alike mails below it move up a number with them. Every client call tries the namespaced API first where
 one exists (`C_Container.GetContainerNumFreeSlots`), and every read that
 could raise goes through `ns.Guarded`.
 

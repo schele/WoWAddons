@@ -44,6 +44,29 @@ function Ticks.AllTicked(mails)
     return #mails > 0 and Ticks.Count(mails) == #mails
 end
 
+--- The mail with `key` has left the box: its tick goes, and each alike
+-- mail below it, now one number lower, keeps its own tick or lack of one.
+function Ticks.Removed(key)
+    local base, number = key:match("^(.*)#(%d+)$")
+    ticked[key] = nil
+    if not base then
+        return
+    end
+    number = tonumber(number)
+    local last = number
+    for other in pairs(ticked) do
+        local otherBase, otherNumber = other:match("^(.*)#(%d+)$")
+        if otherBase == base and tonumber(otherNumber) > last then
+            last = tonumber(otherNumber)
+        end
+    end
+    for below = number + 1, last do
+        ticked[base .. "#" .. (below - 1)] = ticked[base .. "#" .. below]
+    end
+    ticked[base .. "#" .. last] = nil
+    ns.Changed()
+end
+
 function Ticks.SetAll(on)
     for _, mail in ipairs(ns.Inbox.Mails()) do
         ticked[mail.key] = on and true or nil

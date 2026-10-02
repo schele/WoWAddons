@@ -56,9 +56,20 @@ function M.expired(env, item, count, slots)
     return M.mail(env, "Alliance Auction House", string.format("Auction expired: %s (%d)", item, count), 0, items)
 end
 
+M.forever = stub.useForeverInbox
+
+--- The game redrawing its inbox, the way this client does it.
+function M.redraw(env)
+    if env.InboxFrame_Update then
+        env.InboxFrame_Update()
+    else
+        env.InboxFrame:Update()
+    end
+end
+
 function M.openMailbox(env)
     M.fire(env, "MAIL_SHOW")
-    env.InboxFrame_Update()
+    M.redraw(env)
 end
 
 function M.closeMailbox(env)

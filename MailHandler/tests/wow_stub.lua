@@ -86,9 +86,13 @@ function stub.newEnv()
         return frame
     end
 
-    function env.hooksecurefunc(name, fn)
-        local original = env[name]
-        env[name] = function(...)
+    -- Hooks a global function, or a method when given a table first.
+    function env.hooksecurefunc(owner, name, fn)
+        if type(owner) ~= "table" then
+            owner, name, fn = env, owner, name
+        end
+        local original = owner[name]
+        owner[name] = function(...)
             local results = { original(...) }
             fn(...)
             return table.unpack(results)
@@ -182,10 +186,16 @@ function stub.newEnv()
         return "icon", nil, mail.sender, mail.subject, mail.money, mail.cod, 29.5,
             itemCount(mail), false, false, false, true, false
     end
+    -- An item the client has not loaded yet has no name, but its ID and
+    -- HasInboxItem still say it is there.
     function env.GetInboxItem(index, slot)
         local mail = env.__mails[index]
         local item = mail and mail.items[slot]
         if item then return item.name, 1000 + slot, "icon", item.count, 1, true end
+    end
+    function env.HasInboxItem(index, slot)
+        local mail = env.__mails[index]
+        return mail ~= nil and mail.items[slot] ~= nil
     end
     function env.TakeInboxMoney(index)
         table.insert(env.__log, "money " .. index)
@@ -210,15 +220,27 @@ function stub.newEnv()
     function env.DeleteInboxItem(index) table.insert(env.__log, "delete " .. index) end
     function env.GetMoney() return env.__money end
 
-    -- Bags: the free slots are all in the backpack.
+    -- Bags: the free slots for anything are in the backpack; bag 1 is a
+    -- quiver, whose free slots take only ammunition.
+    env.__quiverFree = 0
     env.C_Container = {
         GetContainerNumFreeSlots = function(bag)
             if bag == 0 then return env.__freeSlots, 0 end
+            if bag == 1 then return env.__quiverFree, 1 end
             return 0, 0
         end,
     }
 
     return env
+end
+
+--- Forever's inbox: the mainline mail frame, which redraws with
+-- InboxFrame:Update() and has no global InboxFrame_Update.
+function stub.useForeverInbox(env)
+    env.InboxFrame_Update = nil
+    function env.InboxFrame:Update()
+        env.__redraws = env.__redraws + 1
+    end
 end
 
 return stub

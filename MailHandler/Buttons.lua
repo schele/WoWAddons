@@ -94,8 +94,13 @@ function Buttons.Create()
         ownOpenAll:SetPoint("LEFT", openButton, "RIGHT", 6, 0)
     end
 
+    -- Classic Era redraws its inbox with InboxFrame_Update; Forever's mail
+    -- frame is the mainline one, which redraws with InboxFrame:Update() on
+    -- Prev, Next and the mouse wheel, with no event to follow.
     if hooksecurefunc and InboxFrame_Update then
         hooksecurefunc("InboxFrame_Update", Buttons.Refresh)
+    elseif hooksecurefunc and InboxFrame.Update then
+        hooksecurefunc(InboxFrame, "Update", Buttons.Refresh)
     end
 end
 

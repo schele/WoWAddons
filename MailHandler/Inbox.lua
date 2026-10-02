@@ -28,7 +28,7 @@ local function header(index)
         if sender == nil and subject == nil then
             return nil
         end
-        return {
+        local mail = {
             index = index,
             sender = type(sender) == "string" and sender or "",
             subject = type(subject) == "string" and subject or "",
@@ -36,7 +36,15 @@ local function header(index)
             cod = type(cod) == "number" and cod or 0,
             items = type(itemCount) == "number" and itemCount or 0,
         }
+        mail.base = mail.sender .. "|" .. mail.subject .. "|" .. mail.cod
+        return mail
     end, nil)
+end
+
+--- The mail at `index`, without its key: what an opening looks at to see
+-- whether its own mail, at a place that does not move, has changed.
+function Inbox.Header(index)
+    return header(index)
 end
 
 --- Every mail, top to bottom. A key is the mail's sender, subject and cash
@@ -47,9 +55,8 @@ function Inbox.Mails()
     for index = 1, Inbox.Count() do
         local mail = header(index)
         if mail then
-            local base = mail.sender .. "|" .. mail.subject .. "|" .. mail.cod
-            seen[base] = (seen[base] or 0) + 1
-            mail.key = base .. "#" .. seen[base]
+            seen[mail.base] = (seen[mail.base] or 0) + 1
+            mail.key = mail.base .. "#" .. seen[mail.base]
             mails[#mails + 1] = mail
         end
     end
@@ -65,10 +72,16 @@ function Inbox.Find(key)
     return nil
 end
 
+--- Whether a mail's attachment slot holds an item, asked as the game's own
+-- mail frame asks it: an item the client has not loaded yet has no name,
+-- but is there all the same.
 function Inbox.HasAttachment(index, slot)
     return ns.Guarded(function()
-        local name = GetInboxItem(index, slot)
-        return type(name) == "string" and name ~= ""
+        if HasInboxItem then
+            return HasInboxItem(index, slot) and true or false
+        end
+        local name, itemID = GetInboxItem(index, slot)
+        return (type(itemID) == "number" and itemID > 0) or (type(name) == "string" and name ~= "")
     end, false)
 end
 
@@ -81,13 +94,31 @@ function Inbox.FirstAttachment(index)
     return nil
 end
 
+--- Free slots that take any item: the client's own count where it has one,
+-- as its Open All uses; otherwise general bags only, since a quiver's or a
+-- soul bag's free slots refuse a mail's items.
 function Inbox.FreeSlots()
+    if C_Container and C_Container.CalculateTotalNumberOfFreeBagSlots then
+        local total = ns.Guarded(function()
+            return C_Container.CalculateTotalNumberOfFreeBagSlots()
+        end, nil)
+        if type(total) == "number" then
+            return total
+        end
+    end
+
     local free = 0
     for bag = 0, lastBag() do
         free = free + ns.Guarded(function()
             local get = (C_Container and C_Container.GetContainerNumFreeSlots) or GetContainerNumFreeSlots
-            local slots = get and get(bag)
-            return type(slots) == "number" and slots or 0
+            if not get then
+                return 0
+            end
+            local slots, bagType = get(bag)
+            if type(slots) ~= "number" or (type(bagType) == "number" and bagType ~= 0) then
+                return 0
+            end
+            return slots
         end, 0)
     end
     return free

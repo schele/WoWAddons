@@ -20,16 +20,38 @@ function Opener.Running()
 end
 
 --- Whether the take a run is waiting on has been answered: the gold or the
--- item is gone from the mail, or the mail itself is.
+-- item is gone from the mail, or the mail itself is. Looked for at the
+-- mail's place, not by its key: once the game removes it, the next alike
+-- mail below takes over its key. Working bottom up, its place stays put
+-- while its own mail is there.
 local function answered(waiting)
-    local mail = ns.Inbox.Find(waiting.key)
-    if not mail then
+    if ns.Inbox.Count() < waiting.count then
+        waiting.removed = true
+        return true
+    end
+    local mail = ns.Inbox.Header(waiting.index)
+    if not mail or mail.base ~= waiting.base then
+        waiting.removed = true
         return true
     end
     if waiting.kind == "money" then
         return mail.money == 0
     end
-    return not ns.Inbox.HasAttachment(mail.index, waiting.slot)
+    return not ns.Inbox.HasAttachment(waiting.index, waiting.slot)
+end
+
+--- What a run waits on after a take: the mail's key, and its place and
+-- the size of the box, to see whether the game has removed it.
+local function waitFor(key, mail, kind, slot)
+    return {
+        key = key,
+        base = mail.base,
+        index = mail.index,
+        count = ns.Inbox.Count(),
+        kind = kind,
+        slot = slot,
+        looks = 0,
+    }
 end
 
 local function left(current)
@@ -61,6 +83,9 @@ local function report(current, stopped)
 
     if current.cod > 0 then
         parts[#parts + 1] = string.format("Skipped %s.", ns.Count(current.cod, "cash-on-delivery mail"))
+    end
+    if current.unanswered > 0 then
+        parts[#parts + 1] = string.format("%s did not answer.", ns.Count(current.unanswered, "ticked mail"))
     end
     if stopped then
         parts[#parts + 1] = stopped
@@ -106,8 +131,15 @@ step = function(current)
             if waiting.kind == "item" then
                 current.items = current.items + 1
             end
+            if waiting.removed then
+                -- Gone from the box: its tick goes, and the alike mails
+                -- below move up a number with theirs.
+                ns.Ticks.Removed(waiting.key)
+                current.at = current.at + 1
+            end
         else
             -- The server never answered: leave this mail, still ticked.
+            current.unanswered = current.unanswered + 1
             current.at = current.at + 1
         end
     end
@@ -126,8 +158,8 @@ step = function(current)
             ns.Ticks.Set(key, false)
             current.at = current.at + 1
         elseif mail and mail.money > 0 then
+            current.waiting = waitFor(key, mail, "money")
             TakeInboxMoney(mail.index)
-            current.waiting = { key = key, kind = "money", looks = 0 }
             later(current)
             return
         elseif slot then
@@ -135,8 +167,8 @@ step = function(current)
                 finish(current, string.format("Bags are full: %s left.", ns.Count(left(current), "ticked mail")))
                 return
             end
+            current.waiting = waitFor(key, mail, "item", slot)
             TakeInboxItem(mail.index, slot)
-            current.waiting = { key = key, kind = "item", slot = slot, looks = 0 }
             later(current)
             return
         else
@@ -168,6 +200,7 @@ function Opener.Start(mails)
         startMoney = GetMoney() or 0,
         items = 0,
         cod = 0,
+        unanswered = 0,
         took = {},
     }
     ns.Changed()

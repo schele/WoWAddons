@@ -130,3 +130,20 @@ describe("closing the mailbox", function()
         assertEqual("Open (0)", parts.open:GetText())
     end)
 end)
+
+describe("the boxes on Forever's inbox", function()
+    it("follow a page change, which Forever draws with InboxFrame:Update", function()
+        local ns, env = helpers.loadAddon(helpers.forever)
+        for index = 1, 9 do
+            helpers.sale(env, "Stone " .. index, 1, 100 * index)
+        end
+        helpers.openMailbox(env)
+        local parts = ns.Buttons.Parts()
+
+        env.InboxFrame.pageNum = 2
+        env.InboxFrame:Update()
+
+        assertEqual(ns.Inbox.Mails()[8].key, parts.boxes[1].key)
+        assertFalse(parts.boxes[3]:IsShown())
+    end)
+end)

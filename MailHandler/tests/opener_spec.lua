@@ -214,3 +214,63 @@ describe("Open", function()
         assertEqual(1, #env.__log)
     end)
 end)
+
+describe("alike mails the game removes once empty", function()
+    it("leave the one not ticked unticked when the ticked one goes", function()
+        local ns, env = helpers.loadAddon()
+        env.__autoRemove = true
+        helpers.sale(env, "Copper Bar", 20, 500)
+        helpers.sale(env, "Copper Bar", 20, 700)
+        tick(ns, 1)
+
+        ns.Opener.Start()
+        env.__runAllTimers()
+
+        assertEqual(500, env.__money)
+        assertEqual(700, env.__mails[1].money)
+        assertEqual(0, ns.Ticks.Count())
+        assertMatch("Opened 1 mail: 5s%.", helpers.printed(env))
+    end)
+
+    it("open the two ticked of four, and leave the other two unticked", function()
+        local ns, env = helpers.loadAddon()
+        env.__autoRemove = true
+        for _ = 1, 4 do
+            helpers.expired(env, "Bronze Bar", 12, 1)
+        end
+        tick(ns, 1, 2)
+
+        ns.Opener.Start()
+        env.__runAllTimers()
+
+        assertEqual(2, #env.__mails)
+        assertEqual(0, ns.Ticks.Count())
+        assertMatch("Opened 2 mails: 2 items%.", helpers.printed(env))
+    end)
+end)
+
+describe("an item the client has not loaded yet", function()
+    it("is taken all the same", function()
+        local ns, env = helpers.loadAddon()
+        helpers.mail(env, "Garrok", "Stuff", 0, { [1] = { name = nil, count = 1 } })
+        tick(ns, 1)
+
+        ns.Opener.Start()
+        env.__runAllTimers()
+
+        assertNil(env.__mails[1].items[1])
+    end)
+end)
+
+describe("a take the server never answers", function()
+    it("is named in the line", function()
+        local ns, env = helpers.loadAddon()
+        helpers.sale(env, "Rough Stone", 46, 100).lost = true
+        tick(ns, 1)
+
+        ns.Opener.Start()
+        env.__runAllTimers()
+
+        assertMatch("1 ticked mail did not answer%.", helpers.printed(env))
+    end)
+end)

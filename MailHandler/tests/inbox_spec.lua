@@ -87,3 +87,33 @@ describe("the mailbox", function()
         assertEqual(7, ns.Inbox.FreeSlots())
     end)
 end)
+
+describe("free bag slots", function()
+    it("leave out a quiver's, which take only ammunition", function()
+        local ns, env = helpers.loadAddon()
+        env.__freeSlots = 0
+        env.__quiverFree = 16
+
+        assertEqual(0, ns.Inbox.FreeSlots())
+    end)
+
+    it("are the client's own count where it has one", function()
+        local ns, env = helpers.loadAddon()
+        env.C_Container.CalculateTotalNumberOfFreeBagSlots = function() return 3 end
+
+        assertEqual(3, ns.Inbox.FreeSlots())
+    end)
+end)
+
+describe("an attachment", function()
+    it("is there by its item, whether or not its name has loaded", function()
+        local ns, env = helpers.loadAddon()
+        helpers.mail(env, "Garrok", "Stuff", 0, { [2] = { name = nil, count = 1 } })
+
+        assertTrue(ns.Inbox.HasAttachment(1, 2))
+        assertEqual(2, ns.Inbox.FirstAttachment(1))
+
+        env.HasInboxItem = nil
+        assertTrue(ns.Inbox.HasAttachment(1, 2), "by its item ID, on a client without HasInboxItem")
+    end)
+end)
