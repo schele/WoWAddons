@@ -5,6 +5,7 @@ local M = {}
 M.FILES = {
     "LFGBoard.lua",
     "Activities.lua",
+    "Parse.lua",
 }
 
 -- A filter that shows every row.
