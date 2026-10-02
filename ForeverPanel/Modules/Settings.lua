@@ -307,12 +307,12 @@ function Settings_.Refresh()
     end
 end
 
-local function addDivider(y)
+local function addDivider(y, column)
     local line = panel:CreateTexture(nil, "ARTWORK")
     line:SetColorTexture(1, 1, 1, 0.15)
     line:SetHeight(1)
-    -- Only as wide as the first column, so it does not cut across the second.
-    line:SetPoint("TOPLEFT", COLUMN_X[1], y)
+    -- Only as wide as its column, so it does not cut across the other.
+    line:SetPoint("TOPLEFT", COLUMN_X[column or 1], y)
     line:SetWidth(COLUMN_WIDTH)
 
     table.insert(Settings_.dividers, line)
@@ -424,15 +424,21 @@ local function ensureBuilt()
     local cursor = { top, top }
 
     for index, group in ipairs(groupedSettings()) do
-        local usesFirstColumn = false
+        -- A divider above the group in each column it uses, so a group in
+        -- the second column is set off from what is above it there too.
+        local uses = {}
         for _, row in ipairs(group) do
-            usesFirstColumn = usesFirstColumn or (row.setting.column or 1) == 1
+            uses[row.setting.column or 1] = true
         end
 
-        if index > 1 and usesFirstColumn then
-            cursor[1] = cursor[1] - ROW_HEIGHT / 2
-            addDivider(cursor[1])
-            cursor[1] = cursor[1] - ROW_HEIGHT / 2
+        if index > 1 then
+            for column = 1, #COLUMN_X do
+                if uses[column] then
+                    cursor[column] = cursor[column] - ROW_HEIGHT / 2
+                    addDivider(cursor[column], column)
+                    cursor[column] = cursor[column] - ROW_HEIGHT / 2
+                end
+            end
         end
 
         for _, row in ipairs(group) do

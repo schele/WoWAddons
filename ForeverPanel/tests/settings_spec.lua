@@ -217,7 +217,40 @@ describe("the settings panel", function()
     it("draws a divider between the groups, and only between them", function()
         local ns, env = loggedIn()
 
-        assertEqual(1, #ns.Settings.dividers, "one divider for two groups")
+        assertEqual(2, #ns.Settings.dividers, "one in each column, each under its first group")
+    end)
+
+    it("puts the portrait and chat box options in the right column, under the chat keys", function()
+        local ns = loggedIn()
+
+        local keysY, rows = nil, {}
+        for _, control in ipairs(ns.Settings.controls) do
+            local setting = control.setting
+            local point = { control.widget:GetPoint(1) }
+            local x, y = point[#point - 1], point[#point]
+            if setting.key == "keys" then
+                keysY = y
+            elseif setting.store == "ui" and (setting.key:match("^portrait") or setting.key:match("^chat")) then
+                rows[setting.key] = { x = x, y = y }
+            end
+        end
+
+        for _, key in ipairs({ "portraitBelowBar", "portraitGap", "chatAboveBars", "chatGap" }) do
+            assertTrue(rows[key].x >= 320, key .. " in the right column")
+            assertTrue(rows[key].y < keysY, key .. " below the chat keys")
+        end
+        assertTrue(rows.portraitGap.x > rows.portraitBelowBar.x, "the gap indented under its switch")
+        assertTrue(rows.chatGap.x > rows.chatAboveBars.x, "the gap indented under its switch")
+    end)
+
+    it("keeps every row on the page, which does not scroll", function()
+        local ns = loggedIn()
+
+        for _, control in ipairs(ns.Settings.controls) do
+            local point = { control.widget:GetPoint(1) }
+            local y = point[#point]
+            assertTrue(y > -600, control.setting.store .. "." .. control.setting.key .. " is on the page")
+        end
     end)
 
     it("puts the grouped settings below the ungrouped ones", function()

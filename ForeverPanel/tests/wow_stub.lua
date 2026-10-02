@@ -149,8 +149,22 @@ local function makeWidget(kind, parent)
         return self.left
     end
 
+    function widget:GetRight()
+        return self.right
+    end
+
     function widget:GetEffectiveScale()
         return self.scale
+    end
+
+    -- Edges in the widget's own scale, as the client gives them. Nil until a
+    -- test says where the widget is, as for a frame not yet laid out.
+    function widget:GetTop()
+        return self.top
+    end
+
+    function widget:GetBottom()
+        return self.bottom
     end
     function widget:SetChecked(value)
         self.checked = value and true or false
@@ -308,6 +322,29 @@ function stub.newEnv()
     env.MainActionBar.EndCaps = makeWidget("Frame")
     env.MainActionBar.EndCaps.LeftEndCap = makeWidget("Frame")
     env.MainActionBar.EndCaps.RightEndCap = makeWidget("Frame")
+    -- The player's portrait, where the game's own layout put it.
+    env.PlayerFrame = makeWidget("Frame", env.UIParent)
+    env.PlayerFrame:SetPoint("TOPLEFT", env.UIParent, "TOPLEFT", -19, -4)
+    -- The main chat box, and the calls the game makes when the player has
+    -- moved or resized it and when it puts the account's saved place back.
+    -- Under it, the action bars, all hidden until a test places one.
+    for _, name in ipairs({ "StanceBar", "PetActionBar", "MultiBarBottomLeft" }) do
+        env[name] = makeWidget("Frame", env.UIParent)
+        env[name].shown = false
+    end
+    env.ChatFrame1 = makeWidget("ScrollingMessageFrame", env.UIParent)
+    env.ChatFrame1:SetPoint("BOTTOMLEFT", env.UIParent, "BOTTOMLEFT", 32, 95)
+    function env.FCF_SavePositionAndDimensions() end
+    function env.FCF_RestorePositionAndDimensions() end
+    -- The character window's model, and the account's helm and cloak switches.
+    env.CharacterModelFrame = makeWidget("PlayerModel", env.UIParent)
+    env.CharacterHeadSlot = makeWidget("ItemButton", env.UIParent)
+    env.CharacterBackSlot = makeWidget("ItemButton", env.UIParent)
+    env.__showingHelm, env.__showingCloak = true, true
+    function env.ShowHelm(value) env.__showingHelm = value and true or false end
+    function env.ShowingHelm() return env.__showingHelm end
+    function env.ShowCloak(value) env.__showingCloak = value and true or false end
+    function env.ShowingCloak() return env.__showingCloak end
     -- The font object every unit frame's health and mana text inherits from.
     env.TextStatusBarText = makeWidget("FontString")
     -- Both start closed, as they do in game, so Show() is a real transition

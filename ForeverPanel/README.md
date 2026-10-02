@@ -17,11 +17,18 @@ top-anchored Blizzard frames move down with it instead of being covered.
 Right-click anywhere on the bar for `Settings...` and `Reset module order`.
 
 The settings panel carries every option, including a switch per module to hide
-one without removing it, and four tweaks to Blizzard's own UI: hiding the
+one without removing it, and six tweaks to Blizzard's own UI: hiding the
 gryphons either side of the action bar, turning on the game's health and
 mana numbers on the unit frames, showing the sell price on quest rewards, and
 showing the XP a quest gives (`+1,234 XP (8.2% of level)`) beside the quest
-window's Accept and Complete Quest buttons.
+window's Accept and Complete Quest buttons, and keeping the player portrait
+a set gap under the bar. The game saves the portrait's place to the account,
+so one placed right on a laptop can overlap the bar on a desktop; ForeverPanel
+decides only its height, from the bar, on each screen, and leaves left and
+right where you put it (in Edit Mode, which it stays out of while open). The
+chat box gets the same: its bottom a set gap over the highest action bar under
+it (a druid's form bar, when there is one), its left edge and size as you
+set them.
 
 Modules are rearranged by dragging them along the bar. The bar reorders live
 while you hold one, so it is its own drag preview, and the layout is saved
