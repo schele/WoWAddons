@@ -6,6 +6,7 @@ M.FILES = {
     "AutoVendor.lua",
     "Bags.lua",
     "Keep.lua",
+    "Vendor.lua",
 }
 
 --- Load the addon's files into a stubbed client, in .toc order, each chunk
