@@ -1,0 +1,8 @@
+## Interface: 11509, 16001
+## Title: LFGBoard
+## Notes: Groups that want you, from chat and the group finder, on one board.
+## Author: You
+## Version: 0.1.0
+## SavedVariables: LFGBoardDB
+
+LFGBoard.lua
