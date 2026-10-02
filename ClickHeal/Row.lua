@@ -642,6 +642,34 @@ function Row.Reachable(unit)
     end, true)
 end
 
+--- Whether `unit` is dead, or a ghost, and online: someone a resurrection
+-- can still bring back. Guarded as Row.Reachable is, each read on its own.
+-- Unknown counts as alive, so the row fades as it always has.
+function Row.Raisable(unit)
+    if not guarded(function() return not not UnitIsDeadOrGhost(unit) end, false) then
+        return false
+    end
+
+    return guarded(function() return not not UnitIsConnected(unit) end, true)
+end
+
+--- Fade a raisable unit's row part by part rather than as a whole: the
+-- name, the bar and every heal, but not a resurrection, the one button that
+-- does something now. The whole-row fade would take it down with the rest,
+-- since a button can be no brighter than its row. With `raisable` false,
+-- everything goes back to full, and the row's own fade does the rest.
+local function fadeAllButRaising(row, raisable)
+    local rest = raisable and DIM or 1
+    row.name:SetAlpha(rest)
+    row.health:SetAlpha(rest)
+
+    for index = 1, ns.Slots.MAX do
+        local button = row.buttons[index]
+        local raises = ns.Spells.IsResurrection(button:GetAttribute("spell"))
+        button:SetAlpha(raises and 1 or rest)
+    end
+end
+
 --- Draw each button's cooldown sweep.
 --
 -- Reads the spell off the button's own attribute rather than out of Slots,
@@ -838,7 +866,14 @@ function Row.Refresh(row)
     -- cooldown and gives nothing back. Fading the row is the cheapest way to
     -- stop the hand before it does that. See Row.Reachable above for why
     -- each check behind this is guarded rather than tested plainly.
-    row:SetAlpha(Row.Reachable(unit) and 1 or DIM)
+    --
+    -- Someone dead who can be raised is faded part by part instead, leaving
+    -- the resurrection bright, and not by UnitInRange: that is a heal's
+    -- reach, and the resurrection's own shows on its icon, as every spell's
+    -- does in Row.RefreshRange.
+    local raisable = Row.Raisable(unit)
+    fadeAllButRaising(row, raisable)
+    row:SetAlpha((raisable or Row.Reachable(unit)) and 1 or DIM)
 
     Row.RefreshRange(row)
     Row.RefreshAuras(row)

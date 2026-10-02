@@ -42,8 +42,10 @@ resurrection (Rebirth, Revive, Resurrection, Redemption, Ancestral Spirit): it
 cannot target you, so your own row leaves a gap where it would be, and the
 buttons after it stay in their usual columns.
 
-A whole row fades when the person is dead or offline, because every spell on
-it is useless at once. Being out of range is judged per icon instead, since a
+A whole row fades when the person is offline, because every spell on it is
+useless at once. When they are dead, everything fades but the resurrection,
+the one spell that still does something. Being out of range is judged per
+icon instead, since a
 40-yard heal and a melee-range debuff do not share a reach — the icons that
 cannot land go dark while the rest stay lit.
 

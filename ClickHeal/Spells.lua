@@ -81,10 +81,11 @@ local function nameFromBook(index, bookType)
     return nil
 end
 
--- Spells that cannot target the caster: the resurrections. Nobody casts them
--- on themselves, so a button for one on your own row only ever fails.
--- Soulstone Resurrection is left off, since a warlock can stone themselves.
-local NOT_ON_SELF = {
+-- The resurrections: spells for the dead alone. Nobody casts them on
+-- themselves, so a button for one on your own row only ever fails.
+-- Soulstone Resurrection is left off: it goes on the living, and a warlock
+-- can stone themselves.
+local RESURRECTIONS = {
     ["Rebirth"] = true,
     ["Revive"] = true,
     ["Resurrection"] = true,
@@ -92,10 +93,15 @@ local NOT_ON_SELF = {
     ["Ancestral Spirit"] = true,
 }
 
+--- Whether a spell raises the dead.
+function Spells.IsResurrection(spellName)
+    return RESURRECTIONS[spellName] == true
+end
+
 --- Whether a spell can be cast on `unit` at all, by its nature rather than by
 -- range or state: false only for a resurrection aimed at the player.
 function Spells.CastableOn(spellName, unit)
-    return not (unit == "player" and NOT_ON_SELF[spellName])
+    return not (unit == "player" and Spells.IsResurrection(spellName))
 end
 
 --- Whether this client knows the spell by name, through whichever API it

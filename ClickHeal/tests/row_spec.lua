@@ -631,7 +631,9 @@ describe("dimming a row you cannot usefully click", function()
         local row = ns.Row.Create("party1", env.UIParent)
 
         ns.Row.Refresh(row)
-        assertTrue(row:GetAlpha() < 1)
+        -- The row's fade and the button's together: a dead unit's heals are
+        -- faded one by one, so their resurrection can stay bright.
+        assertTrue(row:GetAlpha() * row.buttons[1]:GetAlpha() < 1)
     end)
 
     it("dims an offline unit", function()
@@ -694,6 +696,111 @@ describe("dimming a row you cannot usefully click", function()
     end)
 end)
 
+describe("a resurrection on a dead unit's row", function()
+    -- A dead unit's heals do nothing, so they fade -- but a resurrection is
+    -- the one spell that does something now, and fading it with the rest
+    -- hides the button the healer is reaching for.
+    local function withRevive(env, ns)
+        env.__spells["Revive"] = true
+        env.__spellTextures["Revive"] = 132132
+        ns.db.bar.slots = 2
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.Slots.Set(2, "Revive")
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+        return row
+    end
+
+    -- How bright a button looks: the row's fade and its own, together.
+    local function shown(row, index)
+        return row:GetAlpha() * row.buttons[index]:GetAlpha()
+    end
+
+    it("stays bright while the heals beside it fade", function()
+        local ns, env = loggedIn()
+        local row = withRevive(env, ns)
+        env.units.party1.dead = true
+
+        ns.Row.Refresh(row)
+
+        assertEqual(1, shown(row, 2), "Revive")
+        assertTrue(shown(row, 1) < 1, "Rejuvenation")
+    end)
+
+    it("fades the name and health bar with the heals", function()
+        local ns, env = loggedIn()
+        local row = withRevive(env, ns)
+        env.units.party1.dead = true
+
+        ns.Row.Refresh(row)
+
+        assertTrue(row:GetAlpha() * row.name:GetAlpha() < 1, "name")
+        assertTrue(row:GetAlpha() * row.health:GetAlpha() < 1, "health")
+    end)
+
+    it("is judged by its own reach, not by the row's", function()
+        -- UnitInRange measures a heal's reach. Whether the resurrection
+        -- reaches is its own spell's question, answered on its icon.
+        local ns, env = loggedIn()
+        local row = withRevive(env, ns)
+        env.units.party1.dead = true
+        env.units.party1.inRange = false
+
+        ns.Row.Refresh(row)
+
+        assertEqual(1, shown(row, 2))
+    end)
+
+    it("darkens its icon when the resurrection cannot reach the body", function()
+        local ns, env = loggedIn()
+        local row = withRevive(env, ns)
+        env.units.party1.dead = true
+        env.__spellRanges["Revive:party1"] = false
+
+        ns.Row.Refresh(row)
+
+        assertTrue(row.buttons[2].icon.vertexColor[1] < 1)
+    end)
+
+    it("fades with everything else for someone offline", function()
+        local ns, env = loggedIn()
+        local row = withRevive(env, ns)
+        env.units.party1.dead = true
+        env.units.party1.connected = false
+
+        ns.Row.Refresh(row)
+
+        assertTrue(shown(row, 2) < 1)
+    end)
+
+    it("gives the heals back once they are raised", function()
+        local ns, env = loggedIn()
+        local row = withRevive(env, ns)
+        env.units.party1.dead = true
+        ns.Row.Refresh(row)
+
+        env.units.party1.dead = false
+        ns.Row.Refresh(row)
+
+        assertEqual(1, shown(row, 1), "Rejuvenation")
+        assertEqual(1, shown(row, 2), "Revive")
+        assertEqual(1, row.name:GetAlpha())
+        assertEqual(1, row.health:GetAlpha())
+    end)
+
+    it("covers every class's resurrection, and nothing cast on the living", function()
+        local ns = loggedIn()
+
+        for _, spell in ipairs({ "Rebirth", "Revive", "Resurrection", "Redemption", "Ancestral Spirit" }) do
+            assertTrue(ns.Spells.IsResurrection(spell), spell)
+        end
+        -- A warlock stones the living, so it is no help to the dead.
+        assertFalse(ns.Spells.IsResurrection("Soulstone Resurrection"))
+        assertFalse(ns.Spells.IsResurrection("Rejuvenation"))
+        assertFalse(ns.Spells.IsResurrection(nil))
+    end)
+end)
+
 describe("refreshing a row on a client that treats a value as secret", function()
     -- A client can hand tainted code (ours) a "secret" value: the API call
     -- that produced it succeeds, but branching on the result -- `if x then`,
@@ -726,7 +833,7 @@ describe("refreshing a row on a client that treats a value as secret", function(
 
         ns.Row.Refresh(row)
 
-        assertTrue(row:GetAlpha() < 1, "a dead unit must still dim")
+        assertTrue(row:GetAlpha() * row.buttons[1]:GetAlpha() < 1, "a dead unit must still dim")
     end)
 
     it("still dims an offline unit when UnitInRange raises", function()
