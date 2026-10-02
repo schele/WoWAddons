@@ -175,3 +175,30 @@ describe("the invert option", function()
         assertEqual(false, ns.db.bar.locked, "a tick stores the opposite")
     end)
 end)
+
+describe("the panel's layout", function()
+    -- The hint wraps to several lines in this narrow column. Rows placed at a
+    -- fixed height on the panel let its last line crowd the first row.
+    it("hangs the first row off the bottom of the hint, with room to breathe", function()
+        local ns = loggedIn()
+        local point, relativeTo, relativePoint, x, y =
+            ns.SettingsPanel.controls[1].widget:GetPoint(1)
+
+        assertEqual("TOPLEFT", point)
+        assertTrue(relativeTo == ns.SettingsPanel.hint, "anchored to the hint")
+        assertEqual("BOTTOMLEFT", relativePoint)
+        assertEqual(0, x, "lined up with the hint's left edge")
+        assertTrue(y <= -16, "at least 16px below the hint")
+    end)
+
+    it("keeps every row below the hint, in order", function()
+        local ns = loggedIn()
+        local previous = 0
+        for _, control in ipairs(ns.SettingsPanel.controls) do
+            local _, relativeTo, _, _, y = control.widget:GetPoint(1)
+            assertTrue(relativeTo == ns.SettingsPanel.hint, control.setting.key)
+            assertTrue(y < previous, control.setting.key .. " below the one before")
+            previous = y
+        end
+    end)
+end)

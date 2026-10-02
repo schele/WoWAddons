@@ -7,6 +7,8 @@ local addonName, ns = ...
 local PADDING = 16
 local ROW_HEIGHT = 30
 local SLIDER_EXTRA = 24
+-- Clear space between the description paragraph and the first row under it.
+local HINT_GAP = 16
 
 -- Wide enough for a 200px slider with room to spare, and comfortably inside
 -- the canvas the game gives us.
@@ -24,7 +26,7 @@ local panel, category, built
 
 local function addCheckbox(setting, y, x)
     local button = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-    button:SetPoint("TOPLEFT", x, y)
+    button:SetPoint("TOPLEFT", Panel.hint, "BOTTOMLEFT", x, y)
 
     -- The label belongs to the template on some clients and not others, so
     -- write our own rather than reaching for button.Text and finding nil.
@@ -57,7 +59,7 @@ end
 
 local function addSlider(setting, y, x)
     local slider = CreateFrame("Slider", nil, panel, "OptionsSliderTemplate")
-    slider:SetPoint("TOPLEFT", x, y - SLIDER_EXTRA)
+    slider:SetPoint("TOPLEFT", Panel.hint, "BOTTOMLEFT", x, y - SLIDER_EXTRA)
     slider:SetMinMaxValues(setting.min, setting.max)
     slider:SetValueStep(setting.step or 1)
     slider:SetObeyStepOnDrag(true)
@@ -164,8 +166,13 @@ local function ensureBuilt()
         .. "effect out of combat."
     )
 
-    local x = PADDING
-    local y = -PADDING - ROW_HEIGHT * 2
+    -- Rows hang off the bottom of the hint rather than a fixed height on the
+    -- panel: in this narrow column it wraps to several lines, and a fixed
+    -- offset let the last crowd the first checkbox. x and y are measured from
+    -- the hint's bottom-left corner, which sits at PADDING like the rows did.
+    Panel.hint = hint
+    local x = 0
+    local y = -HINT_GAP
 
     for _, setting in ipairs(ns.settings) do
         local control
