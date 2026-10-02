@@ -105,9 +105,9 @@ For each listed slot, out of combat:
 4. `ClearCursor()`, which drops the old rank.
 
 Then RankUp looks again. A slot that still holds an old rank is named in chat
-(`RankUp: could not upgrade Healing Touch on button 14`) instead of being
+(`RankUp could not upgrade Healing Touch on action slot 14`) instead of being
 reported as done. A swap that worked prints one line per spell:
-`RankUp: Healing Touch -> Rank 5 (2 buttons)`.
+`RankUp Healing Touch -> Rank 5 (2 buttons)`.
 
 ## Architecture
 
