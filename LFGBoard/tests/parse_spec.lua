@@ -129,3 +129,85 @@ describe("a message that is not recruiting", function()
         assertNil(parse("wts [Linen Cloth]"))
     end)
 end)
+
+describe("the ways people ask for a role", function()
+    it("let a few words come between the ask and the role", function()
+        local cases = {
+            ["Need a tank for DM"] = "tank",
+            ["need 1 tank for DM"] = "tank",
+            ["LF 1 more dps DM"] = "dps",
+            ["LF a healer for WC"] = "healer",
+            ["lf 2 dps sm cath"] = "dps",
+            ["need 2 dps for SFK"] = "dps",
+            ["Looking for a tank for SFK"] = "tank",
+            ["need a heal for wc"] = "healer",
+        }
+        for text, role in pairs(cases) do
+            local got = parse(text)
+            assertTrue(got ~= nil, text)
+            assertTrue(got.roles and got.roles[role], text)
+        end
+    end)
+
+    it("count a role followed by needed", function()
+        local got = parse("Tank and healer needed for DM")
+
+        assertTrue(got.roles.tank)
+        assertTrue(got.roles.healer)
+        assertNil(got.roles.dps)
+    end)
+
+    it("leave out the poster's own role, said before what they look for", function()
+        local tank = parse("Tank LFM SFK need heals")
+        assertNil(tank.roles.tank)
+        assertTrue(tank.roles.healer)
+
+        local healer = parse("Healer LF2M RFK need tank and dps")
+        assertNil(healer.roles.healer)
+        assertTrue(healer.roles.tank)
+        assertTrue(healer.roles.dps)
+    end)
+
+    it("leave out a role the group says it has no room for", function()
+        local full = parse("LF1M DM tank, dps full")
+        assertTrue(full.roles.tank)
+        assertNil(full.roles.dps)
+
+        local none = parse("LFM DM no dps need heals")
+        assertTrue(none.roles.healer)
+        assertNil(none.roles.dps)
+    end)
+end)
+
+describe("links in a message", function()
+    it("do not name a dungeon or a role by their item's name", function()
+        local got = parse("LFM |cff1eff00|Hitem:2236::::::::20:::::::|h[Scarlet Kris]|h|r reserved WC")
+        assertEqual("wc", got.activity.key)
+
+        local robe = parse("LFM DM |cff1eff00|Hitem:7110::::::::20:::::::|h[Healer's Robe]|h|r need tank")
+        assertTrue(robe.roles.tank)
+        assertNil(robe.roles.healer)
+    end)
+
+    it("make a quest group when one is a quest", function()
+        local got = parse("LF2M |cffffff00|Hquest:155:18|h[The Defias Brotherhood]|h|r")
+
+        assertEqual("quest", got.kind)
+    end)
+end)
+
+describe("Trade chatter", function()
+    it("is not a group without a dungeon, a quest or an LFM", function()
+        for _, text in ipairs({
+            "I need all the gold I can get",
+            "need all mats for Lesser Mana Oil",
+            "anyone need tank gear? cheap",
+            "need tank boe? pst",
+            "need heals? priest LFG",
+            "LF more linen cloth",
+            "looking for more copper ore",
+        }) do
+            assertNil(parse(text), text)
+        end
+    end)
+end)
