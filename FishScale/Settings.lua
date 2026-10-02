@@ -10,6 +10,8 @@ local LOGO_SIZE = 24
 local ROW_HEIGHT = 30
 local PANEL_WIDTH = 400
 local INDENT = PADDING + 30 -- under a checkbox's label, not its box
+-- Clear space between the description paragraph and the first row under it.
+local HINT_GAP = 16
 
 local Panel = {}
 ns.SettingsPanel = Panel
@@ -65,11 +67,11 @@ end
 
 local function addKeyButton(y)
     local label = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    label:SetPoint("TOPLEFT", INDENT, y - 4)
+    label:SetPoint("TOPLEFT", Panel.hint, "BOTTOMLEFT", INDENT - PADDING, y - 4)
     label:SetText("Fishing key")
 
     local button = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    button:SetPoint("TOPLEFT", INDENT + 90, y)
+    button:SetPoint("TOPLEFT", Panel.hint, "BOTTOMLEFT", INDENT - PADDING + 90, y)
     button:SetSize(120, 22)
     button:EnableKeyboard(false)
     passKeysThrough(button, true)
@@ -107,7 +109,7 @@ end
 
 local function addCheckbox(text, y, indent, onClick)
     local button = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-    button:SetPoint("TOPLEFT", indent, y)
+    button:SetPoint("TOPLEFT", Panel.hint, "BOTTOMLEFT", indent - PADDING, y)
 
     -- The label belongs to the template on some clients and not others, so
     -- write our own rather than reaching for button.Text and finding nil.
@@ -170,7 +172,12 @@ local function ensureBuilt()
         .. "goes back to its usual job."
     )
 
-    local y = -PADDING - ROW_HEIGHT * 2 - 12
+    -- Rows hang off the bottom of the hint rather than a fixed height on the
+    -- panel: it wraps to three lines, and a fixed offset let the last crowd
+    -- the first checkbox. Each y is measured down from the hint's bottom
+    -- edge; each indent is still from the panel's, as before.
+    Panel.hint = hint
+    local y = -HINT_GAP
 
     Panel.enabled = addCheckbox("Take the fishing key while a pole is equipped", y, PADDING, function(value)
         ns.Fishing.SetEnabled(value)

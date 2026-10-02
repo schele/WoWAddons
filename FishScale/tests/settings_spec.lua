@@ -174,3 +174,28 @@ describe("closing the page", function()
         assertTrue(env.GameMenuFrame:IsShown(), "left where the client put it")
     end)
 end)
+
+describe("the page's layout", function()
+    -- The hint wraps to three lines. Rows placed at a fixed height on the
+    -- panel let its last line crowd the first checkbox.
+    it("hangs the first row off the bottom of the hint, with room to breathe", function()
+        local ns, env, panel = opened()
+        local point, relativeTo, relativePoint, x, y = panel.enabled:GetPoint(1)
+        assertEqual("TOPLEFT", point)
+        assertTrue(relativeTo == panel.hint, "anchored to the hint")
+        assertEqual("BOTTOMLEFT", relativePoint)
+        assertEqual(0, x, "the checkbox lines up with the hint, as before")
+        assertTrue(y <= -16, "at least 16px below the hint")
+    end)
+
+    it("keeps every row below it off the hint too, in order", function()
+        local ns, env, panel = opened()
+        local previous = 0
+        for _, widget in ipairs({ panel.enabled, panel.key, panel.withoutPole, panel.autoLoot, panel.minimap }) do
+            local _, relativeTo, _, _, y = widget:GetPoint(1)
+            assertTrue(relativeTo == panel.hint, "anchored to the hint")
+            assertTrue(y < previous, "below the row before")
+            previous = y
+        end
+    end)
+end)
