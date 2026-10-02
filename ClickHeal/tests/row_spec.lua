@@ -934,16 +934,67 @@ describe("the cooldown sweep on a button", function()
         assertEqual(0, duration)
     end)
 
-    it("draws no sweep for a cooldown the client says is not enabled", function()
+    -- A spell used and waiting for its cooldown to start: Rebirth until the
+    -- dead accept it, Prowl until it ends. Drawn as nothing, a Rebirth just
+    -- cast read as ready on every row until the target accepted.
+    it("holds a used spell's sweep full while its cooldown waits to start", function()
         local ns, env = loggedIn()
         local row = armed(env, ns, 1, "Rejuvenation")
         env.__spellCooldowns["Rejuvenation"] =
-            { startTime = 100, duration = 1.5, isEnabled = false }
+            { startTime = 0, duration = 1800, isEnabled = false }
+
+        ns.Row.RefreshCooldowns(row)
+
+        local cooldown = row.buttons[1].cooldown
+        local start, duration = cooldown:GetCooldownTimes()
+        assertEqual(env.__now, start)
+        assertEqual(1800, duration)
+        assertTrue(cooldown.paused, "held, not counting down")
+    end)
+
+    it("takes the spell's own cooldown when the waiting one gives no length", function()
+        local ns, env = loggedIn()
+        local row = armed(env, ns, 1, "Rejuvenation")
+        env.__spellIDsByName["Rejuvenation"] = 774
+        env.__baseCooldowns[774] = 1800000
+        env.__spellCooldowns["Rejuvenation"] =
+            { startTime = 0, duration = 0, isEnabled = false }
+
+        ns.Row.RefreshCooldowns(row)
+
+        local _, duration = row.buttons[1].cooldown:GetCooldownTimes()
+        assertEqual(1800, duration)
+        assertTrue(row.buttons[1].cooldown.paused)
+    end)
+
+    it("draws no sweep for a waiting cooldown of no known length", function()
+        local ns, env = loggedIn()
+        local row = armed(env, ns, 1, "Rejuvenation")
+        env.__spellCooldowns["Rejuvenation"] =
+            { startTime = 0, duration = 0, isEnabled = false }
 
         ns.Row.RefreshCooldowns(row)
 
         local _, duration = row.buttons[1].cooldown:GetCooldownTimes()
         assertEqual(0, duration)
+    end)
+
+    it("lets the sweep run once the waiting cooldown starts", function()
+        local ns, env = loggedIn()
+        local row = armed(env, ns, 1, "Rejuvenation")
+        env.__spellCooldowns["Rejuvenation"] =
+            { startTime = 0, duration = 1800, isEnabled = false }
+        ns.Row.RefreshCooldowns(row)
+
+        env.__spellCooldowns["Rejuvenation"] =
+            { startTime = 1200, duration = 1800, isEnabled = true }
+        ns.Row.RefreshCooldowns(row)
+
+        local cooldown = row.buttons[1].cooldown
+        local start, duration = cooldown:GetCooldownTimes()
+        assertEqual(1200, start)
+        assertEqual(1800, duration)
+        assertFalse(cooldown.paused)
     end)
 
     it("draws no sweep when the client will not disclose the numbers", function()

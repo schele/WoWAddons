@@ -233,6 +233,9 @@ local function makeWidget(kind, parent, template, env)
         return self.cooldownStart, self.cooldownDuration
     end
     function widget:SetHideCountdownNumbers() end
+    -- A sweep held where it is, and let run again.
+    function widget:Pause() self.paused = true end
+    function widget:Resume() self.paused = false end
 
     -- The draw layer is recorded because it is not merely cosmetic: the
     -- client shows and hides anything in the HIGHLIGHT layer on mouseover by
@@ -543,6 +546,12 @@ function stub.newEnv()
     -- or, for the case the client withholds,
     --   { startTime = env.__secret(), duration = env.__secret(), isEnabled = true }
     env.__spellCooldowns = {}
+    -- Each spell's own cooldown, in milliseconds, by spell ID: what
+    -- GetSpellBaseCooldown gives, whatever the spell is doing now.
+    env.__baseCooldowns = {}
+    function env.GetSpellBaseCooldown(spellID)
+        return env.__baseCooldowns[spellID] or 0, 0
+    end
 
     -- Which spells can reach which units, keyed "<spell>:<unit>". A pair
     -- absent here reads as nil, the client's own way of saying it will not

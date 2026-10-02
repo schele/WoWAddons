@@ -159,9 +159,10 @@ function Spells.CursorSpell()
 end
 
 --- When a spell's cooldown started and how long it runs: start, duration and
--- whether the client wants a sweep drawn at all. Nil when this client has
--- nothing to say about the spell, which a caller reads as "draw nothing"
--- rather than "ready".
+-- whether it is counting yet. `enabled` false is a spell used and waiting
+-- for its cooldown to start, with start 0 and the length about to run. Nil
+-- when this client has nothing to say about the spell, which a caller reads
+-- as "draw nothing" rather than "ready".
 --
 -- The two APIs disagree about shape, not just about name: C_Spell hands back
 -- a table, while the old global returned four loose values with `enabled` as
@@ -199,6 +200,21 @@ function Spells.Cooldown(spellName)
         -- raises. Comparing both here turns "the client will not say" into a
         -- missing sweep, where doing it upstairs took the refresh down for
         -- every remaining button on every remaining row.
+        -- Used, and waiting for its cooldown to start: Rebirth until the dead
+        -- accept it, Prowl until it ends. The game may give no length while
+        -- it waits, and then the spell's own is the one about to run.
+        if not enabled then
+            if type(duration) ~= "number" or duration <= 0 then
+                local id = Spells.SpellID(spellName)
+                local ms = id and GetSpellBaseCooldown and GetSpellBaseCooldown(id)
+                duration = type(ms) == "number" and ms / 1000 or 0
+            end
+            if duration <= 0 then
+                return nil
+            end
+            return { start = 0, duration = duration, enabled = false }
+        end
+
         if not start or not duration or start < 0 or duration <= 0 then
             return nil
         end

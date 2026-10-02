@@ -689,8 +689,22 @@ function Row.RefreshCooldowns(row)
             -- safe to hand straight to the widget; a `duration > 0` on this
             -- line is what the live crash of 2026-09-20 was.
             if start and enabled then
+                if cooldown.Resume then
+                    cooldown:Resume()
+                end
                 cooldown:SetCooldown(start, duration)
+            elseif duration and enabled == false then
+                -- Used and waiting to start, as Rebirth is until the dead
+                -- accept it: held full, so the button reads as spent on
+                -- every row rather than ready, until the count begins.
+                cooldown:SetCooldown(GetTime(), duration)
+                if cooldown.Pause then
+                    cooldown:Pause()
+                end
             else
+                if cooldown.Resume then
+                    cooldown:Resume()
+                end
                 -- A zero-length cooldown is how the widget is told to draw
                 -- nothing. Without this an expired sweep would sit there
                 -- for good, since nothing else ever clears one.
