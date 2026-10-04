@@ -332,6 +332,9 @@ function stub.newEnv()
         env[name] = makeWidget("Frame", env.UIParent)
         env[name].shown = false
     end
+    -- The button that lands a flight early, hidden but for the flight.
+    env.MainMenuBarVehicleLeaveButton = makeWidget("Button", env.MainActionBar)
+    env.MainMenuBarVehicleLeaveButton.shown = false
     env.ChatFrame1 = makeWidget("ScrollingMessageFrame", env.UIParent)
     env.ChatFrame1:SetPoint("BOTTOMLEFT", env.UIParent, "BOTTOMLEFT", 32, 95)
     function env.FCF_SavePositionAndDimensions() end

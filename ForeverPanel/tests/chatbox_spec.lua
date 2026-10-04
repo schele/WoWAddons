@@ -79,6 +79,30 @@ describe("the chat box above the action bars", function()
         assertEqual(90 + 4 + 30, y, "the typing box's bottom the gap over the form bar")
     end)
 
+    it("keeps room for the button that lands a flight, so a flight does not move it", function()
+        local _, env = loggedIn(function(_, e)
+            bar(e.StanceBar, 30, 200, 90)
+            bar(e.MainMenuBarVehicleLeaveButton, 30, 62, 126)
+            e.MainMenuBarVehicleLeaveButton.shown = false
+        end)
+        assertEqual(130, select(2, placed(env)), "clear of it while it is hidden")
+
+        env.MainMenuBarVehicleLeaveButton:Show()
+        env.__runTimers()
+        assertEqual(130, select(2, placed(env)), "and still there when a flight shows it")
+    end)
+
+    it("makes room for the flight's button when it shows, if it had no place while hidden", function()
+        local _, env = loggedIn()
+        assertEqual(54, select(2, placed(env)))
+
+        bar(env.MainMenuBarVehicleLeaveButton, 30, 62, 126)
+        env.MainMenuBarVehicleLeaveButton.shown = false
+        env.MainMenuBarVehicleLeaveButton:Show()
+        env.__runTimers()
+        assertEqual(130, select(2, placed(env)))
+    end)
+
     it("pays no attention to a bar that is not under it", function()
         local _, env = loggedIn(function(_, e) bar(e.MultiBarBottomLeft, 600, 1000, 140) end)
 

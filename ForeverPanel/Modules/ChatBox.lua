@@ -4,8 +4,9 @@ local addonName, ns = ...
 -- game saves where the chat box goes to the account, so one placed right on a
 -- laptop sits wrong on a desktop. Here only its height on the screen is
 -- decided: its bottom edge goes the gap over the highest bar beneath it, which
--- for a druid is the bear and cat form bar. Left and right stay where the
--- game's layout put them, and its size is left alone.
+-- for a druid is the bear and cat form bar, or over the button that lands a
+-- flight early, whose room is kept even while it is hidden. Left and right
+-- stay where the game's layout put them, and its size is left alone.
 
 ns.AddDefaults({
     ui = {
@@ -21,6 +22,13 @@ local BARS = {
     "MultiBarBottomLeft", "MultiBarBottomRight",
     "StanceBar", "StanceBarFrame",
     "PetActionBar", "PetActionBarFrame",
+}
+
+-- Frames kept clear whether shown or not, so the chat box does not jump when
+-- they come and go: the button that lands a flight early (or leaves a
+-- vehicle) shows only for the length of the flight.
+local RESERVED = {
+    "MainMenuBarVehicleLeaveButton",
 }
 
 -- The client's Lua has it global; a newer Lua keeps it in table.
@@ -64,23 +72,37 @@ local function setPoints(frame, points)
     moving = false
 end
 
---- The top of the highest shown bar under the chat box, in screen pixels.
--- A bar counts as under it when the two overlap left to right.
+--- A frame's top in screen pixels, when it is under the chat box: the two
+-- overlap left to right. Nil for one elsewhere, or not laid out yet.
+local function topUnder(frame, left, right)
+    if type(frame) ~= "table" or not frame.GetTop then
+        return
+    end
+    local scale = frame:GetEffectiveScale()
+    local top, barLeft, barRight = frame:GetTop(), frame:GetLeft(), frame.GetRight and frame:GetRight()
+    if top and barLeft and barRight
+        and barLeft * scale < right and barRight * scale > left then
+        return top * scale
+    end
+end
+
+--- The top of the highest shown bar or kept room under the chat box, in
+-- screen pixels.
 local function highestBarTop(left, right)
     local highest
+    local function consider(top)
+        if top and (not highest or top > highest) then
+            highest = top
+        end
+    end
     for _, name in ipairs(BARS) do
         local frame = _G[name]
-        if type(frame) == "table" and frame.IsShown and frame:IsShown() and frame.GetTop then
-            local scale = frame:GetEffectiveScale()
-            local top, barLeft, barRight = frame:GetTop(), frame:GetLeft(), frame.GetRight and frame:GetRight()
-            if top and barLeft and barRight
-                and barLeft * scale < right and barRight * scale > left then
-                top = top * scale
-                if not highest or top > highest then
-                    highest = top
-                end
-            end
+        if type(frame) == "table" and frame.IsShown and frame:IsShown() then
+            consider(topUnder(frame, left, right))
         end
+    end
+    for _, name in ipairs(RESERVED) do
+        consider(topUnder(_G[name], left, right))
     end
     return highest
 end
@@ -172,8 +194,9 @@ local function hook()
         end
     end)
     -- A bar appearing, going or moving: the druid's form bar comes and goes
-    -- with the forms learned, the pet bar with the pet.
-    for _, name in ipairs(BARS) do
+    -- with the forms learned, the pet bar with the pet. The flight's button
+    -- is followed too, for one with no place on screen until it shows.
+    local function follow(name)
         local bar = _G[name]
         if type(bar) == "table" and bar.HookScript then
             bar:HookScript("OnShow", applySoon)
@@ -182,6 +205,12 @@ local function hook()
                 hooksecurefunc(bar, "SetPoint", applySoon)
             end
         end
+    end
+    for _, name in ipairs(BARS) do
+        follow(name)
+    end
+    for _, name in ipairs(RESERVED) do
+        follow(name)
     end
     if EditModeManagerFrame and EditModeManagerFrame.HookScript then
         EditModeManagerFrame:HookScript("OnHide", applySoon)
