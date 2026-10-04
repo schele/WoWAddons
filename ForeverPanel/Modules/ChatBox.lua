@@ -24,12 +24,10 @@ local BARS = {
     "PetActionBar", "PetActionBarFrame",
 }
 
--- Frames kept clear whether shown or not, so the chat box does not jump when
--- they come and go: the button that lands a flight early (or leaves a
--- vehicle) shows only for the length of the flight.
-local RESERVED = {
-    "MainMenuBarVehicleLeaveButton",
-}
+-- The button that lands a flight early (or leaves a vehicle), shown only for
+-- the length of the flight. Its room is kept whether shown or not, so the
+-- chat box does not jump when it comes and goes.
+local FLIGHT_BUTTON = "MainMenuBarVehicleLeaveButton"
 
 -- The client's Lua has it global; a newer Lua keeps it in table.
 local unpack = unpack or table.unpack
@@ -86,6 +84,51 @@ local function topUnder(frame, left, right)
     end
 end
 
+--- The top of the flight's button in screen pixels, when it is under the chat
+-- box. Edit Mode puts it in place only once it shows: on top of the stack of
+-- bars along the bottom, indented from the stack's left like the form bar.
+-- Until then it waits where it was last, at first under the main bar, so
+-- while hidden its place is worked out the way Edit Mode will.
+local function flightButtonTop(left, right)
+    local button = _G[FLIGHT_BUTTON]
+    if type(button) ~= "table" or not button.GetHeight then
+        return
+    end
+    local stack = EditModeUtil and EditModeUtil.GetBottomActionBars and EditModeUtil:GetBottomActionBars()
+    -- Shown, dragged elsewhere in Edit Mode, or on a client that does not
+    -- stack it: where it is, is where it goes.
+    if button:IsShown() or type(stack) ~= "table"
+        or (button.IsInDefaultPosition and not button:IsInDefaultPosition()) then
+        return topUnder(button, left, right)
+    end
+
+    local base = stack[1]
+    local stackTop
+    for _, bar in ipairs(stack) do
+        if bar ~= button and type(bar) == "table" and bar:IsShown()
+            and not (bar.IsInDefaultPosition and not bar:IsInDefaultPosition()) then
+            local top = bar:GetTop()
+            if top then
+                top = top * bar:GetEffectiveScale()
+                if not stackTop or top > stackTop then
+                    stackTop = top
+                end
+            end
+        end
+    end
+    local baseLeft = type(base) == "table" and base:GetLeft()
+    if not (stackTop and baseLeft) then
+        return
+    end
+
+    local scale = button:GetEffectiveScale()
+    local buttonLeft = baseLeft * base:GetEffectiveScale() + (BOTTOM_ACTION_BAR_DEFAULT_OFFSET_X or 0) * scale
+    local buttonRight = buttonLeft + button:GetWidth() * scale
+    if buttonLeft < right and buttonRight > left then
+        return stackTop + ((BOTTOM_ACTION_BARS_SPACER_Y or 4) + button:GetHeight()) * scale
+    end
+end
+
 --- The top of the highest shown bar or kept room under the chat box, in
 -- screen pixels.
 local function highestBarTop(left, right)
@@ -101,9 +144,7 @@ local function highestBarTop(left, right)
             consider(topUnder(frame, left, right))
         end
     end
-    for _, name in ipairs(RESERVED) do
-        consider(topUnder(_G[name], left, right))
-    end
+    consider(flightButtonTop(left, right))
     return highest
 end
 
@@ -195,7 +236,7 @@ local function hook()
     end)
     -- A bar appearing, going or moving: the druid's form bar comes and goes
     -- with the forms learned, the pet bar with the pet. The flight's button
-    -- is followed too, for one with no place on screen until it shows.
+    -- is followed too, for a client that does not stack it.
     local function follow(name)
         local bar = _G[name]
         if type(bar) == "table" and bar.HookScript then
@@ -209,9 +250,7 @@ local function hook()
     for _, name in ipairs(BARS) do
         follow(name)
     end
-    for _, name in ipairs(RESERVED) do
-        follow(name)
-    end
+    follow(FLIGHT_BUTTON)
     if EditModeManagerFrame and EditModeManagerFrame.HookScript then
         EditModeManagerFrame:HookScript("OnHide", applySoon)
     end

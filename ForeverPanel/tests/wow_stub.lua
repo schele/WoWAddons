@@ -332,8 +332,10 @@ function stub.newEnv()
         env[name] = makeWidget("Frame", env.UIParent)
         env[name].shown = false
     end
-    -- The button that lands a flight early, hidden but for the flight.
+    -- The button that lands a flight early, hidden but for the flight, at
+    -- the size its XML gives it.
     env.MainMenuBarVehicleLeaveButton = makeWidget("Button", env.MainActionBar)
+    env.MainMenuBarVehicleLeaveButton:SetSize(32, 32)
     env.MainMenuBarVehicleLeaveButton.shown = false
     env.ChatFrame1 = makeWidget("ScrollingMessageFrame", env.UIParent)
     env.ChatFrame1:SetPoint("BOTTOMLEFT", env.UIParent, "BOTTOMLEFT", 32, 95)
