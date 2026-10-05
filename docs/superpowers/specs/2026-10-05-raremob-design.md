@@ -83,7 +83,7 @@ that rare's pins highlighted.
 **Settings page** (canvas page like the other addons, rows hanging under the
 hint with the 16px gap): Show pins on the world map; Show pins on the
 minimap; Show rares only in the database; Alert sound; Pin size (slider);
-Show the minimap button. All default on except none; pin size 14.
+Show the minimap button. All on by default; pin size 14.
 
 ## Files
 
