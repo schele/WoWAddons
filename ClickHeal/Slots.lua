@@ -9,7 +9,7 @@ ns.Slots = Slots
 
 -- Every row builds this many buttons whatever the count says. Growing the bar
 -- later must never need a frame created at a moment the client forbids one.
-Slots.MAX = 8
+Slots.MAX = 10
 
 -- How many buttons a row shows before anyone changes it. Named rather than
 -- written in twice, because the default and the fallback Count uses when the

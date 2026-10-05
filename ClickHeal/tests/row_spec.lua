@@ -233,9 +233,9 @@ describe("applying spells", function()
         )
     end)
 
-    it("leaves a resurrection off your own row, keeping its place", function()
-        -- Rebirth and Revive cannot target the caster. The gap stays so
-        -- Remove Curse sits in the same column as on every party row.
+    it("leaves a resurrection off your own row, with no gap where it was", function()
+        -- Rebirth and Revive cannot target the caster, so on your own row
+        -- Remove Curse moves up next to Regrowth.
         local ns, env = loggedIn()
         env.__spells["Rebirth"] = true
         env.__spellTextures["Rebirth"] = 136080
@@ -253,9 +253,9 @@ describe("applying spells", function()
         local _, firstX = row.buttons[1]:GetPoint()
         local _, thirdX = row.buttons[3]:GetPoint()
         assertEqual(
-            2 * (row.buttons[1]:GetWidth() + ns.Row.BUTTON_GAP),
+            row.buttons[1]:GetWidth() + ns.Row.BUTTON_GAP,
             thirdX - firstX,
-            "slot 3 stays in its own column"
+            "slot 3 must sit where slot 2 would have been"
         )
     end)
 
@@ -1270,7 +1270,7 @@ describe("the remaining time under an icon", function()
     end)
 
     it("asks the client for a unit's auras once, not once per button", function()
-        -- Eight buttons on each of five rows, five times a second, is
+        -- Ten buttons on each of five rows, five times a second, is
         -- thousands of calls into the client every second if each button
         -- asks for itself.
         local ns, env = loggedIn()

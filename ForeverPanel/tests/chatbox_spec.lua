@@ -22,6 +22,40 @@ local function loggedIn(prepare)
     return ns, env
 end
 
+--- Forever's Edit Mode, which stacks the bars along the bottom and puts the
+-- flight's button on top of them only when it shows. Hidden, the button
+-- waits at its XML anchor, the main bar's bottom left corner.
+local function forever(env)
+    env.BOTTOM_ACTION_BARS_SPACER_Y = 4
+    env.BOTTOM_ACTION_BAR_DEFAULT_OFFSET_X = 30
+    env.EditModeUtil = {
+        GetBottomActionBars = function()
+            return {
+                env.MainActionBar, env.MultiBarBottomLeft, env.StanceBar,
+                env.PetActionBar, env.MainMenuBarVehicleLeaveButton,
+            }
+        end,
+    }
+    bar(env.MainMenuBarVehicleLeaveButton, 20, 52, 32)
+    env.MainMenuBarVehicleLeaveButton.shown = false
+end
+
+--- A flight starts: Edit Mode puts the button over the highest bar in the
+-- stack, the indent in from the main bar, and it shows.
+local function fly(env)
+    local stackTop = env.MainActionBar.top
+    for _, frame in ipairs({ env.MultiBarBottomLeft, env.StanceBar, env.PetActionBar }) do
+        if frame.shown and frame.top > stackTop then
+            stackTop = frame.top
+        end
+    end
+    local button = env.MainMenuBarVehicleLeaveButton
+    button.left, button.right = env.MainActionBar.left + 30, env.MainActionBar.left + 62
+    button.top = stackTop + 4 + 32
+    button:Show()
+    env.__runTimers()
+end
+
 local function settingFor(ns, store, key)
     for _, setting in ipairs(ns.settings) do
         if setting.store == store and setting.key == key then
@@ -77,6 +111,51 @@ describe("the chat box above the action bars", function()
 
         local _, y = placed(env)
         assertEqual(90 + 4 + 30, y, "the typing box's bottom the gap over the form bar")
+    end)
+
+    it("keeps room for the button that lands a flight, so a flight does not move it", function()
+        local _, env = loggedIn(function(_, e)
+            forever(e)
+            bar(e.StanceBar, 30, 200, 90)
+        end)
+        -- Over the form bar, the spacer and the button: 90 + 4 + 32, then the gap.
+        assertEqual(130, select(2, placed(env)), "clear of where it will show while it is hidden")
+
+        fly(env)
+        assertEqual(130, select(2, placed(env)), "and still there when a flight shows it")
+
+        env.MainMenuBarVehicleLeaveButton:Hide()
+        env.__runTimers()
+        assertEqual(130, select(2, placed(env)), "and after it lands")
+    end)
+
+    it("keeps room for the flight's button over the main bar alone", function()
+        local _, env = loggedIn(function(_, e) forever(e) end)
+
+        assertEqual(50 + 4 + 32 + 4, select(2, placed(env)))
+    end)
+
+    it("keeps no room for a flight's button dragged away in Edit Mode", function()
+        local _, env = loggedIn(function(_, e)
+            forever(e)
+            local button = e.MainMenuBarVehicleLeaveButton
+            function button:IsInDefaultPosition() return false end
+            bar(button, 700, 732, 300)
+            button.shown = false
+        end)
+
+        assertEqual(54, select(2, placed(env)))
+    end)
+
+    it("makes room for the flight's button when it shows, on a client that does not stack it", function()
+        local _, env = loggedIn()
+        assertEqual(54, select(2, placed(env)))
+
+        bar(env.MainMenuBarVehicleLeaveButton, 30, 62, 126)
+        env.MainMenuBarVehicleLeaveButton.shown = false
+        env.MainMenuBarVehicleLeaveButton:Show()
+        env.__runTimers()
+        assertEqual(130, select(2, placed(env)))
     end)
 
     it("pays no attention to a bar that is not under it", function()

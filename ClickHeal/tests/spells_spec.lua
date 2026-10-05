@@ -437,7 +437,7 @@ describe("reading the helpful buffs on a unit", function()
     end)
 
     it("takes an already-gathered list rather than asking again", function()
-        -- What lets a row ask once and answer for all eight of its buttons.
+        -- What lets a row ask once and answer for all ten of its buttons.
         local ns, env = loggedIn()
         env.__now = 1000
         local gathered = { Rejuvenation = { expires = 1009, mine = true } }

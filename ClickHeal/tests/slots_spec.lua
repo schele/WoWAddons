@@ -22,6 +22,13 @@ describe("the slot count", function()
         assertEqual(6, ns.Slots.DEFAULT_COUNT)
     end)
 
+    it("goes up to ten", function()
+        -- Pinned for the same reason: eight was too few for a druid's heals,
+        -- buffs, cures and both resurrections.
+        local ns = loggedIn()
+        assertEqual(10, ns.Slots.MAX)
+    end)
+
     it("clamps above the maximum", function()
         local ns = loggedIn()
         ns.db.bar.slots = 99
