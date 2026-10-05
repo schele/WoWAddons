@@ -1,4 +1,4 @@
-// Draws the 64x64 icons for BossLoot, FishScale, BankBags, GatherMap, RankUp, AutoVendor, LFGBoard and MailHandler, and their minimap icons, in the style of
+// Draws the 64x64 icons for BossLoot, FishScale, BankBags, GatherMap, RankUp, AutoVendor, LFGBoard, MailHandler and RareMob, and their minimap icons, in the style of
 // the others: a dark rounded tile with a soft glow in the addon's colour, a
 // thin ring, and a light, glossy symbol with a darker outline and details.
 // A minimap icon is the symbol alone, filling the frame: the minimap button
@@ -259,6 +259,33 @@ const envelopeDetails = union(
 );
 const envelopeShine = ellipse(22, 23.5, 5, 1.3);
 
+// TalentPlanner: a talent tree, nodes on branching lines, in lime.
+const lime = {
+  dark: [10, 18, 6], glow: [52, 92, 24], ring: [150, 210, 80],
+  light: [228, 255, 200], mid: [140, 206, 80], outline: [34, 62, 14], detail: [60, 100, 30],
+};
+const talentTree = union(
+  circle(32, 15, 7), circle(32, 33, 6.5), circle(17, 50, 6.5), circle(47, 50, 6.5),
+  segment(32, 15, 32, 33, 2.6), // the trunk, then a branch to either side
+  segment(32, 33, 17, 50, 2.6),
+  segment(32, 33, 47, 50, 2.6),
+);
+const treeDetails = union(circle(32, 15, 2.4), circle(32, 33, 2.2), circle(17, 50, 2.2), circle(47, 50, 2.2));
+const treeShine = ellipse(29.5, 11.5, 3, 1.2);
+
+// RareMob: a skull, in bone.
+const bone = {
+  dark: [16, 12, 8], glow: [92, 74, 46], ring: [214, 196, 150],
+  light: [252, 246, 230], mid: [208, 194, 162], outline: [58, 44, 28], detail: [44, 32, 20],
+};
+const skull = union(circle(32, 27, 16), roundBox(32, 43, 9.5, 7, 3));
+const skullDetails = union(
+  circle(25, 30, 4.4), circle(39, 30, 4.4), // the eyes
+  triangle(32, 34.5, 29, 40, 35, 40), // the nose
+  roundBox(28.5, 47, 0.7, 3.5, 0.5), roundBox(32, 47, 0.7, 3.5, 0.5), roundBox(35.5, 47, 0.7, 3.5, 0.5), // the teeth
+);
+const skullShine = ellipse(26, 17.5, 5, 1.6);
+
 const root = process.argv[2];
 writeTga(path.join(root, 'BossLoot', 'icon.tga'), draw(crimson, chest, chestDetails, chestShine));
 writeTga(path.join(root, 'BossLoot', 'minimap.tga'), draw(crimson, chest, chestDetails, chestShine, { tile: false, zoom: 1.4 }));
@@ -278,3 +305,7 @@ writeTga(path.join(root, 'LFGBoard', 'icon.tga'), draw(violet, group, groupDetai
 writeTga(path.join(root, 'LFGBoard', 'minimap.tga'), draw(violet, group, groupDetails, groupShine, { tile: false, zoom: 1.3 }));
 writeTga(path.join(root, 'MailHandler', 'icon.tga'), draw(blue, envelope, envelopeDetails, envelopeShine));
 writeTga(path.join(root, 'MailHandler', 'logo.tga'), draw(blue, envelope, envelopeDetails, envelopeShine, { tile: false, zoom: 1.4 }));
+writeTga(path.join(root, 'RareMob', 'icon.tga'), draw(bone, skull, skullDetails, skullShine));
+writeTga(path.join(root, 'RareMob', 'minimap.tga'), draw(bone, skull, skullDetails, skullShine, { tile: false, zoom: 1.35 }));
+writeTga(path.join(root, 'TalentPlanner', 'icon.tga'), draw(lime, talentTree, treeDetails, treeShine));
+writeTga(path.join(root, 'TalentPlanner', 'minimap.tga'), draw(lime, talentTree, treeDetails, treeShine, { tile: false, zoom: 1.2 }));

@@ -1,0 +1,23 @@
+## Interface: 11509, 16001
+## Title: RareMob
+## Notes: Pins rare mobs on the maps, sounds when one is near, and lists the zone's rares.
+## IconTexture: Interface\AddOns\RareMob\icon
+## Author: You
+## Version: 0.1.0
+## SavedVariables: RareMobDB
+
+RareMob.lua
+Data\Rares.lua
+Data\SpawnsEasternKingdoms.lua
+Data\SpawnsKalimdor.lua
+Data\Recorded.lua
+Geometry.lua
+Rares.lua
+Spotter.lua
+Alert.lua
+Pins.lua
+WorldMap.lua
+MinimapPins.lua
+List.lua
+Minimap.lua
+Settings.lua
