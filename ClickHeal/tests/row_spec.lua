@@ -1270,7 +1270,7 @@ describe("the remaining time under an icon", function()
     end)
 
     it("asks the client for a unit's auras once, not once per button", function()
-        -- Eight buttons on each of five rows, five times a second, is
+        -- Ten buttons on each of five rows, five times a second, is
         -- thousands of calls into the client every second if each button
         -- asks for itself.
         local ns, env = loggedIn()

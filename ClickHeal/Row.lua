@@ -786,7 +786,7 @@ end
 --- Write the remaining time of each button's own spell on this row's unit.
 --
 -- The unit's auras are gathered once and shared across the row's buttons.
--- Asked per button instead, eight buttons on each of five rows refreshed
+-- Asked per button instead, ten buttons on each of five rows refreshed
 -- five times a second would be thousands of calls into the client every
 -- second, nearly all of them repeats.
 --

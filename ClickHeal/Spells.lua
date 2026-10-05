@@ -479,7 +479,7 @@ end
 -- this player is the one who cast it. Empty when there are none, or when the
 -- client will not say.
 --
--- Gathered per unit rather than asked per button: with eight buttons on each
+-- Gathered per unit rather than asked per button: with ten buttons on each
 -- of five rows, refreshed five times a second, asking per button would be
 -- thousands of calls into the client every second for the same answers.
 --
