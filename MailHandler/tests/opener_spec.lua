@@ -160,6 +160,19 @@ describe("Open", function()
         assertMatch("Mailbox closed: 2 ticked mails left%.", helpers.printed(env))
     end)
 
+    it("counts the gold of the mails taken, not what the purse shows yet", function()
+        local ns, env = helpers.loadAddon()
+        env.__moneyLags = true
+        helpers.sale(env, "Rough Stone", 46, 100)
+        helpers.sale(env, "Lodestone", 11, 233)
+        tick(ns, 1, 2)
+
+        ns.Opener.Start()
+        env.__runAllTimers()
+
+        assertMatch("Opened 2 mails: 3s 33c%.", helpers.printed(env))
+    end)
+
     it("waits for a server that answers late", function()
         local ns, env = helpers.loadAddon()
         env.__slowServer = true

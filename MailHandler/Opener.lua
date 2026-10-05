@@ -51,6 +51,8 @@ local function waitFor(key, mail, kind, slot)
         kind = kind,
         slot = slot,
         looks = 0,
+        -- The gold a money take is for: counted once the take is answered.
+        money = mail.money,
     }
 end
 
@@ -67,9 +69,10 @@ local function report(current, stopped)
     end
     if opened > 0 then
         local what = {}
-        local gained = math.max(0, (GetMoney() or 0) - current.startMoney)
-        if gained > 0 then
-            what[#what + 1] = ns.Money(gained)
+        -- The gold of the mails taken, not what GetMoney shows: the purse
+        -- can catch up a moment after the mail shows its gold gone.
+        if current.gained > 0 then
+            what[#what + 1] = ns.Money(current.gained)
         end
         if current.items > 0 then
             what[#what + 1] = ns.Count(current.items, "item")
@@ -130,6 +133,8 @@ step = function(current)
             current.took[waiting.key] = true
             if waiting.kind == "item" then
                 current.items = current.items + 1
+            elseif waiting.kind == "money" then
+                current.gained = current.gained + waiting.money
             end
             if waiting.removed then
                 -- Gone from the box: its tick goes, and the alike mails
@@ -197,7 +202,7 @@ function Opener.Start(mails)
     run = {
         targets = targets,
         at = 1,
-        startMoney = GetMoney() or 0,
+        gained = 0,
         items = 0,
         cod = 0,
         unanswered = 0,

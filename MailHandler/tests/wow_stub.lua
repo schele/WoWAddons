@@ -259,7 +259,13 @@ function stub.newEnv()
         local mail = env.__mails[index]
         if not mail then return end
         answer(mail, function()
-            env.__money = env.__money + mail.money
+            -- With __moneyLags, the mail shows its gold gone at once but the
+            -- purse catches up only later, as the client's can.
+            if env.__moneyLags then
+                env.__moneyOwed = (env.__moneyOwed or 0) + mail.money
+            else
+                env.__money = env.__money + mail.money
+            end
             mail.money = 0
             emptied(mail)
         end)
