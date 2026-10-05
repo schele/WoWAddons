@@ -15,6 +15,8 @@ World of Warcraft addons, one folder each.
 | [AutoVendor](AutoVendor/) | Sells your grey items and repairs your gear whenever you open a merchant, with a keep list for greys you want |
 | [LFGBoard](LFGBoard/) | Groups that want you, from chat and the group finder, filtered to your roles and level, with a whisper ready to send |
 | [MailHandler](MailHandler/) | A checkbox on every mail, and Open beside Open All to take only the ticked ones |
+| [RareMob](RareMob/) | Rare and rare elite spawn points on the world map and minimap, a sound when one is near, and the zone's rares with when each was last seen |
+| [TalentPlanner](TalentPlanner/) | Plan the order of your talent points, see the plan in the talent window, and be told which talent comes next |
 
 ## Layout
 
