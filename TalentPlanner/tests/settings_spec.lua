@@ -1,0 +1,90 @@
+local helpers = require("helpers")
+
+local function opened(saved)
+    local ns, env = helpers.loggedIn(saved)
+    ns.SettingsPanel.panel:Show()
+    return ns, env, ns.SettingsPanel
+end
+
+describe("the settings page", function()
+    it("is a page in the game's options, named TalentPlanner", function()
+        local _, env = helpers.loggedIn()
+        assertEqual("TalentPlanner", env.__settingsCategory.name)
+    end)
+
+    it("opens from /tp settings", function()
+        local _, env = helpers.loggedIn()
+        helpers.command(env, "settings")
+        assertEqual("category-id", env.__openedCategory)
+    end)
+
+    it("heads the page with TalentPlanner's own icon", function()
+        local _, _, panel = opened()
+        assertEqual("Interface\\AddOns\\TalentPlanner\\minimap", panel.logo:GetTexture())
+    end)
+
+    it("shows the defaults: every switch on but Learn next", function()
+        local _, _, panel = opened()
+        assertTrue(panel.remind:GetChecked())
+        assertTrue(panel.overlay:GetChecked())
+        assertFalse(panel.learn:GetChecked())
+        assertTrue(panel.minimap:GetChecked())
+    end)
+
+    it("shows what was saved", function()
+        local _, _, panel = opened({ remind = false, learn = true, minimap = { hide = true } })
+        assertFalse(panel.remind:GetChecked())
+        assertTrue(panel.learn:GetChecked())
+        assertFalse(panel.minimap:GetChecked())
+    end)
+
+    it("hangs its rows under the hint", function()
+        local _, _, panel = opened()
+        local _, anchor, relative, _, y = panel.remind:GetPoint(1)
+        assertEqual(panel.hint, anchor)
+        assertEqual("BOTTOMLEFT", relative)
+        assertEqual(-16, y)
+    end)
+end)
+
+describe("the page's switches", function()
+    it("turn the reminder off", function()
+        local ns, _, panel = opened()
+        panel.remind:Click()
+        assertFalse(ns.db.remind)
+    end)
+
+    it("turn the overlay off, hiding the labels on the talent window", function()
+        local ns, env, panel = opened({ chars = { ["Skyler-Aldira"] = {
+            active = "Feral", plans = { Feral = { class = "DRUID", points = { { 1, 1 } } } },
+        } } })
+        env.__makeTalentUI(false)
+        helpers.fire(env, "ADDON_LOADED", "Blizzard_TalentUI")
+        local label = ns.TalentFrame.Overlays()[env.TalentFrameTalent1].label
+        assertTrue(label:IsShown())
+        panel.overlay:Click()
+        assertFalse(ns.db.overlay)
+        assertFalse(label:IsShown())
+    end)
+
+    it("turn Learn next on, showing the planner's button", function()
+        local ns, env, panel = opened()
+        panel.learn:Click()
+        assertTrue(ns.db.learn)
+        helpers.command(env, "")
+        assertTrue(ns.Planner.Frame().learn:IsShown())
+    end)
+
+    it("hide the minimap button", function()
+        local ns, _, panel = opened()
+        panel.minimap:Click()
+        assertTrue(ns.db.minimap.hide)
+        assertFalse(ns.MinimapButton.Button():IsShown())
+    end)
+
+    it("follow a change made by command while the page is open", function()
+        local _, env, panel = opened()
+        helpers.command(env, "minimap")
+        assertFalse(panel.minimap:GetChecked())
+    end)
+end)
