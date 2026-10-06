@@ -1,47 +1,118 @@
 local addonName, ns = ...
 
--- The main chat box, kept a few pixels over the action bars under it. The
--- game saves where the chat box goes to the account, so one placed right on a
--- laptop sits wrong on a desktop. Here only its height on the screen is
--- decided: its bottom edge goes the gap over the highest bar beneath it, which
--- for a druid is the bear and cat form bar, or over the button that lands a
--- flight early, whose room is kept even while it is hidden. Left and right
--- stay where the game's layout put them, and its size is left alone.
+-- The main chat box, where and how big it was last saved in Edit Mode on this
+-- screen. The game saves both to the account, so one placed right on a laptop
+-- sits wrong on a desktop; here each screen keeps its own. On a screen it was
+-- never placed on, the game's layout has it.
 
 ns.AddDefaults({
     ui = {
-        chatAboveBars = true,
-        chatGap = 4,
+        chatPerScreen = true,
+        -- By screen, as "3840x2160": its width and height, and its bottom
+        -- left corner from the screen's in its own units.
+        chatScreens = {},
     },
 })
-
--- The bars that can sit under the chat box, by every name the clients this
--- loads on give them. Only the ones shown and under it count.
-local BARS = {
-    "MainActionBar", "MainMenuBar",
-    "MultiBarBottomLeft", "MultiBarBottomRight",
-    "StanceBar", "StanceBarFrame",
-    "PetActionBar", "PetActionBarFrame",
-}
-
--- The button that lands a flight early (or leaves a vehicle), shown only for
--- the length of the flight. Its room is kept whether shown or not, so the
--- chat box does not jump when it comes and goes.
-local FLIGHT_BUTTON = "MainMenuBarVehicleLeaveButton"
 
 -- The client's Lua has it global; a newer Lua keeps it in table.
 local unpack = unpack or table.unpack
 
--- True while this file moves the chat box, so the hook on its SetPoint does
--- not take our own move for the game's.
+-- True while this file moves or sizes the chat box, so the hooks on its
+-- SetPoint and SetSize do not take our own change for the game's.
 local moving = false
 local queued = false
--- The game's own points, kept from the first move so turning this off can
--- give them back.
+-- The game's own points, kept from our first move since the game last set
+-- them, so turning this off can give them back.
 local original
+-- The layout's size, kept from our first resize the same way.
+local originalSize
+-- Its place and size when Edit Mode opened, so a save that changed them can
+-- be told from one that changed something else.
+local noted
 
 local function chatFrame()
     return ChatFrame1
+end
+
+local function screenKey()
+    local width, height = GetPhysicalScreenSize()
+    if width and height then
+        return width .. "x" .. height
+    end
+end
+
+--- Its size in whole units, as Edit Mode saves it.
+local function sizeOf(frame)
+    return math.floor(frame:GetWidth()), math.floor(frame:GetHeight())
+end
+
+local function setSize(frame, width, height)
+    moving = true
+    frame:SetSize(width, height)
+    moving = false
+end
+
+local function restoreSize()
+    local frame = chatFrame()
+    if frame and originalSize then
+        setSize(frame, originalSize[1], originalSize[2])
+        originalSize = nil
+    end
+end
+
+local function resize(frame, width, height)
+    local currentWidth, currentHeight = sizeOf(frame)
+    if currentWidth == width and currentHeight == height then
+        return
+    end
+    if not originalSize then
+        originalSize = { frame:GetWidth(), frame:GetHeight() }
+    end
+    setSize(frame, width, height)
+end
+
+--- Where it is and how big, its corner from the screen's bottom left in its
+-- own units, as SetPoint takes it. Nil while it is not laid out.
+local function snapshot(frame)
+    local left, bottom = frame:GetLeft(), frame:GetBottom()
+    if not (left and bottom) then
+        return
+    end
+    local scale = frame:GetEffectiveScale()
+    local uiScale = UIParent:GetEffectiveScale()
+    local width, height = sizeOf(frame)
+    return {
+        width = width,
+        height = height,
+        x = left - (UIParent:GetLeft() or 0) * uiScale / scale,
+        y = bottom - (UIParent:GetBottom() or 0) * uiScale / scale,
+    }
+end
+
+--- The same place and size, give or take what Edit Mode rounds away.
+local function same(a, b)
+    return a.width == b.width and a.height == b.height
+        and math.abs(a.x - b.x) < 0.5 and math.abs(a.y - b.y) < 0.5
+end
+
+local function noteScreen()
+    local frame = chatFrame()
+    noted = frame and snapshot(frame)
+end
+
+--- Edit Mode saved: a place or size the player gave the chat box since it
+-- opened is this screen's from now on. The layout has them too, so they are
+-- the ones to give back as well.
+local function recordScreen()
+    local frame = chatFrame()
+    local key = screenKey()
+    local now = frame and snapshot(frame)
+    if not (now and noted and key and ns.db) or same(now, noted) then
+        return
+    end
+    ns.db.ui.chatScreens[key] = now
+    noted = snapshot(frame)
+    original, originalSize = nil, nil
 end
 
 local function editModeOpen()
@@ -70,82 +141,12 @@ local function setPoints(frame, points)
     moving = false
 end
 
---- A frame's top in screen pixels, when it is under the chat box: the two
--- overlap left to right. Nil for one elsewhere, or not laid out yet.
-local function topUnder(frame, left, right)
-    if type(frame) ~= "table" or not frame.GetTop then
-        return
+--- Its bottom left corner at x, y from the screen's, in its own units.
+local function place(frame, x, y)
+    if not original then
+        original = savePoints(frame)
     end
-    local scale = frame:GetEffectiveScale()
-    local top, barLeft, barRight = frame:GetTop(), frame:GetLeft(), frame.GetRight and frame:GetRight()
-    if top and barLeft and barRight
-        and barLeft * scale < right and barRight * scale > left then
-        return top * scale
-    end
-end
-
---- The top of the flight's button in screen pixels, when it is under the chat
--- box. Edit Mode puts it in place only once it shows: on top of the stack of
--- bars along the bottom, indented from the stack's left like the form bar.
--- Until then it waits where it was last, at first under the main bar, so
--- while hidden its place is worked out the way Edit Mode will.
-local function flightButtonTop(left, right)
-    local button = _G[FLIGHT_BUTTON]
-    if type(button) ~= "table" or not button.GetHeight then
-        return
-    end
-    local stack = EditModeUtil and EditModeUtil.GetBottomActionBars and EditModeUtil:GetBottomActionBars()
-    -- Shown, dragged elsewhere in Edit Mode, or on a client that does not
-    -- stack it: where it is, is where it goes.
-    if button:IsShown() or type(stack) ~= "table"
-        or (button.IsInDefaultPosition and not button:IsInDefaultPosition()) then
-        return topUnder(button, left, right)
-    end
-
-    local base = stack[1]
-    local stackTop
-    for _, bar in ipairs(stack) do
-        if bar ~= button and type(bar) == "table" and bar:IsShown()
-            and not (bar.IsInDefaultPosition and not bar:IsInDefaultPosition()) then
-            local top = bar:GetTop()
-            if top then
-                top = top * bar:GetEffectiveScale()
-                if not stackTop or top > stackTop then
-                    stackTop = top
-                end
-            end
-        end
-    end
-    local baseLeft = type(base) == "table" and base:GetLeft()
-    if not (stackTop and baseLeft) then
-        return
-    end
-
-    local scale = button:GetEffectiveScale()
-    local buttonLeft = baseLeft * base:GetEffectiveScale() + (BOTTOM_ACTION_BAR_DEFAULT_OFFSET_X or 0) * scale
-    local buttonRight = buttonLeft + button:GetWidth() * scale
-    if buttonLeft < right and buttonRight > left then
-        return stackTop + ((BOTTOM_ACTION_BARS_SPACER_Y or 4) + button:GetHeight()) * scale
-    end
-end
-
---- The top of the highest shown bar or kept room under the chat box, in
--- screen pixels.
-local function highestBarTop(left, right)
-    local highest
-    local function consider(top)
-        if top and (not highest or top > highest) then
-            highest = top
-        end
-    end
-    for _, name in ipairs(BARS) do
-        local frame = _G[name]
-        if type(frame) == "table" and frame.IsShown and frame:IsShown() then
-            consider(topUnder(frame, left, right))
-        end
-    end
-    consider(flightButtonTop(left, right))
-    return highest
+    setPoints(frame, { { "BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, y } })
 end
 
 local function restore()
@@ -156,59 +157,35 @@ local function restore()
     end
 end
 
---- Put the chat box's bottom the gap over the bars, its left edge where it is.
+--- Where and how big it was last saved on this screen. On a screen it was
+-- never placed on, the layout's place and size.
 local function apply()
     local frame = chatFrame()
     if not frame or not ns.db then
         return
     end
-
-    if not ns.db.ui.chatAboveBars then
-        restore()
-        return
-    end
-    -- Edit Mode is where the player drags it; left alone until it closes.
+    -- Edit Mode is where the player drags and sizes it; left alone until it
+    -- closes.
     if editModeOpen() then
         return
     end
 
-    local scale = frame:GetEffectiveScale()
-    local left, right = frame:GetLeft(), frame.GetRight and frame:GetRight()
-    if not (left and right) then
+    local ui = ns.db.ui
+    local key = screenKey()
+    local screen = ui.chatPerScreen and key and ui.chatScreens[key]
+    if screen then
+        resize(frame, screen.width, screen.height)
+        place(frame, screen.x, screen.y)
         return
     end
-    local barTop = highestBarTop(left * scale, right * scale)
-    if not barTop then
-        return
-    end
-
-    -- Every number in the chat box's own scale.
-    local uiScale = UIParent:GetEffectiveScale()
-    local uiLeft = (UIParent:GetLeft() or 0) * uiScale
-    local uiBottom = (UIParent:GetBottom() or 0) * uiScale
-    -- The box you type in hangs under the chat box and moves with it, so the
-    -- gap is kept under whichever reaches lower.
-    local below = 0
-    local editBox = ChatFrame1EditBox
-    local bottom = frame:GetBottom()
-    local editBottom = editBox and editBox.GetBottom and editBox:GetBottom()
-    if bottom and editBottom then
-        below = math.max(0, bottom * scale - editBottom * editBox:GetEffectiveScale())
-    end
-
-    local x = left - uiLeft / scale
-    local y = (barTop + ns.db.ui.chatGap * uiScale + below - uiBottom) / scale
-
-    if not original then
-        original = savePoints(frame)
-    end
-    setPoints(frame, { { "BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, y } })
+    restoreSize()
+    restore()
 end
 
 ns.ApplyChatBox = apply
 
---- Once, on the next frame: the game moves the chat box and the bars in
--- bursts, and their edges are only right once it has finished.
+--- Once, on the next frame: the game moves and sizes the chat box in bursts,
+-- and its edges are only right once it has finished.
 local function applySoon()
     if queued then
         return
@@ -229,28 +206,25 @@ local function hook()
     end
     hooked = true
 
+    -- The game putting the layout's place or size back: those are the ones
+    -- to give back now, and ours go back over them.
     hooksecurefunc(frame, "SetPoint", function()
         if not moving then
+            original = nil
             applySoon()
         end
     end)
-    -- A bar appearing, going or moving: the druid's form bar comes and goes
-    -- with the forms learned, the pet bar with the pet. The flight's button
-    -- is followed too, for a client that does not stack it.
-    local function follow(name)
-        local bar = _G[name]
-        if type(bar) == "table" and bar.HookScript then
-            bar:HookScript("OnShow", applySoon)
-            bar:HookScript("OnHide", applySoon)
-            if bar.SetPoint then
-                hooksecurefunc(bar, "SetPoint", applySoon)
-            end
+    hooksecurefunc(frame, "SetSize", function()
+        if not moving then
+            originalSize = nil
+            applySoon()
         end
+    end)
+    if EventRegistry and EventRegistry.RegisterCallback then
+        EventRegistry:RegisterCallback("EditMode.Enter", noteScreen)
+        EventRegistry:RegisterCallback("EditMode.SavedLayouts", recordScreen)
+        EventRegistry:RegisterCallback("EditMode.Exit", function() noted = nil end)
     end
-    for _, name in ipairs(BARS) do
-        follow(name)
-    end
-    follow(FLIGHT_BUTTON)
     if EditModeManagerFrame and EditModeManagerFrame.HookScript then
         EditModeManagerFrame:HookScript("OnHide", applySoon)
     end
@@ -258,31 +232,17 @@ end
 
 ns.RegisterSetting({
     store = "ui",
-    key = "chatAboveBars",
+    key = "chatPerScreen",
     type = "checkbox",
     section = "layout",
     column = 2,
-    name = "Keep the chat box over the action bars",
-    tooltip = "The same gap on every screen. Left and right, and its size, stay as you set them.",
-    onChange = apply,
-})
-
-ns.RegisterSetting({
-    store = "ui",
-    key = "chatGap",
-    type = "slider",
-    parent = "ui.chatAboveBars",
-    section = "layout",
-    column = 2,
-    name = "Gap over the action bars",
-    min = 0,
-    max = 40,
+    name = "Keep the chat box's place and size for each screen",
+    tooltip = "Where and how big you last saved it in Edit Mode on this screen. Another screen keeps its own.",
     onChange = apply,
 })
 
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_ENTERING_WORLD")
-events:RegisterEvent("UPDATE_SHAPESHIFT_FORMS")
 events:RegisterEvent("UI_SCALE_CHANGED")
 events:RegisterEvent("DISPLAY_SIZE_CHANGED")
 -- Not on every client; registering a name a client lacks raises.

@@ -28,9 +28,9 @@ right on a laptop can overlap the bar, and sit near the middle, on a 4K
 desktop; ForeverPanel decides both from the screen's own edges, on each screen
 (and stays out of Edit Mode while it is open). Turn off "Keep it at the left
 edge" to leave left and right where Edit Mode put them. The
-chat box gets the same: its bottom a set gap over the highest action bar under
-it (a druid's form bar, when there is one), its left edge and size as you
-set them.
+chat box's place and size are saved to the account too, so ForeverPanel keeps
+them per screen: where and how big you last saved it in Edit Mode on that
+screen. On a screen you have not placed it on, the layout has it.
 
 Modules are rearranged by dragging them along the bar. The bar reorders live
 while you hold one, so it is its own drag preview, and the layout is saved

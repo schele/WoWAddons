@@ -235,12 +235,19 @@ describe("the settings panel", function()
             end
         end
 
-        for _, key in ipairs({ "portraitBelowBar", "portraitGap", "chatAboveBars", "chatGap" }) do
+        for _, key in ipairs({ "portraitBelowBar", "portraitGap", "chatPerScreen" }) do
             assertTrue(rows[key].x >= 320, key .. " in the right column")
             assertTrue(rows[key].y < keysY, key .. " below the chat keys")
         end
         assertTrue(rows.portraitGap.x > rows.portraitBelowBar.x, "the gap indented under its switch")
-        assertTrue(rows.chatGap.x > rows.chatAboveBars.x, "the gap indented under its switch")
+    end)
+
+    it("has no switch or gap for keeping the chat box over the action bars", function()
+        local ns = loggedIn()
+
+        for _, setting in ipairs(ns.settings) do
+            assertFalse(setting.key == "chatAboveBars" or setting.key == "chatGap", setting.key .. " is gone")
+        end
     end)
 
     it("keeps every row on the page, which does not scroll", function()

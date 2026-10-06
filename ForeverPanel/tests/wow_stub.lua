@@ -327,20 +327,33 @@ function stub.newEnv()
     env.PlayerFrame:SetPoint("TOPLEFT", env.UIParent, "TOPLEFT", -19, -4)
     -- The main chat box, and the calls the game makes when the player has
     -- moved or resized it and when it puts the account's saved place back.
-    -- Under it, the action bars, all hidden until a test places one.
-    for _, name in ipairs({ "StanceBar", "PetActionBar", "MultiBarBottomLeft" }) do
-        env[name] = makeWidget("Frame", env.UIParent)
-        env[name].shown = false
-    end
-    -- The button that lands a flight early, hidden but for the flight, at
-    -- the size its XML gives it.
-    env.MainMenuBarVehicleLeaveButton = makeWidget("Button", env.MainActionBar)
-    env.MainMenuBarVehicleLeaveButton:SetSize(32, 32)
-    env.MainMenuBarVehicleLeaveButton.shown = false
     env.ChatFrame1 = makeWidget("ScrollingMessageFrame", env.UIParent)
     env.ChatFrame1:SetPoint("BOTTOMLEFT", env.UIParent, "BOTTOMLEFT", 32, 95)
     function env.FCF_SavePositionAndDimensions() end
     function env.FCF_RestorePositionAndDimensions() end
+    -- The screen the game is drawn on, in pixels.
+    env.__screen = { 3840, 2160 }
+    function env.GetPhysicalScreenSize()
+        return env.__screen[1], env.__screen[2]
+    end
+    -- Blizzard's registry of named callbacks, through which Edit Mode says it
+    -- was entered, saved and left. A callback gets its owner first, a number
+    -- the registry makes up when none was given.
+    env.EventRegistry = { callbacks = {}, owners = 0 }
+    function env.EventRegistry:RegisterCallback(event, fn, owner)
+        if owner == nil then
+            self.owners = self.owners + 1
+            owner = self.owners
+        end
+        self.callbacks[event] = self.callbacks[event] or {}
+        table.insert(self.callbacks[event], { fn = fn, owner = owner })
+        return owner
+    end
+    function env.EventRegistry:TriggerEvent(event, ...)
+        for _, callback in ipairs(self.callbacks[event] or {}) do
+            callback.fn(callback.owner, ...)
+        end
+    end
     -- The character window's model, and the account's helm and cloak switches.
     env.CharacterModelFrame = makeWidget("PlayerModel", env.UIParent)
     env.CharacterHeadSlot = makeWidget("ItemButton", env.UIParent)
