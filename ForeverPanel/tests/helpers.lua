@@ -12,7 +12,6 @@ M.FILES = {
     "Modules/UITweaks.lua",
     "Modules/Portrait.lua",
     "Modules/ChatBox.lua",
-    "Modules/HelmCloak.lua",
     "Modules/ChatKeys.lua",
     "Modules/Settings.lua",
     "Minimap.lua",

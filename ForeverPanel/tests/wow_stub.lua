@@ -354,15 +354,6 @@ function stub.newEnv()
             callback.fn(callback.owner, ...)
         end
     end
-    -- The character window's model, and the account's helm and cloak switches.
-    env.CharacterModelFrame = makeWidget("PlayerModel", env.UIParent)
-    env.CharacterHeadSlot = makeWidget("ItemButton", env.UIParent)
-    env.CharacterBackSlot = makeWidget("ItemButton", env.UIParent)
-    env.__showingHelm, env.__showingCloak = true, true
-    function env.ShowHelm(value) env.__showingHelm = value and true or false end
-    function env.ShowingHelm() return env.__showingHelm end
-    function env.ShowCloak(value) env.__showingCloak = value and true or false end
-    function env.ShowingCloak() return env.__showingCloak end
     -- The font object every unit frame's health and mana text inherits from.
     env.TextStatusBarText = makeWidget("FontString")
     -- Both start closed, as they do in game, so Show() is a real transition
