@@ -17,11 +17,12 @@ top-anchored Blizzard frames move down with it instead of being covered.
 Right-click anywhere on the bar for `Settings...` and `Reset module order`.
 
 The settings panel carries every option, including a switch per module to hide
-one without removing it, and six tweaks to Blizzard's own UI: hiding the
+one without removing it, and seven tweaks to Blizzard's own UI: hiding the
 gryphons either side of the action bar, turning on the game's health and
-mana numbers on the unit frames, showing the sell price on quest rewards, and
+mana numbers on the unit frames, showing the sell price on quest rewards,
 showing the XP a quest gives (`+1,234 XP (8.2% of level)`) beside the quest
-window's Accept and Complete Quest buttons, and keeping the player portrait
+window's Accept and Complete Quest buttons, putting the backpack first in the
+Combined Backpack, and keeping the player portrait
 a set gap under the bar and from the left edge. The game saves the portrait's
 place to the account, measured from the middle of the screen, so one placed
 right on a laptop can overlap the bar, and sit near the middle, on a 4K
@@ -31,6 +32,13 @@ edge" to leave left and right where Edit Mode put them. The
 chat box's place and size are saved to the account too, so ForeverPanel keeps
 them per screen: where and how big you last saved it in Edit Mode on that
 screen. On a screen you have not placed it on, the layout has it.
+
+WoW Forever's 1.60.1 (70291) patch put the backpack at the bottom of the
+Combined Backpack and the last bag on top. "Backpack first in the combined
+bags", on by default, lays the same slots out again on the game's own grid.
+The backpack's first slot goes in the top-left corner, each bag follows in
+order, and any gap goes at the bottom right by the money. Separate bags and
+the gamepad layout are left alone.
 
 Modules are rearranged by dragging them along the bar. The bar reorders live
 while you hold one, so it is its own drag preview, and the layout is saved

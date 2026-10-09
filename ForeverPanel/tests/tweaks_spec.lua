@@ -466,3 +466,161 @@ describe("the XP a quest gives", function()
         assertNil(ns.FormatQuestXP(nil, 1000))
     end)
 end)
+
+describe("the combined bags' order", function()
+    -- A slot of the Combined Backpack: bag and slot, extended when the
+    -- account must be secured to use it.
+    local function slot(env, bag, id, extended)
+        local button = env.CreateFrame("ItemButton")
+        button:SetSize(37, 37)
+        function button:GetBagID() return bag end
+        function button:GetID() return id end
+        function button:IsExtended() return extended == true end
+        button.label = bag .. ":" .. id
+        return button
+    end
+
+    -- The game's Combined Backpack holding `slots`, in a grid `columns` wide
+    -- that fills from the bottom right, as it does with a mouse. Every call
+    -- to the game's grid is kept, with the frames in the order handed to it.
+    local function combinedBags(env, slots, columns)
+        local bags = env.CreateFrame("Frame", "ContainerFrameCombinedBags")
+        bags.anchor, bags.layout = { "BOTTOMRIGHT" }, { direction = "BottomRightToTopLeft" }
+        bags.blizzardLayouts = 0
+        function bags:EnumerateValidItems() return ipairs(slots) end
+        function bags:GetColumns() return columns end
+        function bags:GetInitialItemAnchor() return self.anchor end
+        function bags:GetAnchorLayout() return self.layout end
+        function bags:LayoutAddSlots() self.addSlotsLaidOut = true end
+        function bags:UpdateItemLayout()
+            self.blizzardLayouts = self.blizzardLayouts + 1
+            env.AnchorUtil.GridLayout(slots, self:GetInitialItemAnchor(), self:GetAnchorLayout())
+        end
+        env.__grids = {}
+        env.AnchorUtil = {
+            GridLayout = function(frames, anchor, layout)
+                local copy = {}
+                for index, frame in ipairs(frames) do copy[index] = frame end
+                table.insert(env.__grids, { frames = copy, anchor = anchor, layout = layout })
+            end,
+        }
+        env.InputUtil = { IsGamepadUIEnabled = function() return env.__gamepad == true end }
+        return bags
+    end
+
+    -- The last grid laid out, as labels, "-" for an empty cell.
+    local function lastGrid(env)
+        local grid = env.__grids[#env.__grids]
+        local labels = {}
+        for _, frame in ipairs(grid.frames) do
+            table.insert(labels, frame.label or "-")
+        end
+        return table.concat(labels, " "), grid
+    end
+
+    local function loggedInWith(slots, columns)
+        local ns, env = helpers.loadAddon()
+        local bags = combinedBags(env, slots(env), columns)
+        helpers.login(ns, env)
+        return ns, env, bags
+    end
+
+    local function fiveSlots(env)
+        return { slot(env, 0, 1), slot(env, 0, 2), slot(env, 0, 3), slot(env, 1, 1), slot(env, 1, 2) }
+    end
+
+    it("puts the backpack's first slot top left, each bag after it, the gap at the bottom right", function()
+        local ns, env, bags = loggedInWith(fiveSlots, 4)
+        bags:UpdateItemLayout()
+
+        -- Filled from the bottom right: three empty cells, then the last
+        -- slot, back to the backpack's first in the top-left corner. Read
+        -- from the top left: 0:1 0:2 0:3 1:1 / 1:2, then the gap.
+        local order, grid = lastGrid(env)
+        assertEqual("- - - 1:2 1:1 0:3 0:2 0:1", order)
+        assertEqual(bags.anchor, grid.anchor, "on the game's own anchor")
+        assertEqual(bags.layout, grid.layout, "and the game's own grid")
+        assertTrue(bags.addSlotsLaidOut)
+    end)
+
+    it("needs no empty cells when the bags fill every row", function()
+        local ns, env, bags = loggedInWith(function(e)
+            return { slot(e, 0, 1), slot(e, 0, 2), slot(e, 1, 1), slot(e, 1, 2) }
+        end, 2)
+        bags:UpdateItemLayout()
+
+        assertEqual("1:2 1:1 0:2 0:1", (lastGrid(env)))
+    end)
+
+    it("makes its empty cells the size of a slot, and keeps them out of sight", function()
+        local ns, env, bags = loggedInWith(fiveSlots, 4)
+        bags:UpdateItemLayout()
+
+        local _, grid = lastGrid(env)
+        local empty = grid.frames[1]
+        assertEqual(37, empty:GetWidth())
+        assertEqual(37, empty:GetHeight())
+        assertFalse(empty:IsShown())
+    end)
+
+    it("puts the slots that wait on a secured account last", function()
+        local ns, env, bags = loggedInWith(function(e)
+            return { slot(e, 0, 1), slot(e, 0, 2, true), slot(e, 1, 1) }
+        end, 3)
+        bags:UpdateItemLayout()
+
+        assertEqual("0:2 1:1 0:1", (lastGrid(env)))
+    end)
+
+    it("leaves the game's order alone with the setting off", function()
+        local ns, env, bags = loggedInWith(fiveSlots, 4)
+        ns.SetSettingValue(settingFor(ns, "ui", "backpackFirst"), false)
+        bags:UpdateItemLayout()
+
+        assertEqual("0:1 0:2 0:3 1:1 1:2", (lastGrid(env)))
+    end)
+
+    it("leaves the gamepad layout alone, which already starts top left", function()
+        local ns, env, bags = loggedInWith(fiveSlots, 4)
+        env.__gamepad = true
+        bags:UpdateItemLayout()
+
+        assertEqual("0:1 0:2 0:3 1:1 1:2", (lastGrid(env)))
+    end)
+
+    it("takes effect on open bags as soon as it is switched, either way", function()
+        local ns, env, bags = loggedInWith(fiveSlots, 4)
+        bags:Show()
+        local setting = settingFor(ns, "ui", "backpackFirst")
+
+        ns.SetSettingValue(setting, false)
+        assertEqual("0:1 0:2 0:3 1:1 1:2", (lastGrid(env)), "the game's own order back")
+
+        ns.SetSettingValue(setting, true)
+        assertEqual("- - - 1:2 1:1 0:3 0:2 0:1", (lastGrid(env)))
+    end)
+
+    it("does not fail, and leaves the game's layout, when the bags are not what it expects", function()
+        local ns, env, bags = loggedInWith(fiveSlots, 4)
+        function bags:EnumerateValidItems() error("changed by a patch") end
+        bags:UpdateItemLayout()
+
+        assertEqual(1, bags.blizzardLayouts)
+    end)
+
+    it("does nothing, and does not fail, on a client without the combined bags", function()
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+
+        ns.SetSettingValue(settingFor(ns, "ui", "backpackFirst"), false)
+        ns.SetSettingValue(settingFor(ns, "ui", "backpackFirst"), true)
+    end)
+
+    it("is on by default, in the settings", function()
+        local ns, env = loggedInWith(fiveSlots, 4)
+        local setting = settingFor(ns, "ui", "backpackFirst")
+
+        assertEqual("checkbox", setting.type)
+        assertTrue(ns.db.ui.backpackFirst)
+    end)
+end)

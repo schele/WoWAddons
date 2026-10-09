@@ -102,6 +102,12 @@ local function makeWidget(kind, parent)
         return self.scripts[name]
     end
 
+    -- A scroll frame: its child, and how far it can scroll, which a test
+    -- sets to stand for laid-out content.
+    function widget:SetScrollChild(child) self.scrollChild = child end
+    function widget:GetVerticalScrollRange() return self.verticalScrollRange or 0 end
+    function widget:SetVerticalScroll(value) self.verticalScroll = value end
+
     function widget:HookScript(name, fn)
         local existing = self.scripts[name]
         self.scripts[name] = function(...)

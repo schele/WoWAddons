@@ -14,7 +14,8 @@ local INDENT = 24
 -- Two columns, each with its own vertical cursor. A setting says which it wants
 -- with `column`; the chat table goes right so it does not push everything else
 -- off the bottom of the panel.
-local COLUMN_WIDTH = 280
+-- Narrow enough that the right column's longest label clears the scroll bar.
+local COLUMN_WIDTH = 240
 local COLUMN_X = { PADDING, PADDING + COLUMN_WIDTH + 24 }
 
 local Settings_ = {}
@@ -23,9 +24,12 @@ Settings_.controls = {}
 Settings_.dividers = {}
 
 local panel, category
+-- What the controls are built on: the page inside the scroll frame, or the
+-- canvas itself on a client without the scroll frame template.
+local content
 
 local function addCheckbox(setting, y, indent)
-    local button = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+    local button = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
     button:SetPoint("TOPLEFT", indent or PADDING, y)
 
     -- The label belongs to the template on some clients and not others, so
@@ -58,7 +62,7 @@ local function addCheckbox(setting, y, indent)
 end
 
 local function addSlider(setting, y, indent)
-    local slider = CreateFrame("Slider", nil, panel, "OptionsSliderTemplate")
+    local slider = CreateFrame("Slider", nil, content, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", indent or PADDING, y - SLIDER_EXTRA)
     slider:SetMinMaxValues(setting.min, setting.max)
     slider:SetValueStep(setting.step or 1)
@@ -137,20 +141,20 @@ local function addKeyTable(setting, y, indent)
 
     -- A table hung under a checkbox is already labelled by it.
     if not setting.parent then
-        local header = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+        local header = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
         header:SetPoint("TOPLEFT", indent, y)
         header:SetText(setting.name)
         y = y - ROW_HEIGHT
     end
 
     for index = 1, (setting.rows or 6) do
-        local capture = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+        local capture = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
         capture:SetPoint("TOPLEFT", indent, y)
         capture:SetSize(110, 22)
         capture:EnableKeyboard(false)
         passKeysThrough(capture, true)
 
-        local command = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+        local command = CreateFrame("EditBox", nil, content, "InputBoxTemplate")
         command:SetPoint("TOPLEFT", indent + 122, y)
         command:SetSize(130, 22)
         -- Both, and in this order. An EditBox grabs focus as it comes into
@@ -308,7 +312,7 @@ function Settings_.Refresh()
 end
 
 local function addDivider(y, column)
-    local line = panel:CreateTexture(nil, "ARTWORK")
+    local line = content:CreateTexture(nil, "ARTWORK")
     line:SetColorTexture(1, 1, 1, 0.15)
     line:SetHeight(1)
     -- Only as wide as its column, so it does not cut across the other.
@@ -385,11 +389,47 @@ local built = false
 -- Nothing here exists at login: no edit boxes, no buttons, no frames beyond the
 -- empty canvas itself. Widgets that exist before anyone asks for them were
 -- eating keystrokes from login, and the surest fix is not to build them.
+-- The page scrolls: the options window is shorter than every setting stacked
+-- up, and the last one hung off its bottom edge. As GatherMap's page does.
+local function buildScroll()
+    local ok, scroll = pcall(CreateFrame, "ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    if not (ok and scroll and scroll.SetScrollChild) then
+        content = panel
+        return
+    end
+    -- Room on the right for the template's scroll bar.
+    scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, -4)
+    scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -28, 4)
+    -- The bar only while there is more than fits. The template's own
+    -- scrollBarHideable is not honoured on every client, so this runs after
+    -- its handler, which shows the bar greyed out.
+    local function fitScrollBar()
+        local bar = scroll.ScrollBar
+        if bar and scroll.GetVerticalScrollRange then
+            local needed = (scroll:GetVerticalScrollRange() or 0) > 0
+            bar:SetShown(needed)
+            if not needed and scroll.SetVerticalScroll then
+                scroll:SetVerticalScroll(0)
+            end
+        end
+    end
+    scroll:HookScript("OnScrollRangeChanged", fitScrollBar)
+    scroll:HookScript("OnShow", fitScrollBar)
+
+    content = CreateFrame("Frame", nil, scroll)
+    content:SetSize(COLUMN_X[#COLUMN_X] + COLUMN_WIDTH + PADDING, 1)
+    scroll:SetScrollChild(content)
+    Settings_.scroll = scroll
+end
+
 local function ensureBuilt()
     if built then
         return
     end
     built = true
+
+    buildScroll()
+    Settings_.content = content
 
     -- logo, not icon. They are the same glyph drawn twice: icon.tga carries
     -- the tile the AddOns list needs, because every entry there is a square
@@ -400,13 +440,13 @@ local function ensureBuilt()
     -- Built from addonName rather than spelled out: the .toc already names
     -- this folder, and a second copy of the path is the one that goes stale
     -- when it is renamed.
-    local logo = panel:CreateTexture(nil, "ARTWORK")
+    local logo = content:CreateTexture(nil, "ARTWORK")
     logo:SetSize(LOGO_SIZE, LOGO_SIZE)
     logo:SetPoint("TOPLEFT", PADDING, -PADDING)
     logo:SetTexture("Interface\\AddOns\\" .. addonName .. "\\logo")
     Settings_.logo = logo
 
-    local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    local title = content:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     -- Centred against the icon rather than pinned to the panel, so the two
     -- read as one heading whatever size the icon is given.
     title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
@@ -415,7 +455,7 @@ local function ensureBuilt()
     -- From the addon's own metadata, not a constant here, which would drift
     -- from the .toc the first time either is bumped without the other.
     local metadata = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
-    local version = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    local version = content:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     version:SetPoint("LEFT", title, "RIGHT", 8, -2)
     version:SetText("Version " .. ((metadata and metadata(addonName, "Version")) or "unknown"))
     Settings_.version = version
@@ -462,6 +502,11 @@ local function ensureBuilt()
             control.depth = row.depth
             table.insert(Settings_.controls, control)
         end
+    end
+
+    -- As tall as the longer column, so the scroll frame reaches its last row.
+    if content ~= panel then
+        content:SetHeight(-math.min(cursor[1], cursor[2]) + PADDING)
     end
 
     Settings_.Refresh()

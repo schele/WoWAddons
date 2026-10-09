@@ -236,7 +236,7 @@ describe("the settings panel", function()
         end
 
         for _, key in ipairs({ "portraitBelowBar", "portraitGap", "chatPerScreen" }) do
-            assertTrue(rows[key].x >= 320, key .. " in the right column")
+            assertTrue(rows[key].x >= 280, key .. " in the right column")
             assertTrue(rows[key].y < keysY, key .. " below the chat keys")
         end
         assertTrue(rows.portraitGap.x > rows.portraitBelowBar.x, "the gap indented under its switch")
@@ -250,14 +250,39 @@ describe("the settings panel", function()
         end
     end)
 
-    it("keeps every row on the page, which does not scroll", function()
+    -- The options window is shorter than every setting stacked up: the last
+    -- one hung off its bottom edge. The page scrolls instead.
+    it("puts every row on a page that scrolls, as tall as all of them", function()
         local ns = loggedIn()
+        local scroll, content = ns.Settings.scroll, ns.Settings.content
 
+        assertTrue(scroll ~= nil, "a scroll frame")
+        assertEqual(ns.Settings.panel, scroll.parent, "on the canvas")
+        assertEqual(content, scroll.scrollChild, "scrolling the page")
+
+        local lowest = 0
         for _, control in ipairs(ns.Settings.controls) do
+            assertEqual(content, control.widget.parent, control.setting.key .. " is on the page")
             local point = { control.widget:GetPoint(1) }
-            local y = point[#point]
-            assertTrue(y > -600, control.setting.store .. "." .. control.setting.key .. " is on the page")
+            lowest = math.min(lowest, point[#point])
         end
+        assertTrue(content:GetHeight() > -lowest, "tall enough to reach the last row")
+        assertEqual(content, ns.Settings.logo.parent, "the heading scrolls with it")
+    end)
+
+    it("shows the scroll bar only while there is more than fits", function()
+        local ns, env = loggedIn()
+        local scroll = ns.Settings.scroll
+        scroll.ScrollBar = env.CreateFrame("Slider", nil, scroll)
+
+        scroll.verticalScrollRange = 120
+        scroll.scripts.OnScrollRangeChanged(scroll)
+        assertTrue(scroll.ScrollBar:IsShown())
+
+        scroll.verticalScrollRange = 0
+        scroll.scripts.OnScrollRangeChanged(scroll)
+        assertFalse(scroll.ScrollBar:IsShown())
+        assertEqual(0, scroll.verticalScroll, "back at the top")
     end)
 
     it("puts the grouped settings below the ungrouped ones", function()
