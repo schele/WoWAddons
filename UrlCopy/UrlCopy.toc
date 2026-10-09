@@ -1,6 +1,6 @@
 ## Interface: 11509, 16001
 ## Title: UrlCopy
-## Notes: Makes URLs spoken in chat clickable, and copyable.
+## Notes: Makes URLs spoken in chat clickable, and copyable, and chat itself copyable.
 ## IconTexture: Interface\AddOns\UrlCopy\icon
 ## Author: You
 ## Version: 0.1.0
@@ -10,5 +10,6 @@ UrlCopy.lua
 Detect.lua
 Popup.lua
 Chat.lua
+ChatCopy.lua
 Settings.lua
 Minimap.lua

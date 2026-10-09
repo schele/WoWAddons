@@ -7,6 +7,7 @@ M.FILES = {
     "Detect.lua",
     "Popup.lua",
     "Chat.lua",
+    "ChatCopy.lua",
     "Settings.lua",
     "Minimap.lua",
 }

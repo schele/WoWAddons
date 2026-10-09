@@ -4,7 +4,9 @@ Makes URLs spoken in chat clickable, and opens the one you click in a box you
 can copy from.
 
 WoW's chat frame cannot be selected with the mouse, so a link someone types is
-readable but out of reach. UrlCopy closes that gap.
+readable but out of reach. UrlCopy closes that gap. It does the same for the
+rest of chat: a chat window's text opens in a box where you mark any part of
+it with the mouse and copy it.
 
 **WoW has no clipboard API.** No addon can copy anything for you, and any that
 claims to is doing something else. What UrlCopy can do is put the link in a
@@ -28,6 +30,22 @@ Written with `https://` or `www.`, they work anywhere.
 
 A bare `1.14.4.2` is left alone too — in this game that is a patch number far
 more often than it is a server.
+
+## Copying chat
+
+Move the mouse over a chat window and a small UrlCopy button shows in its
+top-right corner. Click it, or type `/url chat` in the tab you want, and that
+window's lines open in a box:
+
+- The lines are plain text, oldest first, with the newest at the bottom.
+  Colours and icons are gone, and links read as their `[Name]`.
+- Drag with the mouse to mark any part, then press Ctrl+C. Escape closes the
+  box.
+- Typing into the box changes nothing.
+
+The box holds every line the chat window still keeps. The combat log gets no
+button. This client can keep some chat lines from addons. Any line UrlCopy
+may not read is left out, and the box says how many it left out.
 
 ## Install
 
@@ -54,6 +72,7 @@ interface version.
 - `/url <n>` - Copy the nth link from `/url list`, newest first
 - `/url list` - List the links being remembered
 - `/url clear` - Forget them
+- `/url chat` - Open the chat tab you are looking at, to mark and copy its text
 - `/url on` / `/url off` - Whether chat is rewritten at all
 - `/url settings` - Open the settings panel
 
@@ -64,6 +83,7 @@ interface version.
 | Make URLs in chat clickable | The master switch. Off leaves chat exactly as it arrives |
 | Shorten long links | Show just the site's name in chat for a long link; the box still gets the whole URL |
 | Links to remember | How many `/url list` keeps, from 5 to 25 |
+| Copy button on chat windows | The button in a chat window's corner. `/url chat` works with it off |
 
 Links are remembered whether or not chat is being rewritten, so `/url` keeps
 working with the master switch off. That is what makes the switch safe to
@@ -81,6 +101,13 @@ rewrites each URL it finds into `|Hurlcopy:<url>|h|cff66ccff[<display>]|r|h`,
 one of the game's own hyperlinks with a type of our own. Clicks arrive through
 a `hooksecurefunc("SetItemRef", ...)`, which leaves every other link type
 reaching the client's handler untouched.
+
+`ChatCopy.lua` reads a chat window's lines back with the frame's own
+`GetNumMessages` and `GetMessageInfo`, and strips the markup off them. It reads
+each line inside a `pcall`, so a line the client will not let it read is
+skipped and counted, and never stops the rest. The buttons are parented to the
+chat frames, and a light `OnUpdate`, ten times a second, shows each one while
+the mouse is over its window.
 
 The URL travels inside the link rather than as an index into the history, so a
 link that has scrolled up still works long after the history has moved on.

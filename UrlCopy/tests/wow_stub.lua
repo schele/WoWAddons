@@ -115,6 +115,29 @@ local function makeWidget(kind, parent)
     function widget:GetText() return self.text end
     function widget:GetName() return self.frameName end
 
+    -- The copy-chat window: a multi-line box in a scroll frame, which moves.
+    function widget:SetMultiLine(value) self.multiLine = value and true or false end
+    function widget:SetFontObject(value) self.fontObject = value end
+    function widget:SetCursorPosition(value) self.cursor = value end
+    function widget:SetScrollChild(child) self.scrollChild = child end
+    function widget:UpdateScrollChildRect() end
+    -- A test sets verticalScrollRange to stand for laid-out text.
+    function widget:GetVerticalScrollRange() return self.verticalScrollRange or 0 end
+    function widget:SetVerticalScroll(value) self.verticalScroll = value end
+    function widget:GetVerticalScroll() return self.verticalScroll or 0 end
+    function widget:EnableMouseWheel() end
+    function widget:SetMovable() end
+    function widget:SetClampedToScreen() end
+    function widget:StartMoving() end
+    function widget:StopMovingOrSizing() end
+    function widget:SetJustifyV() end
+    function widget:SetTextColor() end
+    function widget:SetColorTexture() end
+    function widget:SetNormalTexture(value) self.normalTexture = value end
+    function widget:SetPushedTexture(value) self.pushedTexture = value end
+    -- A test sets mouseOver to put the mouse over a frame.
+    function widget:IsMouseOver() return self.mouseOver and true or false end
+
     -- The three calls that make a copy box a copy box.
     function widget:HighlightText() self.highlighted = true end
     function widget:SetFocus() self.focused = true end
@@ -167,6 +190,8 @@ function stub.newEnv()
 
     env.UIParent = makeWidget("Frame")
     env.SlashCmdList = {}
+    -- Frames the game closes on Escape, by name.
+    env.UISpecialFrames = {}
     env.OKAY = "Okay"
 
     function env.print(...)
