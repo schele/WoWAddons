@@ -299,6 +299,7 @@ describe("the recorder's commands", function()
         function env.UnitIsDead() end
         function env.GetRealZoneText() end
         function env.IsFishingLoot() end
+        function env.GetLootRollItemLink() end
         env.__printed = {}
         helpers.command(env, "probe")
         assertMatch("Everything the recorder needs", helpers.printed(env))
@@ -401,7 +402,7 @@ describe("recording with the newer merchant and profession calls", function()
         for _, name in ipairs({ "GetNumLootItems", "GetLootSlotLink", "GetLootSlotInfo", "GetLootSourceInfo",
             "GetInstanceInfo", "GetRealZoneText", "UnitGUID", "UnitName", "UnitIsDead", "IsFishingLoot",
             "GetQuestID", "GetTitleText", "GetNumQuestRewards", "GetNumQuestChoices", "GetQuestItemLink",
-            "UnitFactionGroup", "GetMerchantNumItems", "GetMerchantItemLink" }) do
+            "UnitFactionGroup", "GetMerchantNumItems", "GetMerchantItemLink", "GetLootRollItemLink" }) do
             env[name] = function() end
         end
         env.C_MerchantFrame = { GetItemInfo = function() end }

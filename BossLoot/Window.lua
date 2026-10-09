@@ -55,6 +55,11 @@ local BOSS_ROWS_WITH_MAP = 6
 local SEARCH_MIN = 2
 
 local EMPTY_TEXT = "Nothing but world drops and quest items."
+-- A tab with nothing on it: the group finder lists none of its kind.
+local NONE_LISTED = "The group finder lists no %s yet."
+local KIND_NAMES = { dungeon = "dungeons", raid = "raids" }
+-- An instance only the group finder told BossLoot of, before anything drops.
+local UNRECORDED_TEXT = "Nothing recorded here yet. Drops are listed as you loot them or win them on a roll."
 
 -- Above the vanilla list, once recordings come first.
 local CLASSIC_HEADING = "Classic loot"
@@ -198,6 +203,10 @@ function Window.InstanceEntries(view, searchText)
     for _, instance in ipairs(ns.Index.Instances(view.kind)) do
         table.insert(entries, instanceEntry(instance, view.instance))
     end
+    -- WoW Forever's group finder can list none of a kind (no raids yet).
+    if #entries == 0 then
+        table.insert(entries, { kind = "heading", text = string.format(NONE_LISTED, KIND_NAMES[view.kind] or view.kind) })
+    end
     return entries
 end
 
@@ -207,7 +216,8 @@ function Window.BossEntries(instance, selection)
         return entries
     end
 
-    local wing
+    -- A wing's own row needs no heading for it.
+    local wing = instance.wing
     for index, boss in ipairs(instance.bosses) do
         if boss.wing and boss.wing ~= wing then
             table.insert(entries, { kind = "heading", text = boss.wing })
@@ -636,7 +646,8 @@ local function drawHeader(instance, selection)
         return
     end
     header.title:SetText(boss.name)
-    header.subtitle:SetText(boss.wing and (instance.name .. ", " .. boss.wing) or instance.name)
+    local showWing = boss.wing and boss.wing ~= instance.wing
+    header.subtitle:SetText(showWing and (instance.name .. ", " .. boss.wing) or instance.name)
 
     -- The model is set while shown, and only when the boss changes: setting
     -- it again restarts its animation, and one set while hidden can come up
@@ -710,6 +721,10 @@ function Window.Refresh()
     frame.empty:ClearAllPoints()
     frame.empty:SetPoint("TOPLEFT", lootList, "TOPLEFT", 6, -6)
     frame.empty:SetShown(instance ~= nil and #loot == 0)
+    -- An instance BossLoot learnt of from the game has no vanilla list to
+    -- explain an empty one by.
+    local unknown = instance ~= nil and (instance.fromFinder or instance.recorded)
+    frame.empty:SetText(unknown and UNRECORDED_TEXT or EMPTY_TEXT)
 
     drawHeader(instance, selection)
     drawModelView(instance, selection)

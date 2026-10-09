@@ -12,6 +12,7 @@ M.FILES = {
     "ItemCache.lua",
     "ItemData.lua",
     "LootRow.lua",
+    "Finder.lua",
     "Recordings.lua",
     "Recorder.lua",
     "Portrait.lua",

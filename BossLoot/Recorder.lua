@@ -19,6 +19,11 @@ local ENCOUNTER_WINDOW = 60   -- seconds after a fight that a looted creature ca
 local KINDS = { Creature = "npc", Vehicle = "npc", GameObject = "object" }
 local REFRESH_DELAY = 0.5     -- seconds of loot gathered into one update of the lists
 local CRAFTS_DELAY = 1        -- seconds of profession list updates gathered into one reading
+local ROLL_WINDOW = 120       -- seconds after a fight that a roll is taken to be its boss's loot
+local ROLL_DELAY = 2          -- seconds a roll waits, so the loot window it came from is seen first
+local ROLL_MATCH = 65         -- seconds apart that a roll and a loot window holding its item are one drop:
+                              -- a roll runs a minute, and the item is in its corpse until it ends
+local BOSS_UNITS = 5          -- boss1 to boss5, the units the game gives a fight's bosses
 
 local function recorded()
     return ns.db and ns.db.recorded
@@ -83,7 +88,7 @@ local function sourceFor(kind, id, where)
     end
     source.map, source.instance, source.instanceType, source.zone =
         where.map, where.instance, where.instanceType, where.zone
-    return source
+    return source, key
 end
 
 -- The corpses looted before, and marking one that now has been.
@@ -114,34 +119,6 @@ local function markSeen(guid)
     end
 end
 
-local lastEncounter
-
---- A boss fight ended (ENCOUNTER_END): a won one's boss, looted within a
--- minute, is marked as that encounter's boss.
-function Recorder.EncounterEnded(name, success)
-    if success == 1 or success == true then
-        lastEncounter = { name = name, at = now() }
-    end
-end
-
-local function encounterFor(name)
-    if lastEncounter and name == lastEncounter.name and now() - lastEncounter.at <= ENCOUNTER_WINDOW then
-        return lastEncounter.name
-    end
-    return nil
-end
-
-local function targetName(guid)
-    if not (UnitGUID and UnitName) then
-        return nil
-    end
-    local isTarget = ns.Guarded(function() return UnitGUID("target") == guid end, false)
-    if isTarget then
-        return ns.Guarded(function() return UnitName("target") end, nil)
-    end
-    return nil
-end
-
 -- Bring the lists up to date after instance loot, once for a burst of it.
 local refreshPending = false
 local function listsChanged()
@@ -157,6 +134,133 @@ local function listsChanged()
         refreshPending = false
         ns.Recordings.Changed()
     end)
+end
+
+
+-- A roll and a loot window holding its item are one drop. Each remembers
+-- its side, itemID -> { at, key }: when, and the source it was recorded
+-- under (the corpse or chest; the roll's own). A roll also keeps the boss
+-- fight it followed, if any.
+local recentLoot = {}
+local recentRolls = {}
+
+-- A corpse whose item a boss's roll was on is that boss, for good: its
+-- loot, then and after, is the boss's.
+local function markBoss(key, encounter)
+    local source = key and encounter and recorded().sources[key]
+    if source then
+        source.encounter = encounter
+        source.name = source.name or encounter
+    end
+end
+
+-- The last boss fight won: its name, when, where, and whether a roll has
+-- counted it as a kill yet.
+local lastEncounter
+-- The fight going on: the creature ids of the bosses the game has shown,
+-- each with its name where the client gives it.
+local fight
+
+-- A unit's creature id, or nil: not a creature, or a GUID kept secret.
+local function creatureOf(unit)
+    return ns.Guarded(function()
+        local kind, id = Recorder.ParseGUID(UnitGUID(unit))
+        return kind == "npc" and id or nil
+    end, nil)
+end
+
+-- A unit's name, or nil where the client keeps it secret: comparing a
+-- secret raises, so one never gets saved.
+local function nameOf(unit)
+    return ns.Guarded(function()
+        local name = UnitName(unit)
+        if type(name) == "string" and name ~= "" then
+            return name
+        end
+        return nil
+    end, nil)
+end
+
+-- Note the bosses the game shows for the fight going on.
+local function readBossUnits()
+    if not (UnitGUID and fight) then
+        return
+    end
+    for index = 1, BOSS_UNITS do
+        local unit = "boss" .. index
+        local id = creatureOf(unit)
+        if id then
+            fight.bosses[id] = fight.bosses[id] or (UnitName and nameOf(unit)) or false
+        end
+    end
+end
+
+--- A boss fight started (ENCOUNTER_START), or its bosses changed
+-- (INSTANCE_ENCOUNTER_ENGAGE_UNIT): note the bosses the game shows.
+function Recorder.EncounterStarted()
+    fight = { bosses = {} }
+    readBossUnits()
+end
+
+function Recorder.BossesChanged()
+    readBossUnits()
+end
+
+-- What /bl probe says of boss fights: the last one ended, and how many of
+-- its bosses could be read.
+local lastFight
+
+--- A boss fight ended (ENCOUNTER_END). A won one marks the bosses the game
+-- showed as that fight's, for good: their corpses' loot is the boss's
+-- however long after it is looted. A boss looted within a minute, by a name
+-- that matches, is marked too, and a roll within two minutes is its loot.
+function Recorder.EncounterEnded(name, success)
+    fight = fight or { bosses = {} }
+    readBossUnits()
+    local won = success == 1 or success == true
+    local count = 0
+    for _ in pairs(fight.bosses) do
+        count = count + 1
+    end
+    lastFight = { name = name, read = count }
+
+    if won and recorded() then
+        local where = whereNow()
+        lastEncounter = { name = name, at = now(), map = where.map }
+        for id, bossName in pairs(fight.bosses) do
+            local source = sourceFor("npc", id, where)
+            source.encounter = name
+            source.name = source.name or bossName or nil
+        end
+        if count > 0 and (where.instanceType == "party" or where.instanceType == "raid") then
+            listsChanged()
+        end
+    end
+    fight = nil
+end
+
+local function encounterFor(name)
+    if lastEncounter and name == lastEncounter.name and now() - lastEncounter.at <= ENCOUNTER_WINDOW then
+        return lastEncounter.name
+    end
+    return nil
+end
+
+-- The units a looted corpse can be: the target, the corpse under the mouse,
+-- and the one the interact key picked.
+local CORPSE_UNITS = { "target", "mouseover", "softinteract" }
+
+local function corpseName(guid)
+    if not (UnitGUID and UnitName) then
+        return nil
+    end
+    for _, unit in ipairs(CORPSE_UNITS) do
+        local isCorpse = ns.Guarded(function() return UnitGUID(unit) == guid end, false)
+        if isCorpse then
+            return nameOf(unit)
+        end
+    end
+    return nil
 end
 
 -- A live creature's loot window is its pocket (Pick Pocket), not its loot.
@@ -185,22 +289,25 @@ function Recorder.LootOpened()
     local found, order, described = {}, {}, {}
     for slot = 1, GetNumLootItems() do
         local itemID = itemIDOf(GetLootSlotLink(slot))
+        local from = { GetLootSourceInfo(slot) }
         if itemID and not described[itemID] then
             local name, quality
             if GetLootSlotInfo then
                 local _
                 _, name, _, _, quality = GetLootSlotInfo(slot)
             end
-            described[itemID] = { name = name, quality = quality, info = ns.LootRow.ItemInfo(itemID) or false }
+            -- The source the item is recorded under: its first corpse or chest.
+            local kind, id = Recorder.ParseGUID(from[1])
+            local key = kind and (kind .. ":" .. id .. "@" .. (where.map or 0)) or nil
+            described[itemID] = { name = name, quality = quality, info = ns.LootRow.ItemInfo(itemID) or false, key = key }
         end
-        local from = { GetLootSourceInfo(slot) }
         for k = 1, #from, 2 do
             local guid = from[k]
             local entry = found[guid]
             if entry == nil then
                 local kind, id = Recorder.ParseGUID(guid)
                 if kind and not seenBefore(guid) and not livingTarget(guid) then
-                    entry = { kind = kind, id = id, name = targetName(guid), items = {} }
+                    entry = { kind = kind, id = id, name = corpseName(guid), items = {} }
                     table.insert(order, guid)
                 else
                     entry = false
@@ -226,14 +333,100 @@ function Recorder.LootOpened()
         end
         markSeen(guid)
     end
+    local at = now()
+    local sources = recorded().sources
     for itemID, item in pairs(described) do
         remember(itemID, item.name, item.quality, item.info)
+        recentLoot[itemID] = { at = at, key = item.key }
+        -- Rolled on already, and recorded under the roll: the corpse has it
+        -- now, so the roll gives it back, and says whose corpse this is.
+        local rolled = recentRolls[itemID]
+        if rolled and at - rolled.at <= ROLL_MATCH and item.key then
+            local rollSource = sources[rolled.key]
+            local count = rollSource and rollSource.items[itemID]
+            if count then
+                rollSource.items[itemID] = count > 1 and count - 1 or nil
+            end
+            markBoss(item.key, rolled.encounter)
+            recentRolls[itemID] = nil
+        end
     end
 
     -- Loot in the open world changes no list.
     local inInstance = where.instanceType == "party" or where.instanceType == "raid"
     if #order > 0 and inInstance then
         listsChanged()
+    end
+end
+
+-- Roll ids already taken, this session.
+local rollsSeen = {}
+
+-- A roll waits ROLL_DELAY first: if the player opened the corpse it came
+-- from, the loot window has recorded the item, with its corpse, and the roll
+-- only says whose corpse that is.
+local function recordRoll(roll)
+    local encounter = roll.encounter
+    local looted = recentLoot[roll.itemID]
+    if looted and math.abs(looted.at - roll.at) <= ROLL_MATCH then
+        markBoss(looted.key, encounter and encounter.name)
+        listsChanged()
+        return
+    end
+    local source, key = sourceFor("roll", encounter and encounter.name or "trash", roll.where)
+    recentRolls[roll.itemID] = { at = roll.at, key = key, encounter = encounter and encounter.name }
+    if encounter then
+        source.encounter, source.name = encounter.name, encounter.name
+        -- The fight is the kill: once, however many rolls it brings.
+        if not encounter.rolled then
+            encounter.rolled = true
+            source.kills = source.kills + 1
+        end
+    end
+    source.items[roll.itemID] = (source.items[roll.itemID] or 0) + 1
+    remember(roll.itemID, roll.name, roll.quality)
+    listsChanged()
+end
+
+--- A roll started (START_LOOT_ROLL), as it does for everyone in the group
+-- when one of them opens a corpse with something worth rolling on. The
+-- client does not say which corpse: a roll within two minutes of a won boss
+-- fight in this instance is that boss's loot, any other the instance's trash.
+function Recorder.RollStarted(rollID)
+    if not (recorded() and GetLootRollItemLink) or rollID == nil or rollsSeen[rollID] then
+        return
+    end
+    local where = whereNow()
+    if not (where.instanceType == "party" or where.instanceType == "raid") then
+        return
+    end
+    local itemID = ns.Guarded(function() return itemIDOf(GetLootRollItemLink(rollID)) end, nil)
+    if not itemID then
+        return
+    end
+    rollsSeen[rollID] = true
+
+    -- The roll's own name and quality, for an item the game has not
+    -- described yet; a secret one raises on the checks and is left out.
+    local name, quality
+    if GetLootRollItemInfo then
+        ns.Guarded(function()
+            local _, rolledName, _, rolledQuality = GetLootRollItemInfo(rollID)
+            if type(rolledName) == "string" and rolledName ~= "" and type(rolledQuality) == "number" and rolledQuality >= 0 then
+                name, quality = rolledName, rolledQuality
+            end
+        end)
+    end
+    local at = now()
+    local encounter = lastEncounter
+    if not (encounter and encounter.map == where.map and at - encounter.at <= ROLL_WINDOW) then
+        encounter = nil
+    end
+    local roll = { itemID = itemID, name = name, quality = quality, at = at, where = where, encounter = encounter }
+    if C_Timer and C_Timer.After then
+        C_Timer.After(ROLL_DELAY, function() recordRoll(roll) end)
+    else
+        recordRoll(roll)
     end
 end
 
@@ -418,6 +611,7 @@ local PROBED = {
     "GetTradeSkillInfo|C_TradeSkillUI.GetAllRecipeIDs",
     "GetTradeSkillItemLink|C_TradeSkillUI.GetRecipeSchematic|C_TradeSkillUI.GetRecipeItemLink",
     "GetItemStats|C_Item.GetItemStats",
+    "GetLootRollItemLink",
 }
 
 local function present(name)
@@ -445,6 +639,13 @@ ns.RegisterCommand("probe", "Check this client has what the recorder needs", fun
     else
         ns.Print("This client is missing: " .. table.concat(missing, ", "))
     end
+    -- Whether this client says when a boss fight ends, and shows its bosses.
+    if lastFight then
+        ns.Print(string.format("Last boss fight: %s, %d boss%s read.", tostring(lastFight.name),
+            lastFight.read, lastFight.read == 1 and "" or "es"))
+    else
+        ns.Print("No boss fight seen since you logged in.")
+    end
 end)
 
 ns.RegisterCommand("recorded", "Show how much you have recorded", function()
@@ -464,7 +665,10 @@ end)
 
 local handlers = {
     LOOT_OPENED = function() Recorder.LootOpened() end,
+    ENCOUNTER_START = function() Recorder.EncounterStarted() end,
+    INSTANCE_ENCOUNTER_ENGAGE_UNIT = function() Recorder.BossesChanged() end,
     ENCOUNTER_END = function(_, name, _, _, success) Recorder.EncounterEnded(name, success) end,
+    START_LOOT_ROLL = function(rollID) Recorder.RollStarted(rollID) end,
     QUEST_DETAIL = function() Recorder.QuestShown() end,
     QUEST_COMPLETE = function() Recorder.QuestShown() end,
     MERCHANT_SHOW = function() Recorder.MerchantShown() end,

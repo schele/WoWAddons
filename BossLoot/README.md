@@ -40,11 +40,28 @@ rewards, merchant goods and what your professions make. A boss's recorded
 drops come first, with how often they were seen (`3/5` is three drops in five
 kills), and the vanilla list follows under "Classic loot": what has not been
 seen dropping there yet. Only the items the game has never described are
-dimmed, since WoW Forever may not have them at all. The recorder sees the
-loot windows you open, so an item won on a roll from a corpse someone else
-opened is not counted. Instances
-BossLoot does not know are listed once recorded, with the bosses the game
-named. `/bl probe` checks the client has what the recorder needs; `/bl
+dimmed, since WoW Forever may not have them at all.
+
+The recorder sees the loot windows you open, and the rolls your group makes:
+
+- **Rolls.** The game does not say which corpse a roll came from. A roll
+  within two minutes of a won boss fight in that instance counts as the
+  boss's loot, and the fight counts as one kill. Any other roll counts as
+  the instance's trash. A roll and a loot window holding the same item
+  within a minute of each other are one drop: it is counted once, with the
+  corpse.
+- **Bosses.** A corpse holding an item that a boss's roll was on is that
+  boss. The mark is saved with the creature, so all its loot, before and
+  after, lands on the boss. When a boss fight ends, the bosses the game
+  showed for it (boss1 to boss5) are marked the same way, on a client that
+  lets addons read them; WoW Forever does not. A corpse is also named from
+  your target, the corpse under the mouse, or the interact key's pick,
+  where the client allows it.
+
+An instance BossLoot does not know is listed once recorded, with the bosses
+the game named, or at once when the group finder lists it (see below).
+`/bl probe` checks the client has what the recorder needs, and says whether
+a boss fight was seen and how many of its bosses could be read. `/bl
 recorded` counts what you have recorded. To bake recordings into a release,
 put saved-variables files in `tools/recordings/` and rebuild the data.
 
@@ -53,8 +70,22 @@ drops with its chance; click one to go there.
 
 ## WoW Forever
 
-WoW Forever does not have every vanilla instance. Right-click an instance to
-hide it; `/bl unhide` brings them all back.
+WoW Forever does not have every vanilla instance, renames some, and adds its
+own. So BossLoot lists the dungeons and raids the game's group finder offers,
+and no others, with the finder's names and level ranges:
+
+- An instance the finder lists by wing, as it does Scarlet Monastery's four,
+  gets a row per wing, with only that wing's bosses. The map is the whole
+  instance's, and the trash and chest drops are the whole instance's too.
+- An instance BossLoot does not know, like Excavation Site: Wetlands, gets a
+  row straight away. It stays empty until you loot something there.
+- An instance the finder leaves out still comes back once you have recorded
+  loot in it, since that proves WoW Forever has it.
+- On a client with no group finder, or one whose finder lists nothing,
+  BossLoot lists every instance it knows.
+
+`/bl finder` prints the finder's list and what BossLoot made of each one.
+Right-click an instance to hide it; `/bl unhide` brings them all back.
 
 ## Commands
 
@@ -63,6 +94,7 @@ hide it; `/bl unhide` brings them all back.
 | `/bl` | Open or close the window |
 | `/bl minimap` | Hide or show the minimap button |
 | `/bl settings` | Open the settings page in the game's options |
+| `/bl finder` | List the dungeons and raids the game's group finder offers |
 | `/bl unhide` | Bring back every instance you hid |
 | `/bl help` | List the commands |
 

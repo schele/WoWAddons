@@ -68,8 +68,14 @@ function Index.Build()
     end
 end
 
+--- Whether an instance is off the list: the player hid it, or the game's
+-- group finder leaves it out.
 function Index.IsHidden(key)
-    return ns.db ~= nil and ns.db.hidden[key] == true
+    if ns.db ~= nil and ns.db.hidden[key] == true then
+        return true
+    end
+    local instance = ns.instanceByKey[key]
+    return instance ~= nil and ns.Finder ~= nil and ns.Finder.LeavesOut(instance)
 end
 
 --- Every item of the instances on the list, once each, in first-seen order:

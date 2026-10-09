@@ -190,7 +190,9 @@ function Recordings.Apply()
                 byMap[source.map] = instance
             end
             local boss = bossFor(instance, source)
-            if not boss and instance.recorded and source.encounter then
+            -- BossLoot knows no bosses of an instance only recordings or
+            -- the group finder told it of: the game names them.
+            if not boss and (instance.recorded or instance.fromFinder) and source.encounter then
                 boss = { name = source.encounter, loot = {} }
                 table.insert(instance.bosses, boss)
             end
@@ -220,6 +222,14 @@ function Recordings.Apply()
         table.sort(entries, byCount)
     end
 
+    -- A wing's row shares its instance's bosses, and so their recordings,
+    -- but the notable drops are recorded for the instance as a whole.
+    for _, instance in ipairs(ns.instances) do
+        if instance.wingOf then
+            instance.recordedNotable = instance.wingOf.recordedNotable
+        end
+    end
+
     -- A recorded instance with no named boss and nothing notable yet (only
     -- money, or common finds) has nothing to show: it is listed once it does.
     for position = #ns.instances, 1, -1 do
@@ -234,10 +244,15 @@ function Recordings.Apply()
     end
 end
 
---- Something was recorded, or the saved recordings are in: bring the
--- instances, the index and an open window up to date.
+--- Something was recorded, the saved recordings are in, or the group
+-- finder's list changed: bring the instances, the index and an open window
+-- up to date.
 function Recordings.Changed()
     recorders = nil
+    -- The finder's list first: the recordings fill in the rows it makes.
+    if ns.Finder then
+        ns.Finder.Apply()
+    end
     Recordings.Apply()
     if ns.Index and ns.Index.Build then
         ns.Index.Build()
