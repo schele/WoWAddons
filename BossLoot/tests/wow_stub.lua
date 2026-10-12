@@ -271,6 +271,33 @@ function stub.newEnv()
     env.__cursorX, env.__cursorY = 0, 0
     function env.GetCursorPosition() return env.__cursorX, env.__cursorY end
 
+    --- A string the client keeps from addon code: UnitGUID's answer for a
+    -- creature on Forever when unit identity is restricted. type() still
+    -- says "string", so a type check waves it through, and the first method
+    -- call or comparison on it raises -- in the client's own words. Plain
+    -- Lua cannot make a table say "string", so the addon's own `type` is
+    -- told to, for these and nothing else.
+    local secrets = setmetatable({}, { __mode = "k" })
+    local function raise()
+        error("attempt to index local 'guid' (a secret string value, "
+            .. "while execution tainted by 'BossLoot')", 2)
+    end
+    function env.__secretString()
+        local secret = setmetatable({}, {
+            __index = raise, __eq = raise, __lt = raise, __le = raise,
+            __concat = raise, __len = raise,
+            __tostring = function() return "<secret string>" end,
+        })
+        secrets[secret] = true
+        return secret
+    end
+    function env.type(value)
+        if secrets[value] then
+            return "string"
+        end
+        return type(value)
+    end
+
     return env
 end
 

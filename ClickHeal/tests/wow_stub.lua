@@ -213,6 +213,27 @@ local function makeWidget(kind, parent, template, env)
     function widget:GetTexture() return self.texture end
     function widget:SetTexCoord(...) self.texCoord = { ... } end
     function widget:SetVertexColor(r, g, b, a) self.vertexColor = { r, g, b, a } end
+    function widget:SetBlendMode(mode) self.blendMode = mode end
+
+    -- An animation group belongs to the region it was made on, and each
+    -- animation to its group: the aura container walks that chain to decide
+    -- whether a group handed to it is the slot frame's own. An animation
+    -- with no target set plays on its group's region, as the client's does.
+    function widget:CreateAnimationGroup()
+        local group = makeWidget("AnimationGroup", self)
+        group.animations = {}
+        function group:SetLooping(value) self.looping = value end
+        function group:CreateAnimation(animationKind)
+            local animation = makeWidget(animationKind or "Animation", self)
+            function animation:SetFromAlpha(value) self.fromAlpha = value end
+            function animation:SetToAlpha(value) self.toAlpha = value end
+            function animation:SetDuration(value) self.duration = value end
+            function animation:GetTarget() return self.target or group.parent end
+            table.insert(self.animations, animation)
+            return animation
+        end
+        return group
+    end
 
     -- Recorded as plain fields rather than behind a getter: the real
     -- GetHighlightTexture hands back a Texture object, not the path, so a
@@ -392,6 +413,32 @@ function stub.newEnv()
                 self.durationText, self.durationOptions = label, textOptions
             end
 
+            -- Played by the game as the slot's frame comes on screen, and
+            -- stopped as it goes. Refused, as the client refuses it, for a
+            -- group that is not the frame's own: Blizzard_CustomAuraButton.
+            slot.shownAnimations = {}
+            function slot:AddAuraShownAnimation(group)
+                if not isDescendant(group, self) then
+                    error("bad object in function call (must be a direct or "
+                        .. "indirect descendant of owner)", 2)
+                end
+                table.insert(self.shownAnimations, group)
+            end
+
+            -- Textures the game colours by the dispel type of the aura it
+            -- shows. The same ownership rule, and only a Texture.
+            slot.dispelTextures = {}
+            function slot:AddDispelTypeTexture(texture, textureOptions)
+                if not isDescendant(texture, self) then
+                    error("bad object in function call (must be a direct or "
+                        .. "indirect descendant of owner)", 2)
+                end
+                if texture.kind ~= "Texture" then
+                    error("bad object in function call (expected object type 'Texture')", 2)
+                end
+                table.insert(self.dispelTextures, { texture = texture, options = copy(textureOptions) })
+            end
+
             self.slots[key] = slot
             if options.initializeFrame then
                 pcall(options.initializeFrame, slot)
@@ -478,6 +525,20 @@ function stub.newEnv()
             return false, false
         end
         return u.inRange and true or false, true
+    end
+    -- Whether the client has the unit in the world around the player at
+    -- all. A party member outside the instance, or in another zone, is not:
+    --   env.units.party1.visible = false
+    function env.UnitIsVisible(id)
+        local u = unit(id)
+        return u ~= nil and u.visible ~= false
+    end
+    -- 0 when the test gives the unit none: what the client answers for a
+    -- level it does not know.
+    --   env.units.party1.level = 12
+    function env.UnitLevel(id)
+        local u = unit(id)
+        return u and u.level or 0
     end
 
     env.RAID_CLASS_COLORS = {
@@ -733,6 +794,10 @@ function stub.newEnv()
     -- reached through Enum; the string "spell" on older ones.
     env.Enum = env.Enum or {}
     env.Enum.SpellBookSpellBank = { Player = 0, Pet = 1 }
+    -- How the aura container draws a texture handed to AddDispelTypeTexture.
+    env.Enum.CustomAuraButtonDispelTypeTextureStyle = {
+        Border = 0, BorderWithIcon = 1, Icon = 2, PreserveAsset = 3, CustomAsset = 4,
+    }
 
     --- Test helper: put spells in the spellbook at consecutive indices, the
     -- way a character who has learned them would have them. Names repeat
@@ -750,11 +815,46 @@ function stub.newEnv()
         env.__spells[name] = true
     end
 
+    -- Each spellbook entry's own spell ID, and the level each ID is learned
+    -- at. Classic gives every rank its own entry and its own ID; the
+    -- spellbook window hides the lower ones, the calls below do not.
+    env.__spellbookIDs = {}
+    env.__spellLevels = {}
+
+    --- Test helper: one rank of a spell at a chosen index, with its own ID
+    -- and the level it is learned at.
+    function env.__learnRank(index, name, spellID, level)
+        env.__learnSpellAt(index, name)
+        env.__spellbookIDs[tostring(env.Enum.SpellBookSpellBank.Player) .. ":" .. index] = spellID
+        env.__spellLevels[spellID] = level
+    end
+
+    -- What kind of entry each is. The spellbook lists spells still to be
+    -- learned as well, as FutureSpell; a test marks one with
+    --   env.__futureSpells["0:4"] = true
+    env.Enum.SpellBookItemType = { None = 0, Spell = 1, FutureSpell = 2, PetAction = 3, Flyout = 4 }
+    env.__futureSpells = {}
+
     env.C_SpellBook = {
         GetSpellBookItemName = function(index, bookType)
             return env.__spellbook[tostring(bookType) .. ":" .. tostring(index)]
         end,
+        -- A table, as the namespaced call gives; nothing past the last entry.
+        GetSpellBookItemInfo = function(index, bank)
+            local key = tostring(bank) .. ":" .. tostring(index)
+            local name = env.__spellbook[key]
+            if not name then
+                return nil
+            end
+            local itemType = env.__futureSpells[key] and env.Enum.SpellBookItemType.FutureSpell
+                or env.Enum.SpellBookItemType.Spell
+            return { name = name, spellID = env.__spellbookIDs[key], subName = "", itemType = itemType }
+        end,
     }
+
+    env.C_Spell.GetSpellLevelLearned = function(spellID)
+        return env.__spellLevels[spellID] or 0
+    end
 
     -- Cursor ----------------------------------------------------------------
     -- Tests drive this directly: env.__cursor = { "spell", 5, "spell" } for a

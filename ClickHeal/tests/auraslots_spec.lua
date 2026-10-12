@@ -308,3 +308,168 @@ describe("the game's timers on screen, after review", function()
         assertEqual(row, row.auraContainer.allPointsTo)
     end)
 end)
+
+describe("blinking a button whose spell can remove a debuff on the unit", function()
+    it("gives every button a slot of its own over its icon, for debuffs, switched off", function()
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        for index = 1, ns.Slots.MAX do
+            local frame = row.dispelSlots[index].frame
+            local button = row.buttons[index]
+            assertEqual("HARMFUL", frame.filterString)
+            assertFalse(frame.enabled, "off until the button has a spell that removes something")
+            assertEqual(button, frame.allPointsTo, "over the icon, following it through a resize")
+            assertTrue(frame:GetFrameLevel() > button:GetFrameLevel(), "drawn over the icon")
+            assertFalse(frame.mouseEnabled, "a click goes through to the spell")
+        end
+    end)
+
+    it("switches on a Remove Curse button's slot, for curses only", function()
+        local ns, env = loggedIn()
+        local row = rowWith(ns, env, "party1", { "Rejuvenation", "Remove Curse" })
+
+        local curse = row.dispelSlots[2].frame
+        assertTrue(curse.enabled)
+        assertTrue(curse.candidateFilters.includeDispelTypes.Curse)
+        assertNil(curse.candidateFilters.includeDispelTypes.Poison)
+        assertFalse(row.dispelSlots[1].frame.enabled, "Rejuvenation removes nothing")
+    end)
+
+    it("matches every type a spell removes, as Cleanse does", function()
+        local ns, env = loggedIn(function(e) e.__spells["Cleanse"] = true end)
+        local row = rowWith(ns, env, "party1", { "Cleanse" })
+
+        local types = row.dispelSlots[1].frame.candidateFilters.includeDispelTypes
+        assertTrue(types.Poison)
+        assertTrue(types.Disease)
+        assertTrue(types.Magic)
+    end)
+
+    it("follows a change of spell", function()
+        local ns, env = loggedIn()
+        local row = rowWith(ns, env, "party1", { "Remove Curse" })
+
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.Row.ApplySpells(row)
+
+        assertFalse(row.dispelSlots[1].frame.enabled)
+    end)
+
+    it("blinks while the game shows it, by fading the frame in and out", function()
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+        local frame = row.dispelSlots[1].frame
+
+        local group = frame.shownAnimations[1]
+        assertTrue(group ~= nil, "handed to the game, which plays it when the debuff appears")
+        assertEqual("BOUNCE", group.looping, "keeps blinking until the debuff is gone")
+        local fade = group.animations[1]
+        assertEqual("Alpha", fade.kind)
+        assertEqual(frame, fade:GetTarget())
+        assertTrue(fade.toAlpha < fade.fromAlpha)
+    end)
+
+    it("frames the icon in the colour the game gives the debuff's type", function()
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+        local frame = row.dispelSlots[1].frame
+
+        assertEqual(4, #frame.dispelTextures, "the four edges")
+        for _, entry in ipairs(frame.dispelTextures) do
+            assertEqual(env.Enum.CustomAuraButtonDispelTypeTextureStyle.PreserveAsset, entry.options.style,
+                "the edge keeps its shape and takes the colour")
+        end
+    end)
+
+    it("still lights the icon, unblinking, when the game refuses the animation", function()
+        local ns, env = loggedIn()
+        local created = env.CreateFrame
+        env.CreateFrame = function(kind, name, parent, template)
+            local made = created(kind, name, parent, template)
+            if kind == "AuraContainer" then
+                local add = made.AddAuraSlot
+                function made:AddAuraSlot(key, filterString, options)
+                    return add(self, key, filterString, {
+                        candidateFilters = options.candidateFilters,
+                        initializeFrame = function(frame)
+                            frame.AddAuraShownAnimation = function() error("refused", 0) end
+                            options.initializeFrame(frame)
+                        end,
+                    })
+                end
+            end
+            return made
+        end
+        local row = rowWith(ns, env, "party1", { "Remove Curse" })
+
+        assertTrue(row.dispelSlots[1].frame.enabled)
+        assertTrue(ns.AuraSlots.Drawn(row), "the timers are untouched")
+    end)
+
+    it("costs only the blink, never the timers, when the game refuses the slot", function()
+        local ns, env = loggedIn()
+        local created = env.CreateFrame
+        env.CreateFrame = function(kind, name, parent, template)
+            local made = created(kind, name, parent, template)
+            if kind == "AuraContainer" then
+                local add = made.AddAuraSlot
+                function made:AddAuraSlot(key, filterString, options)
+                    if key:find("^dispel") then
+                        error("refused", 0)
+                    end
+                    return add(self, key, filterString, options)
+                end
+            end
+            return made
+        end
+        local row = rowWith(ns, env, "party1", { "Remove Curse" })
+
+        assertTrue(ns.AuraSlots.Drawn(row))
+        assertNil(row.dispelSlots)
+    end)
+
+    it("switches off what was built when a later slot is refused", function()
+        local ns, env = loggedIn()
+        local created = env.CreateFrame
+        env.CreateFrame = function(kind, name, parent, template)
+            local made = created(kind, name, parent, template)
+            if kind == "AuraContainer" then
+                local add = made.AddAuraSlot
+                function made:AddAuraSlot(key, filterString, options)
+                    if key == "dispel2" then
+                        error("refused", 0)
+                    end
+                    return add(self, key, filterString, options)
+                end
+            end
+            return made
+        end
+        local row = rowWith(ns, env, "party1", { "Remove Curse" })
+
+        assertFalse(row.auraContainer.slots.dispel1.enabled, "nothing half-built left blinking")
+    end)
+
+    it("blinks nothing on a client without the container", function()
+        local ns, env = loggedIn(function(e) e.__auraContainer = false end)
+        local row = rowWith(ns, env, "party1", { "Remove Curse" })
+
+        assertNil(row.dispelSlots)
+    end)
+end)
+
+describe("timers for a lower rank", function()
+    it("match every rank of the button's spell, so a rank cast on someone low has its number", function()
+        local ns, env = loggedIn(function(e)
+            e.__learnRank(1, "Mark of the Wild", 1126, 1)
+            e.__learnRank(2, "Mark of the Wild", 5232, 10)
+            e.__learnRank(3, "Mark of the Wild", 6756, 20)
+        end)
+        local row = rowWith(ns, env, "party1", { "Mark of the Wild" })
+
+        local ids = row.auraSlots[1].own.frame.candidateFilters.includeSpellIDs
+        assertTrue(ids[1126])
+        assertTrue(ids[5232])
+        assertTrue(ids[6756])
+    end)
+end)

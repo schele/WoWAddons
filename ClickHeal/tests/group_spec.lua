@@ -844,3 +844,39 @@ describe("the game's timers when the party changes", function()
         end
     end)
 end)
+
+describe("a party member levelling up", function()
+    local function withMarks(ns, env)
+        env.__learnRank(1, "Mark of the Wild", 1126, 1)
+        env.__learnRank(2, "Mark of the Wild", 5232, 10)
+        env.__learnRank(3, "Mark of the Wild", 6756, 20)
+        env.units.party1.level = 5
+        ns.db.bar.slots = 1
+        ns.Slots.Set(1, "Mark of the Wild")
+        ns.Group.ApplyAll()
+    end
+
+    it("gives their row the rank they can now take", function()
+        local ns, env = loggedIn()
+        withMarks(ns, env)
+        assertEqual(5232, helpers.attrs(helpers.rowFor(ns, "party1").buttons[1]).spell)
+
+        env.units.party1.level = 11
+        helpers.fire(env, "UNIT_LEVEL", "party1")
+
+        assertEqual("Mark of the Wild", helpers.attrs(helpers.rowFor(ns, "party1").buttons[1]).spell)
+    end)
+
+    it("waits for the fight to end, as every change to a button does", function()
+        local ns, env = loggedIn()
+        withMarks(ns, env)
+
+        env.__setCombat(true)
+        env.units.party1.level = 11
+        helpers.fire(env, "UNIT_LEVEL", "party1")
+        assertEqual(5232, helpers.attrs(helpers.rowFor(ns, "party1").buttons[1]).spell)
+
+        env.__setCombat(false)
+        assertEqual("Mark of the Wild", helpers.attrs(helpers.rowFor(ns, "party1").buttons[1]).spell)
+    end)
+end)

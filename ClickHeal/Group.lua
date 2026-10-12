@@ -434,8 +434,19 @@ watcher:RegisterEvent("GROUP_ROSTER_UPDATE")
 watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
 watcher:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 watcher:RegisterEvent("SPELLS_CHANGED")
+watcher:RegisterEvent("UNIT_LEVEL")
 
 watcher:SetScript("OnEvent", function(_, event, unit)
+    if event == "UNIT_LEVEL" then
+        -- Which rank a row casts depends on its person's level, and a party
+        -- member who levels up can take a higher one. Only for someone a
+        -- row is for; ApplyAll holds it for the fight to end.
+        if rows[unit] then
+            Group.ApplyAll()
+        end
+        return
+    end
+
     if event == "SPELLS_CHANGED" then
         -- Which buttons exist at all depends on what the player knows, so
         -- learning a spell changes the bar's shape -- and its width. ApplyAll
@@ -514,8 +525,10 @@ function Group.ApplyAll()
     repositionAnchor()
     Group.Layout()
 
+    -- Read once for every row: a walk of the whole spellbook.
+    local ranks = ns.Spells.Ranks()
     for _, row in pairs(rows) do
-        ns.Row.ApplySpells(row)
+        ns.Row.ApplySpells(row, ranks)
     end
 
     -- A button whose spell just changed is showing the sweep of the spell it

@@ -232,7 +232,7 @@ describe("asking whether a spell can reach a unit", function()
     it("reports a spell out of range", function()
         local ns, env = loggedIn()
         env.__spellRanges["Rejuvenation:party1"] = false
-        assertFalse(ns.Spells.InRange("Rejuvenation", "party1"))
+        assertEqual(false, ns.Spells.InRange("Rejuvenation", "party1"))
     end)
 
     it("falls back to the old global, which answered 1 and 0", function()
@@ -273,6 +273,76 @@ describe("asking whether a spell can reach a unit", function()
         local ns = loggedIn()
         assertNil(ns.Spells.InRange("", "party1"))
         assertNil(ns.Spells.InRange("Rejuvenation", nil))
+    end)
+
+    it("reports someone the client cannot see as out of range", function()
+        -- A party member outside the instance, or in another zone, is not a
+        -- target the client can measure to, so the range call answers nil:
+        -- "cannot tell". Read that way, every icon on their row stayed lit.
+        local ns, env = loggedIn()
+        env.units.party1.visible = false
+
+        assertEqual(false, ns.Spells.InRange("Rejuvenation", "party1"))
+    end)
+
+    it("reports someone the client cannot see as out of range, even when the range call raises", function()
+        local ns, env = loggedIn()
+        env.units.party1.visible = false
+        env.C_Spell.IsSpellInRange = function() error("secret boolean value") end
+
+        assertEqual(false, ns.Spells.InRange("Rejuvenation", "party1"))
+    end)
+
+    it("asks the spell as before when the client will not say whether it can see someone", function()
+        local ns, env = loggedIn()
+        env.__spellRanges["Rejuvenation:party1"] = true
+        env.UnitIsVisible = function() error("secret boolean value") end
+
+        assertTrue(ns.Spells.InRange("Rejuvenation", "party1"))
+    end)
+
+    it("asks the spell as before on a client without UnitIsVisible", function()
+        local ns, env = loggedIn()
+        env.UnitIsVisible = nil
+
+        assertNil(ns.Spells.InRange("Rejuvenation", "party1"))
+    end)
+end)
+
+describe("knowing which debuffs a spell removes", function()
+    it("names the dispel types each class's cures remove", function()
+        local ns = loggedIn()
+        local function types(spell)
+            local found = {}
+            for name in pairs(ns.Spells.DispelTypes(spell) or {}) do
+                found[#found + 1] = name
+            end
+            table.sort(found)
+            return table.concat(found, " ")
+        end
+
+        assertEqual("Curse", types("Remove Curse"))
+        assertEqual("Curse", types("Remove Lesser Curse"))
+        assertEqual("Poison", types("Abolish Poison"))
+        assertEqual("Poison", types("Cure Poison"))
+        assertEqual("Disease", types("Cure Disease"))
+        assertEqual("Disease", types("Abolish Disease"))
+        assertEqual("Magic", types("Dispel Magic"))
+        assertEqual("Disease Poison", types("Purify"))
+        assertEqual("Disease Magic Poison", types("Cleanse"))
+    end)
+
+    it("is nil for a spell that removes nothing", function()
+        local ns = loggedIn()
+        assertNil(ns.Spells.DispelTypes("Rejuvenation"))
+        assertNil(ns.Spells.DispelTypes(nil))
+    end)
+
+    it("hands out a copy, so a caller cannot change what the next one is told", function()
+        local ns = loggedIn()
+        ns.Spells.DispelTypes("Remove Curse").Poison = true
+
+        assertNil(ns.Spells.DispelTypes("Remove Curse").Poison)
     end)
 end)
 
@@ -807,5 +877,99 @@ describe("the spell ID of a buff on someone", function()
         local aura = ns.Spells.HelpfulAuras("party1").Rejuvenation
         assertTrue(aura ~= nil, "the buff itself is still there")
         assertNil(aura.spellId)
+    end)
+end)
+
+-- Mark of the Wild's first three ranks, learned at 1, 10 and 20, with
+-- Rejuvenation's one between them in the book.
+local function threeMarks(env)
+    env.__learnRank(1, "Mark of the Wild", 1126, 1)
+    env.__learnRank(2, "Rejuvenation", 774, 4)
+    env.__learnRank(3, "Mark of the Wild", 5232, 10)
+    env.__learnRank(4, "Mark of the Wild", 6756, 20)
+end
+
+describe("the ranks of each spell", function()
+    it("lists every rank in the spellbook by name, lowest level first", function()
+        local ns, env = loggedIn()
+        threeMarks(env)
+
+        local marks = ns.Spells.Ranks()["Mark of the Wild"]
+        assertEqual(3, #marks)
+        assertEqual(1126, marks[1].id)
+        assertEqual(1, marks[1].level)
+        assertEqual(6756, marks[3].id)
+        assertEqual(20, marks[3].level)
+        assertEqual(774, ns.Spells.Ranks()["Rejuvenation"][1].id)
+    end)
+
+    it("lists nothing on a client that cannot say", function()
+        local ns, env = loggedIn()
+        threeMarks(env)
+        env.C_SpellBook.GetSpellBookItemInfo = nil
+
+        assertNil(next(ns.Spells.Ranks()))
+    end)
+
+    it("leaves out a rank not learned yet, which the spellbook lists as well", function()
+        -- Rank 4 at 30 for a character of 28: within reach of someone of 25,
+        -- and a button casting it would cast nothing.
+        local ns, env = loggedIn()
+        threeMarks(env)
+        env.__learnRank(5, "Mark of the Wild", 6757, 30)
+        env.__futureSpells["0:5"] = true
+        env.__learnRank(6, "Mark of the Wild", 6758, 40)
+        env.__futureSpells["0:6"] = true
+
+        assertEqual(3, #ns.Spells.Ranks()["Mark of the Wild"])
+        assertNil(ns.Spells.RankFor(ns.Spells.Ranks(), "Mark of the Wild", 25))
+    end)
+
+    it("leaves out a rank whose level the client will not give", function()
+        local ns, env = loggedIn()
+        threeMarks(env)
+        env.C_Spell.GetSpellLevelLearned = function(id)
+            if id == 5232 then error("secret") end
+            return env.__spellLevels[id]
+        end
+
+        assertEqual(2, #ns.Spells.Ranks()["Mark of the Wild"])
+    end)
+end)
+
+describe("choosing the rank someone can take", function()
+    it("is the highest learned no more than ten levels above theirs", function()
+        local ns, env = loggedIn()
+        threeMarks(env)
+
+        assertEqual(5232, ns.Spells.RankFor(ns.Spells.Ranks(), "Mark of the Wild", 5))
+        assertEqual(5232, ns.Spells.RankFor(ns.Spells.Ranks(), "Mark of the Wild", 9),
+            "one level short of the top rank's twenty")
+    end)
+
+    it("is nil, so the button casts by name, when they can take the top rank", function()
+        local ns, env = loggedIn()
+        threeMarks(env)
+
+        assertNil(ns.Spells.RankFor(ns.Spells.Ranks(), "Mark of the Wild", 10))
+        assertNil(ns.Spells.RankFor(ns.Spells.Ranks(), "Mark of the Wild", 60))
+    end)
+
+    it("is nil when their level is not known", function()
+        local ns, env = loggedIn()
+        threeMarks(env)
+
+        assertNil(ns.Spells.RankFor(ns.Spells.Ranks(), "Mark of the Wild", 0))
+        assertNil(ns.Spells.RankFor(ns.Spells.Ranks(), "Mark of the Wild", nil))
+    end)
+
+    it("is nil for a spell with no ranks listed, or none they can take", function()
+        local ns, env = loggedIn()
+        threeMarks(env)
+        env.__learnRank(5, "Remove Curse", 2782, 24)
+
+        assertNil(ns.Spells.RankFor(ns.Spells.Ranks(), "Regrowth", 5))
+        assertNil(ns.Spells.RankFor(ns.Spells.Ranks(), "Remove Curse", 5),
+            "the game refuses it either way; by name it at least says why")
     end)
 end)

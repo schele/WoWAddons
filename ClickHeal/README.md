@@ -47,7 +47,9 @@ useless at once. When they are dead, everything fades but the resurrection,
 the one spell that still does something. Being out of range is judged per
 icon instead, since a
 40-yard heal and a melee-range debuff do not share a reach — the icons that
-cannot land go dark while the rest stay lit.
+cannot land go dark while the rest stay lit. Someone the game cannot see at
+all, outside the instance you are in or in another zone, has every icon
+dark.
 
 Both depend on the client being willing to answer, and some are not: range in
 particular comes back on some clients as a value an addon is not allowed to
@@ -79,6 +81,25 @@ grey the whole row. `/ch auras` prints what the client is actually saying.
 
 Buttons show the cooldown sweep, the same one the action bars draw — including
 the global cooldown, so a click gives you the feedback you expect.
+
+Each row casts the rank its person can take. The game refuses a rank
+learned more than ten levels above the target, so your top Mark of the Wild
+fails on a party member of level 8. Their row casts the highest rank you
+know that they can take instead, and moves up as they level. Someone who
+can take your top rank gets it, as before. It goes for every spell on the
+bar, heals included: a lower Healing Touch is plenty for a low-level
+player's health, and cheaper. Like every change to a button, a new rank
+waits for the fight to end.
+
+A cure blinks while there is something for it to remove. When a party member
+carries a curse, the Remove Curse button on their row flashes, framed in the
+curse's purple, until the curse is gone; the same goes for poison, disease
+and magic with Cure Poison, Abolish Poison, Cure Disease, Abolish Disease,
+Dispel Magic, Purify, Cleanse and Remove Lesser Curse. The frame takes the
+colour of the debuff actually there, so a Cleanse button framed green is
+being asked for a poison. The game does the watching, through the same aura
+container that draws the timers, so it blinks in combat too. A client
+without that container blinks nothing.
 
 ## Icons, and assigning spells
 

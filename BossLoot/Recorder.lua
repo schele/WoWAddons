@@ -34,13 +34,21 @@ local function now()
 end
 
 --- A GUID's kind and id: "npc", 6910 for a creature; "object", 5678 for a
--- game object; nil for anything else.
+-- game object; nil for anything else, a secret GUID included.
+--
+-- Forever keeps a creature's GUID secret where unit identity is restricted
+-- (UnitGUID, SecretWhenUnitIdentityRestricted): a merchant's, opened on
+-- 2026-10-10, raised on the match below. type() says "string" for a secret
+-- one, so the read itself is what has to be guarded.
 function Recorder.ParseGUID(guid)
     if type(guid) ~= "string" then
         return nil
     end
-    local kind, id = guid:match("^(%a+)%-[^%-]+%-[^%-]+%-[^%-]+%-[^%-]+%-(%d+)%-")
-    kind = KINDS[kind]
+    -- In a table because ns.Guarded hands back one value.
+    local parts = ns.Guarded(function()
+        return { guid:match("^(%a+)%-[^%-]+%-[^%-]+%-[^%-]+%-[^%-]+%-(%d+)%-") }
+    end, {})
+    local kind, id = KINDS[parts[1]], parts[2]
     if not kind then
         return nil
     end

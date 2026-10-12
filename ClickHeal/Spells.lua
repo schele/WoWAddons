@@ -98,6 +98,37 @@ function Spells.IsResurrection(spellName)
     return RESURRECTIONS[spellName] == true
 end
 
+-- What each cure removes, by the dispel type the game gives a debuff. The
+-- names are the game's own ("Curse", not "curse"): the aura container
+-- matches them against the debuff, and a misspelling would match nothing.
+local DISPELS = {
+    ["Remove Curse"] = { "Curse" },
+    ["Remove Lesser Curse"] = { "Curse" },
+    ["Abolish Poison"] = { "Poison" },
+    ["Cure Poison"] = { "Poison" },
+    ["Abolish Disease"] = { "Disease" },
+    ["Cure Disease"] = { "Disease" },
+    ["Dispel Magic"] = { "Magic" },
+    ["Purify"] = { "Poison", "Disease" },
+    ["Cleanse"] = { "Poison", "Disease", "Magic" },
+}
+
+--- The dispel types a spell removes, as a set: { Curse = true }. Nil for a
+-- spell that removes none. A fresh table each time, so a caller can keep or
+-- change it without changing what the next caller is told.
+function Spells.DispelTypes(spellName)
+    local names = DISPELS[spellName]
+    if not names then
+        return nil
+    end
+
+    local types = {}
+    for _, name in ipairs(names) do
+        types[name] = true
+    end
+    return types
+end
+
 --- Whether a spell can be cast on `unit` at all, by its nature rather than by
 -- range or state: false only for a resurrection aimed at the player.
 function Spells.CastableOn(spellName, unit)
@@ -241,9 +272,24 @@ end
 --
 -- nil means "cannot tell" and is deliberately distinct from false. Telling a
 -- healer a spell is out of reach when it is not costs them a cast they had.
+--
+-- Someone the client cannot see at all is the exception: out of reach of
+-- every spell, and asked first. A party member outside the instance, or in
+-- another zone, is not a target the range call can measure to, so it answers
+-- nil -- and read as "cannot tell", every icon on their row stayed lit. The
+-- client sees about a hundred yards around the player, past any spell's
+-- reach, so not seen is out of range. Guarded on its own: a refusal there
+-- leaves the question to the spell, as before.
 function Spells.InRange(spellName, unit)
     if type(spellName) ~= "string" or spellName == "" or not unit then
         return nil
+    end
+
+    local unseen = ns.Guarded(function()
+        return UnitIsVisible ~= nil and not UnitIsVisible(unit)
+    end, false)
+    if unseen then
+        return false
     end
 
     return ns.Guarded(function()
@@ -430,6 +476,92 @@ function Spells.Pickable()
 
     table.sort(names)
     return names
+end
+
+-- How far below a rank's own level a target can be and still take it: the
+-- game refuses a rank learned more than this many levels above the target.
+-- Mark of the Wild learned at 20 goes on someone of 10 and up.
+local RANK_LEVEL_GAP = 10
+
+--- Every rank of every spell in the spellbook, by name: a list of
+-- { id, level } from the lowest level up. Empty on a client without the
+-- calls to ask.
+--
+-- The spellbook holds every rank, each its own entry with its own ID. The
+-- spellbook window hides the lower ones unless "Show all spell ranks" is
+-- ticked, but that is the window's filter (IsSpellBookItemLowRank); the
+-- calls below see them all. A rank whose ID or level the client will not
+-- give is left out, on a guard of its own, and costs only itself.
+function Spells.Ranks()
+    local ranks = {}
+    if not (C_SpellBook and C_SpellBook.GetSpellBookItemInfo
+        and C_Spell and C_Spell.GetSpellLevelLearned) then
+        return ranks
+    end
+
+    local bank = playerSpellBank()
+    for index = 1, SPELLBOOK_LIMIT do
+        local info = ns.Guarded(function()
+            return C_SpellBook.GetSpellBookItemInfo(index, bank)
+        end, nil)
+        if type(info) ~= "table" then
+            break
+        end
+
+        local rank = ns.Guarded(function()
+            -- The spellbook lists ranks still to be learned too. One of
+            -- those within someone's reach would be a button that casts
+            -- nothing, so they are left out, as Blizzard's own spellbook
+            -- tells them apart.
+            local future = Enum and Enum.SpellBookItemType and Enum.SpellBookItemType.FutureSpell
+            if info.isOffSpec or (future ~= nil and info.itemType == future) then
+                return nil
+            end
+
+            local id, name = info.spellID, info.name
+            local level = C_Spell.GetSpellLevelLearned(id)
+            if type(name) ~= "string" or type(id) ~= "number" or type(level) ~= "number" then
+                return nil
+            end
+            return { name = name, id = id + 0, level = level + 0 }
+        end, nil)
+
+        if rank then
+            ranks[rank.name] = ranks[rank.name] or {}
+            table.insert(ranks[rank.name], { id = rank.id, level = rank.level })
+        end
+    end
+
+    for _, list in pairs(ranks) do
+        table.sort(list, function(a, b) return a.level < b.level end)
+    end
+    return ranks
+end
+
+--- The spell ID of the rank of `spellName` to cast on someone of `level`:
+-- the highest one learned no more than RANK_LEVEL_GAP levels above theirs.
+-- Nil when they can take the top rank, which casting by name already
+-- does -- and nil too when their level is unknown, the spell has no ranks
+-- listed, or not even its first rank would take, since a rank they cannot
+-- take is refused whichever rank it is.
+function Spells.RankFor(ranks, spellName, level)
+    local list = ranks and ranks[spellName]
+    if not list or #list == 0 or type(level) ~= "number" or level <= 0 then
+        return nil
+    end
+
+    local highest = level + RANK_LEVEL_GAP
+    if list[#list].level <= highest then
+        return nil
+    end
+
+    for position = #list, 1, -1 do
+        if list[position].level <= highest then
+            return list[position].id
+        end
+    end
+
+    return nil
 end
 
 -- How deep to look through a unit's auras. Forty is past anything a party

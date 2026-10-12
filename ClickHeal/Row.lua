@@ -60,6 +60,10 @@ local HOVER_SIDES = {
     { "TOPRIGHT", "BOTTOMRIGHT" },
 }
 
+-- Read by AuraSlots, whose blinking dispel frame sits on the same edges.
+Row.HOVER_BORDER = HOVER_BORDER
+Row.HOVER_SIDES = HOVER_SIDES
+
 -- Exported because the row's width, the gap a hidden button gives back and
 -- Group's own arithmetic all have to agree on it, and because a test that
 -- restates it as a literal stops agreeing the moment it changes.
@@ -484,13 +488,30 @@ function Row.Create(unit, parent)
     return row
 end
 
+--- The row's person's level, or nil where the client does not say.
+local function unitLevel(unit)
+    return ns.Guarded(function()
+        local level = UnitLevel(unit)
+        return type(level) == "number" and level + 0 or nil
+    end, nil)
+end
+
 --- Write the spell attributes and show only the slots in use.
 -- Every call here is blocked once the player is in combat, so the caller is
 -- responsible for not being in any. Group.ApplyAll is that caller.
-function Row.ApplySpells(row)
+--
+-- `ranks` is Spells.Ranks(), asked once by a caller applying every row; a
+-- row on its own asks for itself.
+function Row.ApplySpells(row, ranks)
     local count = ns.Slots.Count()
     local shown = 0
     local size = buttonSize()
+    ranks = ranks or ns.Spells.Ranks()
+    local level = unitLevel(row.unit)
+
+    if ns.AuraSlots then
+        ns.AuraSlots.LearnRanks(ranks)
+    end
 
     -- Resized here, not only at creation, because the icon size is a setting
     -- and the rows outlive a change to it -- they can only be built out of
@@ -535,7 +556,18 @@ function Row.ApplySpells(row)
         -- which is the one outcome that leaves a healer nothing to click.
         if hasButton(spell) and not Row.Suppressed(row.unit)
             and ns.Spells.CastableOn(spell, row.unit) then
-            button:SetAttribute("spell", spell)
+            -- The rank this person can take. The game refuses a rank
+            -- learned more than ten levels above them, and casting by name
+            -- casts the top one: Mark of the Wild failed on every low-level
+            -- party member. So a row for someone too low for the top rank
+            -- casts a lower one, by its ID, which the secure button casts as
+            -- readily as a name; everyone else's casts by name, as ever.
+            --
+            -- The name is kept on the button, apart from what it casts:
+            -- the timers, the cooldown, range and the dispel blink all ask
+            -- about the spell by name.
+            button.spellName = spell
+            button:SetAttribute("spell", ns.Spells.RankFor(ranks, spell, level) or spell)
 
             button.icon:SetTexture(ns.Spells.Texture(spell) or UNKNOWN_ICON)
             button.icon:Show()
@@ -562,6 +594,7 @@ function Row.ApplySpells(row)
             -- on your own row, which cannot target the caster. A button that
             -- looks pressable and does nothing is the worse failure, and the
             -- buttons after it close up rather than leave a hole.
+            button.spellName = nil
             button:SetAttribute("spell", nil)
             button.icon:Hide()
             button:Hide()
@@ -571,7 +604,7 @@ function Row.ApplySpells(row)
         -- it will cast: a resurrection left off your own row takes its
         -- slots with it.
         if ns.AuraSlots then
-            ns.AuraSlots.SetSpell(row, index, button:GetAttribute("spell"))
+            ns.AuraSlots.SetSpell(row, index, button.spellName)
         end
     end
 
@@ -654,24 +687,24 @@ local function fadeAllButRaising(row, raisable)
 
     for index = 1, ns.Slots.MAX do
         local button = row.buttons[index]
-        local raises = ns.Spells.IsResurrection(button:GetAttribute("spell"))
+        local raises = ns.Spells.IsResurrection(button.spellName)
         button:SetAlpha(raises and 1 or rest)
     end
 end
 
 --- Draw each button's cooldown sweep.
 --
--- Reads the spell off the button's own attribute rather than out of Slots,
--- so the sweep can only ever show the cooldown of the spell this button will
--- actually cast. Touches nothing secure -- reading an attribute we set
--- ourselves is not a secure write -- so like Row.Refresh this is safe
--- mid-fight, which is the only time it matters.
+-- Reads the spell off the button rather than out of Slots, so the sweep can
+-- only ever show the cooldown of the spell this button will actually cast.
+-- By its name, which every rank shares, cooldown and all. Touches nothing
+-- secure, so like Row.Refresh this is safe mid-fight, which is the only
+-- time it matters.
 function Row.RefreshCooldowns(row)
     for index = 1, ns.Slots.MAX do
         local cooldown = row.buttons[index].cooldown
         if cooldown then
             local start, duration, enabled =
-                ns.Spells.Cooldown(row.buttons[index]:GetAttribute("spell"))
+                ns.Spells.Cooldown(row.buttons[index].spellName)
 
             -- No comparison here. Spells.Cooldown has already proven both
             -- numbers readable inside its guard, so anything that arrives is
@@ -716,7 +749,7 @@ end
 function Row.RefreshRange(row)
     for index = 1, ns.Slots.MAX do
         local button = row.buttons[index]
-        local spell = button:GetAttribute("spell")
+        local spell = button.spellName
 
         if spell then
             -- Compared against false rather than tested, because nil here
@@ -774,7 +807,7 @@ function Row.AssignedSpells(row)
     local spells = {}
 
     for index = 1, ns.Slots.MAX do
-        local spell = row.buttons[index]:GetAttribute("spell")
+        local spell = row.buttons[index].spellName
         if spell then
             spells[#spells + 1] = spell
         end
@@ -808,7 +841,7 @@ function Row.RefreshAuras(row)
 
     for index = 1, ns.Slots.MAX do
         local button = row.buttons[index]
-        local spell = button:GetAttribute("spell")
+        local spell = button.spellName
 
         local remaining, mine
         if spell then

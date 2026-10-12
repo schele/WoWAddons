@@ -36,6 +36,13 @@ describe("a GUID", function()
         assertNil(ns.Recorder.ParseGUID("Player-3110-00ABCDEF"))
         assertNil(ns.Recorder.ParseGUID(nil))
     end)
+
+    it("names nothing, rather than raising, when the client keeps it secret", function()
+        -- type() says "string" for a secret one, so a type check lets it in,
+        -- and reading it is what raises.
+        local ns, env = helpers.loggedIn()
+        assertNil(ns.Recorder.ParseGUID(env.__secretString()))
+    end)
 end)
 
 describe("recording loot", function()
@@ -246,6 +253,22 @@ describe("recording quests, merchants and crafts", function()
         assertEqual("Brave Sword", merchant.name)
         assertEqual("Ironforge", merchant.zone)
         assertEqual(81, merchant.items[2901].price)
+    end)
+
+    it("leaves out a merchant whose GUID the client keeps secret, quietly", function()
+        -- Forever, 2026-10-10: "attempt to index local 'guid' (a secret
+        -- string value, while execution tainted by 'BossLoot')", printed as
+        -- a merchant window opened.
+        local ns, env = helpers.loggedIn()
+        function env.UnitGUID(unit) return unit == "npc" and env.__secretString() or nil end
+        function env.UnitName(unit) return unit == "npc" and "Brave Sword" or nil end
+        function env.GetMerchantNumItems() return 1 end
+        function env.GetMerchantItemLink() return "|Hitem:2901::|h[Mining Pick]|h" end
+        function env.GetMerchantItemInfo() return "Mining Pick", 134400, 81 end
+        env.__printed = {}
+        helpers.fire(env, "MERCHANT_SHOW")
+        assertNil(next(ns.db.recorded.merchants))
+        assertEqual("", helpers.printed(env), "nothing to report: there was nothing to read")
     end)
 
     it("records what a profession's recipes make, leaving out the headings", function()

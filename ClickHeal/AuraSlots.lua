@@ -8,6 +8,12 @@ local addonName, ns = ...
 -- which may read secret auras: one per row, on the row's unit, with two slots
 -- under every button that the game shows, hides and counts down. See
 -- docs/superpowers/specs/2026-09-27-clickheal-combat-timers-design.md.
+--
+-- The same container blinks a cure. Each button has a third slot, over its
+-- icon, matching debuffs of the types the button's spell removes: a Remove
+-- Curse button blinks while its row's person carries a curse. The game shows
+-- that slot and plays its blink, so it works in combat, when ClickHeal
+-- itself cannot see a single debuff.
 
 local AuraSlots = {}
 ns.AuraSlots = AuraSlots
@@ -118,11 +124,125 @@ local function addSlot(container, button, key, own)
     return slot
 end
 
---- Give `row` a container on its unit and two slots under every button.
--- True if the game will draw this row's timers. False on a client without
--- the container, or if the game refuses any step -- and then the row keeps
--- ClickHeal's own timers, with nothing half-built left on screen. Called
--- once per row, from Row.Create, out of combat.
+-- The blink: the frame fades to BLINK_LOW and back, each way taking
+-- BLINK_SECONDS. The wash brightens the icon under it, white and additive
+-- so it shows over any icon's colours; the edges take the game's colour for
+-- the debuff's type, purple for a curse, which says which cure is wanted
+-- when Cleanse and its like answer to more than one.
+local BLINK_LOW = 0.15
+local BLINK_SECONDS = 0.4
+local WASH_ALPHA = 0.45
+
+--- The slot over `button` that blinks while its spell has a debuff to remove.
+-- Set up in initializeFrame, like the timers' slots, and for the same
+-- reason. Only the frame and its textures are needed for the slot to be of
+-- use; the blink and the colour are each on a guard of their own, so a
+-- refusal of either leaves a steady white frame rather than nothing.
+local function addDispelSlot(container, button, key)
+    local slot = { key = key }
+
+    local function initializeFrame(frame)
+        pcall(frame.EnableMouse, frame, false)
+        frame:SetAllPoints(button)
+        -- Over the icon and its cooldown sweep, and the timers' slots too.
+        frame:SetFrameLevel(container:GetFrameLevel() + 3)
+
+        local wash = frame:CreateTexture(nil, "OVERLAY")
+        wash:SetAllPoints(frame)
+        wash:SetColorTexture(1, 1, 1, WASH_ALPHA)
+        wash:SetBlendMode("ADD")
+
+        local edges = {}
+        for _, side in ipairs(ns.Row.HOVER_SIDES) do
+            local edge = frame:CreateTexture(nil, "OVERLAY")
+            edge:SetColorTexture(1, 1, 1, 1)
+            edge:SetPoint(side[1], frame, side[1])
+            edge:SetPoint(side[2], frame, side[2])
+            if side.across then
+                edge:SetHeight(ns.Row.HOVER_BORDER)
+            else
+                edge:SetWidth(ns.Row.HOVER_BORDER)
+            end
+            edges[#edges + 1] = edge
+        end
+        slot.ready = true
+
+        pcall(function()
+            local style = Enum.CustomAuraButtonDispelTypeTextureStyle.PreserveAsset
+            for _, edge in ipairs(edges) do
+                frame:AddDispelTypeTexture(edge, { style = style })
+            end
+        end)
+
+        -- BOUNCE runs out and back for as long as the game lets it play,
+        -- which is for as long as the debuff is there.
+        pcall(function()
+            local blink = frame:CreateAnimationGroup()
+            blink:SetLooping("BOUNCE")
+            local fade = blink:CreateAnimation("Alpha")
+            fade:SetFromAlpha(1)
+            fade:SetToAlpha(BLINK_LOW)
+            fade:SetDuration(BLINK_SECONDS)
+            frame:AddAuraShownAnimation(blink)
+        end)
+    end
+
+    -- Matches nothing, and switched off, until SetSpell gives it a cure.
+    slot.frame = container:AddAuraSlot(key, "HARMFUL", {
+        candidateFilters = { includeDispelTypes = {} },
+        initializeFrame = initializeFrame,
+    })
+    -- Off before the check below, so a slot that was not set up is not
+    -- left switched on behind the refusal.
+    container:SetAuraSlotEnabled(key, false)
+    if not slot.ready then
+        error("slot " .. key .. " was not set up", 0)
+    end
+
+    return slot
+end
+
+--- A dispel slot over every button of `row`, or none: a refusal costs the
+-- row its blinking and nothing else, since the timers on the same
+-- container are already built. Whatever was built before the refusal is
+-- switched off, so it can never blink.
+local function attachDispels(row)
+    local slots = {}
+    local built = pcall(function()
+        for index, button in ipairs(row.buttons) do
+            slots[index] = addDispelSlot(row.auraContainer, button, "dispel" .. index)
+        end
+    end)
+
+    if built then
+        row.dispelSlots = slots
+        return
+    end
+
+    for _, slot in pairs(slots) do
+        pcall(row.auraContainer.SetAuraSlotEnabled, row.auraContainer, slot.key, false)
+    end
+    row.dispelSlots = nil
+end
+
+--- Point a button's dispel slot at the debuff types its spell removes, or
+-- switch it off for a spell that removes none.
+local function applyDispel(row, slot, spell)
+    ns.Guarded(function()
+        local types = ns.Spells.DispelTypes(spell)
+        if types then
+            row.auraContainer:SetAuraSlotCandidateFilters(slot.key, { includeDispelTypes = types })
+        end
+        row.auraContainer:SetAuraSlotEnabled(slot.key, types ~= nil)
+    end)
+end
+
+--- Give `row` a container on its unit, two slots under every button and a
+-- dispel slot over each. True if the game will draw this row's timers.
+-- False on a client without the container, or if the game refuses any step
+-- of the timers -- and then the row keeps ClickHeal's own timers, with
+-- nothing half-built left on screen, and blinks nothing. Called once per
+-- row, from Row.Create, out of combat.
 function AuraSlots.Attach(row)
     local container
     local built = pcall(function()
@@ -152,6 +272,7 @@ function AuraSlots.Attach(row)
 
     row.auraContainer = container
     attached[#attached + 1] = row
+    attachDispels(row)
     return true
 end
 
@@ -174,17 +295,35 @@ function AuraSlots.Refresh(row)
     end
 end
 
---- Point the slots under button `index` at `spell`, or at nothing. Out of
--- combat only, like every other change to a button: Row.ApplySpells calls
--- it for every button, every time.
+--- Point the slots of button `index` at `spell`, or at nothing: the timers
+-- under it at the spell's buff, the dispel slot over it at the debuffs it
+-- removes. Out of combat only, like every other change to a button:
+-- Row.ApplySpells calls it for every button, every time.
 function AuraSlots.SetSpell(row, index, spell)
     local slots = row.auraSlots and row.auraSlots[index]
-    if not slots then
-        return
+    if slots then
+        slots.spell = spell
+        applyFilters(row, slots)
     end
 
-    slots.spell = spell
-    applyFilters(row, slots)
+    local dispel = row.dispelSlots and row.dispelSlots[index]
+    if dispel then
+        applyDispel(row, dispel, spell)
+    end
+end
+
+--- Take the ID of every rank the spellbook holds -- Spells.Ranks(), by
+-- name -- so a slot matches the rank a button casts on someone too low for
+-- the top one, and anybody's lower rank, from the first cast. Learned like
+-- an ID seen on a buff, but without reaching for the slots: Row.ApplySpells
+-- calls this just before it points every slot of its row anew.
+function AuraSlots.LearnRanks(ranks)
+    for name, list in pairs(ranks or {}) do
+        learned[name] = learned[name] or {}
+        for _, rank in ipairs(list) do
+            learned[name][rank.id] = true
+        end
+    end
 end
 
 --- Take spell IDs from buffs read out of combat -- Spells.HelpfulAuras'

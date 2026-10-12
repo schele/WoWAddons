@@ -1118,6 +1118,17 @@ describe("dimming an icon its spell cannot reach", function()
         assertEqual(1, row.buttons[1].icon.vertexColor[1])
         assertTrue(row.buttons[2].icon.vertexColor[1] < 1)
     end)
+
+    it("dims every icon of someone the client cannot see, such as outside the instance", function()
+        local ns, env = loggedIn()
+        local row = armed(env, ns, { "Rejuvenation", "Mark of the Wild" })
+        env.units.party1.visible = false
+
+        ns.Row.Refresh(row)
+
+        assertTrue(row.buttons[1].icon.vertexColor[1] < 1)
+        assertTrue(row.buttons[2].icon.vertexColor[1] < 1)
+    end)
 end)
 
 describe("hanging a row off Blizzard's unit frame", function()
@@ -1478,5 +1489,93 @@ describe("whose cast the number under an icon is", function()
 
         assertEqual("38 m", row.buttons[1].timer:GetText())
         assertEqual(1, row.buttons[1].timer.textColor[1])
+    end)
+end)
+
+describe("casting the rank each person can take", function()
+    -- Mark of the Wild learned at 1, 10 and 20: someone at level 5 can take
+    -- the second rank and no higher.
+    local function withMarks(env, ns, unit, level)
+        env.__learnRank(1, "Mark of the Wild", 1126, 1)
+        env.__learnRank(2, "Mark of the Wild", 5232, 10)
+        env.__learnRank(3, "Mark of the Wild", 6756, 20)
+        env.__learnRank(4, "Rejuvenation", 774, 4)
+        env.units[unit].level = level
+        ns.db.bar.slots = 2
+        ns.Slots.Set(1, "Mark of the Wild")
+        ns.Slots.Set(2, "Rejuvenation")
+        local row = ns.Row.Create(unit, env.UIParent)
+        ns.Row.ApplySpells(row)
+        return row
+    end
+
+    it("casts a low-level party member the highest rank they can take, by its ID", function()
+        local ns, env = loggedIn()
+        local row = withMarks(env, ns, "party1", 5)
+
+        assertEqual(5232, helpers.attrs(row.buttons[1]).spell)
+    end)
+
+    it("casts by name, as ever, for someone who can take the top rank", function()
+        local ns, env = loggedIn()
+        local row = withMarks(env, ns, "party1", 25)
+
+        assertEqual("Mark of the Wild", helpers.attrs(row.buttons[1]).spell)
+        assertEqual("Rejuvenation", helpers.attrs(row.buttons[2]).spell)
+    end)
+
+    it("follows the person's level the next time the spells are applied", function()
+        local ns, env = loggedIn()
+        local row = withMarks(env, ns, "party1", 5)
+
+        env.units.party1.level = 30
+        ns.Row.ApplySpells(row)
+
+        assertEqual("Mark of the Wild", helpers.attrs(row.buttons[1]).spell)
+    end)
+
+    it("keeps the spell's name for everything that reads it", function()
+        local ns, env = loggedIn()
+        local row = withMarks(env, ns, "party1", 5)
+        env.__spellRanges["Mark of the Wild:party1"] = false
+        env.__spellCooldowns["Mark of the Wild"] = { startTime = 100, duration = 1.5, isEnabled = true }
+
+        ns.Row.Refresh(row)
+        ns.Row.RefreshCooldowns(row)
+
+        assertEqual("Mark of the Wild", row.buttons[1].spellName)
+        assertEqual("Mark of the Wild", ns.Row.AssignedSpells(row)[1])
+        assertTrue(row.buttons[1].icon.vertexColor[1] < 1, "range is asked by name")
+        local _, duration = row.buttons[1].cooldown:GetCooldownTimes()
+        assertEqual(1.5, duration, "the cooldown is asked by name")
+    end)
+
+    it("still knows a lower rank of a resurrection for what it is", function()
+        local ns, env = loggedIn()
+        env.__learnRank(1, "Rebirth", 20484, 20)
+        env.__learnRank(2, "Rebirth", 20739, 30)
+        env.__learnRank(3, "Rejuvenation", 774, 4)
+        env.units.party1.level = 15
+        env.units.party1.dead = true
+        ns.db.bar.slots = 2
+        ns.Slots.Set(1, "Rejuvenation")
+        ns.Slots.Set(2, "Rebirth")
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+
+        ns.Row.Refresh(row)
+
+        assertEqual(20484, helpers.attrs(row.buttons[2]).spell)
+        assertEqual(1, row:GetAlpha() * row.buttons[2]:GetAlpha(), "Rebirth stays bright on the dead")
+    end)
+
+    it("forgets the name of a button that empties", function()
+        local ns, env = loggedIn()
+        local row = withMarks(env, ns, "party1", 5)
+
+        ns.Slots.Set(1, "")
+        ns.Row.ApplySpells(row)
+
+        assertNil(row.buttons[1].spellName)
     end)
 end)
