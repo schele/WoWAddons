@@ -220,7 +220,7 @@ describe("the settings panel", function()
         assertEqual(2, #ns.Settings.dividers, "one in each column, each under its first group")
     end)
 
-    it("puts the portrait and chat box options in the right column, under the chat keys", function()
+    it("puts the portrait, chat box and action bar options in the right column, under the chat keys", function()
         local ns = loggedIn()
 
         local keysY, rows = nil, {}
@@ -230,12 +230,12 @@ describe("the settings panel", function()
             local x, y = point[#point - 1], point[#point]
             if setting.key == "keys" then
                 keysY = y
-            elseif setting.store == "ui" and (setting.key:match("^portrait") or setting.key:match("^chat")) then
+            elseif setting.store == "ui" and (setting.key:match("^portrait") or setting.key:match("^chat") or setting.key:match("^bars")) then
                 rows[setting.key] = { x = x, y = y }
             end
         end
 
-        for _, key in ipairs({ "portraitBelowBar", "portraitGap", "chatPerScreen" }) do
+        for _, key in ipairs({ "portraitBelowBar", "portraitGap", "chatPerScreen", "barsPerScreen" }) do
             assertTrue(rows[key].x >= 280, key .. " in the right column")
             assertTrue(rows[key].y < keysY, key .. " below the chat keys")
         end

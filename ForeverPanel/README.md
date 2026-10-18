@@ -33,6 +33,16 @@ chat box's place and size are saved to the account too, so ForeverPanel keeps
 them per screen: where and how big you last saved it in Edit Mode on that
 screen. On a screen you have not placed it on, the layout has it.
 
+The action bars' places are kept per screen as well, for each Edit Mode
+layout: every bar stays where it was the first time ForeverPanel saw that
+screen, or where you last saved it there in Edit Mode, so moving a bar on the
+laptop leaves the desktop's alone. A screen not seen before starts from the
+layout as it is then. Only the game can put a bar into the stack along the
+bottom or down the right, so a bar moved out of the stack on another screen
+stays out on this one too. The bars are moved out of combat and never while
+Edit Mode is open, and turning "Keep the action bars' places for each screen"
+off gives them back to the layout.
+
 WoW Forever's 1.60.1 (70291) patch put the backpack at the bottom of the
 Combined Backpack and the last bag on top. "Backpack first in the combined
 bags", on by default, lays the same slots out again on the game's own grid.
