@@ -366,7 +366,136 @@ function ns.TalentWindow()
     end
 end
 
+--------------------------------------------------------------------------------
+-- What the probe saves: every talent call the client has and what a set of
+-- guesses at their arguments returned, written to TalentPlannerDB.probe on
+-- /reload so the shape of a newer API can be read outside the game.
+--------------------------------------------------------------------------------
+
+local NAMESPACES = { "C_SpecializationInfo", "C_ClassTalents", "C_Traits", "C_Talent", "C_PlayerInfo" }
+
+--- A value the saved-variables file can hold. Some values are secrets that
+-- raise when touched, so everything goes through pcall.
+local function describe(value, depth)
+    local ok, kind = pcall(type, value)
+    if not ok then
+        return "<untouchable>"
+    end
+    if kind == "table" then
+        if depth >= 3 then
+            return "<table>"
+        end
+        local copy = {}
+        local walked = pcall(function()
+            for key, inner in pairs(value) do
+                copy[tostring(key)] = describe(inner, depth + 1)
+            end
+        end)
+        if not walked then
+            copy["<error>"] = "could not walk"
+        end
+        return copy
+    end
+    if kind == "function" or kind == "userdata" or kind == "thread" then
+        return kind
+    end
+    local shown, text = pcall(tostring, value)
+    if kind == "number" or kind == "boolean" then
+        return shown and value or "<secret " .. kind .. ">"
+    end
+    return shown and text or "<secret " .. kind .. ">"
+end
+
+local function try(calls, label, fn, ...)
+    if type(fn) ~= "function" then
+        return
+    end
+    local function keep(ok, ...)
+        if not ok then
+            calls[label] = { ok = false, error = describe((...), 0) }
+            return
+        end
+        local returned = {}
+        for i = 1, select("#", ...) do
+            returned[i] = describe((select(i, ...)), 0)
+        end
+        calls[label] = { ok = true, returned = returned }
+    end
+    keep(pcall(fn, ...))
+end
+
+local function record()
+    local saved = { namespaces = {}, globals = {}, calls = {}, addons = {} }
+
+    for _, name in ipairs(NAMESPACES) do
+        if type(_G[name]) == "table" then
+            saved.namespaces[name] = describe(_G[name], 1)
+        end
+    end
+    for name, value in pairs(_G) do
+        if type(name) == "string" and (name:find("Talent") or name:find("Speciali") or name:find("CharacterPoints")) then
+            local kind = type(value)
+            saved.globals[name] = (kind == "function" or kind == "table") and kind or describe(value, 2)
+        end
+    end
+
+    local classID = select(3, UnitClass("player"))
+    local S = _G.C_SpecializationInfo or {}
+    local calls = saved.calls
+    try(calls, "GetNumSpecializations()", _G.GetNumSpecializations)
+    try(calls, "C_SpecializationInfo.GetNumSpecializations()", S.GetNumSpecializations)
+    try(calls, "C_SpecializationInfo.GetNumSpecializationsForClassID(class)", S.GetNumSpecializationsForClassID, classID)
+    try(calls, "GetNumSpecializationsForClassID(class)", _G.GetNumSpecializationsForClassID, classID)
+    try(calls, "GetSpecialization()", _G.GetSpecialization)
+    try(calls, "C_SpecializationInfo.GetSpecialization()", S.GetSpecialization)
+    try(calls, "GetMaxTalentTier()", _G.GetMaxTalentTier)
+    try(calls, "C_SpecializationInfo.GetNumUnspentTalents()", S.GetNumUnspentTalents)
+    try(calls, "GetNumUnspentTalents()", _G.GetNumUnspentTalents)
+    try(calls, "C_SpecializationInfo.HasUnspentTalentPoints()", S.HasUnspentTalentPoints)
+    try(calls, "C_SpecializationInfo.GetActiveSpecGroup()", S.GetActiveSpecGroup)
+    try(calls, "GetActiveSpecGroup()", _G.GetActiveSpecGroup)
+    try(calls, "C_SpecializationInfo.CanPlayerUseTalentUI()", S.CanPlayerUseTalentUI)
+    try(calls, "C_SpecializationInfo.CanPlayerUseTalentSpecUI()", S.CanPlayerUseTalentSpecUI)
+    try(calls, "C_ClassTalents.GetActiveConfigID()", (_G.C_ClassTalents or {}).GetActiveConfigID)
+    for tab = 1, 3 do
+        try(calls, "GetSpecializationInfo(" .. tab .. ")", _G.GetSpecializationInfo, tab)
+        try(calls, "C_SpecializationInfo.GetSpecializationInfo(" .. tab .. ")", S.GetSpecializationInfo, tab)
+        try(calls, "GetSpecializationInfoForClassID(class," .. tab .. ")", _G.GetSpecializationInfoForClassID, classID, tab)
+        try(calls, "C_SpecializationInfo.GetSpecializationInfoForClassID(class," .. tab .. ")",
+            S.GetSpecializationInfoForClassID, classID, tab)
+    end
+    for _, query in ipairs({
+        { "{specializationIndex=1,talentIndex=1}", { specializationIndex = 1, talentIndex = 1 } },
+        { "{specializationIndex=2,talentIndex=3}", { specializationIndex = 2, talentIndex = 3 } },
+        { "{tier=1,column=1}", { tier = 1, column = 1 } },
+        { "{tier=1,column=2}", { tier = 1, column = 2 } },
+        { "{tier=2,column=1}", { tier = 2, column = 1 } },
+        { "{tier=1,column=1,specializationIndex=2}", { tier = 1, column = 1, specializationIndex = 2 } },
+        { "{tier=1,column=1,groupIndex=1}", { tier = 1, column = 1, groupIndex = 1 } },
+    }) do
+        try(calls, "C_SpecializationInfo.GetTalentInfo" .. query[1], S.GetTalentInfo, query[2])
+    end
+    try(calls, "GetTalentTierInfo(1,1)", _G.GetTalentTierInfo, 1, 1)
+    try(calls, "GetTalentInfo(1,1)", _G.GetTalentInfo, 1, 1)
+    try(calls, "GetTalentInfo(1,1,1)", _G.GetTalentInfo, 1, 1, 1)
+    try(calls, "UnitCharacterPoints(player)", _G.UnitCharacterPoints, "player")
+
+    local addons = _G.C_AddOns
+    if addons and addons.GetNumAddOns and addons.GetAddOnInfo then
+        for i = 1, addons.GetNumAddOns() do
+            local name = addons.GetAddOnInfo(i)
+            if type(name) == "string" and (name:find("Talent") or name:find("Spell") or name:find("Deprecated")) then
+                saved.addons[name] = addons.IsAddOnLoaded and addons.IsAddOnLoaded(name) and "loaded" or "not loaded"
+            end
+        end
+    end
+
+    ns.db.probe = saved
+end
+
 local function probe()
+    ns.Guarded(record)
+    ns.Print("Saved what this client has; /reload to write it to TalentPlannerDB.")
     ns.Print("Talent calls on this client:")
     for _, name in ipairs(PROBED) do
         ns.Print(string.format("%s: %s", name, has(type(_G[name]) == "function")))

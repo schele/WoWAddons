@@ -174,6 +174,29 @@ describe("/tp probe", function()
         assertMatch("LearnTalent: no", helpers.printed(env))
     end)
 
+    it("saves what the client has, for reading outside the game", function()
+        local ns, env = helpers.loggedIn(nil, function(env)
+            env.C_SpecializationInfo = {
+                GetTalentInfo = function(query)
+                    if not query.tier then error("query.tier must be specified") end
+                    return { name = "Ferocity", tier = query.tier, column = query.column }
+                end,
+            }
+        end)
+        helpers.command(env, "probe")
+        local saved = ns.db.probe
+        assertTrue(type(saved) == "table")
+        assertEqual("function", saved.namespaces.C_SpecializationInfo.GetTalentInfo)
+        assertEqual("function", saved.globals.GetTalentInfo)
+        local byTier = saved.calls["C_SpecializationInfo.GetTalentInfo{tier=1,column=1}"]
+        assertTrue(byTier.ok)
+        assertEqual("Ferocity", byTier.returned[1].name)
+        local byTab = saved.calls["C_SpecializationInfo.GetTalentInfo{specializationIndex=1,talentIndex=1}"]
+        assertFalse(byTab.ok)
+        assertMatch("query.tier", byTab.error)
+        assertMatch("/reload", helpers.printed(env))
+    end)
+
     it("names the talent window once it is loaded", function()
         local _, env = helpers.loggedIn()
         env.__makeTalentUI(true)
