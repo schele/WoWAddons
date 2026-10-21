@@ -97,6 +97,7 @@ function Panel.Refresh()
 
     Panel.sell:SetChecked(ns.db.sell)
     Panel.repair:SetChecked(ns.db.repair)
+    Panel.undercut:SetChecked(ns.db.undercut)
 
     local items = sortedKeep()
     for index, item in ipairs(items) do
@@ -152,7 +153,8 @@ local function ensureBuilt()
     hint:SetText(
         "Open a merchant and your grey items are sold and your gear repaired, "
         .. "without a click. Nothing better than grey is ever sold, and nothing "
-        .. "on the list below."
+        .. "on the list below. At the auction house, a new auction asks one "
+        .. "copper under the cheapest listing."
     )
     Panel.hint = hint
 
@@ -164,11 +166,14 @@ local function ensureBuilt()
     Panel.repair = addCheckbox("Repair my gear at merchants that can", Panel.sell, 0, CHECK_STEP, function(value)
         ns.Vendor.SetRepair(value)
     end)
+    Panel.undercut = addCheckbox("Post auctions one copper under the cheapest", Panel.repair, 0, CHECK_STEP, function(value)
+        ns.Auction.SetUndercut(value)
+    end)
 
     -- Back by the margin, and less of a gap than under the description: the
     -- box's empty margin below makes up the rest.
     local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    heading:SetPoint("TOPLEFT", Panel.repair, "BOTTOMLEFT", 0, -12)
+    heading:SetPoint("TOPLEFT", Panel.undercut, "BOTTOMLEFT", 0, -12)
     heading:SetText("Never sold")
     Panel.heading = heading
 

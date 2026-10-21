@@ -114,11 +114,29 @@ function stub.newEnv(saved)
         RegisterAddOnCategory = function(category) env.__settingsCategory = category end,
         OpenToCategory = function(id) env.__openedCategory = id end,
     }
+    env.__loadedAddons = {}
     env.C_AddOns = {
         GetAddOnMetadata = function(_, field)
             return field == "Version" and "9.9.9" or nil
         end,
+        IsAddOnLoaded = function(name)
+            return env.__loadedAddons[name] == true
+        end,
     }
+
+    -- The real one is taint-safe; for tests it only has to run the original
+    -- and then the hook, and hand back what the original returned.
+    function env.hooksecurefunc(target, name, hook)
+        if type(target) == "string" then
+            target, name, hook = env, target, name
+        end
+        local original = target[name]
+        target[name] = function(...)
+            local results = table.pack(original(...))
+            hook(...)
+            return table.unpack(results, 1, results.n)
+        end
+    end
 
     -- The client runs a timer after the current chain of calls, not inside
     -- it: queued here with its delay, and run by __runTimers.
@@ -262,6 +280,61 @@ function stub.newEnv(saved)
     end
 
     return env
+end
+
+--- The auction house's sell frames, modeled on Blizzard_AuctionHouseUI in
+-- the Forever client: selecting a row in the sell list runs a callback that
+-- copies the row's price into the inputs. As in the client, the callback
+-- captures the handler method when the frame first shows, so a hook has to
+-- be on the frame by then to be caught up in it.
+function stub.buildAuctionHouse(env)
+    local function makePriceInput(shown)
+        local input = { amount = 0, shown = shown }
+        function input:SetAmount(value) self.amount = value end
+        function input:GetAmount() return self.amount end
+        function input:IsShown() return self.shown end
+        return input
+    end
+
+    -- Stackable goods: one price input, filled with the row's unit price.
+    local commodities = { PriceInput = makePriceInput(true) }
+    function commodities:OnAuctionSelected(result)
+        if not result then
+            return
+        end
+        self.PriceInput:SetAmount(result.unitPrice)
+    end
+    function commodities:Show()
+        local handler = self.OnAuctionSelected
+        self.selectionCallback = function(rowData) handler(self, rowData) end
+    end
+
+    -- Single items: a buyout input, and a bid input shown only outside the
+    -- default buyout-only mode.
+    local items = {
+        PriceInput = makePriceInput(true),
+        SecondaryPriceInput = makePriceInput(false),
+    }
+    function items:OnSearchResultSelected(result)
+        if not result then
+            return
+        end
+        if self.SecondaryPriceInput:IsShown() then
+            self.SecondaryPriceInput:SetAmount(result.bidAmount or 0)
+        end
+        self.PriceInput:SetAmount(result.buyoutAmount or 0)
+    end
+    function items:Show()
+        local handler = self.OnSearchResultSelected
+        self.selectionCallback = function(rowData) handler(self, rowData) end
+    end
+
+    env.AuctionHouseFrame = {
+        CommoditiesSellFrame = commodities,
+        ItemSellFrame = items,
+    }
+    env.__loadedAddons["Blizzard_AuctionHouseUI"] = true
+    return env.AuctionHouseFrame
 end
 
 --- The older client: no C_Container or C_Item, the old globals in their

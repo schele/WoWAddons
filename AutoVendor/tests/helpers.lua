@@ -7,6 +7,7 @@ M.FILES = {
     "Bags.lua",
     "Keep.lua",
     "Vendor.lua",
+    "Auction.lua",
     "Settings.lua",
 }
 
@@ -52,6 +53,22 @@ end
 
 function M.put(env, bag, slot, itemID, count, locked)
     env.__slots[bag .. ":" .. slot] = { itemID = itemID, count = count or 1, locked = locked }
+end
+
+--- Visit the auctioneer: the client loads Blizzard_AuctionHouseUI on demand,
+-- and the sell frames capture their callbacks as they first show.
+function M.openAuctionHouse(env)
+    local frame = stub.buildAuctionHouse(env)
+    M.fire(env, "ADDON_LOADED", "Blizzard_AuctionHouseUI")
+    frame.CommoditiesSellFrame:Show()
+    frame.ItemSellFrame:Show()
+    return frame
+end
+
+--- Click a row in a sell frame's list, as the game's selection callback
+-- delivers it.
+function M.selectRow(sellFrame, rowData)
+    sellFrame.selectionCallback(rowData)
 end
 
 function M.openMerchant(env)

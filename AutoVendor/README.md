@@ -7,6 +7,9 @@ click. One chat line says what happened:
 AutoVendor Sold 7 items for 1g 23s 4c. Repaired for 45s.
 ```
 
+At the auction house, the asking price for a new auction lands one copper
+under the cheapest listing instead of tying with it.
+
 ## What it sells
 
 Grey (Poor quality) items in your bags that a merchant will pay for. Never
@@ -23,15 +26,26 @@ After selling, so the junk's gold helps pay. If this merchant can repair and
 something needs it, everything is repaired from your own gold. If you cannot
 afford it, nothing is repaired and the line says what it would cost.
 
-## Turning either off
+## Undercutting at the auction house
 
-Both happen unless you say otherwise. Like the keep list, the switches are
-shared by all your characters.
+When you put an item up for auction, the game fills the price in with the
+cheapest listing already up. AutoVendor nudges that copy one copper down, so
+your auction sorts ahead of the one it was copied from. The same happens
+when you click a listing in the sell list: you go one copper under that one.
+
+A price you type yourself is never touched, and a listing already asking a
+single copper is matched rather than undercut to nothing.
+
+## Turning any of it off
+
+All of it happens unless you say otherwise. Like the keep list, the switches
+are shared by all your characters.
 
 | Command | Does |
 |---|---|
 | `/av sell` | Turn selling grey items off, or on again |
 | `/av repair` | Turn repairing off, or on again |
+| `/av undercut` | Turn undercutting at the auction house off, or on again |
 
 With repairs off, the line only says what sold.
 
@@ -50,7 +64,7 @@ An item number works in place of a Shift-clicked link: `/av keep 7073`.
 
 ## The settings page
 
-`/av settings`, or Options, AddOns, AutoVendor. It has the two switches as
+`/av settings`, or Options, AddOns, AutoVendor. It has the three switches as
 checkboxes, and the keep list with a button beside each item to sell it again.
 
 ## Worth knowing
