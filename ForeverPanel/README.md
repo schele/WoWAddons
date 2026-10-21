@@ -6,7 +6,7 @@ Out of the box:
 
 | Side | Module | Shows |
 |---|---|---|
-| Left | `money` | Gold, silver and copper with the in-game coin icons |
+| Left | `money` | Gold, silver and copper with the in-game coin icons; click to flip to the money made this session (green for a gain, red for a loss), click again for the purse. The session survives /reload and ends on a real login |
 | Left | `bags` | Bag slots used out of the total with a bag icon (`30/38`), or just the free slots with the total turned off; click to open your bags |
 | Left | `xp` | `xx.xx% XP` through the current level, click to count down to the next one instead; hidden at max level or with XP turned off |
 | Right | `clock` | Local time, click to toggle 12/24 hour |

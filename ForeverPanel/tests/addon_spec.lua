@@ -236,6 +236,121 @@ describe("money module", function()
         assertEqual("9 87 65", plain(ns.Bar:GetModule("money").text:GetText()))
     end)
 
+    -- plain() only strips textures; the session text also carries colour codes.
+    local function stripColors(text)
+        return (plain(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+    end
+
+    it("shows the money made this session on a click", function()
+        local ns, env = helpers.loadAddon()
+        env.money = 10000
+        helpers.login(ns, env)
+
+        env.money = 12345
+        helpers.fire(env, "PLAYER_MONEY")
+
+        local module = ns.Bar:GetModule("money")
+        module.frame.scripts.OnClick(module.frame, "LeftButton")
+
+        assertEqual("Session: 0 23 45", stripColors(module.text:GetText()))
+        assertMatch("|cff40ff40", module.text:GetText())
+    end)
+
+    it("keeps the session figure moving while it is shown", function()
+        local ns, env = helpers.loadAddon()
+        env.money = 10000
+        helpers.login(ns, env)
+
+        local module = ns.Bar:GetModule("money")
+        module.frame.scripts.OnClick(module.frame, "LeftButton")
+
+        env.money = 30000
+        helpers.fire(env, "PLAYER_MONEY")
+
+        assertEqual("Session: 2 0 0", stripColors(module.text:GetText()))
+    end)
+
+    it("shows money spent as a loss", function()
+        local ns, env = helpers.loadAddon()
+        env.money = 10000
+        helpers.login(ns, env)
+
+        env.money = 9000
+        helpers.fire(env, "PLAYER_MONEY")
+
+        local module = ns.Bar:GetModule("money")
+        module.frame.scripts.OnClick(module.frame, "LeftButton")
+
+        -- Only the colour tells a loss from a gain now, so check it too.
+        assertEqual("Session: 0 10 0", stripColors(module.text:GetText()))
+        assertMatch("|cffff4040", module.text:GetText())
+    end)
+
+    it("clicks back to the current money", function()
+        local ns, env = helpers.loadAddon()
+        env.money = 1234567
+        helpers.login(ns, env)
+
+        local module = ns.Bar:GetModule("money")
+        module.frame.scripts.OnClick(module.frame, "LeftButton")
+        module.frame.scripts.OnClick(module.frame, "LeftButton")
+
+        assertEqual("123 45 67", plain(module.text:GetText()))
+    end)
+
+    it("keeps the session across a /reload", function()
+        local ns, env = helpers.loadAddon()
+        env.money = 10000
+        helpers.login(ns, env)
+        helpers.fire(env, "PLAYER_ENTERING_WORLD", true, false)
+
+        env.money = 12345
+        helpers.fire(env, "PLAYER_MONEY")
+
+        -- A /reload reruns the addon files against the same saved variables.
+        local ns2, env2 = helpers.loadAddon()
+        env2.ForeverPanelDB = env.ForeverPanelDB
+        env2.money = 12345
+        helpers.login(ns2, env2)
+        helpers.fire(env2, "PLAYER_ENTERING_WORLD", false, true)
+
+        local module = ns2.Bar:GetModule("money")
+        module.frame.scripts.OnClick(module.frame, "LeftButton")
+
+        assertEqual("Session: 0 23 45", stripColors(module.text:GetText()))
+    end)
+
+    it("starts a new session on a real login", function()
+        local ns, env = helpers.loadAddon()
+        env.money = 10000
+        helpers.login(ns, env)
+        helpers.fire(env, "PLAYER_ENTERING_WORLD", true, false)
+
+        env.money = 12345
+        helpers.fire(env, "PLAYER_MONEY")
+
+        local ns2, env2 = helpers.loadAddon()
+        env2.ForeverPanelDB = env.ForeverPanelDB
+        env2.money = 12345
+        helpers.login(ns2, env2)
+        helpers.fire(env2, "PLAYER_ENTERING_WORLD", true, false)
+
+        local module = ns2.Bar:GetModule("money")
+        module.frame.scripts.OnClick(module.frame, "LeftButton")
+
+        assertEqual("Session: 0 0 0", stripColors(module.text:GetText()))
+    end)
+
+    it("leaves the session view alone on a right-click", function()
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+
+        local module = ns.Bar:GetModule("money")
+        module.frame.scripts.OnClick(module.frame, "RightButton")
+
+        assertEqual("0 0 0", plain(module.text:GetText()))
+    end)
+
     it("sits on the left of the bar", function()
         local ns, env = helpers.loadAddon()
         helpers.login(ns, env)

@@ -36,6 +36,56 @@ end
 
 ns.FormatMoney = formatMoney
 
+local GAIN_COLOR = "|cff40ff40"
+local LOSS_COLOR = "|cffff4040"
+local FLAT_COLOR = "|cffffffff"
+
+--- Build the "money made this session" string: the change since login. No
+-- sign characters; the colour alone carries the direction — green digits for
+-- a gain, red for a loss, white for a flat session. Pure, so it is unit
+-- tested directly.
+local function formatSessionMoney(delta, iconSize)
+    delta = math.floor(tonumber(delta) or 0)
+    local amount = formatMoney(math.abs(delta), iconSize)
+
+    local color = FLAT_COLOR
+    if delta > 0 then
+        color = GAIN_COLOR
+    elseif delta < 0 then
+        color = LOSS_COLOR
+    end
+    return "Session: " .. color .. amount .. "|r"
+end
+
+ns.FormatSessionMoney = formatSessionMoney
+
+ns.AddDefaults({
+    money = {
+        -- Copper at the start of the session; false until one has begun.
+        -- Saved so a /reload carries the session on; a real login starts over.
+        sessionStart = false,
+    },
+})
+
+-- The bar's event plumbing drops event arguments, and this is the one place
+-- they matter: PLAYER_ENTERING_WORLD says whether the world appeared through
+-- a real login (new session) or a /reload or zoning (same session carries on).
+local watcher = CreateFrame("Frame")
+watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+watcher:SetScript("OnEvent", function(_, _, isInitialLogin)
+    if not ns.db then
+        return
+    end
+
+    if isInitialLogin then
+        ns.db.money.sessionStart = GetMoney()
+        local module = ns.Bar:GetModule("money")
+        if module then
+            module:Refresh()
+        end
+    end
+end)
+
 ns.Bar:RegisterModule({
     name = "money",
     side = "LEFT",
@@ -48,8 +98,30 @@ ns.Bar:RegisterModule({
     end,
 
     OnUpdate = function(module)
+        local money = GetMoney()
+        local config = ns.db.money
+
+        -- No session on record yet (first run ever, or the addon arrived
+        -- mid-session through a /reload): the purse as it stands starts one.
+        if config.sessionStart == false then
+            config.sessionStart = money
+        end
+
         local _, fontSize = module.text:GetFont()
-        module.text:SetText(formatMoney(GetMoney(), fontSize))
+        if module.showSession then
+            module.text:SetText(formatSessionMoney(money - config.sessionStart, fontSize))
+        else
+            module.text:SetText(formatMoney(money, fontSize))
+        end
         module:SetWidth(module.text:GetStringWidth())
+    end,
+
+    -- Click to flip between what you are carrying and what this session has
+    -- made; not saved, so a fresh login always starts on the purse.
+    OnClick = function(module, button)
+        if button == "LeftButton" then
+            module.showSession = not module.showSession
+            module:Refresh()
+        end
     end,
 })

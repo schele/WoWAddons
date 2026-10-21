@@ -36,6 +36,42 @@ describe("FormatMoney", function()
     end)
 end)
 
+describe("FormatSessionMoney", function()
+    -- plain() only strips textures; the amount hides between colour codes,
+    -- so strip those too before comparing.
+    local function stripColors(text)
+        return (plain(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+    end
+
+    it("shows a gain in green, with no sign", function()
+        local text = ns.FormatSessionMoney(1234567, 12)
+        assertEqual("Session: 123 45 67", stripColors(text))
+        assertMatch("|cff40ff40", text)
+    end)
+
+    it("shows a loss in red, with no sign", function()
+        local text = ns.FormatSessionMoney(-190, 12)
+        assertEqual("Session: 0 1 90", stripColors(text))
+        assertMatch("|cffff4040", text)
+    end)
+
+    it("shows a flat session in white", function()
+        local text = ns.FormatSessionMoney(0, 12)
+        assertEqual("Session: 0 0 0", stripColors(text))
+        assertMatch("|cffffffff", text)
+    end)
+
+    it("includes the coin icons at the requested size", function()
+        local text = ns.FormatSessionMoney(1, 14)
+        assertMatch("UI%-GoldIcon:14:14", text)
+        assertMatch("UI%-CopperIcon:14:14", text)
+    end)
+
+    it("treats a missing delta as zero", function()
+        assertEqual("Session: 0 0 0", stripColors(ns.FormatSessionMoney(nil, 12)))
+    end)
+end)
+
 describe("FormatClock", function()
     it("pads to two digits in 24 hour mode", function()
         assertEqual("09:05", ns.FormatClock(9, 5, true))
