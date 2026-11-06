@@ -11,6 +11,10 @@
                       "version":  "0.1.0",
                       "commit":  "ac45f7bfa723295114cafb5c58d349383ac22a38"
                   },
+    "ForeverPanel":  {
+                         "version":  "0.5.0",
+                         "commit":  "dc89efeba3adfda2fc2d24cf3fe02acf362be62d"
+                     },
     "MailHandler":  {
                         "version":  "0.1.0",
                         "commit":  "f3a0d0ebc3143971968e40a7611ed043cca61984"
