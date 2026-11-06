@@ -1,4 +1,8 @@
 {
+    "AutoVendor":  {
+                       "version":  "0.2.0",
+                       "commit":  "12b938799f179855df2749e8caa2e9dcba8432de"
+                   },
     "RankUp":  {
                    "version":  "0.1.0",
                    "commit":  "91906d97322435124eab0860419eb14e577610e5"

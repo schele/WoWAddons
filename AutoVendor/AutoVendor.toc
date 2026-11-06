@@ -4,6 +4,7 @@
 ## IconTexture: Interface\AddOns\AutoVendor\icon
 ## Author: Skyler
 ## Version: 0.2.0
+## X-Wago-ID: QN5JL76B
 ## SavedVariables: AutoVendorDB
 
 AutoVendor.lua
