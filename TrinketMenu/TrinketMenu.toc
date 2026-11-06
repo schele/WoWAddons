@@ -2,7 +2,7 @@
 ## Title: TrinketMenu
 ## Notes: Every trinket you are carrying, on a bar. Left-click to equip in slot 1, right-click for slot 2.
 ## IconTexture: Interface\AddOns\TrinketMenu\icon
-## Author: You
+## Author: Skyler
 ## Version: 0.1.0
 ## SavedVariables: TrinketMenuDB
 

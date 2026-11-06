@@ -2,7 +2,7 @@
 ## Title: GatherMap
 ## Notes: Pins for the veins you have mined and the herbs you have picked.
 ## IconTexture: Interface\AddOns\GatherMap\icon
-## Author: You
+## Author: Skyler
 ## Version: 0.1.0
 ## SavedVariables: GatherMapDB, GatherMapSettings
 

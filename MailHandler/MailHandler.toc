@@ -2,7 +2,7 @@
 ## Title: MailHandler
 ## Notes: Tick the mails you want and open only those.
 ## IconTexture: Interface\AddOns\MailHandler\icon
-## Author: You
+## Author: Skyler
 ## Version: 0.1.0
 
 MailHandler.lua

@@ -2,7 +2,7 @@
 ## Title: BankBags
 ## Notes: Your bank, and every character's, from anywhere.
 ## IconTexture: Interface\AddOns\BankBags\icon
-## Author: You
+## Author: Skyler
 ## Version: 0.1.0
 ## SavedVariables: BankBagsDB
 

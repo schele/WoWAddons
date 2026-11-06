@@ -2,7 +2,7 @@
 ## Title: ClickHeal
 ## Notes: A row of spell buttons beside every party member.
 ## IconTexture: Interface\AddOns\ClickHeal\icon
-## Author: You
+## Author: Skyler
 ## Version: 0.1.0
 ## SavedVariables: ClickHealDB
 

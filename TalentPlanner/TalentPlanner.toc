@@ -2,7 +2,7 @@
 ## Title: TalentPlanner
 ## Notes: Plan the order your talent points go in, and see the plan in the talent window.
 ## IconTexture: Interface\AddOns\TalentPlanner\icon
-## Author: You
+## Author: Skyler
 ## Version: 0.1.0
 ## SavedVariables: TalentPlannerDB
 

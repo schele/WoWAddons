@@ -2,7 +2,7 @@
 ## Title: RareMob
 ## Notes: Pins rare mobs on the maps, sounds when one is near, and lists the zone's rares.
 ## IconTexture: Interface\AddOns\RareMob\icon
-## Author: You
+## Author: Skyler
 ## Version: 0.1.0
 ## SavedVariables: RareMobDB
 

@@ -11,17 +11,165 @@
     Interface/AddOns.
 
     -Install copies into a WoW client; -WowPath picks which one.
+
+    -Install also publishes to Wago Addons, once per version: when the .toc's
+    '## Version:' has not been uploaded yet, the zip goes up as a new version.
+    Reinstalling the same version only installs. Needs:
+
+        ## X-Wago-ID: <project id>      in the addon's .toc
+        WAGO_API_TOKEN                   environment variable, from
+                                         addons.wago.io/account/apikeys
+
+    What went up is recorded in wago-uploads.json. -NoWago skips publishing,
+    -Stability beta|alpha marks the upload as a pre-release, and -WagoDryRun
+    prints what would be sent instead of sending it.
 #>
 [CmdletBinding()]
 param(
     [string[]]$Addon,
     [switch]$Install,
-    [string]$WowPath = "C:\Program Files (x86)\World of Warcraft\_classic_beta_"
+    [string]$WowPath = "C:\Program Files (x86)\World of Warcraft\_forever_",
+    [switch]$NoWago,
+    [ValidateSet("stable", "beta", "alpha")]
+    [string]$Stability = "stable",
+    [switch]$WagoDryRun
 )
 
 $ErrorActionPreference = "Stop"
 
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+
 Set-Location $PSScriptRoot
+
+$wagoRecordPath = Join-Path $PSScriptRoot "wago-uploads.json"
+$script:wagoPatches = $null
+
+function Get-TocField([string[]]$tocLines, [string]$field) {
+    $tocLines | Where-Object { $_ -match "^##\s*$([regex]::Escape($field)):\s*(.+)$" } |
+        ForEach-Object { $Matches[1].Trim() } | Select-Object -First 1
+}
+
+function Get-WagoRecord {
+    $record = @{}
+    if (Test-Path $wagoRecordPath) {
+        $json = Get-Content $wagoRecordPath -Raw | ConvertFrom-Json
+        foreach ($property in $json.PSObject.Properties) {
+            $record[$property.Name] = @{ version = $property.Value.version; commit = $property.Value.commit }
+        }
+    }
+    return $record
+}
+
+function Save-WagoRecord([hashtable]$record) {
+    $ordered = [ordered]@{}
+    foreach ($key in ($record.Keys | Sort-Object)) {
+        $ordered[$key] = [ordered]@{ version = $record[$key].version; commit = $record[$key].commit }
+    }
+    $json = $ordered | ConvertTo-Json -Depth 3
+    [System.IO.File]::WriteAllText($wagoRecordPath, "$json`n", (New-Object System.Text.UTF8Encoding $false))
+}
+
+# "11509, 16001" -> supported_classic_patches 1.15.9, supported_forever_patches
+# 1.60.1. Wago names the flavour, so the flavour is whichever of its lists
+# holds the patch, and an interface it does not know stops the upload.
+function Get-WagoSupport([string]$interfaceLine) {
+    if (-not $script:wagoPatches) {
+        $script:wagoPatches = (Invoke-RestMethod "https://addons.wago.io/api/data/game").patches
+    }
+
+    $support = [ordered]@{}
+    foreach ($interface in ($interfaceLine -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
+        $n = [int]$interface
+        $patch = "{0}.{1}.{2}" -f [int][math]::Floor($n / 10000), ([int][math]::Floor($n / 100) % 100), ($n % 100)
+        $flavours = @($script:wagoPatches.PSObject.Properties |
+            Where-Object { @($_.Value) -contains $patch } | ForEach-Object { $_.Name })
+        if (-not $flavours) {
+            throw "Wago has no game version $patch (from '## Interface: $interface')."
+        }
+        foreach ($flavour in $flavours) {
+            $key = "supported_${flavour}_patches"
+            if (-not $support.Contains($key)) {
+                $support[$key] = @()
+            }
+            $support[$key] += $patch
+        }
+    }
+    return $support
+}
+
+function Publish-Wago($name, $version, $zip, [string[]]$tocLines, $folder) {
+    $wagoId = Get-TocField $tocLines "X-Wago-ID"
+    if (-not $wagoId) {
+        Write-Host "Wago: skipped, $name.toc has no '## X-Wago-ID:' line."
+        return
+    }
+
+    $record = Get-WagoRecord
+    $last = $record[$name]
+    if ($last -and $last.version -eq $version) {
+        Write-Host "Wago: already has $name $version. Raise '## Version:' to publish a new one."
+        return
+    }
+
+    # The commits that touched this addon since the last upload, newest first.
+    $changelog = $null
+    if ($last -and $last.commit) {
+        $changelog = (git log --format="- %s" "$($last.commit)..HEAD" -- $folder.Name 2>$null) -join "`n"
+    }
+    if (-not $changelog) {
+        $changelog = if ($last) { "- Version $version" } else { "- First release on Wago." }
+    }
+
+    $metadata = [ordered]@{ label = $version; stability = $Stability; changelog = $changelog }
+    $support = Get-WagoSupport (Get-TocField $tocLines "Interface")
+    foreach ($key in $support.Keys) {
+        $metadata[$key] = @($support[$key])
+    }
+    $json = $metadata | ConvertTo-Json -Depth 3
+
+    if ($WagoDryRun) {
+        Write-Host "Wago (dry run): would POST $zip to project $wagoId with:"
+        Write-Host $json
+        return
+    }
+
+    # The user-level variable too, so a terminal opened before it was set
+    # still finds it.
+    $token = $env:WAGO_API_TOKEN
+    if (-not $token) {
+        $token = [Environment]::GetEnvironmentVariable("WAGO_API_TOKEN", "User")
+    }
+    if (-not $token) {
+        Write-Warning "Wago: skipped, WAGO_API_TOKEN is not set. Make a key at addons.wago.io/account/apikeys."
+        return
+    }
+
+    $metaFile = [System.IO.Path]::GetTempFileName()
+    $responseFile = [System.IO.Path]::GetTempFileName()
+    try {
+        [System.IO.File]::WriteAllText($metaFile, $json, (New-Object System.Text.UTF8Encoding $false))
+        $code = & curl.exe -sS -o $responseFile -w "%{http_code}" `
+            -H "authorization: Bearer $token" -H "accept: application/json" `
+            -F "metadata=<$metaFile" -F "file=@$zip" `
+            "https://addons.wago.io/api/projects/$wagoId/version"
+
+        if ($code -eq "200" -or $code -eq "201") {
+            $record[$name] = @{ version = $version; commit = (git rev-parse HEAD).Trim() }
+            Save-WagoRecord $record
+            Write-Host "Wago: published $name $version ($Stability)."
+        }
+        elseif ($code -eq "404") {
+            Write-Warning "Wago: no project with id '$wagoId' (from $name.toc)."
+        }
+        else {
+            $body = Get-Content $responseFile -Raw -ErrorAction SilentlyContinue
+            Write-Warning "Wago: upload of $name $version failed (HTTP $code). $body"
+        }
+    }
+    finally {
+        Remove-Item $metaFile, $responseFile -Force -ErrorAction SilentlyContinue
+    }
+}
 
 $folders = Get-ChildItem -Directory | Where-Object {
     Test-Path (Join-Path $_.FullName "$($_.Name).toc")
@@ -104,7 +252,26 @@ foreach ($folder in $folders) {
             Remove-Item $zip -Force
         }
 
-        Compress-Archive -Path $addonRoot -DestinationPath $zip
+        # The repo's licence travels with every copy, as the MIT terms ask.
+        $license = Join-Path $PSScriptRoot "LICENSE"
+        if (Test-Path $license) {
+            Copy-Item $license (Join-Path $addonRoot "LICENSE")
+        }
+
+        # Not Compress-Archive: on Windows PowerShell 5.1 it writes entry names
+        # with backslashes, which addon sites and non-Windows unzippers read as
+        # one flat file named "Addon\file.lua". Zip entries must use "/".
+        $archive = [System.IO.Compression.ZipFile]::Open($zip, [System.IO.Compression.ZipArchiveMode]::Create)
+        try {
+            Get-ChildItem -Path $addonRoot -File -Recurse | ForEach-Object {
+                $entry = "$name/" + ($_.FullName.Substring($addonRoot.Length + 1) -replace "\\", "/")
+                [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                    $archive, $_.FullName, $entry, [System.IO.Compression.CompressionLevel]::Optimal)
+            }
+        }
+        finally {
+            $archive.Dispose()
+        }
         Write-Host "Packaged $($files.Count) files -> $zip"
 
         if ($Install) {
@@ -120,6 +287,17 @@ foreach ($folder in $folders) {
 
             Copy-Item $addonRoot $addons -Recurse
             Write-Host "Installed -> $installed"
+
+            # A failed upload is reported but leaves the install, and the
+            # other addons in this run, alone.
+            if (-not $NoWago) {
+                try {
+                    Publish-Wago $name $version $zip $tocLines $folder
+                }
+                catch {
+                    Write-Warning "Wago: $name not published. $_"
+                }
+            }
         }
     }
     finally {

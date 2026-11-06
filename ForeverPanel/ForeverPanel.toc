@@ -2,7 +2,7 @@
 ## Title: ForeverPanel
 ## Notes: A full-width top info bar with XP, clock and money modules.
 ## IconTexture: Interface\AddOns\ForeverPanel\icon
-## Author: You
+## Author: Skyler
 ## Version: 0.5.0
 ## SavedVariables: ForeverPanelDB, ForeverDB
 
