@@ -4,6 +4,7 @@
 ## IconTexture: Interface\AddOns\MailHandler\icon
 ## Author: Skyler
 ## Version: 0.1.0
+## X-Wago-ID: aNerYg62
 
 MailHandler.lua
 Inbox.lua
