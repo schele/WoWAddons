@@ -11,6 +11,10 @@
                       "version":  "0.1.0",
                       "commit":  "ac45f7bfa723295114cafb5c58d349383ac22a38"
                   },
+    "MailHandler":  {
+                        "version":  "0.1.0",
+                        "commit":  "f3a0d0ebc3143971968e40a7611ed043cca61984"
+                    },
     "RankUp":  {
                    "version":  "0.1.0",
                    "commit":  "91906d97322435124eab0860419eb14e577610e5"
