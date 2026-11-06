@@ -4,6 +4,7 @@
 ## IconTexture: Interface\AddOns\BankBags\icon
 ## Author: Skyler
 ## Version: 0.1.0
+## X-Wago-ID: aN0a5A6j
 ## SavedVariables: BankBagsDB
 
 BankBags.lua
