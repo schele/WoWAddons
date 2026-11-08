@@ -7,12 +7,16 @@ M.worn = stub.worn
 M.inBag = stub.inBag
 M.inBank = stub.inBank
 
-M.FILES = { "WardrobeForever.lua" }
+M.FILES = { "WardrobeForever.lua", "Settings.lua" }
 
 --- Load the addon into a stubbed client the way WoW would: in .toc order,
--- each chunk receiving (addonName, privateTable).
-function M.load()
+-- each chunk receiving (addonName, privateTable). `prepare`, if given, sees
+-- the client before any file loads.
+function M.load(prepare)
     local env = stub.newEnv()
+    if prepare then
+        prepare(env)
+    end
     local ns = {}
 
     for _, path in ipairs(M.FILES) do
@@ -67,6 +71,23 @@ function M.tick(env, seconds)
         end
         elapsed = elapsed + step
     end
+end
+
+--- Fire an event on every frame registered for it.
+function M.fire(env, event, ...)
+    local frames = {}
+    for index, frame in ipairs(env.__frames) do
+        frames[index] = frame
+    end
+    for _, frame in ipairs(frames) do
+        if frame.registeredEvents[event] then
+            frame:Fire("OnEvent", event, ...)
+        end
+    end
+end
+
+function M.login(env)
+    M.fire(env, "PLAYER_LOGIN")
 end
 
 function M.flyoutOpenFor(env, slot)

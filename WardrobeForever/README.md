@@ -33,6 +33,9 @@ What is in the list is what Blizzard puts in it: what is in your bags, plus
 "put in bags" for the item you are wearing. In combat, Blizzard only lets
 you change weapons, and it shows an error if you try anything else.
 
+It has a page in the game's options (Options, AddOns, WardrobeForever) that
+says what it does. There is nothing to set.
+
 ## How it works
 
 Blizzard keeps the list open without Alt in one case: when the slot's arrow

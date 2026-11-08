@@ -463,6 +463,7 @@ const ICONS = {
   },
   WardrobeForever: {
     'icon.tga': tex(rose, tunic, tunicDetails, tunicShine),
+    'logo.tga': tex(rose, tunic, tunicDetails, tunicShine, { tile: false, zoom: 1.2 }),
   },
   ClickHeal: {
     'icon.tga': tex(mint, cross, null, crossShine),

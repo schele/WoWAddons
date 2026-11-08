@@ -62,7 +62,20 @@ function stub.newEnv()
             scripts = {},
             hooks = {},
             registeredEvents = {},
+            points = {},
         }
+
+        -- What a settings page does to its widgets, recorded for the tests.
+        function frame:SetPoint(...) table.insert(self.points, { ... }) end
+        function frame:SetSize(width, height) self.width, self.height = width, height end
+        function frame:SetWidth(width) self.width = width end
+        function frame:SetJustifyH(value) self.justifyH = value end
+        function frame:SetText(text) self.text = text end
+        function frame:GetText() return self.text end
+        function frame:SetTexture(texture) self.texture = texture end
+        function frame:GetTexture() return self.texture end
+        function frame:CreateFontString() return makeFrame(nil, self) end
+        function frame:CreateTexture() return makeFrame(nil, self) end
 
         function frame:Show()
             if not self.shown then
@@ -111,6 +124,21 @@ function stub.newEnv()
         if name then env[name] = frame end
         return frame
     end
+
+    env.UIParent = makeFrame("UIParent")
+
+    -- The game's options window, and the addon's own .toc.
+    env.Settings = {
+        RegisterCanvasLayoutCategory = function(frame, name)
+            return { name = name, frame = frame }
+        end,
+        RegisterAddOnCategory = function(category) env.__settingsCategory = category end,
+    }
+    env.C_AddOns = {
+        GetAddOnMetadata = function(_, field)
+            return field == "Version" and "9.9.9" or nil
+        end,
+    }
 
     env.IsModifiedClick = function(action)
         return action == "SHOWITEMFLYOUT" and env.__altDown
