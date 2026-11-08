@@ -22,6 +22,10 @@ hold too few for an item objective, BankBags adds how many are in the bank:
 0/3 Boar Intestines (12 in bank)
 ```
 
+The quest log beside the world map gets the same note on its objective
+lines. It only lists objectives you haven't finished, so a ticked one that
+your bags fall short of shows in red on the tracker alone.
+
 - It counts this character's saved bank, so it knows nothing until you have
   opened the bank once with BankBags installed.
 - **Your other characters' banks** on the same realm, the ones you can mail
@@ -72,7 +76,7 @@ begin with:
 
 | Setting | Does |
 |---|---|
-| Show quest items in the bank on the quest tracker | The tracker notes |
+| Show quest items in the bank on the quest tracker and map | The notes on the tracker and in the map's quest log |
 | Count my other characters' banks on this realm | Adds alts to the notes |
 | Mark ticked objectives I can't hand in yet in red | The red notes, and `(7 carried)` |
 | At the bank, list the quest items to take out | The list in chat at a banker |

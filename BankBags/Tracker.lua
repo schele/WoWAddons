@@ -1,7 +1,8 @@
 local addonName, ns = ...
 
 -- Quest items in the bank, on the objective tracker, and listed in chat at a
--- banker. Forever's objective
+-- banker. The map's quest log gets the same notes, from QuestMap.lua, which
+-- writes them with Tracker.Write. Forever's objective
 -- count is no guide to the bank: it can show "14/14 Golem Isospring" with 7
 -- of them banked, or "0/3 Boar Intestines" with 12 banked. Whenever the bags
 -- hold too few for an item objective, its line gets the bank's share, from
@@ -134,6 +135,29 @@ local function heightOf(fontString, text)
     return fontString:GetHeight()
 end
 
+--- Write an objective's text on a FontString, plus its note when the note
+-- fits without making the text take more lines than it does alone.
+-- `measure(fontString, text)` sets the text and says how tall it is, as
+-- the place it is shown measures it. Returns the text left on it.
+function Tracker.Write(fontString, base, objective, banks, measure)
+    local height = measure(fontString, base)
+    if not (ns.db and ns.db.questNotes) then
+        return base
+    end
+    local parts, colour = Tracker.Note(objective, banks)
+    if not parts then
+        return base
+    end
+    for _, note in ipairs(wordings(parts)) do
+        local text = base .. " " .. colour .. note .. "|r"
+        if measure(fontString, text) <= height + 0.5 then
+            return text
+        end
+    end
+    measure(fontString, base)
+    return base
+end
+
 -- The text Blizzard gave the line, plus the note when it fits.
 local function render(line, questID, index, banks)
     local logIndex = C_QuestLog.GetLogIndexForQuestID(questID)
@@ -145,22 +169,7 @@ local function render(line, questID, index, banks)
     if not (base and objective) then
         return
     end
-
-    local fontString = line.Text
-    local height = heightOf(fontString, base)
-    if not (ns.db and ns.db.questNotes) then
-        return
-    end
-    local parts, colour = Tracker.Note(objective, banks)
-    if not parts then
-        return
-    end
-    for _, note in ipairs(wordings(parts)) do
-        if heightOf(fontString, base .. " " .. colour .. note .. "|r") <= height + 0.5 then
-            return
-        end
-    end
-    heightOf(fontString, base)
+    Tracker.Write(line.Text, base, objective, banks, heightOf)
 end
 
 -- Every line written on, for redrawing when the bank or bags change:
@@ -183,21 +192,24 @@ local function afterObjectives(_, block)
     end
 end
 
---- Redraw the notes: the bank was saved or forgotten, the bags changed, or
--- the setting was flipped. The tracker's count may not have changed, so it
--- will not redraw by itself. Only lines that still show the objective they
--- showed when last written on are touched.
+--- Redraw the notes, on the tracker and in the map's quest log: the bank
+-- was saved or forgotten, the bags changed, or a setting was flipped. The
+-- objective's count may not have changed, so neither redraws by itself.
+-- Only lines that still show the objective they showed when last written
+-- on are touched.
 function Tracker.Redraw()
-    if not next(written) then
-        return
-    end
-    local banks = Tracker.Banks()
-    for line, at in pairs(written) do
-        if at.block.id == at.questID and at.block:GetExistingLine(at.index) == line then
-            pcall(render, line, at.questID, at.index, banks)
-        else
-            written[line] = nil
+    if next(written) then
+        local banks = Tracker.Banks()
+        for line, at in pairs(written) do
+            if at.block.id == at.questID and at.block:GetExistingLine(at.index) == line then
+                pcall(render, line, at.questID, at.index, banks)
+            else
+                written[line] = nil
+            end
         end
+    end
+    if ns.QuestMap then
+        ns.QuestMap.Redraw()
     end
 end
 

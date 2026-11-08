@@ -126,19 +126,23 @@ function M.install(env)
         end
     end
 
-    -- A FontString that wraps at __lineWidth characters, so its height says
-    -- how many lines its text takes, the way GetHeight does in the client.
-    local function makeFontString()
+    -- A FontString that wraps at so many characters (__lineWidth unless told
+    -- which), so its height says how many lines its text takes, the way
+    -- GetHeight and GetStringHeight do in the client.
+    local function makeFontString(widthKey)
         local fs = { text = "", explicitHeight = nil }
         function fs:SetText(text) self.text = text or "" end
         function fs:GetText() return self.text end
         function fs:SetHeight(height) self.explicitHeight = height end
+        function fs:GetStringHeight()
+            local length = #visible(self.text)
+            return LINE_HEIGHT * math.max(1, math.ceil(length / env[widthKey or "__lineWidth"]))
+        end
         function fs:GetHeight()
             if self.explicitHeight and self.explicitHeight > 0 then
                 return self.explicitHeight
             end
-            local length = #visible(self.text)
-            return LINE_HEIGHT * math.max(1, math.ceil(length / env.__lineWidth))
+            return self:GetStringHeight()
         end
         return fs
     end
@@ -213,6 +217,89 @@ function M.install(env)
 
     makeModule("QuestObjectiveTracker")
     makeModule("CampaignQuestObjectiveTracker")
+
+    M.installQuestMap(env, makeFontString)
+end
+
+-- The world map's quest log, from Blizzard_UIPanels_Game/Mainline/
+-- QuestMapFrame.lua in the same source: QuestLogQuests_Update hands every
+-- objective line back to one pool, then draws the log again. A quest that
+-- is not complete gets a line for each objective not yet finished, with the
+-- line's questID set, its Text from GetQuestLogLeaderBoard, and its height
+-- taken from the text's. The pool hands its lines out in no set order, so
+-- this one lists them backwards: a line's place says nothing about which
+-- objective it shows.
+function M.installQuestMap(env, makeFontString)
+    -- How many characters fit on one line of the log before it wraps.
+    env.__mapLineWidth = 40
+    -- Quests the log leaves out, as a search box would: [questID] = true.
+    env.__mapHidden = {}
+
+    local pool = { active = {}, free = {} }
+    env.__mapPool = pool
+
+    function pool:Acquire()
+        local line = table.remove(self.free)
+        if not line then
+            line = { shown = false, Text = makeFontString("__mapLineWidth") }
+            function line:Show() self.shown = true end
+            function line:Hide() self.shown = false end
+            function line:IsShown() return self.shown end
+            function line:SetHeight(height) self.height = height end
+        end
+        table.insert(self.active, line)
+        return line
+    end
+
+    -- Blizzard's frame pool hides a line as it takes it back.
+    function pool:ReleaseAll()
+        for _, line in ipairs(self.active) do
+            line:Hide()
+            table.insert(self.free, line)
+        end
+        self.active = {}
+    end
+
+    function pool:EnumerateActive()
+        local index = #self.active + 1
+        return function()
+            index = index - 1
+            local line = self.active[index]
+            if line then
+                return line, true
+            end
+        end
+    end
+
+    env.QuestScrollFrame = { objectiveFramePool = pool }
+
+    env.QuestLogQuests_Update = function()
+        pool:ReleaseAll()
+        local last = env.C_QuestLog.GetNumQuestLogEntries()
+        for logIndex = 1, last do
+            local info = env.C_QuestLog.GetInfo(logIndex)
+            if not info.isHeader and not env.__mapHidden[info.questID] then
+                local lines, finishedAll = {}, true
+                for index = 1, env.GetNumQuestLeaderBoards(logIndex) do
+                    local text, _, finished = env.GetQuestLogLeaderBoard(index, logIndex)
+                    if text and not finished then
+                        table.insert(lines, text)
+                        finishedAll = false
+                    end
+                end
+                -- A complete quest shows its turn-in text instead.
+                if not finishedAll then
+                    for _, text in ipairs(lines) do
+                        local line = pool:Acquire()
+                        line.questID = info.questID
+                        line:Show()
+                        line.Text:SetText(text)
+                        line:SetHeight(line.Text:GetStringHeight())
+                    end
+                end
+            end
+        end
+    end
 end
 
 return M

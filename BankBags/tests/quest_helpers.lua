@@ -97,6 +97,42 @@ function Q.plainLineText(env, questID, index, moduleName)
     return text and (text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
 end
 
+local function plain(text)
+    return text and (text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+end
+
+--- Open the map, or let something redraw its quest log: Blizzard draws the
+-- whole log again.
+function Q.drawMap(env)
+    env.QuestLogQuests_Update()
+end
+
+--- The line the map's quest log shows for a quest's objective, found by
+-- the start of its text: lines come from a shared pool in no set order.
+-- Lines the log has put away count, when `putAway` says so.
+function Q.mapLine(env, questID, startsWith, putAway)
+    local lines = {}
+    for _, line in ipairs(env.__mapPool.active) do
+        table.insert(lines, line)
+    end
+    if putAway then
+        for _, line in ipairs(env.__mapPool.free) do
+            table.insert(lines, line)
+        end
+    end
+    for _, line in ipairs(lines) do
+        if line.questID == questID and line.Text:GetText():sub(1, #startsWith) == startsWith then
+            return line
+        end
+    end
+end
+
+--- That line's text without colour codes, as the player reads it.
+function Q.mapText(env, questID, startsWith)
+    local line = Q.mapLine(env, questID, startsWith)
+    return line and plain(line.Text:GetText())
+end
+
 --- The colour code the note on a line is written in, if it has one.
 function Q.noteColour(env, questID, index)
     local text = Q.lineText(env, questID, index)

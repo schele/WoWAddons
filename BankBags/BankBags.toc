@@ -3,13 +3,14 @@
 ## Notes: Your bank, and every character's, from anywhere.
 ## IconTexture: Interface\AddOns\BankBags\icon
 ## Author: Skyler
-## Version: 0.2.0
+## Version: 0.3.0
 ## X-Wago-ID: aN0a5A6j
 ## SavedVariables: BankBagsDB
 
 BankBags.lua
 Bank.lua
 Tracker.lua
+QuestMap.lua
 Tooltip.lua
 Window.lua
 Minimap.lua

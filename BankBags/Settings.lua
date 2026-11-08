@@ -95,7 +95,7 @@ local HEADING_GAP = 10
 -- ns.db[key]. An indented one refines the one above it.
 local OPTION_HEIGHT = 28
 local OPTIONS = {
-    { key = "questNotes", label = "Show quest items in the bank on the quest tracker" },
+    { key = "questNotes", label = "Show quest items in the bank on the quest tracker and map" },
     { key = "questAlts", label = "Count my other characters' banks on this realm", indent = 24 },
     { key = "questWarn", label = "Mark ticked objectives I can't hand in yet in red", indent = 24 },
     { key = "bankList", label = "At the bank, list the quest items to take out" },
@@ -233,6 +233,7 @@ local function ensureBuilt()
         local label = box:CreateFontString(nil, "ARTWORK", "GameFontNormal")
         label:SetPoint("LEFT", box, "RIGHT", 4, 0)
         label:SetText(option.label)
+        box.label = label
         box:SetScript("OnClick", function(self)
             ns.SetOption(option.key, self:GetChecked())
         end)
