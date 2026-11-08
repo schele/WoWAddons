@@ -133,11 +133,11 @@ function Publish-Wago($name, $version, $zip, [string[]]$tocLines, $folder) {
         return
     }
 
-    # The user-level variable too, so a terminal opened before it was set
-    # still finds it.
-    $token = $env:WAGO_API_TOKEN
+    # The saved user-level variable first: a terminal (or VS Code) opened
+    # before a new key was saved still carries the old one in $env.
+    $token = [Environment]::GetEnvironmentVariable("WAGO_API_TOKEN", "User")
     if (-not $token) {
-        $token = [Environment]::GetEnvironmentVariable("WAGO_API_TOKEN", "User")
+        $token = $env:WAGO_API_TOKEN
     }
     if (-not $token) {
         Write-Warning "Wago: skipped, WAGO_API_TOKEN is not set. Make a key at addons.wago.io/account/apikeys."

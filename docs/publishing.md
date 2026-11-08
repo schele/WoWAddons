@@ -17,7 +17,8 @@ your Windows user, in your own PowerShell:
 ```
 
 The key never goes in the repo or in a chat. `package.ps1` reads it from
-there, even in a terminal opened before it was set.
+there, even in a terminal opened before it was set. A new key replaces the
+old one with the same command.
 
 ## Once per addon
 
