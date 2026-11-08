@@ -194,6 +194,9 @@ function Bank.Save()
     if ns.Window and ns.Window.Refresh then
         ns.Window.Refresh()
     end
+    if ns.Tracker then
+        ns.Tracker.Redraw()
+    end
     return true
 end
 
@@ -235,6 +238,42 @@ function Bank.Get(key)
     return ns.db.characters[key]
 end
 
+--- A saved bank, counted: { byName = { [name] = n }, byID = { [itemID] = n } }.
+-- Empty for a character with no bank saved.
+function Bank.Counts(key)
+    local counts = { byName = {}, byID = {} }
+    local character = ns.db and ns.db.characters[key]
+    for _, container in ipairs(character and character.containers or {}) do
+        for slot = 1, container.size or 0 do
+            local item = container.slots[slot]
+            local link = item and item.link
+            if link then
+                local name, id = link:match("%[(.-)%]"), tonumber(link:match("|Hitem:(%d+)"))
+                local n = item.count or 1
+                if name then counts.byName[name] = (counts.byName[name] or 0) + n end
+                if id then counts.byID[id] = (counts.byID[id] or 0) + n end
+            end
+        end
+    end
+    return counts
+end
+
+--- The other characters on this realm whose bank is saved, the ones mail can
+-- reach, by name: each { key, name }.
+function Bank.Others()
+    local realm = GetRealmName and GetRealmName() or ""
+    local own = Bank.CharacterKey()
+    local others = {}
+    for key, character in pairs(ns.db and ns.db.characters or {}) do
+        local theirRealm = character.realm or key:match("^(.*)%-[^%-]*$")
+        if key ~= own and theirRealm == realm then
+            table.insert(others, { key = key, name = character.name or key:match("%-([^%-]*)$") })
+        end
+    end
+    table.sort(others, function(a, b) return a.name < b.name end)
+    return others
+end
+
 --- Forget the saved characters with this name, or this "<realm>-<name>",
 -- ignoring case. Returns how many.
 function Bank.Forget(name)
@@ -255,6 +294,9 @@ function Bank.ForgetKey(key)
     if ns.Window and ns.Window.Refresh then
         ns.Window.Refresh()
     end
+    if ns.Tracker then
+        ns.Tracker.Redraw()
+    end
     if ns.SettingsPanel then
         ns.SettingsPanel.Refresh()
     end
@@ -273,6 +315,9 @@ ns.RegisterCommand("forget", "Forget a character's saved bank: /bb forget <name>
     if ns.Window and ns.Window.Refresh then
         ns.Window.Refresh()
     end
+    if ns.Tracker then
+        ns.Tracker.Redraw()
+    end
     if ns.SettingsPanel then
         ns.SettingsPanel.Refresh()
     end
@@ -286,6 +331,9 @@ local handlers = {
     BANKFRAME_OPENED = function()
         atBank = true
         Bank.Save()
+        if ns.Tracker then
+            pcall(ns.Tracker.ListForBank)
+        end
     end,
     BANKFRAME_CLOSED = function()
         -- A change just made is saved now, while the bank can still be read.

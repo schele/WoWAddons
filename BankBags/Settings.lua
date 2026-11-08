@@ -91,6 +91,17 @@ end
 local HINT_GAP = 16
 local HEADING_GAP = 10
 
+-- The on/off options under the minimap switch, each a checkbox writing
+-- ns.db[key]. An indented one refines the one above it.
+local OPTION_HEIGHT = 28
+local OPTIONS = {
+    { key = "questNotes", label = "Show quest items in the bank on the quest tracker" },
+    { key = "questAlts", label = "Count my other characters' banks on this realm", indent = 24 },
+    { key = "questWarn", label = "Mark ticked objectives I can't hand in yet in red", indent = 24 },
+    { key = "bankList", label = "At the bank, list the quest items to take out" },
+    { key = "tooltipCounts", label = "Show bank counts in item tooltips" },
+}
+
 local function row(index)
     local made = Panel.rows[index]
     if made then
@@ -151,6 +162,9 @@ function Panel.Refresh()
         return
     end
     Panel.minimap:SetChecked(not ns.db.minimap.hide)
+    for _, option in ipairs(OPTIONS) do
+        Panel[option.key]:SetChecked(ns.db[option.key])
+    end
     refreshBanks()
 end
 
@@ -212,6 +226,20 @@ local function ensureBuilt()
         ns.MinimapButton.SetHidden(not self:GetChecked())
     end)
     y = y - ROW_HEIGHT - 6
+
+    for _, option in ipairs(OPTIONS) do
+        local box = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+        box:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", option.indent or 0, y)
+        local label = box:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+        label:SetPoint("LEFT", box, "RIGHT", 4, 0)
+        label:SetText(option.label)
+        box:SetScript("OnClick", function(self)
+            ns.SetOption(option.key, self:GetChecked())
+        end)
+        Panel[option.key] = box
+        y = y - OPTION_HEIGHT
+    end
+    y = y - 6
 
     local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     heading:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", 0, y)
