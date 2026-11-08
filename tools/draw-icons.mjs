@@ -1,15 +1,23 @@
-// Draws the 64x64 icons for BossLoot, FishScale, BankBags, GatherMap, RankUp, AutoVendor, LFGBoard, MailHandler, RareMob, TalentPlanner and WardrobeForever, and their minimap icons, in the style of
-// the others: a dark rounded tile with a soft glow in the addon's colour, a
-// thin ring, and a light, glossy symbol with a darker outline and details.
-// A minimap icon is the symbol alone, filling the frame: the minimap button
-// supplies its own dark disc and gold ring. A logo is drawn the same way, for
-// an addon with a settings page but no minimap button: its heading wants the
-// symbol without the tile.
-// Usage, from the repo root: node tools/draw-icons.mjs .
+// Draws every addon's icons in one style: a dark rounded tile with a soft glow
+// in the addon's colour, a shaded ring, and a light, glossy symbol with a
+// darker outline, details and a drop shadow. A minimap icon is the symbol
+// alone, filling the frame: the minimap button supplies its own dark disc and
+// gold ring. A logo is drawn the same way, for an addon with a settings page
+// but no minimap button: its heading wants the symbol without the tile.
+//
+// Designs are shapes in a 64-unit square, so any size comes out sharp.
+//
+// Usage, from the repo root:
+//   node tools/draw-icons.mjs . [Addon ...]               the in-game .tga files
+//   node tools/draw-icons.mjs . [Addon ...] --thumbnails  512px PNGs for addon
+//                                                         sites, in docs/icons/
+// With no addon named, every addon in ICONS below. A new addon gets a theme,
+// a symbol and an ICONS entry here, never a one-off script elsewhere.
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
-const N = 64;
+const N = 64; // design units across
 const S = 4; // supersampling per axis
 
 const len = (x, y) => Math.hypot(x, y);
@@ -51,18 +59,20 @@ function tileColour(theme, x, y) {
 }
 
 // An icon: the tile, ring and symbol; or with `tile` false, the symbol alone,
-// grown by `zoom` about the middle.
-function draw(theme, symbol, details, highlight, { tile: withTile = true, zoom = 1 } = {}) {
+// grown by `zoom` about the middle. `size` is the output's pixels across.
+function draw(theme, symbol, details, highlight, { tile: withTile = true, zoom = 1, size = N } = {}) {
   const tile = roundBox(32, 32, 32, 32, 7);
-  const ring = (x, y) => Math.abs(len(x - 32, y - 32) - 27) - 1.1;
-  const out = new Uint8Array(N * N * 4);
-  for (let py = 0; py < N; py++) {
-    for (let px = 0; px < N; px++) {
+  const ringTop = mix(theme.ring, [255, 255, 255], 0.35);
+  const ringBottom = mix(theme.ring, [0, 0, 0], 0.3);
+  const unit = N / size;
+  const out = new Uint8Array(size * size * 4);
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
       let acc = [0, 0, 0, 0]; // premultiplied
       for (let sy = 0; sy < S; sy++) {
         for (let sx = 0; sx < S; sx++) {
-          const x = px + (sx + 0.5) / S;
-          const y = py + (sy + 0.5) / S;
+          const x = (px + (sx + 0.5) / S) * unit;
+          const y = (py + (sy + 0.5) / S) * unit;
           const ux = (x - 32) / zoom + 32;
           const uy = (y - 32) / zoom + 32;
           let colour = [0, 0, 0];
@@ -71,11 +81,18 @@ function draw(theme, symbol, details, highlight, { tile: withTile = true, zoom =
           if (withTile) {
             const dt = tile(x, y);
             if (dt < 0) {
-              let c = tileColour(theme, x, y);
+              let c = mix(tileColour(theme, x, y), [0, 0, 0], clamp(y / N, 0, 1) * 0.35); // darker toward the bottom
               if (dt > -1.5) c = mix(c, [0, 0, 0], 0.55); // the tile's dark edge
               over(c, 1);
             }
-            if (ring(x, y) < 0) over(theme.ring, 0.95);
+            const band = Math.abs(len(x - 32, y - 32) - 27);
+            if (band < 1.5) {
+              // Lit from above, with a dark line along both edges.
+              over(band > 1.1 ? theme.outline : mix(ringTop, ringBottom, clamp((y - 5) / 54, 0, 1)), 0.95);
+            }
+            // The symbol's shadow, a little below it and soft-edged.
+            const dsh = symbol(ux, uy - 0.9) * zoom;
+            if (dsh < 1.8) over([0, 0, 0], 0.6 * clamp((1.8 - dsh) / 2.4, 0, 1));
           }
           const ds = symbol(ux, uy) * zoom;
           if (ds < 0) {
@@ -91,7 +108,7 @@ function draw(theme, symbol, details, highlight, { tile: withTile = true, zoom =
       }
       const n = S * S;
       const a = acc[3] / n;
-      const i = (py * N + px) * 4;
+      const i = (py * size + px) * 4;
       out[i] = a > 0 ? Math.round(acc[0] / n / a) : 0;
       out[i + 1] = a > 0 ? Math.round(acc[1] / n / a) : 0;
       out[i + 2] = a > 0 ? Math.round(acc[2] / n / a) : 0;
@@ -102,20 +119,60 @@ function draw(theme, symbol, details, highlight, { tile: withTile = true, zoom =
 }
 
 function writeTga(file, px) {
+  const size = Math.round(Math.sqrt(px.length / 4));
   const header = Buffer.alloc(18);
   header[2] = 2; // uncompressed true colour
-  header.writeUInt16LE(N, 12);
-  header.writeUInt16LE(N, 14);
+  header.writeUInt16LE(size, 12);
+  header.writeUInt16LE(size, 14);
   header[16] = 32;
   header[17] = 0x28; // top-left origin, 8 alpha bits
-  const body = Buffer.alloc(N * N * 4);
-  for (let i = 0; i < N * N; i++) {
+  const body = Buffer.alloc(size * size * 4);
+  for (let i = 0; i < size * size; i++) {
     body[i * 4] = px[i * 4 + 2];
     body[i * 4 + 1] = px[i * 4 + 1];
     body[i * 4 + 2] = px[i * 4];
     body[i * 4 + 3] = px[i * 4 + 3];
   }
   fs.writeFileSync(file, Buffer.concat([header, body]));
+}
+
+const crcTable = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+const crc32 = (buf) => {
+  let c = 0xffffffff;
+  for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+};
+
+function writePng(file, px) {
+  const size = Math.round(Math.sqrt(px.length / 4));
+  const chunk = (type, data) => {
+    const head = Buffer.alloc(8);
+    head.writeUInt32BE(data.length, 0);
+    head.write(type, 4, 'ascii');
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(Buffer.concat([head.subarray(4), data])), 0);
+    return Buffer.concat([head, data, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
+  ihdr[8] = 8; // bits per channel
+  ihdr[9] = 6; // RGBA
+  const rows = Buffer.alloc(size * (size * 4 + 1));
+  for (let y = 0; y < size; y++) {
+    rows[y * (size * 4 + 1)] = 0; // no filter
+    Buffer.from(px.buffer, px.byteOffset + y * size * 4, size * 4).copy(rows, y * (size * 4 + 1) + 1);
+  }
+  fs.writeFileSync(file, Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', zlib.deflateSync(rows, { level: 9 })),
+    chunk('IEND', Buffer.alloc(0)),
+  ]));
 }
 
 // BossLoot: a treasure chest, in crimson.
@@ -308,27 +365,149 @@ const tunicDetails = union(
 );
 const tunicShine = ellipse(25.5, 22, 3.6, 1.3);
 
-const root = process.argv[2];
-writeTga(path.join(root, 'BossLoot', 'icon.tga'), draw(crimson, chest, chestDetails, chestShine));
-writeTga(path.join(root, 'BossLoot', 'minimap.tga'), draw(crimson, chest, chestDetails, chestShine, { tile: false, zoom: 1.4 }));
-writeTga(path.join(root, 'FishScale', 'icon.tga'), draw(orange, fish, fishDetails, fishShine));
-writeTga(path.join(root, 'FishScale', 'minimap.tga'), draw(orange, fish, fishDetails, fishShine, { tile: false, zoom: 1.3 }));
-writeTga(path.join(root, 'BankBags', 'icon.tga'), draw(teal, sack, sackDetails, sackShine));
-writeTga(path.join(root, 'BankBags', 'minimap.tga'), draw(teal, sack, sackDetails, sackShine, { tile: false, zoom: 1.4 }));
-writeTga(path.join(root, 'BankBags', 'tab.tga'), draw(teal, safe, safeDetails, safeShine, { tile: false, zoom: 1.3 }));
-writeTga(path.join(root, 'GatherMap', 'icon.tga'), draw(green, mapPin, pinDetails, pinShine));
-writeTga(path.join(root, 'GatherMap', 'minimap.tga'), draw(green, mapPin, pinDetails, pinShine, { tile: false, zoom: 1.35 }));
-console.log('written');
-writeTga(path.join(root, 'RankUp', 'icon.tga'), draw(gold, rankArrow, arrowDetails, arrowShine));
-writeTga(path.join(root, 'RankUp', 'logo.tga'), draw(gold, rankArrow, arrowDetails, arrowShine, { tile: false, zoom: 1.35 }));
-writeTga(path.join(root, 'AutoVendor', 'icon.tga'), draw(silver, coinStack, coinDetails, coinShine));
-writeTga(path.join(root, 'AutoVendor', 'logo.tga'), draw(silver, coinStack, coinDetails, coinShine, { tile: false, zoom: 1.4 }));
-writeTga(path.join(root, 'LFGBoard', 'icon.tga'), draw(violet, group, groupDetails, groupShine));
-writeTga(path.join(root, 'LFGBoard', 'minimap.tga'), draw(violet, group, groupDetails, groupShine, { tile: false, zoom: 1.3 }));
-writeTga(path.join(root, 'MailHandler', 'icon.tga'), draw(blue, envelope, envelopeDetails, envelopeShine));
-writeTga(path.join(root, 'MailHandler', 'logo.tga'), draw(blue, envelope, envelopeDetails, envelopeShine, { tile: false, zoom: 1.4 }));
-writeTga(path.join(root, 'RareMob', 'icon.tga'), draw(bone, skull, skullDetails, skullShine));
-writeTga(path.join(root, 'RareMob', 'minimap.tga'), draw(bone, skull, skullDetails, skullShine, { tile: false, zoom: 1.35 }));
-writeTga(path.join(root, 'TalentPlanner', 'icon.tga'), draw(lime, talentTree, treeDetails, treeShine));
-writeTga(path.join(root, 'TalentPlanner', 'minimap.tga'), draw(lime, talentTree, treeDetails, treeShine, { tile: false, zoom: 1.2 }));
-writeTga(path.join(root, 'WardrobeForever', 'icon.tga'), draw(rose, tunic, tunicDetails, tunicShine));
+// A shape turned by `deg` about cx, cy (clockwise on screen, where y runs down).
+const rotate = (f, cx, cy, deg) => {
+  const a = (deg * Math.PI) / 180;
+  const c = Math.cos(a), s = Math.sin(a);
+  return (x, y) => {
+    const dx = x - cx, dy = y - cy;
+    return f(cx + dx * c + dy * s, cy - dx * s + dy * c);
+  };
+};
+
+// ClickHeal: a healer's cross, in mint.
+const mint = {
+  dark: [6, 18, 12], glow: [30, 96, 64], ring: [96, 210, 150],
+  light: [200, 255, 224], mid: [70, 186, 124], outline: [10, 52, 30], detail: [20, 84, 52],
+};
+const cross = union(roundBox(32, 32, 5.6, 13.8, 2.8), roundBox(32, 32, 13.8, 5.6, 2.8));
+const crossShine = ellipse(32, 22, 3.2, 1.4);
+
+// ForeverPanel: the bar across the top of the screen, running past the ring,
+// with two dividers between its modules, in gold.
+const panelBar = roundBox(32, 28.5, 26.25, 6.6, 3.25);
+const panelDetails = union(roundBox(26.3, 28.8, 0.75, 3, 0.6), roundBox(37.7, 28.8, 0.75, 3, 0.6));
+const panelShine = roundBox(32, 24.2, 22, 1.1, 1.1);
+
+// UrlCopy: two chain links, a hyperlink, in sky blue.
+const sky = {
+  dark: [6, 14, 22], glow: [24, 70, 110], ring: [100, 176, 236],
+  light: [206, 236, 255], mid: [100, 170, 230], outline: [14, 40, 70], detail: [30, 80, 130],
+};
+const link = (cx, cy) => rotate(roundBox(cx, cy, 12.5, 8.5, 8.5), cx, cy, -45);
+const linkHole = (cx, cy) => rotate(roundBox(cx, cy, 5.5, 2.4, 2.4), cx, cy, -45);
+const chain = minus(union(link(23.5, 40.5), link(40.5, 23.5)), union(linkHole(23.5, 40.5), linkHole(40.5, 23.5)));
+const chainShine = rotate(ellipse(37.5, 18.5, 4.5, 1.2), 37.5, 18.5, -45);
+
+// TrinketMenu: a cut gem, in amethyst.
+const amethyst = {
+  dark: [14, 8, 22], glow: [72, 40, 110], ring: [176, 130, 236],
+  light: [236, 216, 255], mid: [168, 120, 226], outline: [52, 24, 84], detail: [84, 48, 130],
+};
+const gem = union(
+  triangle(13, 26, 51, 26, 32, 51), // the pavilion, down to the point
+  roundBox(32, 21, 10, 5, 0), // the crown
+  triangle(13, 26, 22, 16, 22, 26),
+  triangle(51, 26, 42, 16, 42, 26),
+);
+const gemDetails = union(
+  segment(14, 26, 50, 26, 0.6), // the girdle
+  segment(25, 16.5, 32, 49, 0.6), // two facet edges down to the point
+  segment(39, 16.5, 32, 49, 0.6),
+);
+const gemShine = triangle(15.5, 25, 22.5, 17.5, 23.5, 25);
+
+// Every addon's textures: the file under the addon's folder, and how to draw it.
+const tex = (theme, symbol, details, shine, opts) => [theme, symbol, details, shine, opts];
+const ICONS = {
+  BossLoot: {
+    'icon.tga': tex(crimson, chest, chestDetails, chestShine),
+    'minimap.tga': tex(crimson, chest, chestDetails, chestShine, { tile: false, zoom: 1.4 }),
+  },
+  FishScale: {
+    'icon.tga': tex(orange, fish, fishDetails, fishShine),
+    'minimap.tga': tex(orange, fish, fishDetails, fishShine, { tile: false, zoom: 1.3 }),
+  },
+  BankBags: {
+    'icon.tga': tex(teal, sack, sackDetails, sackShine),
+    'minimap.tga': tex(teal, sack, sackDetails, sackShine, { tile: false, zoom: 1.4 }),
+    'tab.tga': tex(teal, safe, safeDetails, safeShine, { tile: false, zoom: 1.3 }),
+  },
+  GatherMap: {
+    'icon.tga': tex(green, mapPin, pinDetails, pinShine),
+    'minimap.tga': tex(green, mapPin, pinDetails, pinShine, { tile: false, zoom: 1.35 }),
+  },
+  RankUp: {
+    'icon.tga': tex(gold, rankArrow, arrowDetails, arrowShine),
+    'logo.tga': tex(gold, rankArrow, arrowDetails, arrowShine, { tile: false, zoom: 1.35 }),
+  },
+  AutoVendor: {
+    'icon.tga': tex(silver, coinStack, coinDetails, coinShine),
+    'logo.tga': tex(silver, coinStack, coinDetails, coinShine, { tile: false, zoom: 1.4 }),
+  },
+  LFGBoard: {
+    'icon.tga': tex(violet, group, groupDetails, groupShine),
+    'minimap.tga': tex(violet, group, groupDetails, groupShine, { tile: false, zoom: 1.3 }),
+  },
+  MailHandler: {
+    'icon.tga': tex(blue, envelope, envelopeDetails, envelopeShine),
+    'logo.tga': tex(blue, envelope, envelopeDetails, envelopeShine, { tile: false, zoom: 1.4 }),
+  },
+  RareMob: {
+    'icon.tga': tex(bone, skull, skullDetails, skullShine),
+    'minimap.tga': tex(bone, skull, skullDetails, skullShine, { tile: false, zoom: 1.35 }),
+  },
+  TalentPlanner: {
+    'icon.tga': tex(lime, talentTree, treeDetails, treeShine),
+    'minimap.tga': tex(lime, talentTree, treeDetails, treeShine, { tile: false, zoom: 1.2 }),
+  },
+  WardrobeForever: {
+    'icon.tga': tex(rose, tunic, tunicDetails, tunicShine),
+  },
+  ClickHeal: {
+    'icon.tga': tex(mint, cross, null, crossShine),
+    'logo.tga': tex(mint, cross, null, crossShine, { tile: false, zoom: 1.4 }),
+  },
+  ForeverPanel: {
+    'icon.tga': tex(gold, panelBar, panelDetails, panelShine),
+    'logo.tga': tex(gold, panelBar, panelDetails, panelShine, { tile: false, zoom: 1.15 }),
+  },
+  UrlCopy: {
+    'icon.tga': tex(sky, chain, null, chainShine),
+    'logo.tga': tex(sky, chain, null, chainShine, { tile: false, zoom: 1.35 }),
+  },
+  TrinketMenu: {
+    'icon.tga': tex(amethyst, gem, gemDetails, gemShine),
+    'logo.tga': tex(amethyst, gem, gemDetails, gemShine, { tile: false, zoom: 1.35 }),
+  },
+};
+
+const args = process.argv.slice(2);
+const root = args.shift();
+if (!root) {
+  console.error('Usage: node tools/draw-icons.mjs <repo root> [Addon ...] [--thumbnails]');
+  process.exit(1);
+}
+const thumbnails = args.includes('--thumbnails');
+const named = args.filter((a) => !a.startsWith('--'));
+const unknown = named.filter((a) => !ICONS[a]);
+if (unknown.length) {
+  console.error(`No icon design for: ${unknown.join(', ')}. Add one to ICONS in tools/draw-icons.mjs.`);
+  process.exit(1);
+}
+
+for (const addon of named.length ? named : Object.keys(ICONS)) {
+  if (thumbnails) {
+    // The tiled icon, big enough for an addon site's thumbnail.
+    const [theme, symbol, details, shine, opts] = ICONS[addon]['icon.tga'];
+    const dir = path.join(root, 'docs', 'icons');
+    fs.mkdirSync(dir, { recursive: true });
+    writePng(path.join(dir, `${addon}.png`), draw(theme, symbol, details, shine, { ...opts, size: 512 }));
+    console.log(`docs/icons/${addon}.png`);
+    continue;
+  }
+  for (const [file, [theme, symbol, details, shine, opts]] of Object.entries(ICONS[addon])) {
+    writeTga(path.join(root, addon, file), draw(theme, symbol, details, shine, opts));
+    console.log(`${addon}/${file}`);
+  }
+}
