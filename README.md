@@ -17,6 +17,7 @@ World of Warcraft addons, one folder each.
 | [MailHandler](MailHandler/) | A checkbox on every mail, and Open beside Open All to take only the ticked ones |
 | [RareMob](RareMob/) | Rare and rare elite spawn points on the world map and minimap, a sound when one is near, and the zone's rares with when each was last seen |
 | [TalentPlanner](TalentPlanner/) | Plan the order of your talent points, see the plan in the talent window, and be told which talent comes next |
+| [WardrobeForever](WardrobeForever/) | Hover a slot on the character sheet to see everything else you could wear there, and click one to put it on |
 
 ## Layout
 

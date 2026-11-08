@@ -1,4 +1,4 @@
-// Draws the 64x64 icons for BossLoot, FishScale, BankBags, GatherMap, RankUp, AutoVendor, LFGBoard, MailHandler and RareMob, and their minimap icons, in the style of
+// Draws the 64x64 icons for BossLoot, FishScale, BankBags, GatherMap, RankUp, AutoVendor, LFGBoard, MailHandler, RareMob, TalentPlanner and WardrobeForever, and their minimap icons, in the style of
 // the others: a dark rounded tile with a soft glow in the addon's colour, a
 // thin ring, and a light, glossy symbol with a darker outline and details.
 // A minimap icon is the symbol alone, filling the frame: the minimap button
@@ -286,6 +286,28 @@ const skullDetails = union(
 );
 const skullShine = ellipse(26, 17.5, 5, 1.6);
 
+// WardrobeForever: a belted tunic with a V neck, in rose.
+const rose = {
+  dark: [20, 8, 14], glow: [100, 34, 66], ring: [220, 110, 160],
+  light: [255, 206, 228], mid: [222, 112, 160], outline: [76, 18, 44], detail: [110, 34, 70],
+};
+const tunic = minus(
+  union(
+    roundBox(32, 22, 12, 6.5, 3), // the shoulders
+    roundBox(32, 38, 10.5, 14.5, 2.5), // the body
+    segment(22, 19, 13, 33, 4.6), // the sleeves
+    segment(42, 19, 51, 33, 4.6),
+  ),
+  triangle(25.5, 11, 38.5, 11, 32, 27), // the V neck
+);
+const tunicDetails = union(
+  roundBox(32, 39, 10.5, 1.9, 0.6), // the belt
+  roundBox(32, 39, 2.4, 2.9, 0.7), // its buckle
+  segment(11.1, 27.2, 18.9, 32.2, 0.8), // the cuffs, square across each sleeve
+  segment(52.9, 27.2, 45.1, 32.2, 0.8),
+);
+const tunicShine = ellipse(25.5, 22, 3.6, 1.3);
+
 const root = process.argv[2];
 writeTga(path.join(root, 'BossLoot', 'icon.tga'), draw(crimson, chest, chestDetails, chestShine));
 writeTga(path.join(root, 'BossLoot', 'minimap.tga'), draw(crimson, chest, chestDetails, chestShine, { tile: false, zoom: 1.4 }));
@@ -309,3 +331,4 @@ writeTga(path.join(root, 'RareMob', 'icon.tga'), draw(bone, skull, skullDetails,
 writeTga(path.join(root, 'RareMob', 'minimap.tga'), draw(bone, skull, skullDetails, skullShine, { tile: false, zoom: 1.35 }));
 writeTga(path.join(root, 'TalentPlanner', 'icon.tga'), draw(lime, talentTree, treeDetails, treeShine));
 writeTga(path.join(root, 'TalentPlanner', 'minimap.tga'), draw(lime, talentTree, treeDetails, treeShine, { tile: false, zoom: 1.2 }));
+writeTga(path.join(root, 'WardrobeForever', 'icon.tga'), draw(rose, tunic, tunicDetails, tunicShine));
