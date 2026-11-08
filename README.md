@@ -52,7 +52,11 @@ extracts straight into `Interface/AddOns`. The file list comes from the `.toc`
 rather than a glob: anything added there ships, and anything listed but missing
 fails the build instead of shipping broken.
 
-`-Install` defaults to the Classic beta client. `-WowPath` picks another:
+`-Install` also uploads a new version to Wago Addons: see
+[docs/publishing.md](docs/publishing.md).
+
+`-Install` defaults to the WoW Forever client (`_forever_`). `-WowPath` picks
+another:
 
 ```powershell
 .\package.ps1 ForeverPanel -Install -WowPath "C:\Program Files (x86)\World of Warcraft\_retail_"
