@@ -4,6 +4,7 @@
 ## IconTexture: Interface\AddOns\WardrobeForever\icon
 ## Author: Skyler
 ## Version: 0.1.0
+## X-Wago-ID: ZKbqZd61
 
 WardrobeForever.lua
 Settings.lua

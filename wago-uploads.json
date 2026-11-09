@@ -22,5 +22,9 @@
     "RankUp":  {
                    "version":  "0.1.0",
                    "commit":  "91906d97322435124eab0860419eb14e577610e5"
-               }
+               },
+    "WardrobeForever":  {
+                            "version":  "0.1.0",
+                            "commit":  "9e3b380f9463f7faa48ce88b7169c7ddef156b50"
+                        }
 }
