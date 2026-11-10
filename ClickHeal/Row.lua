@@ -37,6 +37,12 @@ local function buttonSize()
     return size
 end
 
+-- Read by AuraSlots, which spaces the numbers over and under each icon by
+-- it. From the setting, never from a button: with the game's aura
+-- containers hanging off a button, 1.60.1 answers its GetHeight with a
+-- secret number, and sums on that raise.
+Row.ButtonSize = buttonSize
+
 local BUTTON_GAP = 4
 local PADDING = 4
 

@@ -579,6 +579,21 @@ describe("slot rows following the button count", function()
         assertFalse(control(ns).picks[7]:IsShown())
     end)
 
+    it("brings rows back as the slider is dragged up, where the game draws the timers", function()
+        -- On 1.60.1 the slider's ApplyAll raised before the panel redrew,
+        -- so the list stayed one row short of the count it showed.
+        local ns, env = helpers.loadAddon()
+        env.__auraContainer = true
+        helpers.login(ns, env)
+        ns.SettingsPanel.EnsureBuilt()
+        ns.db.bar.slots = 7
+        ns.SettingsPanel.Refresh()
+
+        controlFor(ns, "bar", "slots").widget:SetValue(8)
+
+        assertTrue(control(ns).picks[8]:IsShown(), "the panel keeps up with the slider")
+    end)
+
     it("survives the slider refreshing itself without looping", function()
         -- The slider's Refresh sets its own value, the client answers with
         -- OnValueChanged, and that onChange refreshes the panel again.

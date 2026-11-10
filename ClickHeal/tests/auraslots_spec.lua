@@ -354,6 +354,23 @@ describe("where the game puts the numbers", function()
         assertEqual("over", numbers[2].side)
     end)
 
+    it("goes on applying spells once the game keeps the button's size to itself", function()
+        -- With the containers hanging from it, 1.60.1 answers a button's
+        -- height as a secret number. Reading it to space the numbers raised
+        -- on every ApplySpells after the first, so no change of spell,
+        -- button count or rank reached the bar.
+        local ns, env = loggedIn(withRejuvenationID)
+        local row = rowWith(ns, env, "party1", { "Rejuvenation" })
+
+        ns.db.bar.slots = 2
+        ns.Slots.Set(2, "Rejuvenation")
+        local ok, err = pcall(ns.Row.ApplySpells, row)
+
+        assertTrue(ok, tostring(err))
+        assertEqual("Rejuvenation", row.buttons[2].spellName, "the second button was reached")
+        assertTrue(group(row, 2, "own").enabled)
+    end)
+
     it("keeps the upper number clear of the smallest icon", function()
         local ns, env = loggedIn(withRejuvenationID)
         local row = rowWith(ns, env, "party1", { "Rejuvenation" })

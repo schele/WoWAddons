@@ -70,9 +70,13 @@ local function layoutFor(iconHeight)
     }
 end
 
---- The height of the icon a button's numbers go under and over.
-local function iconHeight(button)
-    return math.floor((button:GetHeight() or 0) + 0.5)
+--- The height of the icons the numbers go under and over: the setting
+-- Row.ApplySpells sizes every button by. Not the button's own GetHeight,
+-- which the game answers with a secret number once these containers hang
+-- off the button; a sum on that raised, and took every ApplySpells after
+-- login down with it.
+local function iconHeight()
+    return ns.Row.ButtonSize()
 end
 
 --- Every spell ID `spell` is known by, as the map a group's filter wants:
@@ -118,8 +122,8 @@ end
 --- Keep the number over the icon clear of it after the icon is resized.
 -- Out of combat only, as every change to a button is; guarded like the
 -- filters, and left alone when the size has not moved.
-local function applyLayout(timers, button)
-    local height = iconHeight(button)
+local function applyLayout(timers)
+    local height = iconHeight()
     if height == timers.iconHeight then
         return
     end
@@ -228,7 +232,7 @@ end
 
 --- Both sets of numbers for `button`.
 local function addTimers(row, button, track)
-    local height = iconHeight(button)
+    local height = iconHeight()
     return {
         iconHeight = height,
         under = addSet(row, button, false, height, track),
@@ -426,7 +430,7 @@ function AuraSlots.SetSpell(row, index, spell)
     local timers = row.auraTimers and row.auraTimers[index]
     if timers then
         timers.spell = spell
-        applyLayout(timers, row.buttons[index])
+        applyLayout(timers)
         applyFilters(timers)
     end
 

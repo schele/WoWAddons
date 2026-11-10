@@ -76,12 +76,21 @@ local function makeWidget(kind, parent, template, env)
         refuseInCombat(self, "SetWidth")
         self.width = value
     end
-    function widget:GetWidth() return self.width end
+    -- A frame an aura container hangs from answers its size as a secret
+    -- number (see makeAuraContainer). The fields stay plain, so a test can
+    -- still read them.
+    function widget:GetWidth()
+        if self.__secretSize then return self.__env.__secret() end
+        return self.width
+    end
     function widget:SetHeight(value)
         refuseInCombat(self, "SetHeight")
         self.height = value
     end
-    function widget:GetHeight() return self.height end
+    function widget:GetHeight()
+        if self.__secretSize then return self.__env.__secret() end
+        return self.height
+    end
     function widget:SetSize(w, h)
         refuseInCombat(self, "SetSize")
         self.width, self.height = w, h
@@ -446,6 +455,19 @@ function stub.newEnv()
         container.refreshes = 0
 
         function container:SetUnit(unit) self.unit = unit end
+
+        -- A frame the container hangs from answers its size as a secret
+        -- number from then on: 1.60.1 raised "attempt to perform arithmetic
+        -- on a secret number value" on ClickHeal's button:GetHeight() + 0.5
+        -- once the timers' containers hung off the button (General.log,
+        -- 2026-11-10), every time spells were applied after login.
+        local setPoint = container.SetPoint
+        function container:SetPoint(point, relativeTo, ...)
+            if type(relativeTo) == "table" then
+                relativeTo.__secretSize = true
+            end
+            return setPoint(self, point, relativeTo, ...)
+        end
 
         -- Counted: the container re-reads its unit on its own only when one
         -- of that unit's auras changes, so a test can see a refresh asked for.
