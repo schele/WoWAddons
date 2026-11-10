@@ -973,3 +973,108 @@ describe("choosing the rank someone can take", function()
             "the game refuses it either way; by name it at least says why")
     end)
 end)
+
+describe("a buff on someone twice", function()
+    it("keeps every copy, in the order the client lists them", function()
+        local ns, env = loggedIn()
+        env.__auras.party1 = {
+            { name = "Rejuvenation", expirationTime = 1004, spellId = 1430, caster = "party2" },
+            { name = "Mark of the Wild", expirationTime = 3280 },
+            { name = "Rejuvenation", expirationTime = 1012, spellId = 774 },
+        }
+
+        local aura = ns.Spells.HelpfulAuras("party1").Rejuvenation
+
+        assertEqual(2, #aura.copies)
+        assertEqual(1004, aura.copies[1].expires)
+        assertFalse(aura.copies[1].mine)
+        assertEqual(1430, aura.copies[1].spellId)
+        assertEqual(1012, aura.copies[2].expires)
+        assertTrue(aura.copies[2].mine)
+        assertEqual(774, aura.copies[2].spellId)
+    end)
+
+    it("still answers for the first copy where one answer is asked for", function()
+        local ns, env = loggedIn()
+        env.__auras.party1 = {
+            { name = "Rejuvenation", expirationTime = 1004, caster = "party2" },
+            { name = "Rejuvenation", expirationTime = 1012 },
+        }
+
+        local aura = ns.Spells.HelpfulAuras("party1").Rejuvenation
+
+        assertEqual(1004, aura.expires)
+        assertFalse(aura.mine)
+    end)
+
+    it("is timed copy by copy, yours first and then anyone else's", function()
+        -- The order the numbers go on screen: the first under the icon,
+        -- the second above it, as the game's container places them.
+        local ns, env = loggedIn()
+        env.__now = 1000
+        env.__auras.party1 = {
+            { name = "Rejuvenation", expirationTime = 1004, caster = "party2" },
+            { name = "Rejuvenation", expirationTime = 1012 },
+        }
+
+        local times = ns.Spells.AuraTimes("party1", "Rejuvenation")
+
+        assertEqual(2, #times)
+        assertEqual(12, times[1].remaining)
+        assertTrue(times[1].mine)
+        assertEqual(4, times[2].remaining)
+        assertFalse(times[2].mine)
+    end)
+
+    it("keeps two of your own in the client's order", function()
+        local ns, env = loggedIn()
+        env.__now = 1000
+        env.__auras.party1 = {
+            { name = "Rejuvenation", expirationTime = 1009 },
+            { name = "Rejuvenation", expirationTime = 1003 },
+        }
+
+        local times = ns.Spells.AuraTimes("party1", "Rejuvenation")
+
+        assertEqual(9, times[1].remaining)
+        assertEqual(3, times[2].remaining)
+    end)
+
+    it("leaves out a copy that has run out or never does", function()
+        local ns, env = loggedIn()
+        env.__now = 1000
+        env.__auras.party1 = {
+            { name = "Rejuvenation", expirationTime = 990 },
+            { name = "Rejuvenation", expirationTime = 0 },
+            { name = "Rejuvenation", expirationTime = 1007, caster = "party2" },
+        }
+
+        local times = ns.Spells.AuraTimes("party1", "Rejuvenation")
+
+        assertEqual(1, #times)
+        assertEqual(7, times[1].remaining)
+    end)
+
+    it("is no times at all for a buff that is not there", function()
+        local ns, env = loggedIn()
+        env.__auras.party1 = { { name = "Mark of the Wild", expirationTime = 3280 } }
+
+        assertEqual(0, #ns.Spells.AuraTimes("party1", "Rejuvenation"))
+        assertEqual(0, #ns.Spells.AuraTimes("party1", nil))
+    end)
+
+    it("costs only its own number when the client keeps an expiry secret", function()
+        local ns, env = loggedIn()
+        env.__now = 1000
+        env.__auras.party1 = {
+            { name = "Rejuvenation", expirationTime = env.__secret() },
+            { name = "Rejuvenation", expirationTime = 1007, caster = "party2" },
+        }
+
+        local ok, times = pcall(ns.Spells.AuraTimes, "party1", "Rejuvenation")
+
+        assertTrue(ok, "never raises")
+        assertEqual(1, #times)
+        assertEqual(7, times[1].remaining)
+    end)
+end)

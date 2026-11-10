@@ -45,9 +45,14 @@ local PADDING = 4
 local TIMER_WIDTH = 40
 local TIMER_HEIGHT = 14
 
--- Read by AuraSlots, which lays the game's numbers out in the same box.
+-- How far that box sits from the icon: under it, and over it for a second
+-- copy of the same buff.
+local TIMER_GAP = 3
+
+-- Read by AuraSlots, which lays the game's numbers out in the same boxes.
 Row.TIMER_WIDTH = TIMER_WIDTH
 Row.TIMER_HEIGHT = TIMER_HEIGHT
+Row.TIMER_GAP = TIMER_GAP
 
 -- The gold frame a button shows under the cursor: how thick, whatever the
 -- icon size, and its four edges as the pair of corners each runs between.
@@ -155,6 +160,25 @@ local RANGE_DIM = 0.4
 -- it stops being legible against a spell icon.
 local OTHERS_DIM = 0.55
 Row.OTHERS_DIM = OTHERS_DIM
+
+-- The number over an icon, for a second copy of a buff, is green -- the
+-- game's own green, GREEN_FONT_COLOR -- so it reads apart from the white
+-- one under the icon a few pixels away.
+local OVER_COLOUR = { 0.1, 1, 0.1 }
+
+--- The colour of a number: white under the icon, green over it, and either
+-- one dimmed by OTHERS_DIM when somebody else cast that copy.
+function Row.TimerColour(over, theirs)
+    local r, g, b = 1, 1, 1
+    if over then
+        r, g, b = OVER_COLOUR[1], OVER_COLOUR[2], OVER_COLOUR[3]
+    end
+
+    if theirs then
+        return r * OTHERS_DIM, g * OTHERS_DIM, b * OTHERS_DIM
+    end
+    return r, g, b
+end
 
 -- Blizzard's own stand-in for a spell it will not draw. Reached only when
 -- the player knows the spell but the icon lookup came back empty, so that a
@@ -361,13 +385,19 @@ function Row.Create(unit, parent)
         -- Just below the icon rather than across it: at 22 pixels there is
         -- no room to lay a number over the art and still read either.
         button.timer = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        button.timer:SetPoint("TOP", button, "BOTTOM", 0, -3)
+        button.timer:SetPoint("TOP", button, "BOTTOM", 0, -TIMER_GAP)
         -- A box of its own. Left to size itself from the one point above,
         -- it stayed 1 by 1 pixel on 1.60.1 -- GetStringWidth 16.7 for "8m",
         -- GetWidth 1 -- and the number was clipped to nothing. Wider than
         -- the gap to the next icon is fine: the text is centred and short,
         -- so neighbouring boxes overlap where there is nothing to draw.
         button.timer:SetSize(TIMER_WIDTH, TIMER_HEIGHT)
+
+        -- The same box over the icon, for a second copy of the buff: two
+        -- druids' Rejuvenations, or two of your own. Empty otherwise.
+        button.timerAbove = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        button.timerAbove:SetPoint("BOTTOM", button, "TOP", 0, TIMER_GAP)
+        button.timerAbove:SetSize(TIMER_WIDTH, TIMER_HEIGHT)
 
         -- Blizzard's own cooldown widget, so the sweep is the one the action
         -- bars draw and the client animates it for us; all we ever hand it is
@@ -816,7 +846,20 @@ function Row.AssignedSpells(row)
     return spells
 end
 
---- Write the remaining time of each button's own spell on this row's unit.
+--- Write one copy's time left into `label`, or empty it for no copy;
+-- `over` for the label over the icon.
+local function writeTimer(label, time, over)
+    label:SetText(Row.FormatDuration(time and time.remaining))
+
+    -- Compared against false rather than tested, the same way range is:
+    -- nil is the client declining to say who cast it, and an unattributed
+    -- buff on your own unit -- which is every buff on your own unit, on
+    -- this client -- must read as yours rather than greying the row.
+    label:SetTextColor(Row.TimerColour(over, time ~= nil and time.mine == false))
+end
+
+--- Write the remaining time of each button's own spell on this row's unit:
+-- under the icon, and over it when the buff is on them twice.
 --
 -- The unit's auras are gathered once and shared across the row's buttons.
 -- Asked per button instead, ten buttons on each of five rows refreshed
@@ -827,12 +870,13 @@ end
 -- It is worth having -- the buff is on them, and re-casting over it buys
 -- nothing -- but it is not yours, and two druids' Rejuvenations run on the
 -- same target independently, so a white 7s that turns out to be another
--- druid's is a heal you thought you had.
+-- druid's is a heal you thought you had. Yours goes under the icon and
+-- theirs over it, as the game's own numbers are placed.
 function Row.RefreshAuras(row)
     local auras = ns.Spells.HelpfulAuras(row.unit)
 
     -- The game draws this row's numbers, in combat too. What can still be
-    -- read out of combat teaches its slots the IDs of other ranks and other
+    -- read out of combat teaches it the IDs of other ranks and other
     -- casters' copies; button.timer stays empty, so there is one number.
     if ns.AuraSlots and ns.AuraSlots.Drawn(row) then
         ns.AuraSlots.Learn(auras)
@@ -841,27 +885,10 @@ function Row.RefreshAuras(row)
 
     for index = 1, ns.Slots.MAX do
         local button = row.buttons[index]
-        local spell = button.spellName
+        local times = ns.Spells.AuraTimes(row.unit, button.spellName, auras)
 
-        local remaining, mine
-        if spell then
-            -- Not folded into the SetText below: `spell and f()` keeps only
-            -- the first of the two returns, which is how the colour would
-            -- quietly become "always yours".
-            remaining, mine = ns.Spells.AuraRemaining(row.unit, spell, auras)
-        end
-
-        button.timer:SetText(Row.FormatDuration(remaining))
-
-        -- Compared against false rather than tested, the same way range is:
-        -- nil is the client declining to say who cast it, and an unattributed
-        -- buff on your own unit -- which is every buff on your own unit, on
-        -- this client -- must read as yours rather than greying the row.
-        if mine == false then
-            button.timer:SetTextColor(OTHERS_DIM, OTHERS_DIM, OTHERS_DIM)
-        else
-            button.timer:SetTextColor(1, 1, 1)
-        end
+        writeTimer(button.timer, times[1], false)
+        writeTimer(button.timerAbove, times[2], true)
     end
 end
 

@@ -1579,3 +1579,98 @@ describe("casting the rank each person can take", function()
         assertNil(row.buttons[1].spellName)
     end)
 end)
+
+describe("a buff on someone twice, in ClickHeal's own numbers", function()
+    -- Where the client has no aura container, as Classic Era has none,
+    -- ClickHeal writes the numbers itself, and places them as the game's
+    -- container does: the first under the icon, the second above it.
+    local function rowWithRejuvenation(ns, env)
+        ns.db.bar.slots = 1
+        ns.Slots.Set(1, "Rejuvenation")
+        local row = ns.Row.Create("party1", env.UIParent)
+        ns.Row.ApplySpells(row)
+        env.__now = 1000
+        return row
+    end
+
+    it("gives every button a label above its icon, in a box like the one under it", function()
+        local ns, env = loggedIn()
+        local row = ns.Row.Create("party1", env.UIParent)
+
+        for index = 1, ns.Slots.MAX do
+            local button = row.buttons[index]
+            local point, relativeTo, relativePoint, x, y = button.timerAbove:GetPoint(1)
+            assertEqual("BOTTOM", point)
+            assertEqual(button, relativeTo)
+            assertEqual("TOP", relativePoint)
+            assertEqual(0, x)
+            assertEqual(3, y, "as far above the icon as the other is below it")
+            assertEqual(button.timer.width, button.timerAbove.width)
+            assertEqual(button.timer.height, button.timerAbove.height)
+        end
+    end)
+
+    it("writes the second copy's number above the icon", function()
+        local ns, env = loggedIn()
+        local row = rowWithRejuvenation(ns, env)
+        env.__auras.party1 = {
+            { name = "Rejuvenation", expirationTime = 1007 },
+            { name = "Rejuvenation", expirationTime = 1012 },
+        }
+
+        ns.Row.Refresh(row)
+
+        assertEqual("7 s", row.buttons[1].timer:GetText())
+        assertEqual(1, row.buttons[1].timer.textColor[1], "white under the icon")
+        assertEqual("12 s", row.buttons[1].timerAbove:GetText())
+        local colour = row.buttons[1].timerAbove.textColor
+        assertEqual(0.1, colour[1], "green over it")
+        assertEqual(1, colour[2])
+        assertEqual(0.1, colour[3])
+    end)
+
+    it("puts yours under the icon and another caster's above it, whichever the client lists first", function()
+        local ns, env = loggedIn()
+        local row = rowWithRejuvenation(ns, env)
+        env.__auras.party1 = {
+            { name = "Rejuvenation", expirationTime = 1012, caster = "party2" },
+            { name = "Rejuvenation", expirationTime = 1007 },
+        }
+
+        ns.Row.Refresh(row)
+
+        assertEqual("7 s", row.buttons[1].timer:GetText())
+        assertEqual(1, row.buttons[1].timer.textColor[1], "yours, white")
+        assertEqual("12 s", row.buttons[1].timerAbove:GetText())
+        local colour = row.buttons[1].timerAbove.textColor
+        assertEqual(0.55, colour[2], "theirs, green dimmed as grey is dimmed white")
+        assertTrue(colour[1] < 0.1 and colour[3] < 0.1)
+    end)
+
+    it("leaves the space above the icon empty for a single copy", function()
+        local ns, env = loggedIn()
+        local row = rowWithRejuvenation(ns, env)
+        env.__auras.party1 = { { name = "Rejuvenation", expirationTime = 1007 } }
+
+        ns.Row.Refresh(row)
+
+        assertEqual("7 s", row.buttons[1].timer:GetText())
+        assertEqual("", row.buttons[1].timerAbove:GetText())
+    end)
+
+    it("moves the number down when the first copy runs out", function()
+        local ns, env = loggedIn()
+        local row = rowWithRejuvenation(ns, env)
+        env.__auras.party1 = {
+            { name = "Rejuvenation", expirationTime = 1007 },
+            { name = "Rejuvenation", expirationTime = 1012 },
+        }
+        ns.Row.Refresh(row)
+
+        env.__now = 1008
+        ns.Row.Refresh(row)
+
+        assertEqual("4 s", row.buttons[1].timer:GetText())
+        assertEqual("", row.buttons[1].timerAbove:GetText())
+    end)
+end)

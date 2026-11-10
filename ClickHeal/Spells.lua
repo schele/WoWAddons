@@ -651,10 +651,8 @@ function Spells.HelpfulAuras(unit)
                 break
             end
 
-            -- First wins: a spell appearing twice is the same spell, and the
-            -- one the client lists first is the one it considers current.
-            if type(name) == "string" and auras[name] == nil then
-                auras[name] = {
+            if type(name) == "string" then
+                local copy = {
                     expires = expires or 0,
                     -- Judged here, where the source is still in reach: a
                     -- caller holding the gathered table has no way back to
@@ -667,6 +665,18 @@ function Spells.HelpfulAuras(unit)
                         return type(spellId) == "number" and spellId + 0 or nil
                     end, nil),
                 }
+
+                -- The first copy the client lists answers for the buff
+                -- where one answer is wanted; every copy, the first
+                -- included, is kept under it in `copies`, since a buff can
+                -- be on someone twice -- two druids' Rejuvenations -- and
+                -- each runs out on its own.
+                if auras[name] == nil then
+                    copy.copies = { copy }
+                    auras[name] = copy
+                else
+                    table.insert(auras[name].copies, copy)
+                end
             end
         end
 
@@ -674,12 +684,32 @@ function Spells.HelpfulAuras(unit)
     end, {})
 end
 
---- Seconds left on `spellName` on `unit`, and whether this player is the one
--- who cast it. Nil when it is not there, never expires, or cannot be read.
+--- Seconds left on one copy of a buff, or nil when it never runs out, has
+-- run out or cannot be read.
 --
 -- nil rather than 0 throughout: a slot with nothing on it and a slot whose
 -- buff has just run out both mean "no number to show", and neither is worth
 -- distinguishing under a 22 pixel icon.
+--
+-- HelpfulAuras guards the reading, not the reading's result: an expiry the
+-- client will not disclose is truthy, so it rides out of that guard in the
+-- table and arrives here untouched. Subtracting from it and comparing the
+-- result are both things it raises on, so they belong inside a guard of
+-- their own -- which costs one icon its timer instead of the refresh.
+local function remainingOn(copy)
+    return ns.Guarded(function()
+        if copy.expires == 0 then
+            return nil
+        end
+
+        local left = copy.expires - (GetTime and GetTime() or 0)
+        return left > 0 and left or nil
+    end, nil)
+end
+
+--- Seconds left on `spellName` on `unit` -- on the first copy the client
+-- lists -- and whether this player is the one who cast it. Nil when it is
+-- not there, never expires, or cannot be read.
 --
 -- The second return is only ever read alongside a number -- there is nothing
 -- to draw in whose colour otherwise -- so every path with no aura to report
@@ -696,25 +726,48 @@ function Spells.AuraRemaining(unit, spellName, auras)
         return nil
     end
 
-    -- HelpfulAuras guards the reading, not the reading's result: an expiry the
-    -- client will not disclose is truthy, so it rides out of that guard in the
-    -- table and arrives here untouched. Subtracting from it and comparing the
-    -- result are both things it raises on, so they belong inside a guard of
-    -- their own -- which costs one icon its timer instead of the refresh.
-    local remaining = ns.Guarded(function()
-        if aura.expires == 0 then
-            return nil
-        end
-
-        local left = aura.expires - (GetTime and GetTime() or 0)
-        return left > 0 and left or nil
-    end, nil)
-
+    local remaining = remainingOn(aura)
     if not remaining then
         return nil
     end
 
     return remaining, aura.mine
+end
+
+--- The time left on every copy of `spellName` on `unit`, in the order the
+-- numbers go on screen: yours first, then anyone else's, each in the order
+-- the client lists them. A list of { remaining = seconds, mine = ... },
+-- empty when the buff is not there or no copy of it can be timed.
+--
+-- `mine` is as HelpfulAuras gives it, and unknown counts as yours here as
+-- it does there: on your own unit the client attributes nothing.
+function Spells.AuraTimes(unit, spellName, auras)
+    local times = {}
+    if type(spellName) ~= "string" or spellName == "" then
+        return times
+    end
+
+    auras = auras or Spells.HelpfulAuras(unit)
+
+    local aura = auras[spellName]
+    if not aura then
+        return times
+    end
+
+    local others = {}
+    for _, copy in ipairs(aura.copies or { aura }) do
+        local remaining = remainingOn(copy)
+        if remaining then
+            local time = { remaining = remaining, mine = copy.mine }
+            table.insert(copy.mine == false and others or times, time)
+        end
+    end
+
+    for _, time in ipairs(others) do
+        times[#times + 1] = time
+    end
+
+    return times
 end
 
 -- How many of a unit's auras the report below prints one by one. A report is

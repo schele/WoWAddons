@@ -73,6 +73,14 @@ target independently, so a white 7s that turned out to be another druid's
 would be a heal you thought you had. Grey says "it is covered, and not by
 you".
 
+A buff can be on someone twice: two druids' Rejuvenations, or two of your
+own. Each copy runs out on its own, so each gets a number: the first under
+the icon, where a single one always is, and the second above it, in green so
+the two are not read as one. Yours come first, and somebody else's is dimmed
+in either place, so your Rejuvenation and another druid's read white under
+the icon and dark green above it. When the copy under the icon runs out, the
+one above moves down into its place and turns white.
+
 On your own row every number is white, because this client will not say who
 cast the buffs on your own unit: asked which of them you cast, it answers
 none, including the Mark of the Wild you cast on yourself a moment earlier.

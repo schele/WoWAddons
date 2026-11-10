@@ -140,6 +140,8 @@ local function makeWidget(kind, parent, template, env)
     -- to have a top sets one: row.top = 400.
     function widget:GetTop() return self.top end
     function widget:GetEffectiveScale() return self.__env.__uiScale or 1 end
+    -- Recorded: whether the frame cuts its descendants off at its own edges.
+    function widget:SetClipsChildren(value) self.clipsChildren = value and true or false end
     function widget:SetFrameLevel(value) self.frameLevel = value end
     function widget:GetFrameLevel() return self.frameLevel or 1 end
     function widget:SetMovable() end
@@ -355,6 +357,13 @@ function stub.newEnv()
     --   env.__auraSlotError = "the client's words"
     env.__auraContainer = false
 
+    -- The flow layout's enums (Blizzard_SharedXMLBase/AnchorUtil.lua), which
+    -- an aura container lays out its groups' frames by.
+    env.AnchorUtil = {
+        FlowLayoutAxis = { Horizontal = 0, Vertical = 1 },
+        FlowDirection = { Left = -1, Right = 1, Up = 1, Down = -1 },
+    }
+
     local function isDescendant(object, owner)
         local parent = object and object.parent
         while parent do
@@ -379,9 +388,60 @@ function stub.newEnv()
         return result
     end
 
+    --- One of the game's aura frames (CustomAuraButtonTemplate), as a slot or
+    -- a group hands them out.
+    local function makeAuraButton(container)
+        local frame = makeWidget("AuraButton", container, "CustomAuraButtonTemplate", env)
+        -- A Button with OnEnter and OnClick of its own
+        -- (Blizzard_AuraButton.xml), so it takes the mouse unless told not to.
+        frame.mouseEnabled = true
+
+        function frame:SetDurationText(label, textOptions)
+            if label ~= self and not isDescendant(label, self) then
+                error("bad object in function call (must be the owner or "
+                    .. "a direct or indirect descendant of owner)", 2)
+            end
+            self.durationText, self.durationOptions = label, textOptions
+        end
+
+        -- Played by the game as the frame comes on screen, and stopped as it
+        -- goes. Refused, as the client refuses it, for a group that is not
+        -- the frame's own: Blizzard_CustomAuraButton.
+        frame.shownAnimations = {}
+        function frame:AddAuraShownAnimation(group)
+            if not isDescendant(group, self) then
+                error("bad object in function call (must be a direct or "
+                    .. "indirect descendant of owner)", 2)
+            end
+            table.insert(self.shownAnimations, group)
+        end
+
+        -- Textures the game colours by the dispel type of the aura it
+        -- shows. The same ownership rule, and only a Texture.
+        frame.dispelTextures = {}
+        function frame:AddDispelTypeTexture(texture, textureOptions)
+            if not isDescendant(texture, self) then
+                error("bad object in function call (must be a direct or "
+                    .. "indirect descendant of owner)", 2)
+            end
+            if texture.kind ~= "Texture" then
+                error("bad object in function call (expected object type 'Texture')", 2)
+            end
+            table.insert(self.dispelTextures, { texture = texture, options = copy(textureOptions) })
+        end
+
+        return frame
+    end
+
+    -- How many frames a group makes the moment it is added, before any aura
+    -- needs one: CustomAuraContainerConstants.FrameCreationBatchSize.
+    local GROUP_BATCH = 10
+
     local function makeAuraContainer(parent, template)
         local container = makeWidget("AuraContainer", parent, template, env)
         container.slots = {}
+        container.groups = {}
+        container.groupOrder = {}
         container.filterWrites = 0
         container.refreshes = 0
 
@@ -397,53 +457,121 @@ function stub.newEnv()
             end
             options = options or {}
 
-            local slot = makeWidget("AuraButton", self, "CustomAuraButtonTemplate", env)
+            local slot = makeAuraButton(self)
             slot.key, slot.filterString = key, filterString
             slot.candidateFilters = copy(options.candidateFilters)
             slot.enabled = true
-            -- A Button with OnEnter and OnClick of its own
-            -- (Blizzard_AuraButton.xml), so it takes the mouse unless told not to.
-            slot.mouseEnabled = true
-
-            function slot:SetDurationText(label, textOptions)
-                if label ~= self and not isDescendant(label, self) then
-                    error("bad object in function call (must be the owner or "
-                        .. "a direct or indirect descendant of owner)", 2)
-                end
-                self.durationText, self.durationOptions = label, textOptions
-            end
-
-            -- Played by the game as the slot's frame comes on screen, and
-            -- stopped as it goes. Refused, as the client refuses it, for a
-            -- group that is not the frame's own: Blizzard_CustomAuraButton.
-            slot.shownAnimations = {}
-            function slot:AddAuraShownAnimation(group)
-                if not isDescendant(group, self) then
-                    error("bad object in function call (must be a direct or "
-                        .. "indirect descendant of owner)", 2)
-                end
-                table.insert(self.shownAnimations, group)
-            end
-
-            -- Textures the game colours by the dispel type of the aura it
-            -- shows. The same ownership rule, and only a Texture.
-            slot.dispelTextures = {}
-            function slot:AddDispelTypeTexture(texture, textureOptions)
-                if not isDescendant(texture, self) then
-                    error("bad object in function call (must be a direct or "
-                        .. "indirect descendant of owner)", 2)
-                end
-                if texture.kind ~= "Texture" then
-                    error("bad object in function call (expected object type 'Texture')", 2)
-                end
-                table.insert(self.dispelTextures, { texture = texture, options = copy(textureOptions) })
-            end
 
             self.slots[key] = slot
             if options.initializeFrame then
                 pcall(options.initializeFrame, slot)
             end
             return slot
+        end
+
+        -- A group shows as many of its matching auras as maxFrameCount
+        -- allows, each on a frame of its own, and the game places those
+        -- frames itself with the container's flow layout. A test stages a
+        -- refused AddAuraGroup with
+        --   env.__auraGroupError = "the client's words"
+        function container:AddAuraGroup(key, filterString, options)
+            if env.__auraGroupError then
+                error(env.__auraGroupError, 2)
+            end
+            options = options or {}
+
+            local group = {
+                key = key,
+                filterString = filterString,
+                candidateFilters = copy(options.candidateFilters),
+                maxFrameCount = options.maxFrameCount or math.huge,
+                layout = copy(options.layout) or {},
+                enabled = true,
+                frames = {},
+            }
+            self.groups[key] = group
+            table.insert(self.groupOrder, group)
+
+            -- Made up front, hidden until an aura needs one, each through
+            -- initializeFrame as a slot's frame is.
+            for index = 1, GROUP_BATCH do
+                local frame = makeAuraButton(self)
+                frame.shown = false
+                group.frames[index] = frame
+                if options.initializeFrame then
+                    pcall(options.initializeFrame, frame)
+                end
+            end
+        end
+
+        function container:GetAuraGroupFrameCount(key) return #self.groups[key].frames end
+        function container:GetAuraGroupFrame(key, index) return self.groups[key].frames[index] end
+
+        function container:SetAuraGroupEnabled(key, enabled)
+            self.groups[key].enabled = enabled and true or false
+        end
+
+        function container:SetAuraGroupCandidateFilters(key, filters)
+            self.filterWrites = self.filterWrites + 1
+            self.groups[key].candidateFilters = copy(filters)
+        end
+
+        function container:SetAuraGroupLayout(key, layout)
+            self.groups[key].layout = copy(layout) or {}
+        end
+
+        -- The container's flow layout, starting from the client's defaults
+        -- (CustomAuraContainerLayoutDefaults).
+        container.flow = {
+            axis = env.AnchorUtil.FlowLayoutAxis.Horizontal,
+            anchorPoint = "TOPLEFT",
+            horizontal = env.AnchorUtil.FlowDirection.Right,
+            vertical = env.AnchorUtil.FlowDirection.Down,
+        }
+        function container:SetFlowLayoutAxis(axis) self.flow.axis = axis end
+        function container:SetFlowLayoutAnchorPoint(point) self.flow.anchorPoint = point end
+        function container:SetFlowLayoutGrowthDirection(horizontal, vertical)
+            self.flow.horizontal, self.flow.vertical = horizontal, vertical
+        end
+
+        --- Test helper: the game finding `counts[key]` matching auras for
+        -- each group, and showing them as AnchorUtil.ApplyFlowLayout does:
+        -- groups in the order they were added, each frame anchored to the
+        -- container at the layout's anchor point, the cursor moving on by
+        -- the frame's size and its group's elementSpacing. One line only,
+        -- as nothing here sets a maximum line size. Returns the frames
+        -- shown, in order. Placed directly: this is the game's own code,
+        -- which combat does not stop.
+        function container:__showAuras(counts)
+            local flow = self.flow
+            local vertical = flow.axis == env.AnchorUtil.FlowLayoutAxis.Vertical
+            local direction = vertical and flow.vertical or flow.horizontal
+            local cursor = 0
+            local shown = {}
+
+            for _, group in ipairs(self.groupOrder) do
+                local wanted = group.enabled and math.min(counts[group.key] or 0, group.maxFrameCount) or 0
+                local spacing = group.layout.elementSpacing or 0
+
+                for index, frame in ipairs(group.frames) do
+                    if index <= wanted then
+                        local size = vertical
+                            and (group.layout.elementHeight or frame.height)
+                            or (group.layout.elementWidth or frame.width)
+                        frame.points = { {
+                            flow.anchorPoint, self, flow.anchorPoint,
+                            vertical and 0 or cursor, vertical and cursor or 0,
+                        } }
+                        frame.shown = true
+                        cursor = cursor + (size + spacing) * direction
+                        shown[#shown + 1] = frame
+                    else
+                        frame.shown = false
+                    end
+                end
+            end
+
+            return shown
         end
 
         function container:GetAuraSlotFrame(key) return self.slots[key] end

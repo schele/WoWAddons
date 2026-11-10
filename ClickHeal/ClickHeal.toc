@@ -3,7 +3,7 @@
 ## Notes: A row of spell buttons beside every party member.
 ## IconTexture: Interface\AddOns\ClickHeal\icon
 ## Author: Skyler
-## Version: 0.1.0
+## Version: 0.2.0
 ## X-Wago-ID: mNwwYBNo
 ## SavedVariables: ClickHealDB
 
