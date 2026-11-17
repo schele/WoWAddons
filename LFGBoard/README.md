@@ -67,13 +67,20 @@ Alerts switch. A Refresh never alerts: you are already looking.
 
 ## Whisper
 
-The button opens a whisper with the message already typed, so Enter sends
-it:
+The button, or an alert's **[Whisper]** link, writes a whisper at the foot
+of the board with the message already typed, so Enter sends it:
 
-    Hi! Level 20 feral druid, tank or dps. Room for me in Deadmines?
+    To Garrok: Hi! Level 20 feral druid, tank or dps. Room for me in Deadmines?   [Send] [Cancel]
 
 Your level and class, your biggest talent tree, and the roles of yours the
-group wants.
+group wants. Change it before sending if you like; Shift-click a link in a
+post to add it. Escape, Cancel or closing the board drops it.
+
+It is the board's own line, not the game's chat box, on purpose: when an
+addon opens that box or types into it, the game treats the box as the
+addon's until you reload, and then blocks sharing a map pin in chat and
+blames the addon. For the same reason, Shift-clicking a link on the board
+never puts it in the chat box.
 
 ## Commands
 

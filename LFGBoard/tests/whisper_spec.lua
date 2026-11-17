@@ -71,11 +71,113 @@ describe("the whisper", function()
         assertMatch("Room for me in your group%?$", ns.Whisper.Message(view(ns, { kind = "other", activity = false })))
     end)
 
-    it("opens a whisper to them, realm and all, with the message typed", function()
+end)
+
+describe("writing the whisper", function()
+    local MESSAGE = "Hi! Level 20 feral druid, tank or dps. Room for me in Deadmines?"
+
+    local function opened(extra)
         local ns, env = helpers.loggedIn()
+        ns.Whisper.Open(view(ns, extra or { whisperName = "Garrok-Aldira", roles = { tank = true, dps = true } }))
+        return ns, env, ns.Whisper.Composer()
+    end
 
-        ns.Whisper.Open(view(ns, { whisperName = "Garrok-Aldira", roles = { tank = true, dps = true } }))
+    it("opens at the foot of the board, to them, realm and all, with the message typed", function()
+        local ns, env, composer = opened()
 
-        assertEqual("/w Garrok-Aldira Hi! Level 20 feral druid, tank or dps. Room for me in Deadmines?", env.__openedChat)
+        assertTrue(ns.Window.Frame():IsShown(), "the board")
+        assertTrue(composer:IsShown())
+        assertEqual("To Garrok-Aldira:", composer.label:GetText())
+        assertEqual(MESSAGE, composer.box:GetText())
+        assertTrue(composer.box:HasFocus(), "ready for Enter")
+        assertFalse(ns.Window.Frame().footer:IsShown(), "in the footer's place")
+    end)
+
+    it("never opens the game's chat box", function()
+        local _, env = opened()
+        assertNil(env.__openedChat)
+    end)
+
+    it("sends it as a whisper on Enter, and closes", function()
+        local ns, env, composer = opened()
+
+        composer.box.scripts.OnEnterPressed(composer.box)
+
+        assertEqual(1, #env.__sent)
+        assertEqual(MESSAGE, env.__sent[1].text)
+        assertEqual("WHISPER", env.__sent[1].chatType)
+        assertEqual("Garrok-Aldira", env.__sent[1].target)
+        assertFalse(composer:IsShown())
+        assertTrue(ns.Window.Frame().footer:IsShown(), "the footer back")
+    end)
+
+    it("sends what was written over it, with Send", function()
+        local _, env, composer = opened()
+        composer.box:SetText("Hi, healer here")
+
+        composer.send:Click()
+
+        assertEqual("Hi, healer here", env.__sent[1].text)
+    end)
+
+    it("sends nothing when emptied", function()
+        local _, env, composer = opened()
+        composer.box:SetText("   ")
+
+        composer.box.scripts.OnEnterPressed(composer.box)
+
+        assertEqual(0, #env.__sent)
+        assertFalse(composer:IsShown())
+    end)
+
+    it("is dropped by Escape, by Cancel, and by closing the board", function()
+        local ns, env, composer = opened()
+        composer.box.scripts.OnEscapePressed(composer.box)
+        assertFalse(composer:IsShown(), "Escape")
+        assertFalse(composer.box:HasFocus())
+
+        ns.Whisper.Open(view(ns))
+        composer.cancel:Click()
+        assertFalse(composer:IsShown(), "Cancel")
+
+        ns.Whisper.Open(view(ns))
+        ns.Window.Frame():Hide()
+        assertFalse(composer:IsShown(), "the board closed")
+
+        assertEqual(0, #env.__sent)
+    end)
+
+    it("keeps what was written while the game holds chat back in a fight", function()
+        local _, env, composer = opened()
+        env.__chatLockdown = true
+
+        composer.box.scripts.OnEnterPressed(composer.box)
+
+        assertEqual(0, #env.__sent)
+        assertTrue(composer:IsShown())
+        assertEqual(MESSAGE, composer.box:GetText())
+        assertMatch("fight", helpers.printed(env))
+    end)
+
+    it("is replaced by the next one", function()
+        local ns, env, composer = opened()
+
+        ns.Whisper.Open(view(ns, { name = "Elandra", whisperName = "Elandra" }))
+        composer.box.scripts.OnEnterPressed(composer.box)
+
+        assertEqual("Elandra", env.__sent[1].target)
+    end)
+
+    it("takes a link put in it", function()
+        local ns, _, composer = opened()
+
+        assertTrue(ns.Whisper.Insert(" [Linen Cloth]"))
+
+        assertEqual(MESSAGE .. " [Linen Cloth]", composer.box:GetText())
+    end)
+
+    it("takes no link when none is being written", function()
+        local ns = helpers.loggedIn()
+        assertFalse(ns.Whisper.Insert("[Linen Cloth]"))
     end)
 end)

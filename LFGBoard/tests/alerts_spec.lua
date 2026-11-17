@@ -69,13 +69,17 @@ describe("an alert", function()
 end)
 
 describe("an alert's link", function()
-    it("opens the whisper", function()
+    it("opens the board with the whisper written, not the chat box", function()
         local ns, env = helpers.loggedIn()
         ns.Alerts.Consider(posted(ns, "Garrok", "LF1M DM need tank"))
 
         env.SetItemRef("lfgboard:whisper:garrok")
 
-        assertEqual("/w Garrok Hi! Level 20 feral druid, tank. Room for me in Deadmines?", env.__openedChat)
+        local composer = ns.Whisper.Composer()
+        assertTrue(ns.Window.Frame():IsShown())
+        assertEqual("To Garrok:", composer.label:GetText())
+        assertEqual("Hi! Level 20 feral druid, tank. Room for me in Deadmines?", composer.box:GetText())
+        assertNil(env.__openedChat)
     end)
 
     it("still opens the whisper after the row has gone", function()
@@ -85,7 +89,7 @@ describe("an alert's link", function()
 
         env.SetItemRef("lfgboard:whisper:garrok")
 
-        assertMatch("^/w Garrok Hi!", env.__openedChat)
+        assertMatch("^Hi!", ns.Whisper.Composer().box:GetText())
     end)
 
     it("leaves every other link to the game", function()
@@ -93,7 +97,7 @@ describe("an alert's link", function()
 
         env.SetItemRef("item:1234")
 
-        assertNil(env.__openedChat)
+        assertNil(ns.Whisper.Composer())
         assertEqual("item:1234", env.__itemRefs[1])
     end)
 end)

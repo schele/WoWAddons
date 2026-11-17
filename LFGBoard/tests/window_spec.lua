@@ -198,13 +198,16 @@ describe("the board's buttons", function()
         assertMatch("The group finder could not be searched: the group finder has no list for that tab%.", helpers.printed(env))
     end)
 
-    it("Whisper opens chat with the message typed", function()
-        local _, env, frame = opened()
+    it("Whisper writes the message at the foot of the board, not in the chat box", function()
+        local ns, env, frame = opened()
         helpers.say(env, "Garrok", "LFM DM need tank")
 
         frame.rows[1].whisper:Click()
 
-        assertMatch("^/w Garrok Hi! Level 20 feral druid, tank%.", env.__openedChat)
+        local composer = ns.Whisper.Composer()
+        assertEqual("To Garrok:", composer.label:GetText())
+        assertMatch("^Hi! Level 20 feral druid, tank%.", composer.box:GetText())
+        assertNil(env.__openedChat)
     end)
 end)
 
@@ -474,20 +477,38 @@ describe("links in what was said", function()
         assertEqual(row, call[4])
     end)
 
-    it("go into an open chat box on a Shift-click", function()
-        local _, env, row = boardWithLink()
+    it("go into the whisper being written on a Shift-click, never the chat box", function()
+        local ns, env, row = boardWithLink()
+        row.whisper:Click()
         env.__modifiedClick.CHATLINK = true
         env.__chatBoxOpen = true
+
         row.scripts.OnHyperlinkClick(row, "quest:155:18", DEFIAS, "LeftButton")
-        assertEqual(DEFIAS, env.__inserted[1])
+
+        assertMatch("^Hi!.*%?" .. DEFIAS:gsub("%p", "%%%0") .. "$", ns.Whisper.Composer().box:GetText())
+        assertEqual(0, #env.__inserted, "the chat box left alone")
         assertEqual(0, #env.__itemRefCalls, "not opened as well")
     end)
 
-    it("open as a click does on a Shift-click with no chat box open", function()
+    it("do nothing on a Shift-click with no whisper being written", function()
         local _, env, row = boardWithLink()
         env.__modifiedClick.CHATLINK = true
+        env.__chatBoxOpen = true
+
         row.scripts.OnHyperlinkClick(row, "quest:155:18", DEFIAS, "LeftButton")
-        assertEqual(1, #env.__itemRefCalls)
+
+        assertEqual(0, #env.__inserted, "the chat box left alone")
+        assertEqual(0, #env.__itemRefCalls, "the game puts a Shift-click in the chat box")
+    end)
+
+    it("leave a player's or a channel's link alone, which opens the chat box", function()
+        local _, env, row = boardWithLink()
+
+        row.scripts.OnHyperlinkClick(row, "player:Garrok", "[Garrok]", "LeftButton")
+        row.scripts.OnHyperlinkClick(row, "BNplayer:Garrok:1", "[Garrok]", "LeftButton")
+        row.scripts.OnHyperlinkClick(row, "channel:Trade", "[2. Trade]", "LeftButton")
+
+        assertEqual(0, #env.__itemRefCalls)
     end)
 
     it("leave the window moving when a row is dragged, and remember where", function()
@@ -501,8 +522,8 @@ describe("links in what was said", function()
     end)
 
     it("leave the Whisper button working", function()
-        local _, env, row = boardWithLink()
+        local ns, _, row = boardWithLink()
         row.whisper:Click()
-        assertMatch("Garrok", env.__openedChat or "")
+        assertEqual("To Garrok:", ns.Whisper.Composer().label:GetText())
     end)
 end)

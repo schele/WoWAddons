@@ -13,7 +13,8 @@ ns.AddDefaults({
     hideCompleted = true,
 })
 
-local WIDTH, HEIGHT = 820, 460
+-- Tall enough for the whisper line under the last row.
+local WIDTH, HEIGHT = 820, 468
 local ROW_HEIGHT = 28
 local LOGO = 16 -- the glyph before the name, sized to the title bar
 local LOGO_GAP = 6
@@ -171,10 +172,21 @@ local function showLink(row, link)
     end
 end
 
---- A link in what was said, clicked: what chat does. Shift puts it in an
--- open chat box; otherwise, or with no box open, the game opens it.
+-- Links the game answers by opening its chat box: a whisper to a player, a
+-- channel's line.
+local OPENS_CHAT = { player = true, BNplayer = true, playerCommunity = true, BNplayerCommunity = true, channel = true }
+
+--- A link in what was said, clicked: what chat does, short of the chat box.
+-- Shift puts it in the whisper being written. Nothing from here may put text
+-- in the game's chat box or open it, the game's handler included: that marks
+-- the box as LFGBoard's until a reload, and the game then blocks sharing a
+-- map pin in chat and blames LFGBoard (see Whisper.lua).
 local function clickLink(row, link, text, mouseButton)
-    if IsModifiedClick and IsModifiedClick("CHATLINK") and ChatEdit_InsertLink and ChatEdit_InsertLink(text) then
+    if IsModifiedClick and IsModifiedClick("CHATLINK") then
+        ns.Whisper.Insert(text)
+        return
+    end
+    if OPENS_CHAT[link:match("^([^:]+)")] then
         return
     end
     if SetItemRef then

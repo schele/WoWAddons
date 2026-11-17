@@ -68,6 +68,16 @@ local function makeWidget(env, kind, parent, template)
     function widget:SetHighlightTexture(value) self.highlightTexture = value end
     function widget:SetText(value) self.text = value end
     function widget:GetText() return self.text end
+    -- An edit box: who has the keyboard, and text put in at the cursor,
+    -- which the tests keep at the end.
+    function widget:SetAutoFocus(value) self.autoFocus = value end
+    function widget:SetMaxLetters(value) self.maxLetters = value end
+    function widget:SetTextInsets() end
+    function widget:SetCursorPosition(value) self.cursor = value end
+    function widget:SetFocus() env.__focus = self end
+    function widget:ClearFocus() if env.__focus == self then env.__focus = nil end end
+    function widget:HasFocus() return env.__focus == self end
+    function widget:Insert(value) self.text = (self.text or "") .. value end
     function widget:SetTextColor(...) self.textColor = { ... } end
     function widget:SetJustifyH(value) self.justifyH = value end
     function widget:SetWordWrap(value) self.wordWrap = value end
@@ -261,8 +271,18 @@ function stub.newEnv(saved)
         if class then return "Localized", class, "Race", "Race", 0, "Name", "" end
     end
 
-    -- Chat: the box a whisper opens in, and links clicked.
+    -- Chat: the game's own box, which the addon must never open, and links
+    -- clicked.
     function env.ChatFrame_OpenChat(text) env.__openedChat = text end
+    -- Chat the addon sends, and the lockdown that holds it back in a fight.
+    env.__sent = {}
+    env.__chatLockdown = false
+    env.C_ChatInfo = {
+        SendChatMessage = function(text, chatType, language, target)
+            table.insert(env.__sent, { text = text, chatType = chatType, language = language, target = target })
+        end,
+        InChatMessagingLockdown = function() return env.__chatLockdown end,
+    }
     env.__itemRefs = {}
     -- Every argument of each SetItemRef, for the board's links.
     env.__itemRefCalls = {}
