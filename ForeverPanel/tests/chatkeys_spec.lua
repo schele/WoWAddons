@@ -12,11 +12,28 @@ local function loggedIn()
     return ns, env
 end
 
---- Press the key that row's button is bound to.
-local function pressRow(ns, env, index)
-    local button = env["ForeverPanelChatKey" .. index]
-    button.scripts.OnClick(button)
-    return env.__chatOpenedWith
+--- Hold a combination down and let the game act on whatever it is bound to,
+-- the way the client does: an OPENCHAT binding runs Blizzard's own code.
+local function press(env, combination)
+    local parts = {}
+    for part in combination:gmatch("[^-]+") do
+        table.insert(parts, part)
+    end
+    local key = table.remove(parts)
+
+    env.modifiers = {}
+    for _, modifier in ipairs(parts) do
+        env.modifiers[modifier:lower()] = true
+    end
+    env.__keysDown = { [key] = true }
+
+    if env.__overrideBindings[combination] == "OPENCHAT" then
+        env.ChatFrameUtil.OpenChat(nil)
+    end
+
+    env.modifiers = {}
+    env.__keysDown = {}
+    return env.ChatFrame1EditBox
 end
 
 describe("chat keys while switched off", function()
@@ -25,17 +42,30 @@ describe("chat keys while switched off", function()
         helpers.login(ns, env)
 
         assertTrue(ns.db.chat.enabled, "ships on")
-        assertEqual("ForeverPanelChatKey2", env.__overrideBindings["CTRL-G"], "bound from login")
+        assertEqual("OPENCHAT", env.__overrideBindings["CTRL-G"], "bound from login")
     end)
 
     it("creates nothing whatsoever once it is switched off", function()
         local ns, env = helpers.loadAddon()
+        local openChat = env.ChatFrameUtil.OpenChat
         env.ForeverPanelDB = { chat = { enabled = false } }
         helpers.login(ns, env)
 
         assertFalse(ns.db.chat.enabled, "the stored choice wins over the default")
         assertTrue(next(env.__overrideBindings) == nil, "no key is taken")
-        assertTrue(env.ForeverPanelChatKey1 == nil, "not even the buttons exist")
+        assertTrue(env.ChatFrameUtil.OpenChat == openChat, "not even the hook exists")
+    end)
+
+    it("leaves the channel alone once switched off, though the hook stays", function()
+        local ns, env = loggedIn()
+
+        ns.db.chat.enabled = false
+        ns.ChatKeys.Apply()
+        env.__keysDown = { P = true }
+        env.modifiers = { ctrl = true }
+        env.ChatFrameUtil.OpenChat(nil)
+
+        assertEqual("SAY", env.ChatFrame1EditBox:GetChatType())
     end)
 
     it("releases every binding the moment it is switched off", function()
@@ -66,11 +96,25 @@ describe("chat key rows", function()
         assertTrue(#rows > 1, "more than one to start with")
     end)
 
-    it("binds each filled row to its own button", function()
+    -- Opening the chat box from addon code leaves the box, and the globals
+    -- that say which box is open, marked as the addon's. Blizzard then blocks
+    -- its own code that reads them, such as shift-clicking a map pin, which
+    -- copies to the clipboard. The game's binding opens it cleanly.
+    it("binds each filled row to the game's own open-chat key", function()
         local ns, env = loggedIn()
 
-        assertEqual("ForeverPanelChatKey1", env.__overrideBindings["CTRL-S"])
-        assertEqual("ForeverPanelChatKey2", env.__overrideBindings["CTRL-G"])
+        assertEqual("OPENCHAT", env.__overrideBindings["CTRL-S"])
+        assertEqual("OPENCHAT", env.__overrideBindings["CTRL-G"])
+    end)
+
+    it("never opens the chat box from its own code", function()
+        local ns, env = loggedIn()
+
+        press(env, "CTRL-P")
+
+        assertNil(env.__chatOpenedWith, "ChatFrame_OpenChat is not ours to call")
+        assertEqual(1, #env.__openChatCalls, "only the game's binding opened it")
+        assertEqual("<nil>", env.__openChatCalls[1])
     end)
 
     it("leaves a half-filled row unbound", function()
@@ -82,19 +126,111 @@ describe("chat key rows", function()
         assertTrue(env.__overrideBindings["CTRL-S"] == nil, "nothing to open, so nothing bound")
     end)
 
-    it("opens chat with the command and a trailing space", function()
+    it("opens chat on that row's channel", function()
         local ns, env = loggedIn()
 
-        assertEqual("/s ", pressRow(ns, env, 1), "cursor lands after the command")
+        local box = press(env, "CTRL-P")
+
+        assertEqual("PARTY", box:GetChatType())
+        assertEqual("PARTY", box.header, "and the header says so")
     end)
 
-    it("follows a row that has been retyped", function()
+    it("knows a chat type by any of its slash commands", function()
         local ns, env = loggedIn()
 
         ns.db.chat.keys[1].command = "/raid"
         ns.ChatKeys.Apply()
 
-        assertEqual("/raid ", pressRow(ns, env, 1))
+        assertEqual("RAID", press(env, "CTRL-S"):GetChatType())
+    end)
+
+    it("finds a type the game keeps in ChatTypeInfo itself, not its proxy", function()
+        local ns, env = loggedIn()
+
+        ns.db.chat.keys[1].command = "/o"
+        ns.ChatKeys.Apply()
+
+        assertEqual("OFFICER", press(env, "CTRL-S"):GetChatType())
+    end)
+
+    it("opens a numbered channel you are in", function()
+        local ns, env = loggedIn()
+        env.__channels[2] = "Trade - City"
+
+        ns.db.chat.keys[1].command = "/2"
+        ns.ChatKeys.Apply()
+        local box = press(env, "CTRL-S")
+
+        assertEqual("CHANNEL", box:GetChatType())
+        assertEqual(2, box:GetAttribute("channelTarget"))
+    end)
+
+    it("opens on the usual channel when you are not in that numbered one", function()
+        local ns, env = loggedIn()
+
+        ns.db.chat.keys[1].command = "/2"
+        ns.ChatKeys.Apply()
+
+        assertEqual("SAY", press(env, "CTRL-S"):GetChatType(), "outside a city, no Trade")
+    end)
+
+    it("whispers the name a row gives", function()
+        local ns, env = loggedIn()
+
+        ns.db.chat.keys[1].command = "/w Brannoc"
+        ns.ChatKeys.Apply()
+        local box = press(env, "CTRL-S")
+
+        assertEqual("WHISPER", box:GetChatType())
+        assertEqual("Brannoc", box:GetAttribute("tellTarget"))
+    end)
+
+    -- Typing text into the box from addon code taints it as surely as opening
+    -- it, so a row can only pick a channel. Anything else is left unbound
+    -- rather than half working.
+    it("leaves a row unbound when its command is not a channel", function()
+        local ns, env = loggedIn()
+
+        for _, command in ipairs({ "/trade", "/s hello", "/w", "/r", "/ping", "say" }) do
+            ns.db.chat.keys[1].command = command
+            ns.ChatKeys.Apply()
+            assertTrue(env.__overrideBindings["CTRL-S"] == nil, command .. " is not a channel")
+        end
+    end)
+
+    it("says which commands work", function()
+        local ns, env = loggedIn()
+
+        assertTrue(ns.ChatKeys.Resolve("/p") ~= nil)
+        assertNil(ns.ChatKeys.Resolve("/trade"))
+    end)
+
+    it("leaves the channel alone when chat is opened the usual way", function()
+        local ns, env = loggedIn()
+
+        local box = env.ChatFrameUtil.OpenChat(nil)
+
+        assertEqual("SAY", box:GetChatType(), "Enter, with no chat key held")
+    end)
+
+    it("only answers to the exact combination", function()
+        local ns, env = loggedIn()
+
+        env.__keysDown = { P = true }
+        env.modifiers = { ctrl = true, shift = true }
+        local box = env.ChatFrameUtil.OpenChat(nil)
+
+        assertEqual("SAY", box:GetChatType(), "Ctrl+Shift+P is not Ctrl+P")
+    end)
+
+    it("leaves a link alone that opens chat while the key happens to be held", function()
+        local ns, env = loggedIn()
+
+        env.__keysDown = { P = true }
+        env.modifiers = { ctrl = true }
+        local box = env.ChatFrameUtil.OpenChat("[Map Pin Location]")
+
+        assertEqual("SAY", box:GetChatType())
     end)
 
     it("rebinds when a key is changed", function()
@@ -104,7 +240,8 @@ describe("chat key rows", function()
         ns.ChatKeys.Apply()
 
         assertTrue(env.__overrideBindings["CTRL-S"] == nil, "the old key is released")
-        assertEqual("ForeverPanelChatKey1", env.__overrideBindings["ALT-Q"])
+        assertEqual("OPENCHAT", env.__overrideBindings["ALT-Q"])
+        assertEqual("SAY", press(env, "ALT-Q"):GetChatType())
     end)
 end)
 
@@ -258,7 +395,7 @@ describe("keeping the bindings applied", function()
         env.__overrideBindings = {}
         helpers.fire(env, "PLAYER_ENTERING_WORLD")
 
-        assertEqual("ForeverPanelChatKey2", env.__overrideBindings["CTRL-G"])
+        assertEqual("OPENCHAT", env.__overrideBindings["CTRL-G"])
     end)
 
 end)
@@ -285,7 +422,7 @@ describe("chat keys in combat", function()
         env.__inCombat = false
         helpers.fire(env, "PLAYER_REGEN_ENABLED")
 
-        assertEqual("ForeverPanelChatKey1", env.__overrideBindings["ALT-Q"])
+        assertEqual("OPENCHAT", env.__overrideBindings["ALT-Q"])
     end)
 end)
 

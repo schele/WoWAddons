@@ -400,8 +400,92 @@ function stub.newEnv()
         env.__overrideBindings = {}
     end
 
+    function env.SetOverrideBinding(owner, priority, key, command)
+        env.__overrideBindings[key] = command
+    end
+
+    -- The chat box, as far as the chat keys touch it. Blizzard keeps the
+    -- channel in attributes (chatType, tellTarget, channelTarget), and its
+    -- OPENCHAT binding opens the box from its own secure code.
+    local editBox = makeWidget("EditBox", env.ChatFrame1)
+    editBox.attributes = {}
+    function editBox:SetAttribute(name, value)
+        self.attributes[name] = value
+    end
+    function editBox:GetAttribute(name)
+        return self.attributes[name]
+    end
+    function editBox:SetChatType(chatType)
+        self:SetAttribute("chatType", chatType)
+    end
+    function editBox:GetChatType()
+        return self:GetAttribute("chatType")
+    end
+    function editBox:SetTellTarget(target)
+        self:SetAttribute("tellTarget", target)
+    end
+    function editBox:SetChannelTarget(target)
+        self:SetAttribute("channelTarget", target)
+    end
+    function editBox:UpdateHeader()
+        self.header = self:GetChatType()
+    end
+    editBox:SetAttribute("stickyType", "SAY")
+    editBox:SetChatType("SAY")
+    env.ChatFrame1EditBox = editBox
+
+    -- Every call, so a test can tell the game's binding opening the box from
+    -- the addon opening it, which is what taints it.
+    env.__openChatCalls = {}
+    env.ChatFrameUtil = {}
+    function env.ChatFrameUtil.OpenChat(text)
+        table.insert(env.__openChatCalls, text == nil and "<nil>" or text)
+        env.__activeChatBox = editBox
+        editBox:SetChatType(editBox:GetAttribute("stickyType"))
+        editBox:UpdateHeader()
+        return editBox
+    end
+    function env.ChatFrameUtil.GetActiveWindow()
+        return env.__activeChatBox
+    end
+
     function env.ChatFrame_OpenChat(text)
         env.__chatOpenedWith = text
+        return env.ChatFrameUtil.OpenChat(text)
+    end
+
+    -- Once the game has hashed the slash commands it moves each chat type
+    -- into a proxy behind __index, so most are not in ChatTypeInfo itself.
+    env.ChatTypeInfo = setmetatable({ OFFICER = {} }, {
+        __index = {
+            SAY = {}, PARTY = {}, RAID = {}, GUILD = {}, YELL = {}, EMOTE = {},
+            WHISPER = {}, CHANNEL = {}, REPLY = {},
+            PING = { ignoreChatTypeProcessing = true },
+        },
+    })
+    env.SLASH_SAY1, env.SLASH_SAY2 = "/s", "/say"
+    env.SLASH_PARTY1, env.SLASH_PARTY2 = "/p", "/party"
+    env.SLASH_RAID1, env.SLASH_RAID2 = "/ra", "/raid"
+    env.SLASH_GUILD1 = "/g"
+    env.SLASH_OFFICER1 = "/o"
+    env.SLASH_YELL1 = "/y"
+    env.SLASH_EMOTE1 = "/e"
+    env.SLASH_WHISPER1, env.SLASH_WHISPER2 = "/w", "/whisper"
+    env.SLASH_REPLY1 = "/r"
+    env.SLASH_PING1 = "/ping"
+
+    -- Channels joined, by number.
+    env.__channels = {}
+    function env.GetChannelName(id)
+        if env.__channels[id] then
+            return id, env.__channels[id]
+        end
+        return 0
+    end
+
+    env.__keysDown = {}
+    function env.IsKeyDown(key)
+        return env.__keysDown[key] == true
     end
 
     function env.IsControlKeyDown()
