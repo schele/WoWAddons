@@ -175,6 +175,16 @@ function Panel.Refresh()
         return
     end
 
+    -- A click in the bag grid lengthens the junk list above it, which would
+    -- slide the grid down under the mouse. While the mouse is there, only
+    -- grey out what was picked, and catch up once it leaves.
+    if ns.Picker.Hovered() then
+        Panel.waiting = true
+        ns.Picker.MarkTaken()
+        return
+    end
+    Panel.waiting = false
+
     Panel.sell:SetChecked(ns.db.sell)
     Panel.repair:SetChecked(ns.db.repair)
     Panel.undercut:SetChecked(ns.db.undercut)
@@ -304,16 +314,51 @@ local function ensureBuilt()
     Panel.bagsHeading = bagsHeading
     ns.Picker.Build(content, PANEL_WIDTH - PADDING * 2)
     ns.Picker.frame:SetPoint("TOPLEFT", bagsHeading, "BOTTOMLEFT", 0, -LIST_GAP)
+    ns.Picker.OnLeft = function()
+        if Panel.waiting then
+            Panel.Refresh()
+        end
+    end
 
     Panel.Refresh()
 end
 
--- The bag grid follows the bags, but only while the page is there to see
--- it: reading every slot on every loot would be work for nobody.
+-- Whether the page is on screen. IsVisible, not IsShown: the options window
+-- leaves the page it showed last shown when it closes, inside itself.
+local function onScreen()
+    return built and panel ~= nil and panel:IsVisible()
+end
+
+-- An item's name and price come from the server the first time it is asked
+-- about, and the answer arrives on its own, often many at once after a
+-- login. One redraw for the lot, a moment after the first.
+local redrawQueued = false
+local function redrawSoon()
+    if redrawQueued then
+        return
+    end
+    redrawQueued = true
+    C_Timer.After(0.1, function()
+        redrawQueued = false
+        if onScreen() then
+            Panel.Refresh()
+        end
+    end)
+end
+
+-- The bag grid follows the bags and the item answers, but only while the
+-- page is there to see it: reading every slot on every loot would be work
+-- for nobody.
 local bagWatcher = CreateFrame("Frame")
 bagWatcher:RegisterEvent("BAG_UPDATE_DELAYED")
-bagWatcher:SetScript("OnEvent", function()
-    if built and panel and panel:IsShown() then
+bagWatcher:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+bagWatcher:SetScript("OnEvent", function(_, event)
+    if not onScreen() then
+        return
+    end
+    if event == "GET_ITEM_INFO_RECEIVED" then
+        redrawSoon()
+    else
         Panel.Refresh()
     end
 end)

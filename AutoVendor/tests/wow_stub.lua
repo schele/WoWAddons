@@ -39,6 +39,18 @@ local function makeWidget(kind, parent, template)
         if self.scripts.OnHide then self.scripts.OnHide(self) end
     end
     function widget:IsShown() return self.shown end
+    -- Seen only when it and every frame it sits in are shown: the options
+    -- window keeps a closed page shown, inside itself.
+    function widget:IsVisible()
+        if not self.shown then return false end
+        if self.parent and self.parent.IsVisible then return self.parent:IsVisible() end
+        return true
+    end
+    -- Where the mouse is, as a test says.
+    function widget:IsMouseOver() return self.mouseOver == true end
+    function widget:EnableMouse(value) self.mouseEnabled = value end
+    function widget:SetDesaturated(value) self.desaturated = value and true or false end
+    function widget:SetAlpha(value) self.alpha = value end
     widget.points = {}
     function widget:SetPoint(...) table.insert(self.points, { ... }) end
     function widget:ClearAllPoints() self.points = {} end
@@ -285,6 +297,10 @@ function stub.newEnv(saved)
             if item and not env.__uncached[id] then return item.name end
         end,
     }
+
+    -- Shift, Ctrl or Alt held, when a test says so.
+    env.__modifierDown = false
+    function env.IsModifierKeyDown() return env.__modifierDown end
 
     function env.GetMoney() return env.__money end
     function env.CanMerchantRepair() return env.__canRepair end

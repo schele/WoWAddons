@@ -105,7 +105,91 @@ describe("clicking a bag icon", function()
     end)
 end)
 
+describe("clicking while the mouse is over the grid", function()
+    local function hovered()
+        local ns, env = loggedIn()
+        helpers.put(env, 0, 1, 2589) -- Linen Cloth
+        helpers.put(env, 0, 2, 117) -- Tough Jerky
+        ns.SettingsPanel.panel:Show()
+        ns.Picker.frame.mouseOver = true
+        return ns, env, shownButtons(ns.Picker)[1]
+    end
+
+    it("keeps the grid still, and greys out the icon clicked", function()
+        local ns, _, first = hovered()
+        local heading = ns.SettingsPanel.bagsHeading.points[#ns.SettingsPanel.bagsHeading.points][2]
+
+        click(first)
+
+        assertTrue(ns.Junk.Has(2589))
+        assertEqual(2589, first.itemID, "the icon under the mouse still shows what was clicked")
+        assertTrue(first.icon.desaturated)
+        local now = ns.SettingsPanel.bagsHeading.points[#ns.SettingsPanel.bagsHeading.points][2]
+        assertEqual(heading, now, "the grid has not moved")
+    end)
+
+    it("adds nothing more from an icon already clicked", function()
+        local ns, env, first = hovered()
+        click(first)
+        env.__printed = {}
+
+        click(first)
+
+        assertEqual("", helpers.printed(env))
+        assertFalse(ns.Junk.Has(117))
+    end)
+
+    it("redraws once the mouse has left the grid", function()
+        local ns, env, first = hovered()
+        click(first)
+
+        ns.Picker.frame.mouseOver = false
+        first.scripts.OnLeave(first)
+        env.__runAllTimers()
+
+        assertEqual(117, first.itemID)
+        assertFalse(first.icon.desaturated)
+        assertEqual("Linen Cloth", ns.SettingsPanel.junkRows[1].label:GetText())
+    end)
+
+    it("waits while the mouse only moves to another icon", function()
+        local ns, env, first = hovered()
+        click(first)
+
+        first.scripts.OnLeave(first)
+        env.__runAllTimers()
+
+        assertEqual(2589, first.itemID)
+    end)
+end)
+
+describe("a modified click on a bag icon", function()
+    it("puts nothing on the junk list: Shift-click is for linking", function()
+        local ns, env = loggedIn()
+        helpers.put(env, 0, 1, 2589)
+        ns.SettingsPanel.panel:Show()
+        env.__modifierDown = true
+
+        click(shownButtons(ns.Picker)[1])
+
+        assertFalse(ns.Junk.Has(2589))
+    end)
+end)
+
 describe("hovering a bag icon", function()
+    it("keeps the tooltip on the item the icon shows", function()
+        local ns, env = loggedIn()
+        helpers.put(env, 0, 1, 2589)
+        ns.SettingsPanel.panel:Show()
+        local button = shownButtons(ns.Picker)[1]
+        button.scripts.OnEnter(button)
+
+        button.itemID = 117
+        button:UpdateTooltip()
+
+        assertEqual(117, env.GameTooltip.itemID)
+    end)
+
     it("shows the item's tooltip, and hides it after", function()
         local ns, env = loggedIn()
         helpers.put(env, 0, 1, 2589)
@@ -156,10 +240,48 @@ describe("the bag grid and the bags", function()
         ns.SettingsPanel.panel:Show()
         assertEqual(0, #shownButtons(ns.Picker))
 
+        -- The server's answer arrives as its own event, not as a bag change.
         env.__uncached[2589] = nil
-        helpers.fire(env, "BAG_UPDATE_DELAYED")
+        helpers.fire(env, "GET_ITEM_INFO_RECEIVED", 2589, true)
+        env.__runAllTimers()
 
         assertEqual(1, #shownButtons(ns.Picker))
+    end)
+
+    it("redraws once for a burst of item answers", function()
+        local ns, env = opened()
+        local reads = 0
+        local sellable = ns.Bags.Sellable
+        ns.Bags.Sellable = function(...)
+            reads = reads + 1
+            return sellable(...)
+        end
+
+        helpers.fire(env, "GET_ITEM_INFO_RECEIVED", 2589, true)
+        helpers.fire(env, "GET_ITEM_INFO_RECEIVED", 117, true)
+        helpers.fire(env, "GET_ITEM_INFO_RECEIVED", 3300, true)
+        env.__runAllTimers()
+
+        assertEqual(1, reads)
+    end)
+
+    it("does no work once the options window has closed over the page", function()
+        local ns, env = opened()
+        -- The window closes; the page it holds is still shown, inside it.
+        env.SettingsPanel.shown = false
+        ns.SettingsPanel.panel.parent = env.SettingsPanel
+        local reads = 0
+        local sellable = ns.Bags.Sellable
+        ns.Bags.Sellable = function(...)
+            reads = reads + 1
+            return sellable(...)
+        end
+
+        helpers.fire(env, "BAG_UPDATE_DELAYED")
+        helpers.fire(env, "GET_ITEM_INFO_RECEIVED", 2589, true)
+        env.__runAllTimers()
+
+        assertEqual(0, reads)
     end)
 
     it("wraps to a new row after ten icons, and the page grows with it", function()

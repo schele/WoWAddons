@@ -16,6 +16,28 @@ local HIGHLIGHT = "Interface\\Buttons\\ButtonHilight-Square"
 -- hidden when it is smaller, so a redraw never leaves frames behind.
 Picker.buttons = {}
 
+--- Whether the mouse is over the grid. While it is, the page holds the grid
+-- still: each click lengthens the junk list above it, and a grid that slid
+-- down under the mouse would put the next click on another item.
+function Picker.Hovered()
+    local frame = Picker.frame
+    return frame ~= nil and frame.IsMouseOver ~= nil and frame:IsMouseOver() and true or false
+end
+
+--- Called once the mouse has left the grid, for the page to catch up. Set
+-- by the page.
+Picker.OnLeft = nil
+
+-- Leaving one icon may only be moving to the next, so look again once the
+-- mouse has arrived wherever it was going.
+local function leaving()
+    C_Timer.After(0, function()
+        if Picker.OnLeft and not Picker.Hovered() then
+            Picker.OnLeft()
+        end
+    end)
+end
+
 --- Make the grid on `parent`, `width` across. The page anchors
 -- `Picker.frame`; until `Refresh` it shows nothing.
 function Picker.Build(parent, width)
@@ -23,6 +45,10 @@ function Picker.Build(parent, width)
 
     local frame = CreateFrame("Frame", nil, parent)
     frame:SetSize(width, ICON)
+    -- Takes the mouse between the icons too, so leaving the grid through a
+    -- gap is noticed as much as leaving it from an icon.
+    frame:EnableMouse(true)
+    frame:SetScript("OnLeave", leaving)
     Picker.frame = frame
 
     local empty = frame:CreateFontString(nil, "ARTWORK", "GameFontDisable")
@@ -54,21 +80,44 @@ local function addButton(index)
     button:SetHighlightTexture(HIGHLIGHT, "ADD")
 
     button:SetScript("OnEnter", showTooltip)
+    -- The game's tooltip asks its owner to redraw it while it shows, so it
+    -- names what the icon holds now, not what it held when the mouse came.
+    button.UpdateTooltip = showTooltip
     button:SetScript("OnLeave", function()
         if GameTooltip then
             GameTooltip:Hide()
         end
+        leaving()
     end)
     -- The button's item changes as the grid redraws, so the click reads it
-    -- then rather than holding the one it was made for.
+    -- then rather than holding the one it was made for. A plain click only:
+    -- Shift-click means "link this" everywhere else, and an item put on the
+    -- junk list by surprise is sold at the next merchant. An icon already
+    -- clicked, still showing while the mouse is over the grid, does nothing.
     button:SetScript("OnClick", function(self)
-        if self.itemID then
-            ns.Junk.Add(self.itemID, self.name)
+        if not self.itemID or self.taken then
+            return
         end
+        if IsModifierKeyDown and IsModifierKeyDown() then
+            return
+        end
+        ns.Junk.Add(self.itemID, self.name)
     end)
 
     Picker.buttons[index] = button
     return button
+end
+
+--- Grey out each icon whose item has gone on a list, without moving
+-- anything: what the grid shows while the mouse is still over it.
+function Picker.MarkTaken()
+    for _, button in ipairs(Picker.buttons) do
+        if button.itemID and (ns.Junk.Has(button.itemID) or ns.Keep.Has(button.itemID)) then
+            button.taken = true
+            button.icon:SetDesaturated(true)
+            button:SetAlpha(0.5)
+        end
+    end
 end
 
 --- Draw the grid from the bags as they are now. How tall it stands.
@@ -83,13 +132,17 @@ function Picker.Refresh()
         button:SetPoint("TOPLEFT", Picker.frame, "TOPLEFT", column * (ICON + GAP), -row * (ICON + GAP))
         button.itemID = item.itemID
         button.name = item.name
+        button.taken = false
         button.icon:SetTexture(item.icon)
+        button.icon:SetDesaturated(false)
+        button:SetAlpha(1)
         button:Show()
     end
     for index = #items + 1, #Picker.buttons do
         local button = Picker.buttons[index]
         button.itemID = nil
         button.name = nil
+        button.taken = false
         button:Hide()
     end
 
