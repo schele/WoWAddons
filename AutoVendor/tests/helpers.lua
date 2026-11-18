@@ -6,6 +6,7 @@ M.FILES = {
     "AutoVendor.lua",
     "Bags.lua",
     "Keep.lua",
+    "Junk.lua",
     "Vendor.lua",
     "Auction.lua",
     "Settings.lua",

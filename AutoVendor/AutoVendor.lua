@@ -44,6 +44,44 @@ function ns.Guarded(fn, whenUnknown)
     return whenUnknown
 end
 
+--- An item's name from its ID, or nil when the client has not described it.
+function ns.ItemName(itemID)
+    return ns.Guarded(function()
+        if C_Item and C_Item.GetItemNameByID then
+            local name = C_Item.GetItemNameByID(itemID)
+            if type(name) == "string" then
+                return name
+            end
+        end
+        local getItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+        local name = getItemInfo and getItemInfo(itemID)
+        return type(name) == "string" and name or nil
+    end, nil)
+end
+
+--- An item from what was typed: a Shift-clicked link, or a bare number.
+-- Its ID and its name, or nil for anything else. The keep list and the junk
+-- list both read their commands through here.
+function ns.ReadItem(text)
+    local id, name = text:match("|Hitem:(%d+)[^|]*|h%[(.-)%]|h")
+    if id then
+        return tonumber(id), name
+    end
+
+    id = text:match("^(%d+)$")
+    if id then
+        id = tonumber(id)
+        return id, ns.ItemName(id) or ("item " .. id)
+    end
+
+    return nil
+end
+
+--- An item's name as chat shows it: "[Linen Cloth]".
+function ns.ShownItem(name)
+    return "[" .. name .. "]"
+end
+
 --- Copper as the game writes money, coin icons and all; "1g 23s 4c" on a
 -- client without that.
 function ns.Money(copper)

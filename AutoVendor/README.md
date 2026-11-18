@@ -57,10 +57,25 @@ Items AutoVendor never sells, shared by all your characters.
 |---|---|
 | `/av keep` then Shift-click an item | Never sell it |
 | `/av unkeep` then Shift-click an item | Sell it again |
-| `/av list` | Show the list |
+| `/av list` | Show the keep list and the junk list |
 
 An item number works in place of a Shift-clicked link: `/av keep 7073`.
 `/autovendor` is the same as `/av`.
+
+## The junk list
+
+Items AutoVendor always sells, along with the greys, whatever their
+quality: the low-level white items you have outgrown, say. Shared by all
+your characters, like the keep list. An item is on one list at most, so
+putting a kept item on the junk list takes it off the keep list, and the
+other way round.
+
+| Command | Does |
+|---|---|
+| `/av junk` then Shift-click an item | Always sell it |
+| `/av unjunk` then Shift-click an item | Stop selling it |
+
+An item number works here too: `/av junk 2589`.
 
 ## The settings page
 

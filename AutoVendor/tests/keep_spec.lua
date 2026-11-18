@@ -96,6 +96,46 @@ describe("/av list", function()
         local foot = printed:find("[Rabbit's Foot]", 1, true)
         assertTrue(fang and foot and fang < foot)
     end)
+
+    it("names both lists, kept items first", function()
+        local _, env = ready()
+        helpers.command(env, "keep 3300")
+        helpers.command(env, "junk 2589")
+        env.__printed = {}
+
+        helpers.command(env, "list")
+
+        local printed = helpers.printed(env)
+        local never = printed:find("Never sold:", 1, true)
+        local foot = printed:find("[Rabbit's Foot]", 1, true)
+        local always = printed:find("Always sold:", 1, true)
+        local cloth = printed:find("[Linen Cloth]", 1, true)
+        assertTrue(never and foot and always and cloth, printed)
+        assertTrue(never < foot and foot < always and always < cloth, printed)
+    end)
+
+    it("says each empty list is empty", function()
+        local _, env = ready()
+
+        helpers.command(env, "list")
+
+        local printed = helpers.printed(env)
+        assertMatch("Nothing is on the keep list%.", printed)
+        assertMatch("Nothing is on the junk list%.", printed)
+    end)
+end)
+
+describe("keeping a listed item", function()
+    it("takes it off the junk list, and says so", function()
+        local ns, env = ready()
+        helpers.command(env, "junk 2589")
+
+        helpers.command(env, "keep 2589")
+
+        assertFalse(ns.Junk.Has(2589))
+        assertTrue(ns.Keep.Has(2589))
+        assertMatch("Keeping %[Linen Cloth%]: it will not be sold%. It is off the junk list%.", helpers.printed(env))
+    end)
 end)
 
 describe("the keep list", function()
