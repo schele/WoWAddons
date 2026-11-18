@@ -44,7 +44,7 @@ are shared by all your characters.
 
 | Command | Does |
 |---|---|
-| `/av sell` | Turn selling grey items off, or on again |
+| `/av sell` | Turn selling grey items and your junk list off, or on again |
 | `/av repair` | Turn repairing off, or on again |
 | `/av undercut` | Turn undercutting at the auction house off, or on again |
 

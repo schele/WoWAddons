@@ -67,12 +67,12 @@ describe("the settings page", function()
 
     it("shows the version from the addon's metadata", function()
         local _, _, panel = opened()
-        assertTrue(hasText(panel.panel, "^Version 9%.9%.9$"))
+        assertTrue(hasText(panel.content, "^Version 9%.9%.9$"))
     end)
 
     it("says what AutoVendor does", function()
         local _, _, panel = opened()
-        assertTrue(hasText(panel.panel, "grey"))
+        assertTrue(hasText(panel.content, "grey"))
     end)
 
     it("is not built until it is first shown", function()
@@ -130,7 +130,7 @@ describe("the page's switches", function()
     it("are labelled with what they do", function()
         local _, _, panel = opened()
         assertTrue(hasText(panel.repair, "^Repair my gear at merchants that can$"))
-        assertTrue(hasText(panel.sell, "^Sell grey items$"))
+        assertTrue(hasText(panel.sell, "^Sell grey items and my junk list$"))
         assertTrue(hasText(panel.undercut, "^Post auctions one copper under the cheapest$"))
     end)
 
@@ -254,6 +254,108 @@ describe("the page's kept items", function()
         ns.db.keep[1411] = "Withered Staff"
         panel.panel:Show()
         assertEqual("Withered Staff", shownNames(panel))
+    end)
+end)
+
+--- The junk list's names the page is showing, top to bottom.
+local function shownJunk(panel)
+    local names = {}
+    for _, row in ipairs(panel.junkRows) do
+        if row.frame:IsShown() then
+            names[#names + 1] = row.label:GetText()
+        end
+    end
+    return table.concat(names, ", ")
+end
+
+describe("the page's junk list", function()
+    it("says nothing is always sold, and how to add something", function()
+        local _, _, panel = opened()
+        assertEqual("", shownJunk(panel))
+        assertTrue(panel.junkEmpty:IsShown())
+        assertEqual("Nothing is always sold. Click an item in your bags below to add it.", panel.junkEmpty:GetText())
+        assertTrue(hasText(panel.content, "^Always sold$"))
+    end)
+
+    it("lists every listed item by name, in name order", function()
+        local ns, env = loggedIn()
+        helpers.command(env, "junk 117")
+        helpers.command(env, "junk 2589")
+        ns.SettingsPanel.panel:Show()
+        assertEqual("Linen Cloth, Tough Jerky", shownJunk(ns.SettingsPanel))
+        assertFalse(ns.SettingsPanel.junkEmpty:IsShown())
+    end)
+
+    it("stops selling an item from its row's button, as /av unjunk does", function()
+        local ns, env = loggedIn()
+        helpers.command(env, "junk 2589")
+        local panel = ns.SettingsPanel
+        panel.panel:Show()
+
+        local row = panel.junkRows[1]
+        assertEqual("Stop selling", row.button:GetText())
+        row.button.scripts.OnClick(row.button)
+
+        assertFalse(ns.Junk.Has(2589))
+        assertMatch("No longer selling %[Linen Cloth%]%.", helpers.printed(env))
+        assertEqual("", shownJunk(panel))
+        assertTrue(panel.junkEmpty:IsShown())
+    end)
+
+    it("follows /av junk and /av unjunk while the page is open", function()
+        local _, env, panel = opened()
+        helpers.command(env, "junk 2589")
+        assertEqual("Linen Cloth", shownJunk(panel))
+        helpers.command(env, "unjunk 2589")
+        assertEqual("", shownJunk(panel))
+    end)
+
+    it("hangs under the keep list, however long that is", function()
+        local ns, env = loggedIn()
+        helpers.command(env, "keep 3300")
+        helpers.command(env, "keep 7073")
+        local panel = ns.SettingsPanel
+        panel.panel:Show()
+
+        local to, where, y = anchor(panel.junkHeading)
+        assertEqual(panel.rows[2].frame, to)
+        assertEqual("BOTTOMLEFT", where)
+        assertEqual(-12, y)
+
+        helpers.command(env, "unkeep 3300")
+        helpers.command(env, "unkeep 7073")
+        assertEqual(panel.empty, (anchor(panel.junkHeading)))
+    end)
+
+    it("puts its rows just under its heading", function()
+        local ns, env = loggedIn()
+        helpers.command(env, "junk 2589")
+        local panel = ns.SettingsPanel
+        panel.panel:Show()
+
+        local to, where = anchor(panel.junkRows[1].frame)
+        assertEqual(panel.junkHeading, to)
+        assertEqual("BOTTOMLEFT", where)
+        assertEqual(panel.junkHeading, (anchor(panel.junkEmpty)))
+    end)
+end)
+
+describe("the page's scrolling", function()
+    it("puts the whole page inside the scroll frame", function()
+        local _, _, panel = opened()
+        assertEqual(panel.content, panel.scroll.scrollChild)
+        assertEqual(panel.content, panel.hint.parent)
+        assertEqual(panel.content, panel.logo.parent)
+    end)
+
+    it("grows by a row for each listed item", function()
+        local _, env, panel = opened()
+        helpers.command(env, "junk 2589")
+        local one = panel.content:GetHeight()
+        helpers.command(env, "junk 117")
+        local two = panel.content:GetHeight()
+        assertTrue(one > 0, "a height is set")
+        assertEqual(24, two - one)
     end)
 end)
 

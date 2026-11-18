@@ -1,8 +1,9 @@
 local addonName, ns = ...
 
 -- AutoVendor's page in the game's options window: what it does, the switches
--- /av sell and /av repair flip, as checkboxes, and the keep list, each item
--- with a button that sells it again, the way /av unkeep does.
+-- /av sell and /av repair flip, as checkboxes, the keep list, each item with
+-- a button that sells it again, the way /av unkeep does, and the junk list,
+-- each item with a button that stops selling it, the way /av unjunk does.
 
 local PADDING = 16
 -- Big enough to read as a logo beside a GameFontNormalLarge title without
@@ -15,21 +16,31 @@ local BUTTON_WIDTH = 90
 -- The step from one box to the next: the boxes are 32 tall, so 2 of overlap
 -- keeps them a ROW_HEIGHT apart.
 local CHECK_STEP = 2
+-- Under the description, before the first switch.
+local SWITCH_GAP = 16
 -- Under a section heading, before what it heads.
 local LIST_GAP = 8
+-- Above a section heading, after what came before it.
+local SECTION_GAP = 12
 
 local Panel = {}
 ns.SettingsPanel = Panel
 
--- One per kept item, made as the list first grows that long and kept after,
+-- One per listed item, made as a list first grows that long and kept after,
 -- hidden when the list is shorter, so a refresh never leaves frames behind.
 Panel.rows = {}
+Panel.junkRows = {}
 
-local panel, category, built
+-- `content` is what everything on the page is made on: the scroll frame's
+-- child, or the panel itself on a client without the scroll template.
+local panel, content, category, built
+
+-- The keep list and the junk list, once built.
+local keepList, junkList
 
 --- A checkbox hung under `above`, with its label beside it.
 local function addCheckbox(text, above, x, y, onClick)
-    local button = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+    local button = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
     button:SetPoint("TOPLEFT", above, "BOTTOMLEFT", x, y)
 
     -- The label belongs to the template on some clients and not others, so
@@ -44,10 +55,10 @@ local function addCheckbox(text, above, x, y, onClick)
     return button
 end
 
---- The kept items, by name, so the page reads the same as /av list.
-local function sortedKeep()
+--- A list's items, by name, so the page reads the same as /av list.
+local function sorted(list)
     local items = {}
-    for itemID, name in pairs(ns.Keep.All()) do
+    for itemID, name in pairs(list) do
         items[#items + 1] = { itemID = itemID, name = name }
     end
     table.sort(items, function(a, b)
@@ -59,15 +70,32 @@ local function sortedKeep()
     return items
 end
 
-local function addRow(index)
-    local frame = CreateFrame("Frame", nil, panel)
+--- A list on the page: its heading, the words shown while it is empty, and
+-- a row per item with a button that takes the item off (`remove`).
+local function makeList(headingText, emptyText, buttonText, remove, rows)
+    local list = { rows = rows, buttonText = buttonText, remove = remove }
+
+    list.heading = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    list.heading:SetText(headingText)
+
+    -- In the first row's place, so the page has something there either way.
+    list.empty = content:CreateFontString(nil, "ARTWORK", "GameFontDisable")
+    list.empty:SetPoint("TOPLEFT", list.heading, "BOTTOMLEFT", 0, -LIST_GAP)
+    list.empty:SetWidth(PANEL_WIDTH - PADDING * 2)
+    list.empty:SetJustifyH("LEFT")
+    list.empty:SetText(emptyText)
+    return list
+end
+
+local function addRow(list, index)
+    local frame = CreateFrame("Frame", nil, content)
     frame:SetSize(PANEL_WIDTH - PADDING * 2, ITEM_HEIGHT)
-    frame:SetPoint("TOPLEFT", Panel.heading, "BOTTOMLEFT", 0, -LIST_GAP - (index - 1) * ITEM_HEIGHT)
+    frame:SetPoint("TOPLEFT", list.heading, "BOTTOMLEFT", 0, -LIST_GAP - (index - 1) * ITEM_HEIGHT)
 
     local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     button:SetSize(BUTTON_WIDTH, 20)
     button:SetPoint("LEFT", frame, "LEFT", 0, 0)
-    button:SetText("Sell again")
+    button:SetText(list.buttonText)
 
     local label = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     label:SetPoint("LEFT", button, "RIGHT", 8, 0)
@@ -80,15 +108,65 @@ local function addRow(index)
     -- rather than holding the one it was made for.
     button:SetScript("OnClick", function()
         if row.itemID then
-            ns.Keep.Remove(row.itemID)
+            list.remove(row.itemID)
         end
     end)
 
-    Panel.rows[index] = row
+    list.rows[index] = row
     return row
 end
 
---- Show what is saved. Safe to call before the page is built: Keep.lua calls
+--- Show a list's items, or that it is empty. Remembers how many it shows,
+-- for what hangs below it.
+local function fillList(list, saved)
+    local items = sorted(saved)
+    for index, item in ipairs(items) do
+        local row = list.rows[index] or addRow(list, index)
+        row.itemID = item.itemID
+        row.label:SetText(item.name)
+        row.frame:Show()
+    end
+    for index = #items + 1, #list.rows do
+        local row = list.rows[index]
+        row.itemID = nil
+        row.frame:Hide()
+    end
+
+    list.shown = #items
+    if #items == 0 then
+        list.empty:Show()
+    else
+        list.empty:Hide()
+    end
+end
+
+--- The last thing a list shows: its bottom row, or its empty line.
+local function lastOf(list)
+    if list.shown > 0 then
+        return list.rows[list.shown].frame
+    end
+    return list.empty
+end
+
+--- How tall a list stands, from the gap above its heading to its last line.
+local function listHeight(list)
+    local below = list.shown > 0 and list.shown * ITEM_HEIGHT or list.empty:GetStringHeight()
+    return SECTION_GAP + list.heading:GetStringHeight() + LIST_GAP + below
+end
+
+--- The last thing on the page so far, for more to hang below.
+function Panel.Bottom()
+    return lastOf(junkList)
+end
+
+--- The page's full height, so the scroll frame knows how far it goes.
+local function pageHeight()
+    local top = PADDING + ROW_HEIGHT + Panel.hint:GetStringHeight()
+    local switches = SWITCH_GAP + 3 * ROW_HEIGHT + CHECK_STEP
+    return top + switches + listHeight(keepList) + listHeight(junkList) + PADDING
+end
+
+--- Show what is saved. Safe to call before the page is built: the lists call
 -- it on every change, from a command as much as from here.
 function Panel.Refresh()
     if not built then
@@ -99,24 +177,47 @@ function Panel.Refresh()
     Panel.repair:SetChecked(ns.db.repair)
     Panel.undercut:SetChecked(ns.db.undercut)
 
-    local items = sortedKeep()
-    for index, item in ipairs(items) do
-        local row = Panel.rows[index] or addRow(index)
-        row.itemID = item.itemID
-        row.label:SetText(item.name)
-        row.frame:Show()
-    end
-    for index = #items + 1, #Panel.rows do
-        local row = Panel.rows[index]
-        row.itemID = nil
-        row.frame:Hide()
-    end
+    fillList(keepList, ns.Keep.All())
+    fillList(junkList, ns.Junk.All())
 
-    if #items == 0 then
-        Panel.empty:Show()
-    else
-        Panel.empty:Hide()
+    -- The junk list starts wherever the keep list ends.
+    junkList.heading:ClearAllPoints()
+    junkList.heading:SetPoint("TOPLEFT", lastOf(keepList), "BOTTOMLEFT", 0, -SECTION_GAP)
+
+    content:SetHeight(pageHeight())
+end
+
+--- The page scrolls: with both lists it can outgrow the options window. As
+-- ForeverPanel's page does.
+local function buildScroll()
+    local ok, scroll = pcall(CreateFrame, "ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    if not (ok and scroll and scroll.SetScrollChild) then
+        content = panel
+        return
     end
+    -- Room on the right for the template's scroll bar.
+    scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, -4)
+    scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -28, 4)
+    -- The bar only while there is more than fits. The template's own
+    -- scrollBarHideable is not honoured on every client, so this runs after
+    -- its handler, which shows the bar greyed out.
+    local function fitScrollBar()
+        local bar = scroll.ScrollBar
+        if bar and scroll.GetVerticalScrollRange then
+            local needed = (scroll:GetVerticalScrollRange() or 0) > 0
+            bar:SetShown(needed)
+            if not needed and scroll.SetVerticalScroll then
+                scroll:SetVerticalScroll(0)
+            end
+        end
+    end
+    scroll:HookScript("OnScrollRangeChanged", fitScrollBar)
+    scroll:HookScript("OnShow", fitScrollBar)
+
+    content = CreateFrame("Frame", nil, scroll)
+    content:SetSize(PANEL_WIDTH, 1)
+    scroll:SetScrollChild(content)
+    Panel.scroll = scroll
 end
 
 local function ensureBuilt()
@@ -125,42 +226,45 @@ local function ensureBuilt()
     end
     built = true
 
+    buildScroll()
+    Panel.content = content
+
     -- logo, not icon: icon.tga carries the square tile the AddOns list
     -- needs, which on a dark panel reads as a sticker pasted on. logo.tga is
     -- the same coins alone, on transparency.
-    local logo = panel:CreateTexture(nil, "ARTWORK")
+    local logo = content:CreateTexture(nil, "ARTWORK")
     logo:SetSize(LOGO_SIZE, LOGO_SIZE)
     logo:SetPoint("TOPLEFT", PADDING, -PADDING)
     logo:SetTexture("Interface\\AddOns\\" .. addonName .. "\\logo")
     Panel.logo = logo
 
-    local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    local title = content:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
     title:SetText("AutoVendor")
 
     local metadata = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
-    local version = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    local version = content:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     version:SetPoint("LEFT", title, "RIGHT", 8, -2)
     version:SetText("Version " .. ((metadata and metadata(addonName, "Version")) or "unknown"))
 
     -- From here down, each part hangs from the one above it, so a
     -- description that wraps to another line pushes the rest down instead
     -- of running into it.
-    local hint = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    local hint = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     hint:SetPoint("TOPLEFT", PADDING, -PADDING - ROW_HEIGHT)
     hint:SetWidth(PANEL_WIDTH - PADDING * 2)
     hint:SetJustifyH("LEFT")
     hint:SetText(
-        "Open a merchant and your grey items are sold and your gear repaired, "
-        .. "without a click. Nothing better than grey is ever sold, and nothing "
-        .. "on the list below. At the auction house, a new auction asks one "
-        .. "copper under the cheapest listing."
+        "Open a merchant and your grey items, and anything on your junk list, "
+        .. "are sold and your gear repaired, without a click. Nothing on the "
+        .. "keep list is ever sold. At the auction house, a new auction asks "
+        .. "one copper under the cheapest listing."
     )
     Panel.hint = hint
 
     -- The box's art has a few pixels of empty margin; pulled left by that
     -- much, the box itself lines up with the text above.
-    Panel.sell = addCheckbox("Sell grey items", hint, 0, -16, function(value)
+    Panel.sell = addCheckbox("Sell grey items and my junk list", hint, 0, -SWITCH_GAP, function(value)
         ns.Vendor.SetSell(value)
     end)
     Panel.repair = addCheckbox("Repair my gear at merchants that can", Panel.sell, 0, CHECK_STEP, function(value)
@@ -170,20 +274,24 @@ local function ensureBuilt()
         ns.Auction.SetUndercut(value)
     end)
 
+    keepList = makeList("Never sold",
+        "Nothing is kept. To keep an item, type /av keep and Shift-click it.",
+        "Sell again", function(itemID)
+            ns.Keep.Remove(itemID)
+        end, Panel.rows)
     -- Back by the margin, and less of a gap than under the description: the
     -- box's empty margin below makes up the rest.
-    local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    heading:SetPoint("TOPLEFT", Panel.undercut, "BOTTOMLEFT", 0, -12)
-    heading:SetText("Never sold")
-    Panel.heading = heading
+    keepList.heading:SetPoint("TOPLEFT", Panel.undercut, "BOTTOMLEFT", 0, -SECTION_GAP)
+    Panel.heading = keepList.heading
+    Panel.empty = keepList.empty
 
-    -- In the first row's place, so the page has something there either way.
-    local empty = panel:CreateFontString(nil, "ARTWORK", "GameFontDisable")
-    empty:SetPoint("TOPLEFT", heading, "BOTTOMLEFT", 0, -LIST_GAP)
-    empty:SetWidth(PANEL_WIDTH - PADDING * 2)
-    empty:SetJustifyH("LEFT")
-    empty:SetText("Nothing is kept. To keep an item, type /av keep and Shift-click it.")
-    Panel.empty = empty
+    junkList = makeList("Always sold",
+        "Nothing is always sold. Click an item in your bags below to add it.",
+        "Stop selling", function(itemID)
+            ns.Junk.Remove(itemID)
+        end, Panel.junkRows)
+    Panel.junkHeading = junkList.heading
+    Panel.junkEmpty = junkList.empty
 
     Panel.Refresh()
 end

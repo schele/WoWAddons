@@ -45,6 +45,15 @@ local function makeWidget(kind, parent, template)
     function widget:SetSize(w, h) self.width, self.height = w, h end
     function widget:SetWidth(value) self.width = value end
     function widget:SetHeight(value) self.height = value end
+    function widget:GetHeight() return self.height or 0 end
+    function widget:SetAllPoints(target) self.allPoints = target or true end
+    -- A line of text, whatever it says: enough for a page to add up heights.
+    function widget:GetStringHeight() return 12 end
+    -- A scroll frame: what it scrolls, and nothing to scroll by.
+    function widget:SetScrollChild(child) self.scrollChild = child end
+    function widget:GetVerticalScrollRange() return 0 end
+    function widget:SetVerticalScroll(value) self.verticalScroll = value end
+    function widget:SetShown(value) if value then self:Show() else self:Hide() end end
     function widget:SetJustifyH(value) self.justifyH = value end
     function widget:SetTexture(value) self.texture = value end
     function widget:GetTexture() return self.texture end
