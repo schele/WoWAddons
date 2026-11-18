@@ -40,14 +40,14 @@ old one with the same command.
 
    | Field | What goes in it |
    |---|---|
-   | Display Name | The addon's name, as in its `.toc` |
-   | URL Slug | The name in lowercase, e.g. `rankup`; `<name>-skyler` if taken |
+   | Display Name | The addon's name, as in its `.toc`. The form asks for no URL slug (it did once) |
    | Summary | One sentence for players |
    | Description | Markdown, adapted from the addon's README for players: what it does, then its commands. Leave out install, test and code sections |
    | Addon License | `https://github.com/schele/WoWAddons/blob/main/LICENSE` (it wants a URL) |
    | Addon Source | `https://github.com/schele/WoWAddons` |
    | Support link | `https://github.com/schele/WoWAddons/issues` |
    | Website, Wiki, Discord | Empty |
+   | Categories | The closest of Wago's list to what the addon does |
    | Hide from 3rd party addon updaters | **Unticked**, or WowUp cannot see it |
    | Unlisted | Unticked |
    | Thumbnail | `docs/icons/<Addon>.png` |
