@@ -13,11 +13,33 @@ ns.AddDefaults({
     characters = {},
 })
 
+-- The keyring, wherever this client numbers it: -2 on Classic, -1 on Forever.
+local KEYRING = (Enum and Enum.BagIndex and Enum.BagIndex.Keyring) or KEYRING_CONTAINER
+
+--- The main bank's container, or nil on a client without one. Classic keeps
+-- its bank at -1. Forever has none, its bank is all tabs, and there -1 is the
+-- keyring. The game's own list of containers says which; a client without
+-- that list is an older Classic one. Never the keyring.
+local function mainBank()
+    local bags = Enum and Enum.BagIndex
+    local main
+    if bags then
+        main = bags.Bank
+    else
+        main = BANK_CONTAINER or -1
+    end
+    if main ~= nil and main == KEYRING then
+        return nil
+    end
+    return main
+end
+
 -- The containers, numbered as the game's own bank frame numbers them: the
--- main bank, then the bank bags after every bag the character wears (a
--- reagent bag too, on clients that have one). Not from Enum.BagIndex: on a
--- client whose enum is laid out for another, it would skip a bank bag.
-local MAIN = BANK_CONTAINER or -1
+-- main bank, where there is one, then the bank bags after every bag the
+-- character wears (a reagent bag too, on clients that have one). The bags not
+-- from Enum.BagIndex: on a client whose enum is laid out for another, it
+-- would skip a bank bag.
+local MAIN = mainBank()
 local FIRST_BAG = (NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4) + 1
 local LAST_BAG = FIRST_BAG + (NUM_BANKBAGSLOTS or 6) - 1
 local SAVE_DELAY = 0.3 -- seconds of changes gathered into one save
@@ -132,15 +154,6 @@ local function chosenIcon(tab)
     return icon
 end
 
-local function isEmpty(container)
-    for slot = 1, container.size do
-        if container.slots[slot] then
-            return false
-        end
-    end
-    return true
-end
-
 --- The bank as it is: the main bank, then each bank bag or tab that has slots.
 function Bank.Read()
     local tabs = tabData()
@@ -166,10 +179,8 @@ function Bank.Read()
         end
     end
 
-    -- A client with tabs still reports the old bank, every slot of it empty:
-    -- shown, it is rows of slots nothing can go in. Kept if anything is there.
-    local main = readContainer(MAIN, "Bank")
-    if main and not (tabCount > 0 and isEmpty(main)) then
+    local main = MAIN and readContainer(MAIN, "Bank")
+    if main then
         table.insert(containers, 1, main)
     end
     return containers
@@ -324,8 +335,29 @@ ns.RegisterCommand("forget", "Forget a character's saved bank: /bb forget <name>
 end)
 
 local function isBankContainer(container)
-    return container == MAIN or (container and container >= FIRST_BAG and container <= LAST_BAG)
+    return (MAIN ~= nil and container == MAIN) or (container and container >= FIRST_BAG and container <= LAST_BAG)
 end
+
+-- An earlier BankBags read Forever's keyring as the main bank, and a copy it
+-- saved keeps the keys under "Bank" until that character next visits a
+-- banker. Dropped from every saved bank, so neither the window nor the counts
+-- show keys as banked.
+ns.OnLogin(function()
+    if KEYRING == nil or KEYRING == MAIN then
+        return
+    end
+    for _, character in pairs(ns.db.characters) do
+        local containers = type(character) == "table" and character.containers
+        if type(containers) == "table" then
+            for index = #containers, 1, -1 do
+                local container = containers[index]
+                if type(container) == "table" and container.id == KEYRING then
+                    table.remove(containers, index)
+                end
+            end
+        end
+    end
+end)
 
 local handlers = {
     BANKFRAME_OPENED = function()

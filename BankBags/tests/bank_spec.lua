@@ -121,22 +121,32 @@ describe("saving the bank", function()
     end)
 end)
 
+-- Forever's own list of containers, as its client hands it over: its bank is
+-- all tabs, from 6, and -1 is the keyring. Classic keeps its bank at -1 and
+-- its keyring at -2.
+local FOREVER_BAGS = {
+    Accountbanktab = -3, Characterbanktab = -2, Keyring = -1, Backpack = 0,
+    ReagentBag = 5, CharacterBankTab_1 = 6,
+}
+local KEY = { link = "|cffa335ee|Hitem:12382::|h[Key to the City]|h|r", count = 1, icon = 134236, quality = 4 }
+
 describe("bank tabs", function()
     -- What a client with bank tabs hands over: each tab a container like a
     -- bag, its "bag" a placeholder item no player is meant to see.
     local TAB_BAG = { link = "|cffffffff|Hitem:999999::|h[Character Bank Tab Bag (DNT)]|h|r", icon = 4549254 }
     local TAB_ICON = "Interface\\AddOns\\BankBags\\tab"
 
-    -- The old 28-slot bank, empty unless told otherwise, and two tabs (6 and
-    -- 7) of 4 slots, Linen in the first.
-    local function withTabs(mainItem, setup)
+    -- Forever: the 32-slot keyring at -1, empty unless told otherwise, and
+    -- two tabs (6 and 7) of 4 slots, Linen in the first.
+    local function withTabs(keyringItem, setup)
         return function(env)
             env.NUM_BAG_SLOTS, env.NUM_TOTAL_EQUIPPED_BAG_SLOTS, env.NUM_BANKBAGSLOTS = 4, 5, 6
-            local main = {}
-            for slot = 1, 28 do main[slot] = false end
-            main[1] = mainItem or false
+            env.Enum = { BagIndex = FOREVER_BAGS }
+            local keyring = {}
+            for slot = 1, 32 do keyring[slot] = false end
+            keyring[1] = keyringItem or false
             helpers.bank(env,
-                { [-1] = main, [6] = { LINEN, false, false, false }, [7] = { false, false, false, false } },
+                { [-1] = keyring, [6] = { LINEN, false, false, false }, [7] = { false, false, false, false } },
                 { [6] = TAB_BAG, [7] = TAB_BAG })
             if setup then setup(env) end
         end
@@ -161,17 +171,11 @@ describe("bank tabs", function()
         assertEqual(TAB_ICON, containers[2].icon)
     end)
 
-    it("leaves out the old bank when it is empty and the tabs hold the bank", function()
-        local containers = saved(withTabs())
+    it("never saves the keyring, which Forever numbers where Classic keeps its bank", function()
+        local containers = saved(withTabs(KEY))
         assertEqual(2, #containers)
         assertEqual(6, containers[1].id)
-    end)
-
-    it("keeps the old bank when something is in it", function()
-        local containers = saved(withTabs(BOOTS))
-        assertEqual(-1, containers[1].id)
-        assertEqual("Bank", containers[1].name)
-        assertEqual(3, #containers)
+        assertEqual(7, containers[2].id)
     end)
 
     it("keeps an empty bank on a client without tabs", function()
@@ -187,7 +191,7 @@ describe("bank tabs", function()
     it("takes a tab's name and icon from the client, when it says", function()
         local asked
         local containers = saved(withTabs(nil, function(env)
-            env.Enum = { BankType = { Character = 0 } }
+            env.Enum.BankType = { Character = 0 }
             env.C_Bank = {
                 FetchPurchasedBankTabData = function(bankType)
                     asked = bankType
@@ -261,5 +265,61 @@ describe("which containers are the bank bags", function()
             e.NUM_BAG_SLOTS, e.NUM_BANKBAGSLOTS = 4, 6
             e.Enum = { BagIndex = { Bank = -1, BankBag_1 = 6 } }
         end))
+    end)
+
+    it("reads the bank at -1 where the game's own list puts it there, as Classic's does", function()
+        assertEqual("-1,5,6,7,8,9,10", savedIds(function(e)
+            e.NUM_BAG_SLOTS, e.NUM_BANKBAGSLOTS = 4, 6
+            e.Enum = { BagIndex = { Bank = -1, Keyring = -2, Backpack = 0 } }
+        end))
+    end)
+
+    it("reads no main bank on Forever, whose list has none and puts the keyring at -1", function()
+        assertEqual("6,7,8,9,10,11,12", savedIds(function(e)
+            e.NUM_BAG_SLOTS, e.NUM_TOTAL_EQUIPPED_BAG_SLOTS, e.NUM_BANKBAGSLOTS = 4, 5, 7
+            e.Enum = { BagIndex = FOREVER_BAGS }
+        end))
+    end)
+end)
+
+describe("a keyring an earlier BankBags saved as the bank", function()
+    -- What Aldira's saved bank held: the keyring, read from -1 and named
+    -- "Bank", above a tab.
+    local function savedWithKeyring(e)
+        e.BankBagsDB = { characters = { ["Stormwind-Alt"] = { name = "Alt", realm = "Stormwind", containers = {
+            { id = -1, name = "Bank", size = 32, slots = { [1] = KEY } },
+            { id = 6, name = "Tab 1", size = 4, slots = { [1] = LINEN } },
+        } } } }
+    end
+
+    it("is dropped from every saved bank at login on Forever", function()
+        local ns = helpers.loggedIn(function(e)
+            e.NUM_BAG_SLOTS, e.NUM_TOTAL_EQUIPPED_BAG_SLOTS, e.NUM_BANKBAGSLOTS = 4, 5, 6
+            e.Enum = { BagIndex = FOREVER_BAGS }
+            savedWithKeyring(e)
+        end)
+        local containers = ns.db.characters["Stormwind-Alt"].containers
+        assertEqual(1, #containers)
+        assertEqual(6, containers[1].id)
+    end)
+
+    it("is no longer counted as banked", function()
+        local ns = helpers.loggedIn(function(e)
+            e.Enum = { BagIndex = FOREVER_BAGS }
+            savedWithKeyring(e)
+        end)
+        local counts = ns.Bank.Counts("Stormwind-Alt")
+        assertEqual(nil, counts.byID[12382])
+        assertEqual(20, counts.byID[2589])
+    end)
+
+    it("leaves Classic's bank alone, which really is at -1", function()
+        local ns = helpers.loggedIn(function(e)
+            e.Enum = { BagIndex = { Bank = -1, Keyring = -2 } }
+            savedWithKeyring(e)
+        end)
+        local containers = ns.db.characters["Stormwind-Alt"].containers
+        assertEqual(2, #containers)
+        assertEqual(-1, containers[1].id)
     end)
 end)
