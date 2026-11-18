@@ -15,6 +15,10 @@
                          "version":  "0.5.1",
                          "commit":  "13e47250e3b713fe3260b6b9f24dee04d8489e54"
                      },
+    "LFGBoard":  {
+                     "version":  "0.1.0",
+                     "commit":  "d8d2e4d60d231e8596329483164b84d91bcefa18"
+                 },
     "MailHandler":  {
                         "version":  "0.1.0",
                         "commit":  "f3a0d0ebc3143971968e40a7611ed043cca61984"
