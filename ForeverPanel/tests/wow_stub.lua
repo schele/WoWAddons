@@ -483,8 +483,15 @@ function stub.newEnv()
         return 0
     end
 
+    -- Keys held, by name. While a binding runs, Forever hides the modifiers
+    -- it used from everything but IsKeyDown(key, true); those go in
+    -- __heldByBinding as well.
     env.__keysDown = {}
-    function env.IsKeyDown(key)
+    env.__heldByBinding = {}
+    function env.IsKeyDown(key, excludeBindingState)
+        if not excludeBindingState and env.__heldByBinding[key] then
+            return false
+        end
         return env.__keysDown[key] == true
     end
 

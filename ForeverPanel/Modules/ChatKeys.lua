@@ -191,8 +191,16 @@ local function parseCombination(combination)
     return modifiers, key
 end
 
-local function isDown(check)
-    return (check and check()) and true or false
+--- Whether a modifier is held. While a binding runs, Forever reports the
+-- modifiers it used as up: IsControlKeyDown() is false with Ctrl held, and so
+-- is IsKeyDown("LCTRL"). IsKeyDown's second argument reads past the binding
+-- to the keyboard itself (traced in game, 2026-11-18). The plain check stays
+-- for clients that do report them.
+local function modifierDown(reported, left, right)
+    if reported and reported() then
+        return true
+    end
+    return (IsKeyDown(left, true) or IsKeyDown(right, true)) and true or false
 end
 
 --- The row whose combination is held down right now, resolved. The game's
@@ -207,10 +215,10 @@ local function heldTarget()
         if row and row.key and row.key ~= "" then
             local modifiers, key = parseCombination(row.key)
 
-            if isDown(IsAltKeyDown) == (modifiers.ALT == true)
-                and isDown(IsControlKeyDown) == (modifiers.CTRL == true)
-                and isDown(IsShiftKeyDown) == (modifiers.SHIFT == true)
-                and IsKeyDown(key) then
+            if modifierDown(IsAltKeyDown, "LALT", "RALT") == (modifiers.ALT == true)
+                and modifierDown(IsControlKeyDown, "LCTRL", "RCTRL") == (modifiers.CTRL == true)
+                and modifierDown(IsShiftKeyDown, "LSHIFT", "RSHIFT") == (modifiers.SHIFT == true)
+                and IsKeyDown(key, true) then
                 local target = ChatKeys.Resolve(row.command)
                 if target then
                     return target
@@ -355,7 +363,14 @@ loader:SetScript("OnEvent", function(_, event)
         end
 
         for index = 1, ROWS do
-            ns.db.chat.keys[index] = ns.db.chat.keys[index] or { key = "", command = "" }
+            local row = ns.db.chat.keys[index] or { key = "", command = "" }
+            ns.db.chat.keys[index] = row
+
+            -- An earlier seed put "/trade" on Ctrl+T, which opens a trade
+            -- window, so the row was left unbound. Trade chat is channel 2.
+            if type(row.command) == "string" and row.command:match("^%s*/[Tt][Rr][Aa][Dd][Ee]%s*$") then
+                row.command = "/2"
+            end
         end
 
         ChatKeys.Apply()

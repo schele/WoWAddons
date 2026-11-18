@@ -13,8 +13,12 @@ local function loggedIn()
 end
 
 --- Hold a combination down and let the game act on whatever it is bound to,
--- the way the client does: an OPENCHAT binding runs Blizzard's own code.
-local function press(env, combination)
+-- the way Forever does: an OPENCHAT binding runs Blizzard's own code, and
+-- while it runs the game reports the binding's modifiers as up.
+-- IsControlKeyDown() says false with Ctrl held; only IsKeyDown("LCTRL", true)
+-- sees it (traced in game, 2026-11-18). Modifiers are the left-hand ones
+-- unless `side` is "R".
+local function press(env, combination, side)
     local parts = {}
     for part in combination:gmatch("[^-]+") do
         table.insert(parts, part)
@@ -22,17 +26,20 @@ local function press(env, combination)
     local key = table.remove(parts)
 
     env.modifiers = {}
-    for _, modifier in ipairs(parts) do
-        env.modifiers[modifier:lower()] = true
-    end
     env.__keysDown = { [key] = true }
+    env.__heldByBinding = {}
+    for _, modifier in ipairs(parts) do
+        local name = (side or "L") .. modifier
+        env.__keysDown[name] = true
+        env.__heldByBinding[name] = true
+    end
 
     if env.__overrideBindings[combination] == "OPENCHAT" then
         env.ChatFrameUtil.OpenChat(nil)
     end
 
-    env.modifiers = {}
     env.__keysDown = {}
+    env.__heldByBinding = {}
     return env.ChatFrame1EditBox
 end
 
@@ -94,6 +101,22 @@ describe("chat key rows", function()
         assertEqual("CTRL-S", rows[1].key)
         assertEqual("/s", rows[1].command)
         assertTrue(#rows > 1, "more than one to start with")
+    end)
+
+    -- An earlier version seeded Ctrl+T as "/trade", which opens a trade with
+    -- your target, not Trade chat, so the chat keys leave it unbound.
+    it("turns the /trade an earlier version seeded into Trade chat's channel 2", function()
+        local ns, env = helpers.loadAddon()
+        env.ForeverPanelDB = { chat = { enabled = true, seeded = true, keys = {
+            { key = "CTRL-T", command = "/trade" },
+            { key = "CTRL-U", command = " /Trade " },
+        } } }
+        env.__channels[2] = "Trade - City"
+        helpers.login(ns, env)
+
+        assertEqual("/2", ns.db.chat.keys[1].command)
+        assertEqual("/2", ns.db.chat.keys[2].command, "however it was typed")
+        assertEqual("CHANNEL", press(env, "CTRL-T"):GetChatType(), "and Ctrl+T opens it")
     end)
 
     -- Opening the chat box from addon code leaves the box, and the globals
@@ -221,6 +244,22 @@ describe("chat key rows", function()
         local box = env.ChatFrameUtil.OpenChat(nil)
 
         assertEqual("SAY", box:GetChatType(), "Ctrl+Shift+P is not Ctrl+P")
+    end)
+
+    it("tells Ctrl+P from Ctrl+Shift+P, though the game says neither is held", function()
+        local ns, env = loggedIn()
+
+        ns.db.chat.keys[1] = { key = "CTRL-SHIFT-P", command = "/g" }
+        ns.ChatKeys.Apply()
+
+        assertEqual("GUILD", press(env, "CTRL-SHIFT-P"):GetChatType(), "both modifiers")
+        assertEqual("PARTY", press(env, "CTRL-P"):GetChatType(), "Ctrl alone")
+    end)
+
+    it("answers to the right-hand Ctrl too", function()
+        local ns, env = loggedIn()
+
+        assertEqual("PARTY", press(env, "CTRL-P", "R"):GetChatType())
     end)
 
     it("leaves a link alone that opens chat while the key happens to be held", function()
