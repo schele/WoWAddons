@@ -26,6 +26,18 @@ describe("junk", function()
         assertEqual(0, junk[1].bag)
         assertEqual(4, junk[2].bag)
     end)
+
+    it("is a white item on the junk list", function()
+        local ns, env = helpers.loadAddon()
+        helpers.put(env, 0, 1, 2589, 5) -- Linen Cloth
+
+        local junk = ns.Bags.Junk({}, { [2589] = "Linen Cloth" })
+
+        assertEqual(1, #junk)
+        assertEqual(2589, junk[1].itemID)
+        assertEqual(5, junk[1].count)
+        assertEqual(13, junk[1].price)
+    end)
 end)
 
 describe("not junk", function()
@@ -48,6 +60,20 @@ describe("not junk", function()
         helpers.put(env, 0, 1, 7073)
 
         assertEqual(0, #ns.Bags.Junk({ [7073] = "Broken Fang" }))
+    end)
+
+    it("is an item on the junk list no merchant will pay for", function()
+        local ns, env = helpers.loadAddon()
+        helpers.put(env, 0, 1, 6948) -- Hearthstone
+
+        assertEqual(0, #ns.Bags.Junk({}, { [6948] = "Hearthstone" }))
+    end)
+
+    it("is an item on both lists: kept wins", function()
+        local ns, env = helpers.loadAddon()
+        helpers.put(env, 0, 1, 2589)
+
+        assertEqual(0, #ns.Bags.Junk({ [2589] = "Linen Cloth" }, { [2589] = "Linen Cloth" }))
     end)
 
     it("is a locked item", function()
@@ -113,6 +139,88 @@ describe("where a sale stands", function()
         env.__raisingSlots["1:2"] = true
 
         assertEqual("there", ns.Bags.SlotState(1, 2, 3300))
+    end)
+end)
+
+describe("what could be put on the junk list", function()
+    it("is each white item in the bags once, with its name and icon", function()
+        local ns, env = helpers.loadAddon()
+        helpers.put(env, 0, 1, 2589)
+        helpers.put(env, 0, 2, 2589)
+
+        local items = ns.Bags.Sellable({}, {})
+
+        assertEqual(1, #items)
+        assertEqual(2589, items[1].itemID)
+        assertEqual("Linen Cloth", items[1].name)
+        assertEqual(1, items[1].icon)
+    end)
+
+    it("is in name order", function()
+        local ns, env = helpers.loadAddon()
+        helpers.put(env, 0, 1, 117) -- Tough Jerky
+        helpers.put(env, 1, 1, 2589) -- Linen Cloth
+
+        local items = ns.Bags.Sellable({}, {})
+
+        assertEqual("Linen Cloth", items[1].name)
+        assertEqual("Tough Jerky", items[2].name)
+    end)
+
+    it("leaves out greys, items with no sell price, and items on either list", function()
+        local ns, env = helpers.loadAddon()
+        helpers.put(env, 0, 1, 3300) -- grey, sold anyway
+        helpers.put(env, 0, 2, 6948) -- Hearthstone, no sell price
+        helpers.put(env, 0, 3, 2589) -- on the junk list
+        helpers.put(env, 0, 4, 7073) -- grey on the keep list
+        helpers.put(env, 0, 5, 117) -- Tough Jerky
+
+        local items = ns.Bags.Sellable({ [7073] = "Broken Fang" }, { [2589] = "Linen Cloth" })
+
+        assertEqual(1, #items)
+        assertEqual(117, items[1].itemID)
+    end)
+
+    it("leaves out a kept white item", function()
+        local ns, env = helpers.loadAddon()
+        helpers.put(env, 0, 1, 2589)
+
+        assertEqual(0, #ns.Bags.Sellable({ [2589] = "Linen Cloth" }, {}))
+    end)
+
+    it("leaves out an item the client has not described yet, until it has", function()
+        local ns, env = helpers.loadAddon()
+        env.__uncached[2589] = true
+        helpers.put(env, 0, 1, 2589)
+
+        assertEqual(0, #ns.Bags.Sellable({}, {}))
+
+        env.__uncached[2589] = nil
+        assertEqual(1, #ns.Bags.Sellable({}, {}))
+    end)
+
+    it("skips a slot that will not read, and reads the rest", function()
+        local ns, env = helpers.loadAddon()
+        env.__raisingSlots["0:1"] = true
+        helpers.put(env, 0, 1, 117)
+        helpers.put(env, 0, 2, 2589)
+
+        local items = ns.Bags.Sellable({}, {})
+
+        assertEqual(1, #items)
+        assertEqual(2589, items[1].itemID)
+    end)
+
+    it("is found with the older client's calls too", function()
+        local ns, env = helpers.loadAddon()
+        helpers.legacy(env)
+        helpers.put(env, 0, 1, 2589)
+
+        local items = ns.Bags.Sellable({}, {})
+
+        assertEqual(1, #items)
+        assertEqual("Linen Cloth", items[1].name)
+        assertEqual(1, items[1].icon)
     end)
 end)
 

@@ -1,6 +1,6 @@
 ## Interface: 11509, 16001
 ## Title: AutoVendor
-## Notes: Sells your grey items and repairs your gear whenever you open a merchant, and undercuts the cheapest auction when you post one.
+## Notes: Sells your grey items and the items you pick, and repairs your gear whenever you open a merchant, and undercuts the cheapest auction when you post one.
 ## IconTexture: Interface\AddOns\AutoVendor\icon
 ## Author: Skyler
 ## Version: 0.2.0

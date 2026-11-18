@@ -67,7 +67,7 @@ local function nextJunk(current)
     if not ns.db.sell then
         return nil
     end
-    for _, entry in ipairs(ns.Bags.Junk(ns.Keep.All())) do
+    for _, entry in ipairs(ns.Bags.Junk(ns.Keep.All(), ns.Junk.All())) do
         if not current.tried[tried(entry)] then
             return entry
         end
@@ -184,8 +184,8 @@ local function changed()
     end
 end
 
---- Sell grey items at a merchant, or leave them be. A visit under way
--- notices at its next step.
+--- Sell grey items and the junk list at a merchant, or leave them be. A
+-- visit under way notices at its next step.
 function Vendor.SetSell(value)
     ns.db.sell = value and true or false
     changed()
@@ -201,9 +201,9 @@ local function onOff(value)
     return value and "on" or "off"
 end
 
-ns.RegisterCommand("sell", "turn selling grey items on or off", function()
+ns.RegisterCommand("sell", "turn selling grey items and your junk list on or off", function()
     Vendor.SetSell(not ns.db.sell)
-    ns.Print("Sell grey items: " .. onOff(ns.db.sell) .. ".")
+    ns.Print("Sell grey items and junk list: " .. onOff(ns.db.sell) .. ".")
 end)
 
 ns.RegisterCommand("repair", "turn repairing at merchants on or off", function()

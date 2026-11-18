@@ -12,8 +12,9 @@ under the cheapest listing instead of tying with it.
 
 ## What it sells
 
-Grey (Poor quality) items in your bags that a merchant will pay for. Never
-white items, trade goods or anything better, never an item with no sell
+Grey (Poor quality) items in your bags that a merchant will pay for, and
+the items you have put on your junk list. Never a white item, trade good or
+anything better that is not on the junk list, never an item with no sell
 price (which spares most quest items), and never anything on your keep list.
 
 Items go one at a time, a fifth of a second apart, because the server

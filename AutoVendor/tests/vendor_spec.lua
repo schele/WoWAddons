@@ -287,6 +287,34 @@ describe("with repairs turned off", function()
     end)
 end)
 
+describe("the junk list at a merchant", function()
+    it("is sold along with the greys", function()
+        local _, env = ready()
+        helpers.command(env, "junk 2589")
+        helpers.put(env, 0, 1, 3300) -- grey, 15c
+        helpers.put(env, 0, 2, 2589, 2) -- Linen Cloth, 2 x 13c
+
+        helpers.openMerchant(env)
+        env.__runAllTimers()
+
+        assertNil(env.__slots["0:1"])
+        assertNil(env.__slots["0:2"])
+        assertMatch("Sold 3 items for 41c%.", helpers.printed(env))
+    end)
+
+    it("is not sold with selling turned off", function()
+        local _, env = ready()
+        helpers.command(env, "junk 2589")
+        helpers.command(env, "sell")
+        helpers.put(env, 0, 1, 2589)
+
+        helpers.openMerchant(env)
+        env.__runAllTimers()
+
+        assertEqual(0, #env.__sales)
+    end)
+end)
+
 describe("with selling turned off", function()
     it("sells nothing, and still repairs", function()
         local _, env = ready()
@@ -325,10 +353,10 @@ describe("/av repair and /av sell", function()
         local ns, env = ready()
         helpers.command(env, "sell")
         assertFalse(ns.db.sell)
-        assertMatch("Sell grey items: off%.", helpers.printed(env))
+        assertMatch("Sell grey items and junk list: off%.", helpers.printed(env))
         helpers.command(env, "sell")
         assertTrue(ns.db.sell)
-        assertMatch("Sell grey items: on%.", helpers.printed(env))
+        assertMatch("Sell grey items and junk list: on%.", helpers.printed(env))
     end)
 
     it("are remembered after a reload", function()

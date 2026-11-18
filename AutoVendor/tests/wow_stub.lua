@@ -174,6 +174,7 @@ function stub.newEnv(saved)
         [9999] = { name = "Worthless Rock", quality = 0, price = 0 },
         [2589] = { name = "Linen Cloth", quality = 1, price = 13 },
         [6948] = { name = "Hearthstone", quality = 1, price = 0 },
+        [117] = { name = "Tough Jerky", quality = 1, price = 1 },
     }
     -- Items the client has not described yet: asking about them gives nothing.
     env.__uncached = {}
