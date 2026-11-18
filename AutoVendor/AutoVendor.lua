@@ -82,6 +82,62 @@ function ns.ShownItem(name)
     return "[" .. name .. "]"
 end
 
+-- In an item's place when the client has no icon for it.
+local UNKNOWN_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+
+--- An item's icon from its ID. The client knows it without asking the
+-- server, so it is there even before the item's name is.
+function ns.ItemIcon(itemID)
+    return ns.Guarded(function()
+        local getIcon = (C_Item and C_Item.GetItemIconByID) or GetItemIcon
+        return getIcon and getIcon(itemID) or UNKNOWN_ICON
+    end, UNKNOWN_ICON)
+end
+
+--- The colour the game writes an item's name in, by its quality, as
+-- { r, g, b }; white until the client has described the item.
+function ns.ItemColor(itemID)
+    return ns.Guarded(function()
+        local quality
+        if C_Item and C_Item.GetItemQualityByID then
+            quality = C_Item.GetItemQualityByID(itemID)
+        else
+            local getItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+            quality = getItemInfo and select(3, getItemInfo(itemID))
+        end
+        local qualityColor = (C_Item and C_Item.GetItemQualityColor) or GetItemQualityColor
+        if type(quality) == "number" and qualityColor then
+            local r, g, b = qualityColor(quality)
+            if r then
+                return { r, g, b }
+            end
+        end
+        return { 1, 1, 1 }
+    end, { 1, 1, 1 })
+end
+
+--- Show the tooltip of the item `owner` holds (`owner.itemID`) beside it.
+-- Also the owner's UpdateTooltip: the game asks the owner to redraw its
+-- tooltip while it shows, so it names what the owner holds now.
+function ns.ShowItemTooltip(owner)
+    if not (GameTooltip and owner.itemID) then
+        return
+    end
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    if GameTooltip.SetItemByID then
+        GameTooltip:SetItemByID(owner.itemID)
+    else
+        GameTooltip:SetHyperlink("item:" .. owner.itemID)
+    end
+    GameTooltip:Show()
+end
+
+function ns.HideItemTooltip()
+    if GameTooltip then
+        GameTooltip:Hide()
+    end
+end
+
 --- Copper as the game writes money, coin icons and all; "1g 23s 4c" on a
 -- client without that.
 function ns.Money(copper)

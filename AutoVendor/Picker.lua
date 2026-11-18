@@ -59,19 +59,6 @@ function Picker.Build(parent, width)
     Picker.empty = empty
 end
 
-local function showTooltip(button)
-    if not (GameTooltip and button.itemID) then
-        return
-    end
-    GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-    if GameTooltip.SetItemByID then
-        GameTooltip:SetItemByID(button.itemID)
-    else
-        GameTooltip:SetHyperlink("item:" .. button.itemID)
-    end
-    GameTooltip:Show()
-end
-
 local function addButton(index)
     local button = CreateFrame("Button", nil, Picker.frame)
     button:SetSize(ICON, ICON)
@@ -79,14 +66,12 @@ local function addButton(index)
     button.icon:SetAllPoints(button)
     button:SetHighlightTexture(HIGHLIGHT, "ADD")
 
-    button:SetScript("OnEnter", showTooltip)
-    -- The game's tooltip asks its owner to redraw it while it shows, so it
-    -- names what the icon holds now, not what it held when the mouse came.
-    button.UpdateTooltip = showTooltip
+    -- Redrawn while it shows, so it names what the icon holds now, not what
+    -- it held when the mouse came.
+    button:SetScript("OnEnter", ns.ShowItemTooltip)
+    button.UpdateTooltip = ns.ShowItemTooltip
     button:SetScript("OnLeave", function()
-        if GameTooltip then
-            GameTooltip:Hide()
-        end
+        ns.HideItemTooltip()
         leaving()
     end)
     -- The button's item changes as the grid redraws, so the click reads it

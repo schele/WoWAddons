@@ -3,7 +3,7 @@
 ## Notes: Sells your grey items and the items you pick, and repairs your gear whenever you open a merchant, and undercuts the cheapest auction when you post one.
 ## IconTexture: Interface\AddOns\AutoVendor\icon
 ## Author: Skyler
-## Version: 0.2.0
+## Version: 0.3.0
 ## X-Wago-ID: QN5JL76B
 ## SavedVariables: AutoVendorDB
 

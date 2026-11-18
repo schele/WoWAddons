@@ -11,6 +11,8 @@ local PADDING = 16
 local LOGO_SIZE = 24
 local ROW_HEIGHT = 30
 local ITEM_HEIGHT = 24
+-- A listed item's icon, beside its name: as tall as the row's button.
+local ITEM_ICON = 20
 local PANEL_WIDTH = 400
 local BUTTON_WIDTH = 90
 -- The step from one box to the next: the boxes are 32 tall, so 2 of overlap
@@ -97,12 +99,26 @@ local function addRow(list, index)
     button:SetPoint("LEFT", frame, "LEFT", 0, 0)
     button:SetText(list.buttonText)
 
-    local label = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-    label:SetPoint("LEFT", button, "RIGHT", 8, 0)
-    label:SetWidth(PANEL_WIDTH - PADDING * 2 - BUTTON_WIDTH - 8)
+    -- The item as the bags show it, its icon and its name in its quality's
+    -- colour, with its tooltip under the mouse.
+    local itemWidth = PANEL_WIDTH - PADDING * 2 - BUTTON_WIDTH - 8
+    local item = CreateFrame("Button", nil, frame)
+    item:SetSize(itemWidth, ITEM_HEIGHT)
+    item:SetPoint("LEFT", button, "RIGHT", 8, 0)
+    item:SetScript("OnEnter", ns.ShowItemTooltip)
+    item.UpdateTooltip = ns.ShowItemTooltip
+    item:SetScript("OnLeave", ns.HideItemTooltip)
+
+    local icon = item:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(ITEM_ICON, ITEM_ICON)
+    icon:SetPoint("LEFT", item, "LEFT", 0, 0)
+
+    local label = item:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    label:SetPoint("LEFT", icon, "RIGHT", 6, 0)
+    label:SetWidth(itemWidth - ITEM_ICON - 6)
     label:SetJustifyH("LEFT")
 
-    local row = { frame = frame, button = button, label = label }
+    local row = { frame = frame, button = button, item = item, icon = icon, label = label }
 
     -- The row's item changes as the list does, so the click reads it then
     -- rather than holding the one it was made for.
@@ -120,15 +136,21 @@ end
 -- for what hangs below it.
 local function fillList(list, saved)
     local items = sorted(saved)
-    for index, item in ipairs(items) do
+    for index, entry in ipairs(items) do
         local row = list.rows[index] or addRow(list, index)
-        row.itemID = item.itemID
-        row.label:SetText(item.name)
+        row.itemID = entry.itemID
+        row.item.itemID = entry.itemID
+        row.icon:SetTexture(ns.ItemIcon(entry.itemID))
+        row.label:SetText(entry.name)
+        -- Every time: a reused row still wears the last item's colour.
+        local color = ns.ItemColor(entry.itemID)
+        row.label:SetTextColor(color[1], color[2], color[3])
         row.frame:Show()
     end
     for index = #items + 1, #list.rows do
         local row = list.rows[index]
         row.itemID = nil
+        row.item.itemID = nil
         row.frame:Hide()
     end
 

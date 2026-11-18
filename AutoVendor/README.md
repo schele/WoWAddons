@@ -82,7 +82,9 @@ An item number works here too: `/av junk 2589`.
 
 `/av settings`, or Options, AddOns, AutoVendor. It has the three switches as
 checkboxes, the keep list with a button beside each item to sell it again,
-and the junk list with a button beside each item to stop selling it.
+and the junk list with a button beside each item to stop selling it. Each
+listed item shows its icon and its name in its quality's colour, as your
+bags do; hover it for its tooltip.
 
 Under the lists, **In your bags** shows the items in your bags that could go
 on the junk list, once each, as their icons: not greys (those are sold

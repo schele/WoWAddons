@@ -340,6 +340,91 @@ describe("the page's junk list", function()
     end)
 end)
 
+--- A label's colour, "r g b", rounded to two places.
+local function colour(label)
+    local r, g, b = label:GetTextColor()
+    if not r then
+        return "none"
+    end
+    return string.format("%.2f %.2f %.2f", r, g, b)
+end
+
+describe("an item on the page's lists", function()
+    it("shows the item's icon beside its name", function()
+        local ns, env = loggedIn()
+        helpers.command(env, "junk 2589")
+        helpers.command(env, "keep 3300")
+        local panel = ns.SettingsPanel
+        panel.panel:Show()
+
+        assertEqual(1000 + 2589, panel.junkRows[1].icon:GetTexture())
+        assertEqual(1000 + 3300, panel.rows[1].icon:GetTexture())
+        assertEqual("Linen Cloth", panel.junkRows[1].label:GetText())
+    end)
+
+    it("writes its name in its quality's colour, as the bags do", function()
+        local ns, env = loggedIn()
+        helpers.command(env, "junk 6070")
+        helpers.command(env, "keep 3300")
+        local panel = ns.SettingsPanel
+        panel.panel:Show()
+
+        assertEqual("0.12 1.00 0.00", colour(panel.junkRows[1].label))
+        assertEqual("0.62 0.62 0.62", colour(panel.rows[1].label))
+    end)
+
+    it("takes the colour of the item a reused row now shows", function()
+        local ns, env = opened()
+        helpers.command(env, "junk 6070")
+        helpers.command(env, "unjunk 6070")
+        env.__uncached[2589] = true
+        helpers.command(env, "junk 2589")
+
+        assertEqual("1.00 1.00 1.00", colour(ns.SettingsPanel.junkRows[1].label))
+    end)
+
+    it("colours the name once the client has described the item", function()
+        local ns, env = loggedIn()
+        env.__uncached[6070] = true
+        helpers.command(env, "junk 6070")
+        ns.SettingsPanel.panel:Show()
+        local label = ns.SettingsPanel.junkRows[1].label
+        assertEqual("1.00 1.00 1.00", colour(label))
+
+        env.__uncached[6070] = nil
+        helpers.fire(env, "GET_ITEM_INFO_RECEIVED", 6070, true)
+        env.__runAllTimers()
+
+        assertEqual("0.12 1.00 0.00", colour(label))
+    end)
+
+    it("shows the item's tooltip on hover, and hides it after", function()
+        local ns, env = loggedIn()
+        helpers.command(env, "junk 2589")
+        ns.SettingsPanel.panel:Show()
+        local item = ns.SettingsPanel.junkRows[1].item
+
+        item.scripts.OnEnter(item)
+        assertEqual(2589, env.GameTooltip.itemID)
+        assertEqual(item, env.GameTooltip.owner)
+        assertTrue(env.GameTooltip:IsShown())
+
+        item.scripts.OnLeave(item)
+        assertFalse(env.GameTooltip:IsShown())
+    end)
+
+    it("shows its icon and colour on the older client too", function()
+        local ns, env = helpers.loadAddon()
+        helpers.legacy(env)
+        helpers.login(env)
+        helpers.command(env, "junk 6070")
+        ns.SettingsPanel.panel:Show()
+
+        assertEqual(1000 + 6070, ns.SettingsPanel.junkRows[1].icon:GetTexture())
+        assertEqual("0.12 1.00 0.00", colour(ns.SettingsPanel.junkRows[1].label))
+    end)
+end)
+
 describe("the page's scrolling", function()
     it("puts the whole page inside the scroll frame", function()
         local _, _, panel = opened()

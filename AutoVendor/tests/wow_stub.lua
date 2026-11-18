@@ -71,6 +71,10 @@ local function makeWidget(kind, parent, template)
     function widget:SetTexture(value) self.texture = value end
     function widget:GetTexture() return self.texture end
     function widget:SetText(value) self.text = value end
+    function widget:SetTextColor(r, g, b) self.textColor = { r, g, b } end
+    function widget:GetTextColor()
+        if self.textColor then return table.unpack(self.textColor) end
+    end
     function widget:GetText() return self.text end
     function widget:SetChecked(value) self.checked = value and true or false end
     function widget:GetChecked() return self.checked end
@@ -203,6 +207,13 @@ function stub.newEnv(saved)
         [2589] = { name = "Linen Cloth", quality = 1, price = 13 },
         [6948] = { name = "Hearthstone", quality = 1, price = 0 },
         [117] = { name = "Tough Jerky", quality = 1, price = 1 },
+        [6070] = { name = "Wolfskin Bracers", quality = 2, price = 77 },
+    }
+    -- How the game colours each quality: grey, white, green.
+    env.__qualityColors = {
+        [0] = { 0.62, 0.62, 0.62 },
+        [1] = { 1, 1, 1 },
+        [2] = { 0.12, 1, 0 },
     }
     -- Items the client has not described yet: asking about them gives nothing.
     env.__uncached = {}
@@ -296,6 +307,18 @@ function stub.newEnv(saved)
             local item = env.__items[id]
             if item and not env.__uncached[id] then return item.name end
         end,
+        -- The client knows every item's icon without asking the server.
+        GetItemIconByID = function(id)
+            if env.__items[id] then return 1000 + id end
+        end,
+        GetItemQualityByID = function(id)
+            local item = env.__items[id]
+            if item and not env.__uncached[id] then return item.quality end
+        end,
+        GetItemQualityColor = function(quality)
+            local color = env.__qualityColors[quality]
+            if color then return color[1], color[2], color[3], "ffffffff" end
+        end,
     }
 
     -- Shift, Ctrl or Alt held, when a test says so.
@@ -385,6 +408,8 @@ function stub.useLegacyAPI(env)
     end
     env.UseContainerItem = container.UseContainerItem
     env.GetItemInfo = item.GetItemInfo
+    env.GetItemIcon = item.GetItemIconByID
+    env.GetItemQualityColor = item.GetItemQualityColor
 end
 
 return stub
