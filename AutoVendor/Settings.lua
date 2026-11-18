@@ -160,10 +160,12 @@ function Panel.Bottom()
 end
 
 --- The page's full height, so the scroll frame knows how far it goes.
-local function pageHeight()
+-- `gridHeight` is how tall the bag grid stands.
+local function pageHeight(gridHeight)
     local top = PADDING + ROW_HEIGHT + Panel.hint:GetStringHeight()
     local switches = SWITCH_GAP + 3 * ROW_HEIGHT + CHECK_STEP
-    return top + switches + listHeight(keepList) + listHeight(junkList) + PADDING
+    local bags = SECTION_GAP + Panel.bagsHeading:GetStringHeight() + LIST_GAP + gridHeight
+    return top + switches + listHeight(keepList) + listHeight(junkList) + bags + PADDING
 end
 
 --- Show what is saved. Safe to call before the page is built: the lists call
@@ -180,11 +182,14 @@ function Panel.Refresh()
     fillList(keepList, ns.Keep.All())
     fillList(junkList, ns.Junk.All())
 
-    -- The junk list starts wherever the keep list ends.
+    -- The junk list starts wherever the keep list ends, and the bags
+    -- wherever the junk list ends.
     junkList.heading:ClearAllPoints()
     junkList.heading:SetPoint("TOPLEFT", lastOf(keepList), "BOTTOMLEFT", 0, -SECTION_GAP)
+    Panel.bagsHeading:ClearAllPoints()
+    Panel.bagsHeading:SetPoint("TOPLEFT", Panel.Bottom(), "BOTTOMLEFT", 0, -SECTION_GAP)
 
-    content:SetHeight(pageHeight())
+    content:SetHeight(pageHeight(ns.Picker.Refresh()))
 end
 
 --- The page scrolls: with both lists it can outgrow the options window. As
@@ -293,8 +298,25 @@ local function ensureBuilt()
     Panel.junkHeading = junkList.heading
     Panel.junkEmpty = junkList.empty
 
+    -- The bags, to pick more from.
+    local bagsHeading = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    bagsHeading:SetText("In your bags (click to always sell)")
+    Panel.bagsHeading = bagsHeading
+    ns.Picker.Build(content, PANEL_WIDTH - PADDING * 2)
+    ns.Picker.frame:SetPoint("TOPLEFT", bagsHeading, "BOTTOMLEFT", 0, -LIST_GAP)
+
     Panel.Refresh()
 end
+
+-- The bag grid follows the bags, but only while the page is there to see
+-- it: reading every slot on every loot would be work for nobody.
+local bagWatcher = CreateFrame("Frame")
+bagWatcher:RegisterEvent("BAG_UPDATE_DELAYED")
+bagWatcher:SetScript("OnEvent", function()
+    if built and panel and panel:IsShown() then
+        Panel.Refresh()
+    end
+end)
 
 --- Claim a place in the game's options, without building anything yet.
 local function register()

@@ -9,6 +9,7 @@ M.FILES = {
     "Junk.lua",
     "Vendor.lua",
     "Auction.lua",
+    "Picker.lua",
     "Settings.lua",
 }
 

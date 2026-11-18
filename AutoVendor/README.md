@@ -81,13 +81,20 @@ An item number works here too: `/av junk 2589`.
 ## The settings page
 
 `/av settings`, or Options, AddOns, AutoVendor. It has the three switches as
-checkboxes, and the keep list with a button beside each item to sell it again.
+checkboxes, the keep list with a button beside each item to sell it again,
+and the junk list with a button beside each item to stop selling it.
+
+Under the lists, **In your bags** shows the items in your bags that could go
+on the junk list, once each, as their icons: not greys (those are sold
+anyway), not items no merchant pays for, and nothing already on a list.
+Hover one for its tooltip; click it to always sell it. The icons follow your
+bags while the page is open.
 
 ## Worth knowing
 
-The merchant's Buyback tab holds your last 12 sales. With more than 12 greys,
-the earliest cannot be bought back, so put anything you might want on the
-keep list before you visit.
+The merchant's Buyback tab holds your last 12 sales. With more than 12 items
+to sell, the earliest cannot be bought back, so put anything you might want
+on the keep list before you visit.
 
 To pause AutoVendor altogether, disable it in the AddOns list, or turn both
 switches off.

@@ -54,6 +54,7 @@ local function makeWidget(kind, parent, template)
     function widget:GetVerticalScrollRange() return 0 end
     function widget:SetVerticalScroll(value) self.verticalScroll = value end
     function widget:SetShown(value) if value then self:Show() else self:Hide() end end
+    function widget:SetHighlightTexture(texture, mode) self.highlight = texture end
     function widget:SetJustifyH(value) self.justifyH = value end
     function widget:SetTexture(value) self.texture = value end
     function widget:GetTexture() return self.texture end
@@ -107,6 +108,12 @@ function stub.newEnv(saved)
     end
 
     env.UIParent = makeWidget("Frame")
+
+    -- The tooltip, hidden to begin with: whose it is and which item it shows.
+    env.GameTooltip = makeWidget("GameTooltip", env.UIParent)
+    env.GameTooltip.shown = false
+    function env.GameTooltip:SetOwner(owner, anchor) self.owner, self.anchor = owner, anchor end
+    function env.GameTooltip:SetItemByID(itemID) self.itemID = itemID end
 
     -- The game's options window and the game menu, both closed to begin with.
     env.SettingsPanel = makeWidget("Frame", env.UIParent)
