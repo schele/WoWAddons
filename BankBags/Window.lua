@@ -3,7 +3,7 @@ local addonName, ns = ...
 -- The window: a character's saved bank, the main bank first and then each
 -- bank bag under its name, twelve slots to a row, scrolling when long. A
 -- search dims what does not match; the footer says when it was saved; the
--- button under the title steps through every character saved.
+-- dropdown under the title picks whose bank is shown.
 
 local Window = {}
 ns.Window = Window
@@ -17,8 +17,11 @@ local GAP = 4
 local PER_ROW = 12
 local PADDING = 14
 local TITLE_BAR = 24 -- the game's title bar, with the name in it
-local BAR_TOP = TITLE_BAR + 6
-local BAR_HEIGHT = 26 -- the picker and search under the title bar
+-- As much room above the dropdown's box as under it.
+local BAR_TOP = TITLE_BAR + 16
+-- The dropdown and search under the title bar, and room under them: the
+-- dropdown is 25 tall, and the game draws its box a few past that.
+local BAR_HEIGHT = 36
 local TOP = BAR_TOP + BAR_HEIGHT
 local LOGO = 16 -- the icon before the name, sized to the title bar
 local LOGO_GAP = 6
@@ -26,7 +29,7 @@ local HEADER = 24 -- a section's heading
 local SECTION_GAP = 6
 local FOOTER = 24
 local WIDTH = PADDING * 2 + PER_ROW * SLOT + (PER_ROW - 1) * GAP
-local HEIGHT = 520
+local HEIGHT = 540
 local VIEW_WIDTH = WIDTH - PADDING * 2
 local VIEW_HEIGHT = HEIGHT - TOP - FOOTER - PADDING
 local DIM = 0.25
@@ -79,17 +82,47 @@ local function qualityColour(quality)
     return (colours and colours[quality]) or QUALITY[quality]
 end
 
--- A character's name in their class colour, and their realm in grey.
-local function characterLabel(key, character)
-    local name = character and character.name or key:match("%-(.-)$") or key
-    local realm = character and character.realm or key:match("^(.-)%-") or ""
+local function plainName(key, character)
+    return character and character.name or key:match("%-(.-)$") or key
+end
+
+local function realmOf(key, character)
+    return character and character.realm or key:match("^(.-)%-") or ""
+end
+
+-- A character's name in their class colour. Each part of the colour cut to a
+-- whole number, as the game's own class colours are written.
+local function characterName(key, character)
+    local name = plainName(key, character)
     local colour = character and character.class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[character.class]
     if colour then
-        name = string.format("|cff%02x%02x%02x%s|r", colour.r * 255, colour.g * 255, colour.b * 255, name)
+        local function hex(part)
+            return math.floor(part * 255)
+        end
+        name = string.format("|cff%02x%02x%02x%s|r", hex(colour.r), hex(colour.g), hex(colour.b), name)
     end
-    return name .. " |cff808080" .. realm .. "|r"
+    return name
+end
+
+-- A character's name in their class colour, and their realm in grey: the
+-- settings page's list of saved banks.
+local function characterLabel(key, character)
+    return characterName(key, character) .. " |cff808080" .. realmOf(key, character) .. "|r"
 end
 Window.CharacterLabel = characterLabel
+
+-- A character as the dropdown lists them: their name, and their realm only
+-- when another saved character shares the name.
+local function menuName(key, keys)
+    local character = ns.Bank.Get(key)
+    local name = plainName(key, character)
+    for _, other in ipairs(keys) do
+        if other ~= key and plainName(other, ns.Bank.Get(other)) == name then
+            return characterName(key, character) .. " (" .. realmOf(key, character) .. ")"
+        end
+    end
+    return characterName(key, character)
+end
 
 -- A frame with a template, or without when this client lacks the template.
 local function createFrame(kind, name, parent, template)
@@ -224,7 +257,15 @@ function Window.Refresh()
     end
     shownKey = shownKey or ns.Bank.CharacterKey()
     local character = ns.Bank.Get(shownKey)
-    frame.picker.text:SetText(characterLabel(shownKey, character))
+    if frame.dropdown then
+        -- Made again each time: a bank saved or forgotten changes the list,
+        -- and the button reads the name shown from it. The character played
+        -- is named even before their bank is saved and listed.
+        frame.dropdown:SetDefaultText(characterName(shownKey, character))
+        frame.dropdown:GenerateMenu()
+    else
+        frame.picker.text:SetText(characterName(shownKey, character))
+    end
 
     local y, headers, slots = 0, 0, 0
     for _, container in ipairs(character and character.containers or {}) do
@@ -270,7 +311,19 @@ function Window.Shown()
     return shownKey
 end
 
--- Step through the saved characters, forward or back.
+-- Show another character's bank, from its top.
+local function show(key)
+    shownKey = key
+    scrollTo(0)
+    Window.Refresh()
+end
+
+local function isShown(key)
+    return key == shownKey
+end
+
+-- Step through the saved characters, forward or back: on a client without
+-- the game's dropdown.
 local function cycle(step)
     local keys = ns.Bank.Characters()
     if #keys == 0 then
@@ -282,9 +335,39 @@ local function cycle(step)
             at = index
         end
     end
-    shownKey = keys[(at - 1 + step) % #keys + 1]
-    scrollTo(0)
-    Window.Refresh()
+    show(keys[(at - 1 + step) % #keys + 1])
+end
+
+-- Whose bank is shown: the game's dropdown, listing every saved character by
+-- name. On a client without it, the name alone, a click for the next and a
+-- right-click for the last.
+local function createPicker()
+    local ok, dropdown = pcall(CreateFrame, "DropdownButton", nil, frame, "WowStyle1DropdownTemplate")
+    if ok and dropdown and dropdown.SetupMenu then
+        dropdown:SetWidth(200)
+        dropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING, -BAR_TOP)
+        dropdown:SetupMenu(function(_, root)
+            local keys = ns.Bank.Characters()
+            for _, key in ipairs(keys) do
+                root:CreateRadio(menuName(key, keys), isShown, show, key)
+            end
+        end)
+        frame.dropdown = dropdown
+        return
+    end
+    if ok and dropdown then
+        dropdown:Hide() -- a template of that name, but not the dropdown this expects
+    end
+
+    frame.picker = CreateFrame("Button", nil, frame)
+    frame.picker:SetSize(200, 20)
+    frame.picker:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING, -BAR_TOP)
+    frame.picker:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    frame.picker.text = frame.picker:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    frame.picker.text:SetPoint("LEFT", frame.picker, "LEFT", 4, 0)
+    frame.picker:SetScript("OnClick", function(_, mouseButton)
+        cycle(mouseButton == "RightButton" and -1 or 1)
+    end)
 end
 
 local function savePosition(self)
@@ -374,16 +457,7 @@ local function create()
         end)
     end
 
-    -- The character shown: a click for the next, a right-click for the last.
-    frame.picker = CreateFrame("Button", nil, frame)
-    frame.picker:SetSize(200, 20)
-    frame.picker:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING, -BAR_TOP)
-    frame.picker:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    frame.picker.text = frame.picker:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    frame.picker.text:SetPoint("LEFT", frame.picker, "LEFT", 4, 0)
-    frame.picker:SetScript("OnClick", function(_, mouseButton)
-        cycle(mouseButton == "RightButton" and -1 or 1)
-    end)
+    createPicker()
 
     frame.search = createSearchBox(frame)
     frame.search:SetSize(180, 20)

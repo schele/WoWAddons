@@ -198,6 +198,43 @@ function stub.newEnv()
             frame.NineSlice.Text = frame.NineSlice:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             frame.ClosePanelButton = makeWidget("Button", frame, "UIPanelCloseButtonDefaultAnchors", env)
         end
+        -- The game's dropdown, as Blizzard_Menu's guide describes it: a
+        -- function fills the menu with radios, and the button reads the one
+        -- selected, or the default text when none is. `radios` is the menu as
+        -- last made, each { text, isSelected, setSelected, data }.
+        if template == "WowStyle1DropdownTemplate" then
+            frame.radios = {}
+            function frame:SetDefaultText(text) self.defaultText = text end
+            function frame:SetupMenu(generator)
+                self.menuGenerator = generator
+                if self:IsShown() then self:GenerateMenu() end
+            end
+            function frame:GenerateMenu()
+                if not self.menuGenerator then return end
+                local radios, root = {}, {}
+                function root:CreateRadio(text, isSelected, setSelected, data)
+                    table.insert(radios, { text = text, isSelected = isSelected, setSelected = setSelected, data = data })
+                end
+                self.menuGenerator(self, root)
+                self.radios = radios
+                local selected = {}
+                for _, radio in ipairs(radios) do
+                    if radio.isSelected(radio.data) then table.insert(selected, radio.text) end
+                end
+                self.selectionText = #selected > 0 and table.concat(selected, ", ") or self.defaultText
+            end
+            -- A player choosing an entry: the client sets it, then reads the
+            -- selection again from the menu it has.
+            function frame:Pick(index)
+                local radio = self.radios[index]
+                radio.setSelected(radio.data)
+                local selected = {}
+                for _, each in ipairs(self.radios) do
+                    if each.isSelected(each.data) then table.insert(selected, each.text) end
+                end
+                self.selectionText = #selected > 0 and table.concat(selected, ", ") or self.defaultText
+            end
+        end
         return frame
     end
 

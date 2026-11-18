@@ -100,20 +100,6 @@ describe("the bank window", function()
         assertEqual(1, #env.__modifiedClicks, "nothing for an empty slot")
     end)
 
-    it("cycles through the saved characters, the one played first", function()
-        local ns, env, frame = opened()
-        ns.db.characters["Stormwind-Alt"] = { name = "Alt", realm = "Stormwind", class = "MAGE", saved = env.__now, containers = {} }
-        ns.Window.Refresh()
-        assertMatch("Carl", frame.picker.text:GetText())
-        frame.picker.scripts.OnClick(frame.picker, "LeftButton")
-        assertMatch("Alt", frame.picker.text:GetText())
-        assertEqual("Stormwind-Alt", ns.Window.Shown())
-        frame.picker.scripts.OnClick(frame.picker, "LeftButton")
-        assertMatch("Carl", frame.picker.text:GetText())
-        frame.picker.scripts.OnClick(frame.picker, "RightButton")
-        assertMatch("Alt", frame.picker.text:GetText(), "a right-click goes back")
-    end)
-
     it("scrolls with the mouse wheel, no further than the end", function()
         local ns, env = helpers.loggedIn()
         local big = carl(env)
@@ -143,6 +129,106 @@ describe("the bank window", function()
             if name == "BankBagsFrame" then escapes = true end
         end
         assertTrue(escapes)
+    end)
+end)
+
+-- Text without its colour codes.
+local function plain(text)
+    return (tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+end
+
+local function entries(dropdown)
+    local names = {}
+    for _, radio in ipairs(dropdown.radios) do
+        names[#names + 1] = plain(radio.text)
+    end
+    return table.concat(names, ", ")
+end
+
+describe("choosing whose bank to show", function()
+    -- Carl's bank, and Alt's, a mage on the same realm.
+    local function twoSaved(setup)
+        local ns, env = helpers.loggedIn(setup)
+        ns.db.characters["Stormwind-Carl"] = carl(env)
+        ns.db.characters["Stormwind-Alt"] = { name = "Alt", realm = "Stormwind", class = "MAGE", saved = env.__now, containers = {} }
+        ns.Window.Open()
+        return ns, env, ns.Window.Frame()
+    end
+
+    it("is a dropdown of every saved character, the one played first", function()
+        local _, _, frame = twoSaved()
+        assertEqual("WowStyle1DropdownTemplate", frame.dropdown.template)
+        assertEqual("Carl, Alt", entries(frame.dropdown))
+        assertEqual("Carl", plain(frame.dropdown.selectionText))
+    end)
+
+    -- The dropdown is 25 tall, and the game draws its box a few past that.
+    it("leaves room under the dropdown before the bank starts", function()
+        local _, _, frame = twoSaved()
+        local dropdownTop = -frame.dropdown.points[1][5]
+        local bankTop = -frame.scroll.points[1][5]
+        assertTrue(bankTop - (dropdownTop + 25) >= 10, "gap under the dropdown: " .. (bankTop - dropdownTop - 25))
+    end)
+
+    -- Under the game's title bar, 24 tall, with as much room above the
+    -- dropdown's box as under it.
+    it("leaves room above the dropdown too", function()
+        local _, _, frame = twoSaved()
+        local dropdownTop = -frame.dropdown.points[1][5]
+        assertTrue(dropdownTop - 24 >= 16, "gap above the dropdown: " .. (dropdownTop - 24))
+    end)
+
+    it("shows the bank of the character picked", function()
+        local ns, _, frame = twoSaved()
+        frame.dropdown:Pick(2)
+        assertEqual("Stormwind-Alt", ns.Window.Shown())
+        assertEqual("Alt", plain(frame.dropdown.selectionText))
+        assertEqual(0, shown(frame.headers), "Alt's bank is empty")
+    end)
+
+    it("names each character in their class colour, without their realm", function()
+        local _, _, frame = twoSaved(function(e)
+            e.RAID_CLASS_COLORS = { DRUID = { r = 1, g = 0.49, b = 0.04 }, MAGE = { r = 0.25, g = 0.78, b = 0.92 } }
+        end)
+        assertEqual("|cffff7c0aCarl|r", frame.dropdown.radios[1].text)
+        assertEqual("|cff3fc6eaAlt|r", frame.dropdown.radios[2].text)
+    end)
+
+    it("tells apart two characters of one name on different realms", function()
+        local ns, env, frame = twoSaved()
+        ns.db.characters["Ironforge-Carl"] = { name = "Carl", realm = "Ironforge", class = "MAGE", saved = env.__now, containers = {} }
+        ns.Window.Refresh()
+        assertEqual("Carl (Stormwind), Carl (Ironforge), Alt", entries(frame.dropdown))
+    end)
+
+    it("follows a bank saved or forgotten while it is open", function()
+        local ns, env, frame = twoSaved()
+        ns.db.characters["Stormwind-Morwen"] = { name = "Morwen", realm = "Stormwind", saved = env.__now, containers = {} }
+        ns.Window.Refresh()
+        assertEqual("Carl, Alt, Morwen", entries(frame.dropdown))
+        helpers.command(env, "forget Alt")
+        assertEqual("Carl, Morwen", entries(frame.dropdown))
+    end)
+
+    it("names the character played before their bank is saved", function()
+        local ns = helpers.loggedIn()
+        ns.Window.Open()
+        local frame = ns.Window.Frame()
+        assertEqual(0, #frame.dropdown.radios)
+        assertEqual("Carl", plain(frame.dropdown.selectionText))
+    end)
+
+    it("steps through the characters on a client without the game's dropdown", function()
+        local ns, _, frame = twoSaved(function(e)
+            e.__missingTemplates["WowStyle1DropdownTemplate"] = true
+        end)
+        assertEqual(nil, frame.dropdown)
+        assertEqual("Carl", plain(frame.picker.text:GetText()), "no realm")
+        frame.picker.scripts.OnClick(frame.picker, "LeftButton")
+        assertEqual("Stormwind-Alt", ns.Window.Shown())
+        assertEqual("Alt", plain(frame.picker.text:GetText()))
+        frame.picker.scripts.OnClick(frame.picker, "RightButton")
+        assertEqual("Carl", plain(frame.picker.text:GetText()), "a right-click goes back")
     end)
 end)
 
