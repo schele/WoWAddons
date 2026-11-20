@@ -172,6 +172,121 @@ describe("Open All", function()
     end)
 end)
 
+describe("Forward (N)", function()
+    it("sits at the top right of the mail window, level with Select all", function()
+        local _, env, parts = opened(3)
+
+        local point, relative, relativePoint, _, y = parts.forward:GetPoint(1)
+        assertEqual(env.InboxFrame, parts.forward:GetParent())
+        assertEqual("TOPRIGHT", point)
+        assertEqual(env.MailFrame, relative)
+        assertEqual("TOPRIGHT", relativePoint)
+        assertEqual(select(5, parts.selectAll:GetPoint(1)), y)
+    end)
+
+    it("counts the ticked mails, and is greyed while there are none", function()
+        local _, _, parts = opened(3)
+        assertEqual("Forward (0)", parts.forward:GetText())
+        assertFalse(parts.forward:IsEnabled())
+
+        parts.boxes[1]:Click()
+        parts.boxes[3]:Click()
+
+        assertEqual("Forward (2)", parts.forward:GetText())
+        assertTrue(parts.forward:IsEnabled())
+    end)
+
+    it("forwards the ticked mails", function()
+        local _, env, parts = opened(3)
+        parts.boxes[2]:Click()
+
+        parts.forward:Click()
+        env.__runAllTimers()
+
+        assertEqual(2, env.__tab)
+        assertEqual(200, env.MoneyInputFrame_GetCopper(env.SendMailMoney))
+    end)
+
+    it("is greyed, and so is Open, until the forward has gone", function()
+        local _, env, parts = opened(3)
+        parts.boxes[1]:Click()
+
+        parts.forward:Click()
+        env.__runAllTimers()
+        parts.boxes[3]:Click()
+        assertFalse(parts.forward:IsEnabled())
+        assertFalse(parts.open:IsEnabled())
+
+        env.SendMailNameEditBox:SetText("Brakka")
+        helpers.pressSend(env)
+        assertTrue(parts.forward:IsEnabled())
+        assertTrue(parts.open:IsEnabled())
+    end)
+
+    it("is greyed while Open is opening", function()
+        local _, env, parts = opened(3)
+        env.__slowServer = true
+        parts.boxes[1]:Click()
+        parts.boxes[2]:Click()
+
+        parts.open:Click()
+
+        assertFalse(parts.forward:IsEnabled())
+    end)
+end)
+
+describe("Forward on the open mail", function()
+    it("sits left of Reply, as big as it", function()
+        local _, env, parts = opened(1)
+
+        local point, relative, relativePoint, x, y = parts.forwardOpen:GetPoint(1)
+        assertEqual(env.OpenMailFrame, parts.forwardOpen:GetParent())
+        assertEqual("RIGHT", point)
+        assertEqual(env.OpenMailReplyButton, relative)
+        assertEqual("LEFT", relativePoint)
+        assertEqual(0, x)
+        assertEqual(0, y)
+        assertEqual(82, parts.forwardOpen:GetWidth())
+        assertEqual(22, parts.forwardOpen:GetHeight())
+    end)
+
+    it("forwards the mail that is open", function()
+        local _, env, parts = opened(3)
+        helpers.openMail(env, 2)
+
+        parts.forwardOpen:Click()
+        env.__runAllTimers()
+
+        assertEqual(2, env.__tab)
+        assertEqual(200, env.MoneyInputFrame_GetCopper(env.SendMailMoney))
+    end)
+
+    it("is greyed for a cash-on-delivery mail", function()
+        local _, env, parts = opened(1, function(e)
+            helpers.mail(e, "Garrok", "Linen", 0, { [1] = { name = "Linen Cloth", count = 20 } }, 500)
+        end)
+
+        helpers.openMail(env, 1)
+        assertFalse(parts.forwardOpen:IsEnabled())
+
+        helpers.openMail(env, 2)
+        assertTrue(parts.forwardOpen:IsEnabled())
+    end)
+
+    it("follows Forever's open mail, which redraws with OpenMailFrame:Update", function()
+        local _, env, parts = opened(1, function(e)
+            helpers.forever(e)
+            helpers.mail(e, "Garrok", "Linen", 0, { [1] = { name = "Linen Cloth", count = 20 } }, 500)
+        end)
+
+        helpers.openMail(env, 2)
+        assertTrue(parts.forwardOpen:IsEnabled())
+
+        helpers.openMail(env, 1)
+        assertFalse(parts.forwardOpen:IsEnabled())
+    end)
+end)
+
 describe("closing the mailbox", function()
     it("forgets the ticks", function()
         local ns, env, parts = opened(3)

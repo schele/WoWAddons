@@ -2,7 +2,7 @@
 
 Open the mails you choose, not all or none. Every mail in your inbox gets a
 checkbox; **Open** takes the gold and items of the ticked ones only, beside
-the game's own **Open All**.
+the game's own **Open All**, and **Forward** sends them on to someone else.
 
 ```
  [x] Alliance Auction House   Auction successful: Rough Stone (46)
@@ -39,6 +39,42 @@ is done, one chat line:
 
 **Open All** is the game's own button, moved over to make room. On a
 client without one, MailHandler adds its own.
+
+## Forward
+
+The game has no forward, so MailHandler makes one: a new mail from you
+with the forwarded mails' gold and items.
+
+```
+ [x] Select all                        [ Forward (2) ]
+```
+
+- **Forward (N)**, top right of the inbox, forwards the ticked mails.
+- **Forward**, left of Reply on an open mail, forwards that one, with its
+  text (an auction house invoice is written out: what was bought, from
+  whom).
+
+Either way MailHandler switches to the **Send Mail** tab, takes each
+mail's gold and items, oldest first, and puts the items on the tab as
+they come. The subject says what is forwarded (`FW: Linen Cloth (20)`, or
+`FW: 6 mails`), the text lists each mail's sender and subject, and the
+gold goes in as gold sent, never as cash on delivery. The name is the
+one this character last forwarded to; type another over it if you like.
+**You press Send.** When it has gone, one chat line:
+
+    Forwarded 6 mails to Brakka: 1g 23s 4c, 6 items.
+
+- **Twelve items fit in a mail.** With more, MailHandler fills one, says
+  so, and once you have sent it fills the next, to the same name. Full
+  bags do the same: send what is on the tab, and the rest follows.
+- An item that topped up a stack of your own is split back off, so the
+  mail carries just what the mail you forwarded did.
+- A **cash-on-delivery** mail is skipped. An item that cannot be mailed
+  (soulbound) stays in your bags, and the chat line says so.
+- On WoW Forever, the game may ask before sending items or gold to a
+  player it counts as a stranger: accept its warning to send.
+- Open and Forward wait for each other. Closing the mailbox stops a
+  forward; what was taken is in your bags.
 
 ## Install
 

@@ -19,43 +19,6 @@ function Opener.Running()
     return run ~= nil
 end
 
---- Whether the take a run is waiting on has been answered: the gold or the
--- item is gone from the mail, or the mail itself is. Looked for at the
--- mail's place, not by its key: once the game removes it, the next alike
--- mail below takes over its key. Working bottom up, its place stays put
--- while its own mail is there.
-local function answered(waiting)
-    if ns.Inbox.Count() < waiting.count then
-        waiting.removed = true
-        return true
-    end
-    local mail = ns.Inbox.Header(waiting.index)
-    if not mail or mail.base ~= waiting.base then
-        waiting.removed = true
-        return true
-    end
-    if waiting.kind == "money" then
-        return mail.money == 0
-    end
-    return not ns.Inbox.HasAttachment(waiting.index, waiting.slot)
-end
-
---- What a run waits on after a take: the mail's key, and its place and
--- the size of the box, to see whether the game has removed it.
-local function waitFor(key, mail, kind, slot)
-    return {
-        key = key,
-        base = mail.base,
-        index = mail.index,
-        count = ns.Inbox.Count(),
-        kind = kind,
-        slot = slot,
-        looks = 0,
-        -- The gold a money take is for: counted once the take is answered.
-        money = mail.money,
-    }
-end
-
 local function left(current)
     return #current.targets - current.at + 1
 end
@@ -122,7 +85,7 @@ step = function(current)
 
     local waiting = current.waiting
     if waiting then
-        local done = answered(waiting)
+        local done = ns.Inbox.Answered(waiting)
         if not done and waiting.looks < Opener.MAX_LOOKS then
             waiting.looks = waiting.looks + 1
             later(current)
@@ -163,7 +126,7 @@ step = function(current)
             ns.Ticks.Set(key, false)
             current.at = current.at + 1
         elseif mail and mail.money > 0 then
-            current.waiting = waitFor(key, mail, "money")
+            current.waiting = ns.Inbox.Watch(key, mail, "money")
             TakeInboxMoney(mail.index)
             later(current)
             return
@@ -172,7 +135,7 @@ step = function(current)
                 finish(current, string.format("Bags are full: %s left.", ns.Count(left(current), "ticked mail")))
                 return
             end
-            current.waiting = waitFor(key, mail, "item", slot)
+            current.waiting = ns.Inbox.Watch(key, mail, "item", slot)
             TakeInboxItem(mail.index, slot)
             later(current)
             return
@@ -184,10 +147,10 @@ step = function(current)
     end
 end
 
---- Open the ticked mails, bottom up. False when a run is already going or
--- nothing is ticked.
+--- Open the ticked mails, bottom up. False when a run or a forward is
+-- already going, or nothing is ticked.
 function Opener.Start(mails)
-    if run then
+    if ns.Busy() then
         return false
     end
     local ticked = ns.Ticks.Mails(mails)

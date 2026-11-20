@@ -51,7 +51,12 @@ local function ensureBuilt()
         .. "mails you want: Open (N) takes the gold and items of the ticked ones, "
         .. "beside the game's own Open All, and Select all ticks every mail on "
         .. "every page. It never deletes a mail, and skips a cash on delivery "
-        .. "mail rather than pay for it."
+        .. "mail rather than pay for it.\n\n"
+        .. "Forward (N) sends the ticked mails' gold and items on to someone "
+        .. "else, and Forward beside Reply does the same for the open mail. "
+        .. "MailHandler fills in the Send Mail tab, with the name you last "
+        .. "forwarded to; you press Send. Twelve items fit in a mail: once one "
+        .. "has gone, it fills the next."
     )
     Panel.about = about
 end

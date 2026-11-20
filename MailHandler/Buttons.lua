@@ -1,8 +1,9 @@
 local addonName, ns = ...
 
 -- The checkboxes and buttons, laid on the game's own inbox: a box left of
--- each mail's icon, Select all under the title, and Open (N) beside the
--- game's Open All, which is moved over, not changed.
+-- each mail's icon, Select all under the title with Forward (N) across
+-- from it, and Open (N) beside the game's Open All, which is moved over,
+-- not changed. On the open mail, Forward left of Reply.
 
 local Buttons = {}
 ns.Buttons = Buttons
@@ -14,9 +15,14 @@ local SHIFT = 42
 -- box is clear of the frame's border.
 local ROOM = 20
 
+-- Select all's place under the title, which Forward (N) is level with.
+local TOP = -36
+-- Forward (N) is wider than Open: its count follows a longer word.
+local FORWARD_WIDTH = 90
+
 local created = false
 local boxes = {}
-local selectAll, openButton, ownOpenAll
+local selectAll, openButton, ownOpenAll, forwardButton, forwardOpenButton
 
 local function rowsPerPage()
     return INBOXITEMS_TO_DISPLAY or 7
@@ -132,7 +138,7 @@ function Buttons.Create()
 
     selectAll = CreateFrame("CheckButton", "MailHandlerSelectAll", InboxFrame, "UICheckButtonTemplate")
     selectAll:SetSize(22, 22)
-    selectAll:SetPoint("TOPLEFT", InboxFrame, "TOPLEFT", 64, -36)
+    selectAll:SetPoint("TOPLEFT", InboxFrame, "TOPLEFT", 64, TOP)
     selectAll.label = selectAll:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     selectAll.label:SetPoint("LEFT", selectAll, "RIGHT", 2, 0)
     selectAll.label:SetText("Select all")
@@ -163,13 +169,40 @@ function Buttons.Create()
         ownOpenAll:SetPoint("LEFT", openButton, "RIGHT", 6, 0)
     end
 
+    forwardButton = panelButton("MailHandlerForwardButton", "Forward (0)", function()
+        ns.Forwarder.ForwardTicked()
+    end)
+    forwardButton:SetWidth(FORWARD_WIDTH)
+    -- By the window's right edge: Classic Era's inbox is wider than the
+    -- window it sits in, and its own right edge is out of sight.
+    forwardButton:SetPoint("TOPRIGHT", MailFrame or InboxFrame, "TOPRIGHT", -12, TOP)
+
+    -- Left of Reply, as big as it, as the game's own buttons along the
+    -- open mail's bottom sit edge to edge.
+    if OpenMailFrame and OpenMailReplyButton then
+        forwardOpenButton = CreateFrame("Button", "MailHandlerForwardOpenButton", OpenMailFrame, "UIPanelButtonTemplate")
+        local width, height = OpenMailReplyButton:GetWidth(), OpenMailReplyButton:GetHeight()
+        forwardOpenButton:SetSize(width > 0 and width or 82, height > 0 and height or 22)
+        forwardOpenButton:SetPoint("RIGHT", OpenMailReplyButton, "LEFT", 0, 0)
+        forwardOpenButton:SetText("Forward")
+        forwardOpenButton:SetScript("OnClick", function()
+            ns.Forwarder.ForwardOpen()
+        end)
+    end
+
     -- Classic Era redraws its inbox with InboxFrame_Update; Forever's mail
     -- frame is the mainline one, which redraws with InboxFrame:Update() on
-    -- Prev, Next and the mouse wheel, with no event to follow.
+    -- Prev, Next and the mouse wheel, with no event to follow. The open
+    -- mail likewise: OpenMail_Update, or OpenMailFrame:Update().
     if hooksecurefunc and InboxFrame_Update then
         hooksecurefunc("InboxFrame_Update", Buttons.Refresh)
     elseif hooksecurefunc and InboxFrame.Update then
         hooksecurefunc(InboxFrame, "Update", Buttons.Refresh)
+    end
+    if hooksecurefunc and OpenMail_Update then
+        hooksecurefunc("OpenMail_Update", Buttons.Refresh)
+    elseif hooksecurefunc and OpenMailFrame and OpenMailFrame.Update then
+        hooksecurefunc(OpenMailFrame, "Update", Buttons.Refresh)
     end
 end
 
@@ -192,18 +225,31 @@ function Buttons.Refresh()
         box:SetChecked(mail ~= nil and ns.Ticks.Is(mail.key))
     end
 
-    local running = ns.Opener.Running()
+    local busy = ns.Busy()
     local count = ns.Ticks.Count(mails)
     selectAll:SetChecked(ns.Ticks.AllTicked(mails))
     openButton:SetText(string.format("Open (%d)", count))
-    openButton:SetEnabled(count > 0 and not running)
+    openButton:SetEnabled(count > 0 and not busy)
+    forwardButton:SetText(string.format("Forward (%d)", count))
+    forwardButton:SetEnabled(count > 0 and not busy)
     if ownOpenAll then
-        ownOpenAll:SetEnabled(#mails > 0 and not running)
+        ownOpenAll:SetEnabled(#mails > 0 and not busy)
+    end
+    if forwardOpenButton then
+        local open = OpenMailFrame:IsShown() and ns.Forwarder.OpenMail()
+        forwardOpenButton:SetEnabled(open and open.cod == 0 and not busy)
     end
 end
 
 function Buttons.Parts()
-    return { boxes = boxes, selectAll = selectAll, open = openButton, openAll = ownOpenAll }
+    return {
+        boxes = boxes,
+        selectAll = selectAll,
+        open = openButton,
+        openAll = ownOpenAll,
+        forward = forwardButton,
+        forwardOpen = forwardOpenButton,
+    }
 end
 
 local events = CreateFrame("Frame")
@@ -218,6 +264,7 @@ events:SetScript("OnEvent", function(_, event)
         Buttons.Refresh()
     else
         ns.Opener.Stop()
+        ns.Forwarder.Stop()
         ns.Ticks.Clear()
         Buttons.Refresh()
     end

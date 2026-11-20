@@ -85,6 +85,52 @@ function Inbox.HasAttachment(index, slot)
     end, false)
 end
 
+--- What to watch after a take, to see when the server has answered it: the
+-- mail's key, and its place and the size of the box, to see whether the
+-- game has removed it. `kind` is "money" or "item".
+function Inbox.Watch(key, mail, kind, slot)
+    return {
+        key = key,
+        base = mail.base,
+        index = mail.index,
+        count = Inbox.Count(),
+        kind = kind,
+        slot = slot,
+        looks = 0,
+        -- The gold a money take is for: counted once the take is answered.
+        money = mail.money,
+    }
+end
+
+--- Whether the take being watched has been answered: the gold or the item
+-- is gone from the mail, or the mail itself is. Looked for at the mail's
+-- place, not by its key: once the game removes it, the next alike mail
+-- below takes over its key. Working bottom up, its place stays put while
+-- its own mail is there. Sets `removed` when the mail has gone.
+function Inbox.Answered(watch)
+    if Inbox.Count() < watch.count then
+        watch.removed = true
+        return true
+    end
+    local mail = header(watch.index)
+    if not mail or mail.base ~= watch.base then
+        watch.removed = true
+        return true
+    end
+    if watch.kind == "money" then
+        return mail.money == 0
+    end
+    return not Inbox.HasAttachment(watch.index, watch.slot)
+end
+
+--- How many of its item an attachment holds; 0 when unknown.
+function Inbox.AttachmentCount(index, slot)
+    return ns.Guarded(function()
+        local _, _, _, count = GetInboxItem(index, slot)
+        return type(count) == "number" and count or 0
+    end, 0)
+end
+
 function Inbox.FirstAttachment(index)
     for slot = 1, maxAttachments() do
         if Inbox.HasAttachment(index, slot) then

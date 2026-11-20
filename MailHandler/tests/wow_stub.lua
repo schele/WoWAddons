@@ -70,6 +70,12 @@ local function makeWidget(env, kind, parent, template)
     function widget:GetTexture() return self.texture end
     function widget:SetJustifyH(value) self.justifyH = value end
     function widget:IsShown() return self.shown end
+    -- For edit boxes: Classic Era's mail text box is a scrolling one, read
+    -- with GetInputText.
+    function widget:SetFocus() env.__focus = self end
+    function widget:ClearFocus() if env.__focus == self then env.__focus = nil end end
+    function widget:GetInputText() return self.text or "" end
+    function widget:GetHeight() return self.height or 0 end
 
     -- Test helper: drive this widget's OnEvent handler.
     function widget:Fire(event, ...)
@@ -148,7 +154,11 @@ function stub.newEnv()
     env.GameFontNormalSmall = { name = "GameFontNormalSmall" }
     env.GameFontHighlightSmall = { name = "GameFontHighlightSmall" }
     env.GameFontDisableSmall = { name = "GameFontDisableSmall" }
-    env.InboxFrame = makeWidget(env, "Frame", env.UIParent)
+    -- The mail window, and the inbox inside it. On Classic Era the inbox
+    -- is wider than the window, so only the window's right edge is the
+    -- one players see.
+    env.MailFrame = makeWidget(env, "Frame", env.UIParent)
+    env.InboxFrame = makeWidget(env, "Frame", env.MailFrame)
     env.InboxFrame.pageNum = 1
     for row = 1, 7 do
         env["MailItem" .. row] = makeWidget(env, "Frame", env.InboxFrame)
@@ -243,12 +253,39 @@ function stub.newEnv()
         return "icon", nil, mail.sender, mail.subject, mail.money, mail.cod, 29.5,
             itemCount(mail), false, false, false, true, false
     end
+    -- An item's ID, the same for every item of that name. One not loaded
+    -- yet has no name, but has an ID all the same.
+    env.__ids = {}
+    function env.__itemID(name)
+        name = name or "(not loaded)"
+        if not env.__ids[name] then
+            local count = 0
+            for _ in pairs(env.__ids) do count = count + 1 end
+            env.__ids[name] = 2000 + count
+        end
+        return env.__ids[name]
+    end
+
     -- An item the client has not loaded yet has no name, but its ID and
     -- HasInboxItem still say it is there.
     function env.GetInboxItem(index, slot)
         local mail = env.__mails[index]
         local item = mail and mail.items[slot]
-        if item then return item.name, 1000 + slot, "icon", item.count, 1, true end
+        if item then return item.name, env.__itemID(item.name), "icon", item.count, 1, true end
+    end
+    -- A mail's text, and for an auction house invoice, what it was for.
+    function env.GetInboxText(index)
+        local mail = env.__mails[index]
+        if not mail then return nil end
+        mail.read = true
+        return mail.text, nil, nil, true, mail.invoice ~= nil
+    end
+    function env.GetInboxInvoiceInfo(index)
+        local mail = env.__mails[index]
+        local invoice = mail and mail.invoice
+        if invoice then
+            return invoice.type, invoice.item, invoice.player, invoice.bid or 0, 0, 0, 0, 0, 0, 0, invoice.count or 1
+        end
     end
     function env.HasInboxItem(index, slot)
         local mail = env.__mails[index]
@@ -270,13 +307,29 @@ function stub.newEnv()
             emptied(mail)
         end)
     end
+    -- With real bags (stub.useBags), the item goes into them; otherwise
+    -- only the count of free slots goes down.
     function env.TakeInboxItem(index, slot)
         table.insert(env.__log, "item " .. index .. ":" .. slot)
         local mail = env.__mails[index]
-        if not (mail and mail.items[slot]) or env.__freeSlots <= 0 then return end
+        local item = mail and mail.items[slot]
+        if not item then return end
+        if env.__bags then
+            if not env.__fits(item) then return end
+        elseif env.__freeSlots <= 0 then
+            return
+        end
         answer(mail, function()
             mail.items[slot] = nil
-            env.__freeSlots = env.__freeSlots - 1
+            if env.__bags and env.__bagsLag then
+                -- The mail shows the item gone a moment before the bags
+                -- show it come.
+                table.insert(env.__replies, function() env.__store(item) end)
+            elseif env.__bags then
+                env.__store(item)
+            else
+                env.__freeSlots = env.__freeSlots - 1
+            end
             emptied(mail)
         end)
     end
@@ -294,7 +347,271 @@ function stub.newEnv()
         end,
     }
 
+    function env.__fire(event, ...)
+        local frames = {}
+        for index, frame in ipairs(env.__frames) do frames[index] = frame end
+        for _, frame in ipairs(frames) do
+            if frame.registeredEvents[event] then frame:Fire(event, ...) end
+        end
+    end
+
+    -- The open mail, beside the inbox: Reply, Delete and Close along its
+    -- bottom, Reply 82 wide.
+    env.OpenMailFrame = makeWidget(env, "Frame", env.UIParent)
+    env.OpenMailFrame.shown = false
+    env.OpenMailDeleteButton = makeWidget(env, "Button", env.OpenMailFrame, "UIPanelButtonTemplate")
+    env.OpenMailReplyButton = makeWidget(env, "Button", env.OpenMailFrame, "UIPanelButtonTemplate")
+    env.OpenMailReplyButton:SetSize(82, 22)
+    env.OpenMailReplyButton:SetPoint("RIGHT", env.OpenMailDeleteButton, "LEFT", 0, 0)
+    function env.OpenMail_Update() env.__openMailRedraws = (env.__openMailRedraws or 0) + 1 end
+
+    -- The Send Mail tab: To, Subject, the text, the gold with its Send
+    -- Money and C.O.D. choice, and Send, as Classic Era's (its text box is
+    -- MailEditBox; Forever's is SendMailBodyEditBox, see useForeverInbox).
+    env.ATTACHMENTS_MAX_SEND = 12
+    env.__tab = 1
+    env.SendMailFrame = makeWidget(env, "Frame", env.UIParent)
+    env.SendMailNameEditBox = makeWidget(env, "EditBox", env.SendMailFrame)
+    env.SendMailSubjectEditBox = makeWidget(env, "EditBox", env.SendMailFrame)
+    env.MailEditBox = makeWidget(env, "EditBox", env.SendMailFrame)
+    env.SendMailMoney = makeWidget(env, "Frame", env.SendMailFrame)
+    env.SendMailSendMoneyButton = makeWidget(env, "CheckButton", env.SendMailFrame)
+    env.SendMailCODButton = makeWidget(env, "CheckButton", env.SendMailFrame)
+    env.SendMailSendMoneyButton.checked = true
+    env.SendMailMailButton = makeWidget(env, "Button", env.SendMailFrame, "UIPanelButtonTemplate")
+
+    function env.MailFrameTab_OnClick(_, tab)
+        env.__tab = tab
+        if tab == 2 then env.SendMailFrame.sendMode = "send" end
+    end
+    function env.MoneyInputFrame_SetCopper(frame, copper) frame.copper = copper end
+    function env.MoneyInputFrame_GetCopper(frame) return frame.copper or 0 end
+    function env.MoneyInputFrame_ResetMoney(frame) frame.copper = 0 end
+    function env.SendMailRadioButton_OnClick(index)
+        env.SendMailSendMoneyButton:SetChecked(index == 1)
+        env.SendMailCODButton:SetChecked(index ~= 1)
+    end
+
+    local function bodyBox()
+        return env.SendMailBodyEditBox or env.MailEditBox
+    end
+    function env.__body() return bodyBox():GetText() or "" end
+
+    -- What the game's Send does: the gold box becomes the gold sent, or the
+    -- C.O.D. asked, then the mail goes.
+    env.SendMailMailButton:SetScript("OnClick", function()
+        local copper = env.MoneyInputFrame_GetCopper(env.SendMailMoney)
+        env.SetSendMailCOD(0)
+        env.SetSendMailMoney(0)
+        if env.SendMailSendMoneyButton:GetChecked() then
+            if copper > 0 then env.SetSendMailMoney(copper) end
+        elseif copper > 0 then
+            env.SetSendMailCOD(copper)
+        end
+        local body = env.SendMailBodyEditBox and env.SendMailBodyEditBox:GetText() or env.MailEditBox:GetInputText()
+        env.SendMail(env.SendMailNameEditBox:GetText() or "", env.SendMailSubjectEditBox:GetText() or "", body)
+    end)
+
+    -- The game's own mail frame: once a mail has gone, the Send Mail tab is
+    -- emptied. Made before the addon loads, so it hears the event first.
+    local blizzard = env.CreateFrame("Frame")
+    blizzard:RegisterEvent("MAIL_SEND_SUCCESS")
+    blizzard:SetScript("OnEvent", function()
+        env.SendMailNameEditBox:SetText("")
+        env.SendMailSubjectEditBox:SetText("")
+        bodyBox():SetText("")
+        env.MoneyInputFrame_ResetMoney(env.SendMailMoney)
+        env.SendMailRadioButton_OnClick(1)
+        if env.SendMailFrame.sendMode == "reply" then env.MailFrameTab_OnClick(nil, 1) end
+    end)
+
+    -- The items on the Send Mail tab, by attachment slot, and the mails
+    -- sent. Attaching needs real bags (stub.useBags).
+    env.__send = {}
+    env.__sent = {}
+    env.__sendMoney, env.__sendCOD = 0, 0
+    function env.SetSendMailMoney(copper) env.__sendMoney = copper end
+    function env.SetSendMailCOD(copper) env.__sendCOD = copper end
+    function env.HasSendMailItem(index) return env.__send[index] ~= nil end
+    function env.GetSendMailItem(index)
+        local held = env.__send[index] and env.__bags[0].slots[env.__send[index]]
+        if held then return held.name, held.id, "icon", held.count, 1 end
+    end
+    function env.ClickSendMailItemButton() end
+    function env.CursorHasItem() return env.__cursor ~= nil end
+    function env.ClearCursor() end
+
+    --- A mail sent: its gold leaves the purse and its items the bags. The
+    -- server says it has gone a moment later.
+    function env.SendMail(to, subject, body)
+        local mail = { to = to, subject = subject, body = body, money = env.__sendMoney, cod = env.__sendCOD, items = {} }
+        for index = 1, env.ATTACHMENTS_MAX_SEND do
+            local slot = env.__send[index]
+            if slot then
+                local held = env.__bags[0].slots[slot]
+                table.insert(mail.items, { name = held.name, count = held.count })
+                env.__bags[0].slots[slot] = nil
+            end
+        end
+        env.__send = {}
+        env.__money = env.__money - mail.money
+        table.insert(env.__sent, mail)
+        table.insert(env.__replies, function() env.__fire("MAIL_SEND_SUCCESS") end)
+    end
+
     return env
+end
+
+--- Real bags: a backpack of `size` slots, each { id, name, count, stack,
+-- bound, locked }, and the cursor. A take tops up the player's own stacks
+-- of the item first, then fills empty slots, as the game does. Picking up
+-- or splitting a stack locks it; an item put on the Send Mail tab stays
+-- in its slot, locked, until the mail goes.
+function stub.useBags(env, size)
+    local bag = { size = size or 16, slots = {} }
+    env.__bags = { [0] = bag }
+    env.__cursor = nil
+    env.__uiErrors = {}
+
+    local function free()
+        local count = 0
+        for slot = 1, bag.size do
+            if not bag.slots[slot] then count = count + 1 end
+        end
+        return count
+    end
+
+    function env.__fits(item)
+        local id, stack, space = env.__itemID(item.name), item.stack or 20, 0
+        for slot = 1, bag.size do
+            local held = bag.slots[slot]
+            if not held then
+                space = space + stack
+            elseif held.id == id and not held.locked then
+                space = space + stack - held.count
+            end
+        end
+        return space >= item.count
+    end
+
+    function env.__store(item)
+        local id, stack, left = env.__itemID(item.name), item.stack or 20, item.count
+        for slot = 1, bag.size do
+            local held = bag.slots[slot]
+            if left > 0 and held and held.id == id and not held.locked and held.count < stack then
+                local add = math.min(stack - held.count, left)
+                held.count = held.count + add
+                left = left - add
+            end
+        end
+        for slot = 1, bag.size do
+            if left > 0 and not bag.slots[slot] then
+                local put = math.min(stack, left)
+                bag.slots[slot] = { id = id, name = item.name, count = put, stack = stack, bound = item.bound }
+                left = left - put
+            end
+        end
+    end
+
+    --- Test helper: the player's own items, in a slot.
+    function env.__give(slot, name, count, stack)
+        bag.slots[slot] = { id = env.__itemID(name), name = name, count = count, stack = stack or 20 }
+    end
+
+    --- Test helper: how many of an item are in the bags, sent or not.
+    function env.__held(name)
+        local total = 0
+        for slot = 1, bag.size do
+            local held = bag.slots[slot]
+            if held and held.name == name then total = total + held.count end
+        end
+        return total
+    end
+
+    env.C_Container = {
+        GetContainerNumSlots = function(which) return which == 0 and bag.size or 0 end,
+        GetContainerNumFreeSlots = function(which)
+            if which == 0 then return free(), 0 end
+            return 0, 0
+        end,
+        GetContainerItemInfo = function(which, slot)
+            local held = which == 0 and bag.slots[slot]
+            if not held then return nil end
+            return {
+                iconFileID = 1, stackCount = held.count, isLocked = held.locked or false, quality = 1,
+                isReadable = false, hasLoot = false, isFiltered = false, hasNoValue = false,
+                itemID = held.id, isBound = held.bound or false,
+                hyperlink = "|cffffffff|Hitem:" .. held.id .. "::::::::60:::::|h[" .. held.name .. "]|h|r",
+            }
+        end,
+        PickupContainerItem = function(which, slot)
+            if which ~= 0 then return end
+            local held, cursor = bag.slots[slot], env.__cursor
+            if not cursor then
+                if held and not held.locked then
+                    env.__cursor = { slot = slot, count = held.count }
+                    held.locked = true
+                end
+                return
+            end
+            if cursor.slot == slot then
+                held.locked = false
+                env.__cursor = nil
+                return
+            end
+            if held then return end
+            -- Put down in an empty slot: the server moves it a moment later.
+            local source = bag.slots[cursor.slot]
+            env.__cursor = nil
+            local function place()
+                if cursor.count >= source.count then
+                    bag.slots[cursor.slot] = nil
+                    source.locked = false
+                    bag.slots[slot] = source
+                else
+                    source.count = source.count - cursor.count
+                    source.locked = false
+                    bag.slots[slot] = { id = source.id, name = source.name, count = cursor.count, stack = source.stack, bound = source.bound }
+                end
+            end
+            if env.__slowServer then
+                table.insert(env.__replies, place)
+            else
+                place()
+            end
+        end,
+        SplitContainerItem = function(which, slot, count)
+            local held = which == 0 and bag.slots[slot]
+            if env.__cursor or not held or held.locked or count >= held.count then return end
+            env.__cursor = { slot = slot, count = count, split = true }
+            held.locked = true
+        end,
+    }
+
+    function env.ClearCursor()
+        if env.__cursor then
+            bag.slots[env.__cursor.slot].locked = false
+            env.__cursor = nil
+        end
+    end
+
+    -- A soulbound item will not go, and stays on the cursor. Nor will part
+    -- of a stack straight off a split: MailHandler must not count on it.
+    function env.ClickSendMailItemButton(index)
+        local cursor = env.__cursor
+        if not cursor or env.__send[index] then return end
+        local held = bag.slots[cursor.slot]
+        if held.bound then
+            table.insert(env.__uiErrors, "You can't mail soulbound items.")
+            return
+        end
+        if cursor.split then
+            table.insert(env.__uiErrors, "split stack")
+            return
+        end
+        env.__send[index] = cursor.slot
+        env.__cursor = nil
+    end
 end
 
 --- Forever's inbox: the mainline mail frame, which redraws with
@@ -304,6 +621,14 @@ function stub.useForeverInbox(env)
     function env.InboxFrame:Update()
         env.__redraws = env.__redraws + 1
     end
+    -- Its open mail redraws with OpenMailFrame:Update(), and its mail text
+    -- box is a plain one.
+    env.OpenMail_Update = nil
+    function env.OpenMailFrame:Update()
+        env.__openMailRedraws = (env.__openMailRedraws or 0) + 1
+    end
+    env.SendMailBodyEditBox = env.MailEditBox
+    env.MailEditBox = nil
 end
 
 return stub

@@ -5,8 +5,10 @@ local M = {}
 M.FILES = {
     "MailHandler.lua",
     "Inbox.lua",
+    "Bags.lua",
     "Ticks.lua",
     "Opener.lua",
+    "Forward.lua",
     "Buttons.lua",
     "Settings.lua",
 }
@@ -58,6 +60,34 @@ function M.expired(env, item, count, slots)
 end
 
 M.forever = stub.useForeverInbox
+M.bags = stub.useBags
+
+--- The player opening the mail at `index`, the way the game redraws it.
+function M.openMail(env, index)
+    env.InboxFrame.openMailID = index
+    env.OpenMailFrame:Show()
+    if env.OpenMail_Update then
+        env.OpenMail_Update()
+    else
+        env.OpenMailFrame:Update()
+    end
+end
+
+--- The player pressing the game's Send, and the server answering.
+function M.pressSend(env)
+    env.SendMailMailButton:Click()
+    env.__runAllTimers()
+end
+
+--- What is on the Send Mail tab, "name xcount" per attachment, in order.
+function M.attached(env)
+    local list = {}
+    for index = 1, env.ATTACHMENTS_MAX_SEND do
+        local name, _, _, count = env.GetSendMailItem(index)
+        if name then list[#list + 1] = name .. " x" .. count end
+    end
+    return table.concat(list, ", ")
+end
 
 --- The game redrawing its inbox, the way this client does it.
 function M.redraw(env)

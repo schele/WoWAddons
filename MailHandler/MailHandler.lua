@@ -50,6 +50,11 @@ function ns.Count(count, word)
     return string.format("%d %ss", count, word)
 end
 
+--- Whether Open or a forward is going: only one at a time.
+function ns.Busy()
+    return (ns.Opener and ns.Opener.Running()) or (ns.Forwarder and ns.Forwarder.Running()) or false
+end
+
 --- Something about the ticks or the opening changed: redraw the boxes and
 -- Open's count, if they are made.
 function ns.Changed()

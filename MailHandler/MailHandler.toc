@@ -1,14 +1,17 @@
 ## Interface: 11509, 16001
 ## Title: MailHandler
-## Notes: Tick the mails you want and open only those.
+## Notes: Tick the mails you want, then open or forward only those.
 ## IconTexture: Interface\AddOns\MailHandler\icon
 ## Author: Skyler
 ## Version: 0.1.0
 ## X-Wago-ID: aNerYg62
+## SavedVariablesPerCharacter: MailHandlerCharDB
 
 MailHandler.lua
 Inbox.lua
+Bags.lua
 Ticks.lua
 Opener.lua
+Forward.lua
 Buttons.lua
 Settings.lua
