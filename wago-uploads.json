@@ -20,8 +20,8 @@
                      "commit":  "d8d2e4d60d231e8596329483164b84d91bcefa18"
                  },
     "MailHandler":  {
-                        "version":  "0.1.0",
-                        "commit":  "f3a0d0ebc3143971968e40a7611ed043cca61984"
+                        "version":  "0.2.0",
+                        "commit":  "c0c67b429c9849101c8ace7d48be80269190ed32"
                     },
     "RankUp":  {
                    "version":  "0.1.0",
