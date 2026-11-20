@@ -59,6 +59,13 @@ describe("the settings page", function()
         assertMatch("Send", text)
     end)
 
+    it("says it writes the subject of a mail you send", function()
+        local ns, env, panel = opened()
+        local text = panel.about:GetText()
+        assertMatch("subject", text)
+        assertMatch("Send Mail", text)
+    end)
+
     it("says it never deletes a mail and never pays for one", function()
         local ns, env, panel = opened()
         local text = panel.about:GetText()

@@ -31,8 +31,22 @@ local function makeWidget(env, kind, parent, template)
     function widget:SetWidth(value) self.width = value end
     function widget:GetWidth() return self.width or 0 end
     function widget:GetParent() return self.parent end
-    function widget:SetText(value) self.text = value end
+    -- An edit box hears its text change, from code as from typing, as the
+    -- client's does.
+    function widget:SetText(value)
+        self.text = value
+        if self.kind == "EditBox" and self.scripts.OnTextChanged then
+            self.scripts.OnTextChanged(self, false)
+        end
+    end
     function widget:GetText() return self.text end
+    function widget:HookScript(name, fn)
+        local original = self.scripts[name]
+        self.scripts[name] = function(...)
+            if original then original(...) end
+            fn(...)
+        end
+    end
     function widget:CreateFontString()
         local text = makeWidget(env, "FontString", self)
         self.regions = self.regions or {}
@@ -379,23 +393,94 @@ function stub.newEnv()
     env.SendMailCODButton = makeWidget(env, "CheckButton", env.SendMailFrame)
     env.SendMailSendMoneyButton.checked = true
     env.SendMailMailButton = makeWidget(env, "Button", env.SendMailFrame, "UIPanelButtonTemplate")
-
-    function env.MailFrameTab_OnClick(_, tab)
-        env.__tab = tab
-        if tab == 2 then env.SendMailFrame.sendMode = "send" end
-    end
-    function env.MoneyInputFrame_SetCopper(frame, copper) frame.copper = copper end
-    function env.MoneyInputFrame_GetCopper(frame) return frame.copper or 0 end
-    function env.MoneyInputFrame_ResetMoney(frame) frame.copper = 0 end
-    function env.SendMailRadioButton_OnClick(index)
-        env.SendMailSendMoneyButton:SetChecked(index == 1)
-        env.SendMailCODButton:SetChecked(index ~= 1)
-    end
+    env.SendMailNameEditBox.text = ""
+    env.SendMailSubjectEditBox.text = ""
+    env.MailEditBox.text = ""
 
     local function bodyBox()
         return env.SendMailBodyEditBox or env.MailEditBox
     end
     function env.__body() return bodyBox():GetText() or "" end
+
+    -- Cash on delivery: Classic Era has it; Forever turns it off (see
+    -- useForeverInbox).
+    env.__codEnabled = true
+    env.C_Mail = { IsCODEnabled = function() return env.__codEnabled end }
+
+    -- Send is enabled once there is a name and a subject.
+    function env.SendMailFrame_CanSend()
+        local name = env.SendMailNameEditBox:GetText() or ""
+        local subject = env.SendMailSubjectEditBox:GetText() or ""
+        env.SendMailMailButton:SetEnabled(name ~= "" and subject ~= "")
+    end
+    -- Bound when the boxes were made, as the game's XML binds it: a hook
+    -- on the global does not run from these.
+    local canSend = env.SendMailFrame_CanSend
+    env.SendMailNameEditBox:SetScript("OnTextChanged", function() canSend() end)
+    env.SendMailSubjectEditBox:SetScript("OnTextChanged", function() canSend() end)
+
+    -- The gold to send, in a box each for gold, silver and copper. Setting
+    -- it writes each box, and each says it changed.
+    env.SendMailMoney.boxes = {}
+    for _, coin in ipairs({ "Gold", "Silver", "Copper" }) do
+        local box = makeWidget(env, "EditBox", env.SendMailMoney)
+        box.text = ""
+        box:SetScript("OnTextChanged", function() canSend() end)
+        env["SendMailMoney" .. coin] = box
+        table.insert(env.SendMailMoney.boxes, box)
+    end
+    function env.MoneyInputFrame_SetCopper(frame, copper)
+        frame.copper = copper
+        if frame.boxes then
+            local parts = { math.floor(copper / 10000), math.floor(copper / 100) % 100, copper % 100 }
+            for index, box in ipairs(frame.boxes) do
+                box:SetText(parts[index] > 0 and tostring(parts[index]) or "")
+            end
+        end
+    end
+    function env.MoneyInputFrame_GetCopper(frame) return frame.copper or 0 end
+    function env.MoneyInputFrame_ResetMoney(frame) env.MoneyInputFrame_SetCopper(frame, 0) end
+
+    function env.MailFrameTab_OnClick(_, tab)
+        env.__tab = tab
+        if tab == 2 then env.SendMailFrame.sendMode = "send" end
+    end
+    function env.SendMailRadioButton_OnClick(index)
+        env.SendMailSendMoneyButton:SetChecked(index == 1)
+        env.SendMailCODButton:SetChecked(index ~= 1)
+    end
+
+    -- The game's redraw of the tab, on MAIL_SEND_INFO_UPDATE: with items
+    -- on it, and only where cash on delivery is allowed, an empty subject,
+    -- or the one it last wrote, becomes the first stack's name and count.
+    -- Without, its own subject is cleared. Then Send is enabled, or not.
+    env.SendMailFrame.previousItem = ""
+    function env.SendMailFrame_Update()
+        local count, title = 0, nil
+        for index = 1, env.ATTACHMENTS_MAX_SEND do
+            if env.HasSendMailItem(index) then
+                count = count + 1
+                local name, _, _, stack = env.GetSendMailItem(index)
+                if not title and name then
+                    title = stack <= 1 and name or (name .. " (" .. stack .. ")")
+                end
+            end
+        end
+        local frame, subject = env.SendMailFrame, env.SendMailSubjectEditBox
+        if count > 0 and env.C_Mail.IsCODEnabled() then
+            if subject:GetText() == "" or subject:GetText() == frame.previousItem then
+                title = title or ""
+                subject:SetText(title)
+                frame.previousItem = title
+            end
+        else
+            if subject:GetText() == frame.previousItem then subject:SetText("") end
+            frame.previousItem = ""
+            env.SendMailRadioButton_OnClick(1)
+        end
+        env.SendMailFrame_CanSend()
+    end
+    env.SendMailFrame_CanSend()
 
     -- What the game's Send does: the gold box becomes the gold sent, or the
     -- C.O.D. asked, then the mail goes.
@@ -412,14 +497,22 @@ function stub.newEnv()
         env.SendMail(env.SendMailNameEditBox:GetText() or "", env.SendMailSubjectEditBox:GetText() or "", body)
     end)
 
-    -- The game's own mail frame: once a mail has gone, the Send Mail tab is
-    -- emptied. Made before the addon loads, so it hears the event first.
+    -- The game's own mail frame: it redraws the Send Mail tab when an item
+    -- goes on or comes off, and once a mail has gone, empties the tab in
+    -- its order, the gold last. Made before the addon loads, so it hears
+    -- each event first.
     local blizzard = env.CreateFrame("Frame")
+    blizzard:RegisterEvent("MAIL_SEND_INFO_UPDATE")
     blizzard:RegisterEvent("MAIL_SEND_SUCCESS")
-    blizzard:SetScript("OnEvent", function()
+    blizzard:SetScript("OnEvent", function(_, event)
+        if event == "MAIL_SEND_INFO_UPDATE" then
+            env.SendMailFrame_Update()
+            return
+        end
         env.SendMailNameEditBox:SetText("")
         env.SendMailSubjectEditBox:SetText("")
         bodyBox():SetText("")
+        env.SendMailFrame_Update()
         env.MoneyInputFrame_ResetMoney(env.SendMailMoney)
         env.SendMailRadioButton_OnClick(1)
         if env.SendMailFrame.sendMode == "reply" then env.MailFrameTab_OnClick(nil, 1) end
@@ -611,6 +704,17 @@ function stub.useBags(env, size)
         end
         env.__send[index] = cursor.slot
         env.__cursor = nil
+        env.__fire("MAIL_SEND_INFO_UPDATE")
+    end
+
+    --- Test helper: the player taking the item at `index` off the Send
+    -- Mail tab, back into its slot.
+    function env.__detach(index)
+        local slot = env.__send[index]
+        if not slot then return end
+        env.__send[index] = nil
+        bag.slots[slot].locked = false
+        env.__fire("MAIL_SEND_INFO_UPDATE")
     end
 end
 
@@ -629,6 +733,8 @@ function stub.useForeverInbox(env)
     end
     env.SendMailBodyEditBox = env.MailEditBox
     env.MailEditBox = nil
+    -- No cash on delivery, so the game never writes a subject itself.
+    env.__codEnabled = false
 end
 
 return stub

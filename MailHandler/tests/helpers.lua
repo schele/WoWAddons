@@ -9,6 +9,7 @@ M.FILES = {
     "Ticks.lua",
     "Opener.lua",
     "Forward.lua",
+    "Subject.lua",
     "Buttons.lua",
     "Settings.lua",
 }
@@ -77,6 +78,23 @@ end
 function M.pressSend(env)
     env.SendMailMailButton:Click()
     env.__runAllTimers()
+end
+
+--- The player putting the item in backpack slot `slot` on the Send Mail
+-- tab, in its first free place.
+function M.attach(env, slot)
+    env.C_Container.PickupContainerItem(0, slot)
+    for index = 1, env.ATTACHMENTS_MAX_SEND do
+        if not env.HasSendMailItem(index) then
+            env.ClickSendMailItemButton(index)
+            return index
+        end
+    end
+end
+
+--- The player typing gold to send, in copper.
+function M.typeMoney(env, copper)
+    env.MoneyInputFrame_SetCopper(env.SendMailMoney, copper)
 end
 
 --- What is on the Send Mail tab, "name xcount" per attachment, in order.

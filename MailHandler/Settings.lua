@@ -56,7 +56,10 @@ local function ensureBuilt()
         .. "else, and Forward beside Reply does the same for the open mail. "
         .. "MailHandler fills in the Send Mail tab, with the name you last "
         .. "forwarded to; you press Send. Twelve items fit in a mail: once one "
-        .. "has gone, it fills the next."
+        .. "has gone, it fills the next.\n\n"
+        .. "On the Send Mail tab, a mail with no subject gets one: the items it "
+        .. "carries, with their counts, or else its gold. Type your own and it "
+        .. "is left alone."
     )
     Panel.about = about
 end

@@ -76,6 +76,24 @@ one this character last forwarded to; type another over it if you like.
 - Open and Forward wait for each other. Closing the mailbox stops a
   forward; what was taken is in your bags.
 
+## Subject
+
+The game will not send a mail without a subject, and on WoW Forever it
+never writes one for you. MailHandler does, on the **Send Mail** tab,
+while the subject is empty:
+
+    Chunk of Boar Meat (77), Lean Venison (4) and 2 more
+
+- Every item on the mail, its stacks added up, in the order they went
+  on, as many as fit in the subject, then how many more.
+- A mail with gold and no items gets the gold: `1g 23s 45c`.
+- It follows the items as you put them on and take them off. Type a
+  subject of your own and it is left alone; so is a reply's, and a
+  forward's.
+- A letter with nothing in it keeps an empty subject, for you to write.
+- On Classic Era, where the game names the first stack, MailHandler
+  names every item instead.
+
 ## Install
 
 1. Copy this folder into your client's `Interface/AddOns` as `MailHandler`,

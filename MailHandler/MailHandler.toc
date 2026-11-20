@@ -3,7 +3,7 @@
 ## Notes: Tick the mails you want, then open or forward only those.
 ## IconTexture: Interface\AddOns\MailHandler\icon
 ## Author: Skyler
-## Version: 0.1.0
+## Version: 0.2.0
 ## X-Wago-ID: aNerYg62
 ## SavedVariablesPerCharacter: MailHandlerCharDB
 
@@ -13,5 +13,6 @@ Bags.lua
 Ticks.lua
 Opener.lua
 Forward.lua
+Subject.lua
 Buttons.lua
 Settings.lua

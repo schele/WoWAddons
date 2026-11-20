@@ -24,7 +24,12 @@ function ns.Money(copper)
     if GetMoneyString then
         return GetMoneyString(copper)
     end
+    return ns.PlainMoney(copper)
+end
 
+--- Copper as "1g 23s 4c": for text that cannot carry coin icons, such as
+-- a mail's subject.
+function ns.PlainMoney(copper)
     local gold = math.floor(copper / 10000)
     local silver = math.floor(copper / 100) % 100
     local rest = copper % 100
