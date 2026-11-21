@@ -21,7 +21,7 @@ describe("the window", function()
         local f = frame(ns)
         assertEqual("SettingsFrameTemplate", f.template)
         assertEqual("Threat", f.title:GetText())
-        assertEqual("Interface\\AddOns\\ThreatMeter\\logo", f.logo:GetTexture())
+        assertEqual("Interface\\AddOns\\ThreatForever\\logo", f.logo:GetTexture())
         assertEqual(1, f.background.color[4], "solid, never see-through")
     end)
 
@@ -41,7 +41,7 @@ describe("the window", function()
 
     it("stays up out of combat with 'only in combat' off", function()
         local ns = helpers.loggedIn(function(env)
-            env.ThreatMeterDB = { settings = { combatOnly = false } }
+            env.ThreatForeverDB = { settings = { combatOnly = false } }
         end)
 
         assertTrue(frame(ns):IsShown())
@@ -199,7 +199,7 @@ describe("turning it off and on", function()
 
     it("says it waits for combat when turned on outside it", function()
         local ns, env = helpers.loggedIn(function(env)
-            env.ThreatMeterDB = { settings = { shown = false } }
+            env.ThreatForeverDB = { settings = { shown = false } }
         end)
 
         helpers.command(env, "")
@@ -226,7 +226,7 @@ describe("its place", function()
 
     it("is where it was left at the next login", function()
         local ns = helpers.loggedIn(function(env)
-            env.ThreatMeterDB = { settings = {
+            env.ThreatForeverDB = { settings = {
                 window = { point = "TOPLEFT", relativePoint = "TOPLEFT", x = 120, y = -340 },
             } }
         end)

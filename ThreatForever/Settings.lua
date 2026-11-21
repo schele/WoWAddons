@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
--- ThreatMeter's page in the game's options window: what it does, a box per
+-- ThreatForever's page in the game's options window: what it does, a box per
 -- switch and a button to try the warning. Laid out as StealthWatch's: the
 -- rows hang under the description.
 
@@ -97,7 +97,7 @@ local function ensureBuilt()
 
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
-    title:SetText("ThreatMeter")
+    title:SetText("ThreatForever")
 
     -- From the .toc, so the two cannot drift apart.
     local metadata = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
@@ -141,7 +141,7 @@ local function register()
     -- opened, and that is when it gets filled.
     panel = CreateFrame("Frame", nil, UIParent)
     panel:Hide()
-    panel.name = "ThreatMeter"
+    panel.name = "ThreatForever"
     Panel.panel = panel
 
     panel:SetScript("OnShow", function()
@@ -149,7 +149,7 @@ local function register()
         Panel.Refresh()
     end)
 
-    category = Settings.RegisterCanvasLayoutCategory(panel, "ThreatMeter")
+    category = Settings.RegisterCanvasLayoutCategory(panel, "ThreatForever")
     Settings.RegisterAddOnCategory(category)
 end
 

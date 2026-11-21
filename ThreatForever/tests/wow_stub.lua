@@ -1,4 +1,4 @@
--- A stand-in for the parts of the WoW client ThreatMeter touches: units and
+-- A stand-in for the parts of the WoW client ThreatForever touches: units and
 -- the group, each one's threat on a mob, combat, the window's frame, status
 -- bars, the raid warning text, sounds and the options window. Widgets record
 -- what was done to them so tests can assert on it.

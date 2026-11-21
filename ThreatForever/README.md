@@ -1,4 +1,4 @@
-# ThreatMeter (World of Warcraft AddOn)
+# ThreatForever (World of Warcraft AddOn)
 
 A window with a bar for everyone in your group on the threat list of the mob
 you are fighting, filled to how close each one is to pulling aggro, and a
@@ -51,7 +51,7 @@ on your target.
 
 ## Settings and commands
 
-It has a page in the game's options (Options, AddOns, ThreatMeter): a box
+It has a page in the game's options (Options, AddOns, ThreatForever): a box
 each for the window, "Only in combat" and the warning, and a Test button for
 the warning.
 
@@ -67,7 +67,7 @@ the warning.
 
 From the repo root:
 
-    .\package.ps1 ThreatMeter -Install -NoWago
+    .\package.ps1 ThreatForever -Install -NoWago
 
 See the [repo README](../README.md) for packaging and test commands.
 
@@ -78,5 +78,5 @@ The tests run outside the game against a stand-in for the client
 Forever does.
 
 ```powershell
-.\run-tests.ps1 ThreatMeter
+.\run-tests.ps1 ThreatForever
 ```

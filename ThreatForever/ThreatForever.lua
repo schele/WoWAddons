@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
-ns.PREFIX = "|cffe8604cThreatMeter|r"
+ns.PREFIX = "|cffe8604cThreatForever|r"
 
 -- Settings defaults are contributed by each file at load time, so every
 -- piece of config lives next to the code that reads it.
@@ -49,15 +49,15 @@ function ns.IsSecret(value)
 end
 
 local function ensureDatabase()
-    if type(ThreatMeterDB) ~= "table" then
-        ThreatMeterDB = {}
+    if type(ThreatForeverDB) ~= "table" then
+        ThreatForeverDB = {}
     end
-    if type(ThreatMeterDB.settings) ~= "table" then
-        ThreatMeterDB.settings = {}
+    if type(ThreatForeverDB.settings) ~= "table" then
+        ThreatForeverDB.settings = {}
     end
-    applyDefaults(ThreatMeterDB.settings, defaults)
-    ns.db = ThreatMeterDB
-    ns.settings = ThreatMeterDB.settings
+    applyDefaults(ThreatForeverDB.settings, defaults)
+    ns.db = ThreatForeverDB
+    ns.settings = ThreatForeverDB.settings
 end
 
 -- Whatever shows a setting registers here, and redraws when one changes.
@@ -127,9 +127,9 @@ local function runCommand(msg)
     showHelp()
 end
 
-SLASH_THREATMETER1 = "/threat"
-SLASH_THREATMETER2 = "/threatmeter"
-SlashCmdList.THREATMETER = runCommand
+SLASH_THREATFOREVER1 = "/threat"
+SLASH_THREATFOREVER2 = "/threatforever"
+SlashCmdList.THREATFOREVER = runCommand
 
 -- Work to do once the player is in the world and the database exists.
 local loginHandlers = {}

@@ -5,7 +5,7 @@ local M = {}
 -- In .toc order. Files not written yet are skipped, so early specs run
 -- before later files exist.
 M.FILES = {
-    "ThreatMeter.lua",
+    "ThreatForever.lua",
     "Threat.lua",
     "Window.lua",
     "Warn.lua",
@@ -31,7 +31,7 @@ function M.loadAddon()
     for _, path in ipairs(M.FILES) do
         if exists(path) then
             local chunk = assert(loadfile(path, "t", env))
-            chunk("ThreatMeter", ns)
+            chunk("ThreatForever", ns)
         end
     end
     return ns, env
@@ -51,7 +51,7 @@ function M.fire(env, event, ...)
 end
 
 function M.login(env)
-    M.fire(env, "ADDON_LOADED", "ThreatMeter")
+    M.fire(env, "ADDON_LOADED", "ThreatForever")
     M.fire(env, "PLAYER_LOGIN")
 end
 
@@ -64,7 +64,7 @@ function M.loggedIn(setup)
 end
 
 function M.command(env, text)
-    env.SlashCmdList.THREATMETER(text)
+    env.SlashCmdList.THREATFOREVER(text)
     env.__runTimers()
 end
 

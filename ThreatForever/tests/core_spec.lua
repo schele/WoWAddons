@@ -11,7 +11,7 @@ describe("saved settings", function()
 
     it("keeps what was saved", function()
         local ns = helpers.loggedIn(function(env)
-            env.ThreatMeterDB = { settings = { warn = false } }
+            env.ThreatForeverDB = { settings = { warn = false } }
         end)
 
         assertFalse(ns.settings.warn)
@@ -20,11 +20,11 @@ describe("saved settings", function()
 end)
 
 describe("slash commands", function()
-    it("answers to /threat and /threatmeter", function()
+    it("answers to /threat and /threatforever", function()
         local _, env = helpers.loggedIn()
 
-        assertEqual("/threat", env.SLASH_THREATMETER1)
-        assertEqual("/threatmeter", env.SLASH_THREATMETER2)
+        assertEqual("/threat", env.SLASH_THREATFOREVER1)
+        assertEqual("/threatforever", env.SLASH_THREATFOREVER2)
     end)
 
     it("lists every command in the help", function()

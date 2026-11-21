@@ -45,9 +45,9 @@ end
 -- one of the game's windows. On a client without it, the dialog border, a
 -- name and a close button of our own. Solid either way.
 local function createWindowFrame()
-    local ok, made = pcall(CreateFrame, "Frame", "ThreatMeterFrame", UIParent, "SettingsFrameTemplate")
+    local ok, made = pcall(CreateFrame, "Frame", "ThreatForeverFrame", UIParent, "SettingsFrameTemplate")
     if not (ok and made) then
-        made = createFrame("Frame", "ThreatMeterFrame", UIParent, "BackdropTemplate")
+        made = createFrame("Frame", "ThreatForeverFrame", UIParent, "BackdropTemplate")
     end
     local native = made.NineSlice and made.NineSlice.Text and made.ClosePanelButton and made.Bg
 
@@ -80,7 +80,7 @@ local function createWindowFrame()
     made.logo = (native and made.NineSlice or made):CreateTexture(nil, "OVERLAY")
     made.logo:SetSize(LOGO, LOGO)
     made.logo:SetPoint("RIGHT", made.title, "LEFT", -LOGO_GAP, 0)
-    made.logo:SetTexture("Interface\\AddOns\\ThreatMeter\\logo")
+    made.logo:SetTexture("Interface\\AddOns\\ThreatForever\\logo")
 
     -- Our own, not the game's: that asks the window manager, which an addon
     -- may not do in combat.

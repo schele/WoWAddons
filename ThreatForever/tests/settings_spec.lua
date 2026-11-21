@@ -15,16 +15,16 @@ end
 local SWITCHES = { "shown", "combatOnly", "warn" }
 
 describe("the settings page", function()
-    it("is a page in the game's options, named ThreatMeter", function()
+    it("is a page in the game's options, named ThreatForever", function()
         local _, env = helpers.loggedIn()
-        assertEqual("ThreatMeter", env.__settingsCategory.name)
+        assertEqual("ThreatForever", env.__settingsCategory.name)
     end)
 
     it("waits for login before claiming its place", function()
         local _, env = helpers.loadAddon()
         assertNil(env.__settingsCategory)
         helpers.login(env)
-        assertEqual("ThreatMeter", env.__settingsCategory.name)
+        assertEqual("ThreatForever", env.__settingsCategory.name)
     end)
 
     it("stays unbuilt until the options window opens it", function()
@@ -33,9 +33,9 @@ describe("the settings page", function()
         assertNil(ns.SettingsPanel.hint, "nothing built yet")
     end)
 
-    it("heads the page with ThreatMeter's logo and the version from the .toc", function()
+    it("heads the page with ThreatForever's logo and the version from the .toc", function()
         local _, _, panel = opened()
-        assertEqual("Interface\\AddOns\\ThreatMeter\\logo", panel.logo:GetTexture())
+        assertEqual("Interface\\AddOns\\ThreatForever\\logo", panel.logo:GetTexture())
         assertEqual("Version 9.9.9", panel.version:GetText())
     end)
 
@@ -65,7 +65,7 @@ describe("the settings page", function()
 
     it("shows what is saved", function()
         local _, _, panel = opened(function(env)
-            env.ThreatMeterDB = { settings = { warn = false } }
+            env.ThreatForeverDB = { settings = { warn = false } }
         end)
         assertTrue(panel.checks.shown:GetChecked())
         assertTrue(panel.checks.combatOnly:GetChecked())

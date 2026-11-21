@@ -417,7 +417,7 @@ const gemDetails = union(
 );
 const gemShine = triangle(15.5, 25, 22.5, 17.5, 23.5, 25);
 
-// ThreatMeter: a gauge, its needle swung over toward the top of the scale, in
+// ThreatForever: a gauge, its needle swung over toward the top of the scale, in
 // scarlet.
 const scarlet = {
   dark: [24, 4, 6], glow: [128, 16, 22], ring: [248, 74, 66],
@@ -501,7 +501,7 @@ const ICONS = {
     'icon.tga': tex(amethyst, gem, gemDetails, gemShine),
     'logo.tga': tex(amethyst, gem, gemDetails, gemShine, { tile: false, zoom: 1.35 }),
   },
-  ThreatMeter: {
+  ThreatForever: {
     'icon.tga': tex(scarlet, gauge, gaugeDetails, gaugeShine),
     'logo.tga': tex(scarlet, gauge, gaugeDetails, gaugeShine, { tile: false, zoom: 1.3 }),
   },
