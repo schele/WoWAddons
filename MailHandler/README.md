@@ -59,7 +59,8 @@ mail's gold and items, oldest first, and puts the items on the tab as
 they come. The subject says what is forwarded (`FW: Linen Cloth (20)`, or
 `FW: 6 mails`), the text lists each mail's sender and subject, and the
 gold goes in as gold sent, never as cash on delivery. The name is the
-one this character last forwarded to; type another over it if you like.
+one this character last forwarded to, or else your default recipient;
+type another over it if you like.
 **You press Send.** When it has gone, one chat line:
 
     Forwarded 6 mails to Brakka: 1g 23s 4c, 6 items.
@@ -75,6 +76,32 @@ one this character last forwarded to; type another over it if you like.
   player it counts as a stranger: accept its warning to send.
 - Open and Forward wait for each other. Closing the mailbox stops a
   forward; what was taken is in your bags.
+
+## Who new mail goes to
+
+Pick a default recipient, usually your bank character, and every new mail
+starts with that name in **To**.
+
+- **The arrow** at the right end of the To box lists your other characters
+  on this realm and side, each in its class colour, with the default
+  picked. Pick one and it becomes the default and goes in To now. A name
+  you have typed in To is on the list too, for a character MailHandler
+  has not seen yet; **Nobody** takes the default away.
+- The name goes in To when the Send Mail tab opens, and again once a mail
+  has gone, ready for the next. It is selected, so typing another name
+  replaces it. A name already in To is left alone, and Reply still fills
+  in the sender.
+- **Shared** by your characters on the realm and side, since they all send
+  to the same bank character. That character's own To stays empty: nobody
+  mails themselves.
+- **Your characters:** the game has no list of an account's characters, so
+  MailHandler notes each one as it logs in. Log in on each once and they
+  are on the list; until then, type the name in To and pick it.
+- A forward goes to whom this character last forwarded to, as before, or
+  else to the default.
+
+The settings page (Options, AddOns, MailHandler) shows the default under
+**New mail goes to**, and changes it from the same list.
 
 ## Subject
 

@@ -1,10 +1,11 @@
 ## Interface: 11509, 16001
 ## Title: MailHandler
-## Notes: Tick the mails you want, then open or forward only those.
+## Notes: Tick the mails you want, then open or forward only those. New mail starts addressed to your bank character.
 ## IconTexture: Interface\AddOns\MailHandler\icon
 ## Author: Skyler
-## Version: 0.2.0
+## Version: 0.3.0
 ## X-Wago-ID: aNerYg62
+## SavedVariables: MailHandlerDB
 ## SavedVariablesPerCharacter: MailHandlerCharDB
 
 MailHandler.lua
@@ -14,5 +15,6 @@ Ticks.lua
 Opener.lua
 Forward.lua
 Subject.lua
+Recipient.lua
 Buttons.lua
 Settings.lua

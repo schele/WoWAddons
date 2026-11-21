@@ -90,6 +90,12 @@ local function makeWidget(env, kind, parent, template)
     function widget:ClearFocus() if env.__focus == self then env.__focus = nil end end
     function widget:GetInputText() return self.text or "" end
     function widget:GetHeight() return self.height or 0 end
+    function widget:SetHeight(value) self.height = value end
+    function widget:HighlightText() self.highlighted = true end
+    function widget:SetNormalTexture(value) self.normalTexture = value end
+    function widget:SetPushedTexture(value) self.pushedTexture = value end
+    function widget:SetHighlightTexture(value) self.highlightTexture = value end
+    function widget:SetTextColor(r, g, b) self.textColor = { r, g, b } end
 
     -- Test helper: drive this widget's OnEvent handler.
     function widget:Fire(event, ...)
@@ -133,6 +139,82 @@ function stub.newEnv()
         if name then env[name] = frame end
         return frame
     end
+
+    -- Who is logged in: name, realm, faction and class file. A test logs in
+    -- another character by changing these before login.
+    env.__player = { name = "Skyler", realm = "Forever", faction = "Alliance", class = "WARRIOR" }
+    -- On WoW Forever a character has a first name and a surname: UnitName
+    -- hands back both, and the game's NameUtil joins them with a space
+    -- (Camelot/NameUtil.lua). Without a surname, the first name alone.
+    function env.UnitName(unit)
+        if unit == "player" then return env.__player.name, env.__player.surname end
+    end
+    env.UnitNameUnmodified = env.UnitName
+    env.NameUtil = {
+        GetUnmodifiedUnitFullName = function(unit)
+            local name, surname = env.UnitNameUnmodified(unit)
+            if surname then return name .. " " .. surname end
+            return name
+        end,
+    }
+    function env.GetNormalizedRealmName() return env.__player.realm end
+    function env.GetRealmName() return env.__player.realm end
+    function env.UnitFactionGroup(unit)
+        if unit == "player" then return env.__player.faction, env.__player.faction end
+    end
+    function env.UnitClass(unit)
+        if unit == "player" then return env.__player.class, env.__player.class end
+    end
+    env.RAID_CLASS_COLORS = {
+        WARRIOR = { colorStr = "ffc69b6d" },
+        PRIEST = { colorStr = "ffffffff" },
+        DRUID = { colorStr = "ffff7c0a" },
+        MAGE = { colorStr = "ff3fc7eb" },
+    }
+
+    -- The game's menus (MenuUtil): what one was built from, so a test can
+    -- read the entries back and pick one the way a click would.
+    local function makeMenuRoot()
+        local root = { entries = {} }
+        local function add(entry)
+            table.insert(root.entries, entry)
+            return entry
+        end
+        function root:CreateTitle(text) return add({ kind = "title", text = text }) end
+        function root:CreateButton(text, callback) return add({ kind = "button", text = text, callback = callback }) end
+        function root:CreateRadio(text, isSelected, setSelected, data)
+            return add({
+                kind = "radio", text = text, data = data,
+                selected = function() return isSelected(data) end,
+                pick = function() setSelected(data) end,
+            })
+        end
+        function root:CreateDivider() return add({ kind = "divider" }) end
+        --- An entry by its text, colour codes and all stripped.
+        function root:Find(text)
+            for _, entry in ipairs(self.entries) do
+                local plain = entry.text and entry.text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+                if plain == text then return entry end
+            end
+        end
+        return root
+    end
+    env.MenuUtil = {
+        CreateContextMenu = function(owner, generator)
+            local root = makeMenuRoot()
+            generator(owner, root)
+            env.__menu, env.__menuOwner = root, owner
+            return root
+        end,
+    }
+
+    -- The tooltip: whose it is and its lines.
+    env.GameTooltip = makeWidget(env, "GameTooltip", nil)
+    env.GameTooltip.shown = false
+    env.GameTooltip.lines = {}
+    function env.GameTooltip:SetOwner(owner) self.owner, self.lines = owner, {} end
+    function env.GameTooltip:SetText(text) self.lines = { text } end
+    function env.GameTooltip:AddLine(text) table.insert(self.lines, text) end
 
     -- Hooks a global function, or a method when given a table first.
     function env.hooksecurefunc(owner, name, fn)
@@ -501,6 +583,18 @@ function stub.newEnv()
     -- goes on or comes off, and once a mail has gone, empties the tab in
     -- its order, the gold last. Made before the addon loads, so it hears
     -- each event first.
+    -- Emptying the tab once a mail has gone, as Forever's SendMailFrame_Reset
+    -- does: the name first, with the cursor put in it.
+    function env.SendMailFrame_Reset()
+        env.SendMailNameEditBox:SetText("")
+        env.SendMailNameEditBox:SetFocus()
+        env.SendMailSubjectEditBox:SetText("")
+        bodyBox():SetText("")
+        env.SendMailFrame_Update()
+        env.MoneyInputFrame_ResetMoney(env.SendMailMoney)
+        env.SendMailRadioButton_OnClick(1)
+    end
+
     local blizzard = env.CreateFrame("Frame")
     blizzard:RegisterEvent("MAIL_SEND_INFO_UPDATE")
     blizzard:RegisterEvent("MAIL_SEND_SUCCESS")
@@ -509,12 +603,8 @@ function stub.newEnv()
             env.SendMailFrame_Update()
             return
         end
-        env.SendMailNameEditBox:SetText("")
-        env.SendMailSubjectEditBox:SetText("")
-        bodyBox():SetText("")
-        env.SendMailFrame_Update()
-        env.MoneyInputFrame_ResetMoney(env.SendMailMoney)
-        env.SendMailRadioButton_OnClick(1)
+        -- By name, as the game calls it, so a hook on it runs.
+        env.SendMailFrame_Reset()
         if env.SendMailFrame.sendMode == "reply" then env.MailFrameTab_OnClick(nil, 1) end
     end)
 

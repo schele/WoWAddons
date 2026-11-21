@@ -59,9 +59,36 @@ local function ensureBuilt()
         .. "has gone, it fills the next.\n\n"
         .. "On the Send Mail tab, a mail with no subject gets one: the items it "
         .. "carries, with their counts, or else its gold. Type your own and it "
-        .. "is left alone."
+        .. "is left alone.\n\n"
+        .. "New mail starts with the name you choose below, or from the arrow "
+        .. "beside To: usually your bank character. Your characters on this "
+        .. "realm share it."
     )
     Panel.about = about
+
+    -- Who new mail goes to, chosen from the same list as the arrow beside To.
+    local label = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    label:SetPoint("TOPLEFT", about, "BOTTOMLEFT", 0, -16)
+    label:SetText("New mail goes to:")
+    Panel.recipientLabel = label
+
+    local recipient = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    recipient:SetSize(140, 22)
+    recipient:SetPoint("LEFT", label, "RIGHT", 8, 0)
+    recipient:SetScript("OnClick", function(self)
+        ns.Recipient.OpenMenu(self, false)
+    end)
+    Panel.recipient = recipient
+
+    Panel.Refresh()
+end
+
+--- Show the default recipient. Safe to call before the page is built.
+function Panel.Refresh()
+    if not built or not Panel.recipient then
+        return
+    end
+    Panel.recipient:SetText(ns.Recipient.Default() or "Nobody")
 end
 
 --- Claim a place in the game's options, without building anything yet.

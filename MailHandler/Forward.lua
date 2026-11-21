@@ -512,7 +512,8 @@ local function start(mails, letter)
         targets = targets,
         at = 1,
         letter = letter or "",
-        to = saved().lastRecipient,
+        -- Whom this character last forwarded to, or else the default.
+        to = saved().lastRecipient or (ns.Recipient and ns.Recipient.Default()),
         batch = newBatch(),
         pending = {},
         touched = {},

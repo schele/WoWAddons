@@ -10,6 +10,7 @@ M.FILES = {
     "Opener.lua",
     "Forward.lua",
     "Subject.lua",
+    "Recipient.lua",
     "Buttons.lua",
     "Settings.lua",
 }
