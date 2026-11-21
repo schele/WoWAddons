@@ -417,6 +417,26 @@ const gemDetails = union(
 );
 const gemShine = triangle(15.5, 25, 22.5, 17.5, 23.5, 25);
 
+// ThreatMeter: a gauge, its needle swung over toward the top of the scale, in
+// scarlet.
+const scarlet = {
+  dark: [24, 4, 6], glow: [128, 16, 22], ring: [248, 74, 66],
+  light: [255, 222, 210], mid: [238, 98, 82], outline: [84, 8, 10], detail: [124, 14, 14],
+};
+const gauge = union(
+  // The dial, the top half of a disc; cut low enough that the base hides
+  // the cut, or the two meet at the same depth and draw an outline across.
+  intersect(circle(32, 41, 23), (x, y) => y - 44),
+  roundBox(32, 42.5, 23, 3.5, 1.8), // its flat base
+);
+const gaugeDetails = union(
+  (x, y) => (y > 37 ? 20 : Math.abs(len(x - 32, y - 41) - 17.5) - 0.9), // the scale's arc
+  segment(13.5, 41, 17.5, 41, 0.9), segment(32, 22.5, 32, 26.5, 0.9), segment(50.5, 41, 46.5, 41, 0.9), // ticks
+  segment(32, 41, 45.5, 27, 1.9), // the needle, near the top of the scale
+  circle(32, 41, 3.6), // its hub
+);
+const gaugeShine = ellipse(22, 28, 4, 1.3);
+
 // Every addon's textures: the file under the addon's folder, and how to draw it.
 const tex = (theme, symbol, details, shine, opts) => [theme, symbol, details, shine, opts];
 const ICONS = {
@@ -480,6 +500,10 @@ const ICONS = {
   TrinketMenu: {
     'icon.tga': tex(amethyst, gem, gemDetails, gemShine),
     'logo.tga': tex(amethyst, gem, gemDetails, gemShine, { tile: false, zoom: 1.35 }),
+  },
+  ThreatMeter: {
+    'icon.tga': tex(scarlet, gauge, gaugeDetails, gaugeShine),
+    'logo.tga': tex(scarlet, gauge, gaugeDetails, gaugeShine, { tile: false, zoom: 1.3 }),
   },
 };
 

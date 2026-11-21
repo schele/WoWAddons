@@ -1,0 +1,13 @@
+## Interface: 11509, 16001
+## Title: ThreatMeter
+## Notes: A bar for everyone in your group showing how close they are to pulling aggro, and a warning before you do.
+## IconTexture: Interface\AddOns\ThreatMeter\icon
+## Author: Skyler
+## Version: 0.1.0
+## SavedVariables: ThreatMeterDB
+
+ThreatMeter.lua
+Threat.lua
+Window.lua
+Warn.lua
+Settings.lua
