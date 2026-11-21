@@ -9,6 +9,8 @@ M.FILES = {
     "Junk.lua",
     "Vendor.lua",
     "Auction.lua",
+    "Deals.lua",
+    "DealsTab.lua",
     "Picker.lua",
     "Settings.lua",
 }
@@ -65,6 +67,34 @@ function M.openAuctionHouse(env)
     frame.CommoditiesSellFrame:Show()
     frame.ItemSellFrame:Show()
     return frame
+end
+
+--- An auction up at the auction house: `count` of `itemID` for a buyout of
+-- `buyout` copper. `extra` can set bid, owner or saleStatus.
+function M.auction(env, itemID, count, buyout, extra)
+    local auction = { itemID = itemID, count = count, buyout = buyout }
+    for key, value in pairs(extra or {}) do
+        auction[key] = value
+    end
+    table.insert(env.__auctions, auction)
+    return auction
+end
+
+--- Logged in and standing at the auctioneer with the window open on the
+-- Buy tab. `setup(env)` runs first.
+function M.atAuctionHouse(setup)
+    local ns, env = M.loadAddon()
+    if setup then setup(env) end
+    M.login(env)
+    local frame = M.openAuctionHouse(env)
+    frame:Show()
+    return ns, env, frame
+end
+
+--- The auction house answers a full scan, and every slice of it is read.
+function M.scanAnswered(env)
+    M.fire(env, "REPLICATE_ITEM_LIST_UPDATE")
+    env.__runAllTimers()
 end
 
 --- Click a row in a sell frame's list, as the game's selection callback

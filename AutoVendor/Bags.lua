@@ -70,6 +70,8 @@ local function sellPrice(itemID)
     return type(price) == "number" and price or nil
 end
 
+Bags.SellPrice = sellPrice
+
 --- A slot's junk, { bag, slot, itemID, count, price }, or nil. Junk is grey
 -- or on the junk list (`chosen`), and never kept. One guarded read, so a slot
 -- the client will not describe costs that slot and no other.

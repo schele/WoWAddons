@@ -37,6 +37,59 @@ when you click a listing in the sell list: you go one copper under that one.
 A price you type yourself is never touched, and a listing already asking a
 single copper is matched rather than undercut to nothing.
 
+## Vendor deals at the auction house
+
+A fourth tab on the auction house window, after Buy, Sell and Auctions.
+**Scan** reads every auction up at once (the game's full scan) and lists the
+ones a merchant pays more for than their buyout, by at least the profit you
+set: buy one, sell it to the next merchant, keep the difference.
+
+- **Least profit:** the slider at the right of Scan, in steps from any
+  profit at all up to 1 gold; 50 copper to begin with. Moving it filters the
+  list at once, without scanning again. The settings page has the same
+  slider, under the Vendor deals box.
+- **Reading the scan** goes a slice of 200 auctions a frame, so the game
+  keeps drawing; the line under Scan counts them as they go. Each item's
+  price is looked up once a scan, and an item the game describes late has
+  only its own auctions read again.
+
+- **Each row:** the item and how many, the buyout, what a merchant pays for
+  them all, and the profit. The biggest profit comes first. Hover a row for
+  the item's tooltip.
+- **Left out:** auctions with no buyout (a bid can be outbid), ones that
+  would make less than the least profit, your own auctions, ones already
+  sold, and items no merchant buys.
+- **Buying:** click a row and AutoVendor looks the item up in the Buy tab,
+  where you buy it with the game's own Buy Now and its confirmation.
+  AutoVendor never spends your gold itself. A deal you have bought stays on
+  the list until the next scan.
+- **Items the game has not shown you before** have no sell price until the
+  game sends their details. AutoVendor asks for them, and they join the
+  list a moment after the scan.
+
+The line under Scan counts the seconds while the auction house is asked;
+a progress bar takes its place while the auctions are read. The deals found
+so far fill the list as it reads, the biggest profit first, re-sorted a few
+times a second as more come in. After that it
+says how many the scan read, how long ago, and how many deals it found.
+The game says the list is ready more than once for one scan; AutoVendor
+reads it the first time only.
+
+While a scan waits or is read, **Scan** becomes **Stop**. Stopped while
+waiting, the page goes back to what it showed before; stopped while
+reading, it keeps the deals found so far and says how far it got.
+
+The auction house allows one full scan every 15 minutes (as retail's does),
+and sends nothing back when asked sooner. So for 15 minutes after it last
+answered, the button is greyed out and counts down, **Scan in 14:59**,
+across a /reload too. The game keeps the last list it
+sent, so then AutoVendor shows that one, says so, and says when the next
+full scan should be allowed. With no list kept either, the line says when
+to try again.
+
+WoW Forever's auction house answers the full scan (seen in the game). How
+often it allows one is not yet confirmed: the 15 minutes are retail's.
+
 ## Turning any of it off
 
 All of it happens unless you say otherwise. Like the keep list, the switches
@@ -47,6 +100,7 @@ are shared by all your characters.
 | `/av sell` | Turn selling grey items and your junk list off, or on again |
 | `/av repair` | Turn repairing off, or on again |
 | `/av undercut` | Turn undercutting at the auction house off, or on again |
+| `/av deals` | Take the Vendor deals tab off the auction house, or put it back |
 
 With repairs off, the line only says what sold.
 
@@ -80,8 +134,8 @@ An item number works here too: `/av junk 2589`.
 
 ## The settings page
 
-`/av settings`, or Options, AddOns, AutoVendor. It has the three switches as
-checkboxes, the keep list with a button beside each item to sell it again,
+`/av settings`, or Options, AddOns, AutoVendor. It has the four switches as
+checkboxes, the Vendor deals tab's least profit as a slider, the keep list with a button beside each item to sell it again,
 and the junk list with a button beside each item to stop selling it. Each
 listed item shows its icon and its name in its quality's colour, as your
 bags do; hover it for its tooltip.

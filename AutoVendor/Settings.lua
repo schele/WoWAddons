@@ -24,6 +24,12 @@ local SWITCH_GAP = 16
 local LIST_GAP = 8
 -- Above a section heading, after what came before it.
 local SECTION_GAP = 12
+-- The least profit slider, under the Vendor deals box and in from it: its
+-- label, the slider, and the template's labels for its two ends below it.
+local SLIDER_INDENT = 30
+local SLIDER_WIDTH = 200
+local SLIDER_ENDS = 14
+local SLIDER_ROW = 52
 
 local Panel = {}
 ns.SettingsPanel = Panel
@@ -55,6 +61,62 @@ local function addCheckbox(text, above, x, y, onClick)
         onClick(self:GetChecked() and true or false)
     end)
     return button
+end
+
+-- While the slider is being set to the saved value, so that is not taken
+-- for the player moving it.
+local syncing = false
+
+local function leastProfitText(copper)
+    return "Least profit for a vendor deal: " .. ns.Money(copper)
+end
+
+--- Put the slider on the saved least profit, and name it.
+function Panel.SyncSlider()
+    if not Panel.minProfit then
+        return
+    end
+    local least = ns.Deals.MinProfit()
+    syncing = true
+    Panel.minProfit:SetValue(ns.Deals.StepOf(least))
+    syncing = false
+    Panel.minProfitLabel:SetText(leastProfitText(least))
+end
+
+--- The least profit a vendor deal must make, as on the auction house tab:
+-- in steps from any profit up to a gold. Hung under the Vendor deals box.
+local function buildSlider()
+    local steps = ns.Deals.STEPS
+    local label = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    label:SetPoint("TOPLEFT", Panel.deals, "BOTTOMLEFT", SLIDER_INDENT, -2)
+    Panel.minProfitLabel = label
+
+    local slider = CreateFrame("Slider", nil, content, "OptionsSliderTemplate")
+    slider:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -8)
+    slider:SetWidth(SLIDER_WIDTH)
+    slider:SetMinMaxValues(1, #steps)
+    slider:SetValueStep(1)
+    slider:SetObeyStepOnDrag(true)
+    if slider.Low and slider.Low.SetText then
+        slider.Low:SetText(ns.Money(steps[1]))
+    end
+    if slider.High and slider.High.SetText then
+        slider.High:SetText(ns.Money(steps[#steps]))
+    end
+    if slider.Text and slider.Text.SetText then
+        slider.Text:SetText("")
+    end
+    slider:SetScript("OnValueChanged", function(_, value)
+        if syncing then
+            return
+        end
+        local copper = steps[math.max(1, math.min(#steps, math.floor(value + 0.5)))]
+        label:SetText(leastProfitText(copper))
+        if copper ~= ns.Deals.MinProfit() then
+            ns.Deals.SetMinProfit(copper)
+        end
+    end)
+    Panel.minProfit = slider
 end
 
 --- A list's items, by name, so the page reads the same as /av list.
@@ -185,7 +247,7 @@ end
 -- `gridHeight` is how tall the bag grid stands.
 local function pageHeight(gridHeight)
     local top = PADDING + ROW_HEIGHT + Panel.hint:GetStringHeight()
-    local switches = SWITCH_GAP + 3 * ROW_HEIGHT + CHECK_STEP
+    local switches = SWITCH_GAP + 4 * ROW_HEIGHT + CHECK_STEP + SLIDER_ROW
     local bags = SECTION_GAP + Panel.bagsHeading:GetStringHeight() + LIST_GAP + gridHeight
     return top + switches + listHeight(keepList) + listHeight(junkList) + bags + PADDING
 end
@@ -210,6 +272,8 @@ function Panel.Refresh()
     Panel.sell:SetChecked(ns.db.sell)
     Panel.repair:SetChecked(ns.db.repair)
     Panel.undercut:SetChecked(ns.db.undercut)
+    Panel.deals:SetChecked(ns.db.deals)
+    Panel.SyncSlider()
 
     fillList(keepList, ns.Keep.All())
     fillList(junkList, ns.Junk.All())
@@ -295,7 +359,8 @@ local function ensureBuilt()
         "Open a merchant and your grey items, and anything on your junk list, "
         .. "are sold and your gear repaired, without a click. Nothing on the "
         .. "keep list is ever sold. At the auction house, a new auction asks "
-        .. "one copper under the cheapest listing."
+        .. "one copper under the cheapest listing, and the Vendor deals tab "
+        .. "finds auctions a merchant would pay more for than their buyout."
     )
     Panel.hint = hint
 
@@ -310,6 +375,10 @@ local function ensureBuilt()
     Panel.undercut = addCheckbox("Post auctions one copper under the cheapest", Panel.repair, 0, CHECK_STEP, function(value)
         ns.Auction.SetUndercut(value)
     end)
+    Panel.deals = addCheckbox("A Vendor deals tab at the auction house", Panel.undercut, 0, CHECK_STEP, function(value)
+        ns.DealsTab.SetEnabled(value)
+    end)
+    buildSlider()
 
     keepList = makeList("Never sold",
         "Nothing is kept. To keep an item, type /av keep and Shift-click it.",
@@ -318,7 +387,7 @@ local function ensureBuilt()
         end, Panel.rows)
     -- Back by the margin, and less of a gap than under the description: the
     -- box's empty margin below makes up the rest.
-    keepList.heading:SetPoint("TOPLEFT", Panel.undercut, "BOTTOMLEFT", 0, -SECTION_GAP)
+    keepList.heading:SetPoint("TOPLEFT", Panel.minProfit, "BOTTOMLEFT", -SLIDER_INDENT, -SECTION_GAP - SLIDER_ENDS)
     Panel.heading = keepList.heading
     Panel.empty = keepList.empty
 

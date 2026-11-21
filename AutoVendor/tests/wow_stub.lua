@@ -78,6 +78,41 @@ local function makeWidget(kind, parent, template)
     function widget:GetText() return self.text end
     function widget:SetChecked(value) self.checked = value and true or false end
     function widget:GetChecked() return self.checked end
+    function widget:GetParent() return self.parent end
+    -- Sliders. Setting a new value fires OnValueChanged, as the client's
+    -- does, with userInput false.
+    function widget:SetMinMaxValues(low, high) self.min, self.max = low, high end
+    function widget:GetMinMaxValues() return self.min, self.max end
+    function widget:SetValueStep(value) self.valueStep = value end
+    function widget:SetObeyStepOnDrag(value) self.obeyStep = value end
+    function widget:SetValue(value)
+        if self.min then value = math.max(self.min, math.min(self.max, value)) end
+        if self.value == value then return end
+        self.value = value
+        if self.scripts.OnValueChanged then self.scripts.OnValueChanged(self, value, false) end
+    end
+    function widget:GetValue() return self.value end
+    -- Status bars: the texture and colour they fill with.
+    function widget:SetStatusBarTexture(value) self.barTexture = value end
+    function widget:SetStatusBarColor(r, g, b) self.barColor = { r, g, b } end
+    -- Atlas art, by name.
+    function widget:SetAtlas(atlas) self.atlas = atlas end
+    function widget:GetAtlas() return self.atlas end
+    function widget:SetBlendMode(mode) self.blendMode = mode end
+    --- Test helper: the player dragging a slider to `value`.
+    function widget:Drag(value)
+        self.value = nil
+        if self.min then value = math.max(self.min, math.min(self.max, value)) end
+        self.value = value
+        if self.scripts.OnValueChanged then self.scripts.OnValueChanged(self, value, true) end
+    end
+    function widget:SetEnabled(value) self.disabled = not value end
+    function widget:Enable() self.disabled = false end
+    function widget:Disable() self.disabled = true end
+    function widget:IsEnabled() return not self.disabled end
+    function widget:EnableMouseWheel(value) self.mouseWheel = value end
+    function widget:SetColorTexture(r, g, b, a) self.color = { r, g, b, a } end
+    function widget:SetWordWrap(value) self.wordWrap = value end
     function widget:CreateTexture() return makeWidget("Texture", self) end
     -- Remembered on the parent, so a test can find a label by its text.
     function widget:CreateFontString()
@@ -120,8 +155,93 @@ function stub.newEnv(saved)
         frame.frameName = name
         table.insert(env.__frames, frame)
         if name then env[name] = frame end
+        -- The auction house's tab template: parentArray="Tabs" puts the tab
+        -- on its window's list, and a click sets the tab's display mode.
+        if template == "AuctionHouseFrameDisplayModeTabTemplate" and parent and parent.Tabs then
+            table.insert(parent.Tabs, frame)
+            frame:SetScript("OnClick", function(self) parent:SetDisplayMode(self.displayMode) end)
+        end
+        -- The options slider's own labels: its two ends and its name.
+        if template == "OptionsSliderTemplate" then
+            frame.Low = frame:CreateFontString()
+            frame.High = frame:CreateFontString()
+            frame.Text = frame:CreateFontString()
+        end
         return frame
     end
+
+    -- PanelTemplates, as far as tabs go: how many, and which is selected.
+    function env.PanelTemplates_SetNumTabs(frame, count) frame.numTabs = count end
+    function env.PanelTemplates_SetTab(frame, index) frame.selectedTab = index end
+    function env.PanelTemplates_GetSelectedTab(frame) return frame.selectedTab end
+
+    -- Art the client has by atlas name, and the border layouts it draws
+    -- (NineSliceUtil), recorded on the frame they were laid on.
+    env.__atlases = {
+        ["auctionhouse-background-index"] = true,
+        ["auctionhouse-rowstripe-1"] = true,
+        ["auctionhouse-rowstripe-2"] = true,
+        ["auctionhouse-ui-row-highlight"] = true,
+    }
+    env.C_Texture = {
+        GetAtlasInfo = function(name)
+            if env.__atlases[name] then return { width = 1, height = 1 } end
+        end,
+    }
+    env.NineSliceUtil = {
+        ApplyLayoutByName = function(frame, layout) frame.layout = layout end,
+    }
+
+    -- The clock, in seconds since 1970, as time() gives it, and date() to
+    -- write a time of day.
+    env.__clock = 1700000000
+    function env.time() return env.__clock end
+    env.date = os.date
+
+    function env.UnitName(unit)
+        if unit == "player" then return "Skyler" end
+    end
+
+    -- The auction house's full scan (C_AuctionHouse.ReplicateItems): every
+    -- auction up, as { itemID, count, buyout, bid, owner, saleStatus }. A
+    -- scan asked for is answered when a test fires REPLICATE_ITEM_LIST_UPDATE.
+    -- The game counts the auctions from 0, so index 0 is the first.
+    env.__auctions = {}
+    env.__replicates = 0
+    -- How many auctions were read, to tell a slice from the whole list.
+    env.__replicateReads = 0
+    env.C_AuctionHouse = {
+        ReplicateItems = function() env.__replicates = env.__replicates + 1 end,
+        GetNumReplicateItems = function() return #env.__auctions end,
+        -- An auction's name is its own: with a suffix ("of the Whale") when
+        -- it has `fullName`. One the game has not finished describing
+        -- (`unnamed`) comes with an empty name and hasAllInfo false, though
+        -- its item, and so its sell price, may be known; with `nolink` it
+        -- has no link yet either.
+        GetReplicateItemInfo = function(index)
+            env.__replicateReads = env.__replicateReads + 1
+            local auction = env.__auctions[index + 1]
+            if not auction then return nil end
+            local item = env.__items[auction.itemID] or {}
+            local described = not env.__uncached[auction.itemID] and not auction.unnamed
+            local name = nil
+            if auction.unnamed then
+                name = ""
+            elseif described then
+                name = auction.fullName or item.name
+            end
+            return name, 1000 + auction.itemID, auction.count or 1,
+                item.quality or 1, true, 1, "", auction.bid or 0, 1, auction.buyout or 0, 0, nil, nil,
+                auction.owner or "Someone", auction.owner or "Someone", auction.saleStatus or 0,
+                auction.itemID, described
+        end,
+        GetReplicateItemLink = function(index)
+            local auction = env.__auctions[index + 1]
+            if auction and not auction.nolink and env.__items[auction.itemID] and not env.__uncached[auction.itemID] then
+                return env.__link(auction.itemID, auction.fullName)
+            end
+        end,
+    }
 
     env.UIParent = makeWidget("Frame")
 
@@ -185,9 +305,23 @@ function stub.newEnv(saved)
     -- timers have run, so a step always looks before the answer arrives.
     function env.__runTimers()
         local pending, replies = env.__timers, env.__replies
-        env.__timers, env.__replies = {}, {}
+        env.__timers, env.__replies, env.__timerDelays = {}, {}, {}
         for _, fn in ipairs(pending) do fn() end
         for _, fn in ipairs(replies) do fn() end
+    end
+    --- Only the timers queued with a delay of `seconds` or less; the rest
+    -- stay queued, as the client would still be waiting on them.
+    function env.__runTimersUpTo(seconds)
+        local pending, delays = env.__timers, env.__timerDelays
+        env.__timers, env.__timerDelays = {}, {}
+        for index, fn in ipairs(pending) do
+            if (delays[index] or 0) <= seconds then
+                fn()
+            else
+                table.insert(env.__timers, fn)
+                table.insert(env.__timerDelays, delays[index])
+            end
+        end
     end
     --- Every round until nothing is queued.
     function env.__runAllTimers()
@@ -208,7 +342,12 @@ function stub.newEnv(saved)
         [6948] = { name = "Hearthstone", quality = 1, price = 0 },
         [117] = { name = "Tough Jerky", quality = 1, price = 1 },
         [6070] = { name = "Wolfskin Bracers", quality = 2, price = 77 },
+        [9798] = { name = "Ivycloth Boots of Arcane Protection", quality = 2, price = 823 },
+        -- An item with a random suffix: its own name is the plain one.
+        [15251] = { name = "Polished Zweihander", quality = 2, price = 3877 },
     }
+    -- Items asked for with C_Item.RequestLoadItemDataByID.
+    env.__requested = {}
     -- How the game colours each quality: grey, white, green.
     env.__qualityColors = {
         [0] = { 0.62, 0.62, 0.62 },
@@ -218,8 +357,8 @@ function stub.newEnv(saved)
     -- Items the client has not described yet: asking about them gives nothing.
     env.__uncached = {}
 
-    function env.__link(id)
-        return "|cff9d9d9d|Hitem:" .. id .. "::::::::20:::::::|h[" .. env.__items[id].name .. "]|h|r"
+    function env.__link(id, fullName)
+        return "|cff9d9d9d|Hitem:" .. id .. "::::::::20:::::::|h[" .. (fullName or env.__items[id].name) .. "]|h|r"
     end
 
     -- Bags by number, and each slot's contents keyed "bag:slot":
@@ -297,8 +436,11 @@ function stub.newEnv(saved)
         end,
     }
 
+    -- How often each item was looked up.
+    env.__itemInfoCalls = {}
     env.C_Item = {
         GetItemInfo = function(id)
+            env.__itemInfoCalls[id] = (env.__itemInfoCalls[id] or 0) + 1
             local item = env.__items[id]
             if not item or env.__uncached[id] then return nil end
             return item.name, env.__link(id), item.quality, 1, 1, "Junk", "Junk", 1, "", 1, item.price
@@ -319,7 +461,11 @@ function stub.newEnv(saved)
             local color = env.__qualityColors[quality]
             if color then return color[1], color[2], color[3], "ffffffff" end
         end,
+        RequestLoadItemDataByID = function(id) env.__requested[id] = true end,
     }
+
+    -- The tooltip can show a link as well as an item by ID.
+    function env.GameTooltip:SetHyperlink(link) self.link = link end
 
     -- Shift, Ctrl or Alt held, when a test says so.
     env.__modifierDown = false
@@ -385,10 +531,74 @@ function stub.buildAuctionHouse(env)
         self.selectionCallback = function(rowData) handler(self, rowData) end
     end
 
-    env.AuctionHouseFrame = {
-        CommoditiesSellFrame = commodities,
-        ItemSellFrame = items,
+    -- The window, closed: its Buy, Sell and Auctions tabs, each showing its
+    -- own part of the window (Blizzard_AuctionHouseFrame.lua's display
+    -- modes, cut down to one part each), and the Buy tab's search bar.
+    local frame = makeWidget("Frame", env.UIParent)
+    frame.shown = false
+    frame.CommoditiesSellFrame = commodities
+    frame.ItemSellFrame = items
+
+    env.AuctionHouseFrameDisplayMode = {
+        Buy = { "BrowseResultsFrame" },
+        ItemSell = { "ItemSellList" },
+        Auctions = { "AuctionsFrame" },
     }
+    local modes = env.AuctionHouseFrameDisplayMode
+    for _, part in ipairs({ "BrowseResultsFrame", "ItemSellList", "AuctionsFrame" }) do
+        frame[part] = makeWidget("Frame", frame)
+        frame[part].shown = false
+    end
+
+    frame.Tabs = {}
+    frame.tabsForDisplayMode = {}
+    for index, info in ipairs({ { "BuyTab", modes.Buy }, { "SellTab", modes.ItemSell }, { "AuctionsTab", modes.Auctions } }) do
+        local tab = makeWidget("Button", frame)
+        tab.displayMode = info[2]
+        tab:SetScript("OnClick", function(self) frame:SetDisplayMode(self.displayMode) end)
+        frame[info[1]] = tab
+        frame.Tabs[index] = tab
+        frame.tabsForDisplayMode[info[2]] = index
+    end
+    frame.numTabs = 3
+
+    function frame:SetDisplayMode(mode)
+        if self.displayMode == mode then return end
+        self.displayMode = mode
+        local wanted = {}
+        for _, part in ipairs(mode) do wanted[part] = true end
+        for _, other in pairs(env.AuctionHouseFrameDisplayMode) do
+            for _, part in ipairs(other) do
+                if not wanted[part] then self[part]:Hide() end
+            end
+        end
+        for _, part in ipairs(mode) do self[part]:Show() end
+        local tab = self.tabsForDisplayMode[mode]
+        if tab then
+            env.PanelTemplates_SetTab(self, tab)
+            self:UpdateTitle()
+        end
+    end
+    function frame:GetDisplayMode() return self.displayMode end
+    function frame:UpdateTitle()
+        local titles = { "Browse Auctions", "Post Auctions", "Auctions" }
+        self:SetTitle(titles[self.selectedTab] or "Browse Auctions")
+    end
+    function frame:SetTitle(text) self.title = text end
+
+    -- What the Buy tab was asked to look for, in order.
+    env.__searches = {}
+    frame.SearchBar = {}
+    function frame.SearchBar:SetSearchText(text) self.text = text end
+    function frame.SearchBar:StartSearch()
+        table.insert(env.__searches, self.text)
+        frame:SetDisplayMode(modes.Buy)
+    end
+
+    -- Opening it lands on the Buy tab, as the game's OnShow does.
+    frame:SetScript("OnShow", function(self) self:SetDisplayMode(modes.Buy) end)
+
+    env.AuctionHouseFrame = frame
     env.__loadedAddons["Blizzard_AuctionHouseUI"] = true
     return env.AuctionHouseFrame
 end
