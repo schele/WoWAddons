@@ -1,7 +1,7 @@
 {
     "AutoVendor":  {
-                       "version":  "0.3.0",
-                       "commit":  "a7293fbad29c31d0ec6896a432910ad73f4d158b"
+                       "version":  "0.4.0",
+                       "commit":  "5bdfb0f5e4c764009d1ce550e221a37d9123821c"
                    },
     "BankBags":  {
                      "version":  "0.3.1",
@@ -12,16 +12,16 @@
                       "commit":  "25708d4054c57049ce8fb0831a2b327b3c66de27"
                   },
     "ForeverPanel":  {
-                         "version":  "0.6.0",
-                         "commit":  "7b30cdbd5ed6386c88d818635da121a9bb5c76c6"
+                         "version":  "0.7.0",
+                         "commit":  "5bdfb0f5e4c764009d1ce550e221a37d9123821c"
                      },
     "LFGBoard":  {
                      "version":  "0.1.0",
                      "commit":  "d8d2e4d60d231e8596329483164b84d91bcefa18"
                  },
     "MailHandler":  {
-                        "version":  "0.2.0",
-                        "commit":  "c0c67b429c9849101c8ace7d48be80269190ed32"
+                        "version":  "0.3.0",
+                        "commit":  "5bdfb0f5e4c764009d1ce550e221a37d9123821c"
                     },
     "RankUp":  {
                    "version":  "0.1.0",
