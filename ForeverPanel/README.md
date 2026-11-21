@@ -6,10 +6,18 @@ Out of the box:
 
 | Side | Module | Shows |
 |---|---|---|
-| Left | `money` | Gold, silver and copper with the in-game coin icons; click to flip to the money made this session (green for a gain, red for a loss), click again for the purse. The session survives /reload and ends on a real login |
+| Left | `money` | Gold, silver and copper with the in-game coin icons; click to flip to the money made this session (green for a gain, red for a loss), click again for the purse. The session survives /reload and ends on a real login, or when you right-click the block and pick `Reset session money` |
 | Left | `bags` | Bag slots used out of the total with a bag icon (`30/38`), or just the free slots with the total turned off; click to open your bags |
 | Left | `xp` | `xx.xx% XP` through the current level, click to count down to the next one instead; hidden at max level or with XP turned off |
+| Left | `honor` | Honor points with the currency's own icon (`1,234`); click to open the currency tab, hover for the game's tooltip for it, cap included. Hidden on a character that has never had honor |
 | Right | `clock` | Local time, click to toggle 12/24 hour |
+
+Honor here is WoW Forever's spendable honor, the currency its PvP vendors
+take, not the rank points that set your PvP rank. Forever's interface code
+never names the honor currency, so the block tries the game's two honor ids
+(`CLASSIC_HONOR_CURRENCY_ID` 1901, `HONOR_CURRENCY_ID` 1792) and then looks
+for a currency called Honor in the currency tab. `/fp honor` says how much
+there is and which currency id it came from. Not yet confirmed in the game.
 
 The bar reserves its own strip of screen: it insets `UIParent` from the top, so
 top-anchored Blizzard frames move down with it instead of being covered.
@@ -126,7 +134,9 @@ interface version.
 - `/fp bar reset` - Restore the default module order
 - `/fp settings` - Open the settings panel
 - `/fp bar debug` - Print the bar's screen rect and module widths
+- `/fp money reset` - Start the money made this session over from now
 - `/fp xp` - Toggle XP between counting up and counting down
+- `/fp honor` - How much honor you have, and which currency the bar reads it from
 - `/fp clock` - Toggle 12/24 hour time
 - `/fp clock blizzard` - Show or hide Blizzard's own clock
 - `/fp untrack` - Untrack every quest (WoW Forever)
@@ -163,6 +173,12 @@ ns.Bar:RegisterModule({
     end,
 
     OnClick = function(module, button) end,   -- optional
+
+    -- Optional: actions of its own for the right-click menu, added under the
+    -- bar's when it is opened over this module.
+    OnMenu = function(module, root)
+        root:CreateButton("Reset durability log", function() end)
+    end,
 })
 ```
 

@@ -1,9 +1,9 @@
 ## Interface: 11509, 16001
 ## Title: ForeverPanel
-## Notes: A bar across the top of the screen with money, bag space, XP and the time, and your UI kept in place on each screen.
+## Notes: A bar across the top of the screen with money, bag space, XP, honor and the time, and your UI kept in place on each screen.
 ## IconTexture: Interface\AddOns\ForeverPanel\icon
 ## Author: Skyler
-## Version: 0.6.0
+## Version: 0.7.0
 ## X-Wago-ID: ANz71M64
 ## SavedVariables: ForeverPanelDB, ForeverDB
 
@@ -13,6 +13,7 @@ Modules/Money.lua
 Modules/Clock.lua
 Modules/XP.lua
 Modules/Bags.lua
+Modules/Honor.lua
 Modules/UITweaks.lua
 Modules/Portrait.lua
 Modules/ChatBox.lua

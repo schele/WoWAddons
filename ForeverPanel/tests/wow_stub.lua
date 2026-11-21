@@ -812,6 +812,54 @@ function stub.newEnv(options)
         env.__bagsOpened = true
     end
 
+    -- Currencies the game knows, by id: { name, quantity, maxQuantity,
+    -- iconFileID, discovered }. The game answers for any real id, discovered or
+    -- not; only a made-up one gets nil. Empty by default, so the honor block
+    -- stays off the bar unless a test gives the character honor.
+    -- __currencyList is the currency tab's rows in order: ids, or a header's
+    -- name. A collapsed header hides its rows, so tests empty the list for it.
+    env.__currencies = {}
+    env.__currencyList = {}
+    env.HONOR = "Honor"
+    env.Constants = {
+        CurrencyConsts = { HONOR_CURRENCY_ID = 1792, CLASSIC_HONOR_CURRENCY_ID = 1901 },
+    }
+
+    local function currencyInfo(id)
+        local currency = env.__currencies[id]
+        if not currency then
+            return nil
+        end
+        return {
+            currencyID = id,
+            name = currency.name,
+            isHeader = false,
+            quantity = currency.quantity or 0,
+            maxQuantity = currency.maxQuantity or 0,
+            iconFileID = currency.iconFileID or 1455894,
+            discovered = currency.discovered ~= false,
+        }
+    end
+
+    env.C_CurrencyInfo = {
+        GetCurrencyInfo = currencyInfo,
+        GetCurrencyListSize = function()
+            return #env.__currencyList
+        end,
+        GetCurrencyListInfo = function(index)
+            local row = env.__currencyList[index]
+            if type(row) == "string" then
+                return { name = row, isHeader = true, quantity = 0, discovered = true }
+            end
+            return row and currencyInfo(row)
+        end,
+    }
+
+    -- The character window's tab opened last, by frame name.
+    function env.ToggleCharacter(tab)
+        env.__characterTab = tab
+    end
+
     env.C_AddOns = {
         GetAddOnMetadata = function(_, field)
             return field == "Version" and "9.9.9" or nil
@@ -873,6 +921,9 @@ function stub.newEnv(options)
     end
     function env.GameTooltip:AddLine(text, r, g, b, wrap)
         table.insert(self.lines, { text = text, r = r, g = g, b = b, wrap = wrap })
+    end
+    function env.GameTooltip:SetCurrencyByID(id)
+        self.currencyID = id
     end
 
     -- Sounds played: each kit handed to PlaySound.

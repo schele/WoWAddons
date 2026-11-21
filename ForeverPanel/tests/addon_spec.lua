@@ -341,6 +341,86 @@ describe("money module", function()
         assertEqual("Session: 0 0 0", stripColors(module.text:GetText()))
     end)
 
+    --- Log in with 1g, earn 23s 45c, and show the session figure.
+    local function sessionUnderway()
+        local ns, env = helpers.loadAddon()
+        env.money = 10000
+        helpers.login(ns, env)
+        helpers.fire(env, "PLAYER_ENTERING_WORLD", true, false)
+
+        env.money = 12345
+        helpers.fire(env, "PLAYER_MONEY")
+
+        local module = ns.Bar:GetModule("money")
+        module.frame.scripts.OnClick(module.frame, "LeftButton")
+        return ns, env, module
+    end
+
+    local function rightClick(env, module)
+        env.__menu = nil
+        module.frame.scripts.OnClick(module.frame, "RightButton")
+        return env.__menu
+    end
+
+    it("starts the session over from the money block's right-click menu", function()
+        local ns, env, module = sessionUnderway()
+
+        local entry = rightClick(env, module):Find("Reset session money")
+        assertTrue(entry ~= nil, "the menu offers it")
+        entry.callback()
+
+        assertEqual("Session: 0 0 0", stripColors(module.text:GetText()), "redrawn at once")
+        assertMatch("Session money reset%.", table.concat(env.__printed, "\n"))
+
+        env.money = 13345
+        helpers.fire(env, "PLAYER_MONEY")
+        assertEqual("Session: 0 10 0", stripColors(module.text:GetText()), "counting from the reset")
+    end)
+
+    it("keeps a reset session across a /reload", function()
+        local ns, env, module = sessionUnderway()
+        rightClick(env, module):Find("Reset session money").callback()
+
+        local ns2, env2 = helpers.loadAddon()
+        env2.ForeverPanelDB = env.ForeverPanelDB
+        env2.money = 12345
+        helpers.login(ns2, env2)
+        helpers.fire(env2, "PLAYER_ENTERING_WORLD", false, true)
+
+        local module2 = ns2.Bar:GetModule("money")
+        module2.frame.scripts.OnClick(module2.frame, "LeftButton")
+        assertEqual("Session: 0 0 0", stripColors(module2.text:GetText()))
+    end)
+
+    it("offers the reset only over the money block", function()
+        local ns, env = sessionUnderway()
+
+        local clock = rightClick(env, ns.Bar:GetModule("clock"))
+        assertTrue(clock:Find("Reset session money") == nil, "not over the clock")
+
+        env.__menu = nil
+        env.ForeverBar.scripts.OnMouseUp(env.ForeverBar, "RightButton")
+        assertTrue(env.__menu:Find("Reset session money") == nil, "nor over the bar itself")
+    end)
+
+    it("starts the session over with /fp money reset", function()
+        local ns, env, module = sessionUnderway()
+
+        helpers.command(env, "money reset")
+
+        assertEqual("Session: 0 0 0", stripColors(module.text:GetText()))
+        assertMatch("Session money reset%.", table.concat(env.__printed, "\n"))
+    end)
+
+    it("lists /fp money in the help", function()
+        local ns, env = helpers.loadAddon()
+        helpers.login(ns, env)
+
+        helpers.command(env, "help")
+
+        assertMatch("/fp money %- ", table.concat(env.__printed, "\n"))
+    end)
+
     it("leaves the session view alone on a right-click", function()
         local ns, env = helpers.loadAddon()
         helpers.login(ns, env)

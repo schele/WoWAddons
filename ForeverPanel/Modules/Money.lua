@@ -124,4 +124,33 @@ ns.Bar:RegisterModule({
             module:Refresh()
         end
     end,
+
+    OnMenu = function(_, root)
+        root:CreateButton("Reset session money", function()
+            ns.ResetSessionMoney()
+        end)
+    end,
 })
+
+--- Start the session over from the purse as it stands. Saved like any
+-- session start, so a /reload keeps counting from the reset.
+function ns.ResetSessionMoney()
+    ns.db.money.sessionStart = GetMoney()
+
+    local module = ns.Bar:GetModule("money")
+    if module then
+        module:Refresh()
+    end
+
+    ns.Print("Session money reset.")
+end
+
+ns.RegisterCommand("money", "money reset - Start the money made this session over from now", function(rest)
+    local argument = ((rest or ""):match("^(%S*)") or ""):lower()
+
+    if argument == "reset" then
+        ns.ResetSessionMoney()
+    else
+        ns.Print("Usage: /fp money reset")
+    end
+end)

@@ -508,7 +508,7 @@ local function createModuleFrame(module)
     -- unreachable wherever you happened to click on text.
     frame:SetScript("OnClick", function(_, button)
         if button == "RightButton" then
-            Bar:OpenMenu(frame)
+            Bar:OpenMenu(frame, module)
         elseif module.OnClick then
             module:OnClick(button)
         end
@@ -574,6 +574,7 @@ function Bar:RegisterModule(definition)
         OnClick = definition.OnClick,
         OnEnter = definition.OnEnter,
         OnLeave = definition.OnLeave,
+        OnMenu = definition.OnMenu,
     }, moduleMeta)
 
     modulesByName[name] = module
@@ -754,7 +755,9 @@ end
 -- Actions only. Toggles all live on the settings panel: a checkbox here would
 -- be a second place to keep them in step, and toggling one that re-anchors
 -- UIParent slid the open menu out from under the cursor.
-function Bar:OpenMenu(owner)
+-- Opened over a module, the module's own actions (its OnMenu) follow the
+-- bar's, so they are offered only where they apply.
+function Bar:OpenMenu(owner, module)
     if dragging or not MenuUtil then
         return
     end
@@ -775,6 +778,11 @@ function Bar:OpenMenu(owner)
                 ns.ReportKeyboard()
             end
         end)
+
+        if module and module.OnMenu then
+            root:CreateDivider()
+            module:OnMenu(root)
+        end
     end)
 end
 
