@@ -17,8 +17,12 @@ local HINT_GAP = 16
 local SWITCHES = {
     { key = "shown", label = "Show the threat window" },
     { key = "combatOnly", label = "Only in combat" },
+    { key = "split", label = "A part for each mob you fight", slider = true },
     { key = "warn", label = "Warn me before I pull aggro" },
 }
+-- How many mobs at once, under the switch for a part per mob and in from it.
+local SLIDER_WIDTH = 200
+local SLIDER_ROW = 50
 
 local Panel = {}
 ns.SettingsPanel = Panel
@@ -67,10 +71,16 @@ end
 local DESCRIPTION = "A bar for everyone in your group on the threat list of the mob you are fighting: "
     .. "your target, or your target's target when you have a friend targeted, as a healer on the tank "
     .. "does. A full bar pulls aggro. The most threat comes first, in each one's class colour. "
+    .. "With a part for each mob, the window also shows the other mobs your group fights, the one "
+    .. "closest to being pulled first; it sees them by their nameplates, so keep enemy nameplates on (V). "
     .. "On a boss WoW Forever hides the numbers from addons, so the bars still fill but the list "
     .. "cannot be sorted by them: it shows the tank, anyone over the tank, you, then the group. "
     .. "The warning comes when the game says you are over the tank, which it says even on a boss, "
     .. "or at 90% where the numbers show."
+
+-- While the slider is being set to the saved value, so that is not taken
+-- for the player moving it.
+local syncing = false
 
 --- Show what is saved. Safe to call before the page is built.
 function Panel.Refresh()
@@ -80,6 +90,46 @@ function Panel.Refresh()
     for key, check in pairs(Panel.checks) do
         check:SetChecked(ns.settings[key])
     end
+    if Panel.maxMobs then
+        syncing = true
+        Panel.maxMobs:SetValue(ns.settings.maxMobs)
+        syncing = false
+        Panel.maxMobsLabel:SetText("Mobs at once: " .. ns.settings.maxMobs)
+    end
+end
+
+--- How many mobs the window shows a part for at once: one to the most.
+local function mobsSlider()
+    local most = ns.Threat.MOST_MOBS
+    local label = text("", PADDING + COLUMN, -2)
+    local slider = CreateFrame("Slider", nil, panel, "OptionsSliderTemplate")
+    place(slider, PADDING + COLUMN + 4, -22)
+    slider:SetWidth(SLIDER_WIDTH)
+    slider:SetMinMaxValues(1, most)
+    slider:SetValueStep(1)
+    slider:SetObeyStepOnDrag(true)
+    if slider.Low and slider.Low.SetText then
+        slider.Low:SetText("1")
+    end
+    if slider.High and slider.High.SetText then
+        slider.High:SetText(tostring(most))
+    end
+    if slider.Text and slider.Text.SetText then
+        slider.Text:SetText("")
+    end
+    slider:SetScript("OnValueChanged", function(_, value)
+        if syncing then
+            return
+        end
+        local count = math.max(1, math.min(most, math.floor(value + 0.5)))
+        label:SetText("Mobs at once: " .. count)
+        if count ~= ns.settings.maxMobs then
+            ns.settings.maxMobs = count
+            ns.Refresh()
+        end
+    end)
+    Panel.maxMobs, Panel.maxMobsLabel = slider, label
+    table.insert(rows, { height = SLIDER_ROW, frames = { label, slider } })
 end
 
 local function ensureBuilt()
@@ -119,6 +169,9 @@ local function ensureBuilt()
             ns.settings[key] = value
             ns.Refresh()
         end)
+        if switch.slider then
+            mobsSlider()
+        end
     end
 
     local test = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")

@@ -65,15 +65,22 @@ function Warn.Show()
     ns.Guarded(function() showOnScreen(Warn.TEXT) end)
 end
 
-function Warn.Check(list)
-    if not ns.settings.warn then
+--- Over every mob shown: about to pull any of them sets it off, and it is
+-- ready again once you are well back on all of them.
+function Warn.Check()
+    if not ns.settings.warn or ns.Threat.InDemo() then
         return
     end
-    local row = playerRow(list)
-    if armed and danger(row) then
+    local anyDanger, allCalm = false, true
+    for _, list in ipairs(ns.Threat.All()) do
+        local row = playerRow(list)
+        anyDanger = anyDanger or danger(row)
+        allCalm = allCalm and calm(row)
+    end
+    if armed and anyDanger then
         armed = false
         Warn.Show()
-    elseif not armed and calm(row) then
+    elseif not armed and allCalm then
         armed = true
     end
 end

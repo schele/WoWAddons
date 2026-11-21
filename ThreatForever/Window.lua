@@ -26,8 +26,18 @@ local BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
 -- A pet, or anyone else the client gives no class colour.
 local PLAIN = { r = 0.6, g = 0.6, b = 0.6 }
 
+-- With a part per mob and more than one mob shown, each shows this many.
+local SPLIT_ROWS = 5
+-- A mob's heading, from the top of its part; and the space between parts.
+local HEADER_Y = 30
+local PART_GAP = 8
+-- One line of the small font at the bottom, which BOTTOM leaves room for.
+local FOOTER_LINE = 12
+
 Window.MAX_ROWS = MAX_ROWS
+Window.SPLIT_ROWS = SPLIT_ROWS
 Window.rows = {}
+Window.headers = {}
 
 local frame
 
@@ -75,7 +85,7 @@ local function createWindowFrame()
         made.close:SetPoint("TOPRIGHT", made, "TOPRIGHT", -4, -4)
     end
     made.background:SetColorTexture(0.06, 0.045, 0.03, 1)
-    made.title:SetText("Threat")
+    made.title:SetText("Threat Forever")
 
     made.logo = (native and made.NineSlice or made):CreateTexture(nil, "OVERLAY")
     made.logo:SetSize(LOGO, LOGO)
@@ -93,10 +103,10 @@ local function createWindowFrame()
     return made
 end
 
-local function makeRow(index)
+--- A row: placed where it goes each time the window is drawn.
+local function makeRow()
     local row = CreateFrame("Frame", nil, frame)
     row:SetSize(WIDTH - 24, ROW_HEIGHT)
-    row:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -TOP - (index - 1) * (ROW_HEIGHT + ROW_GAP))
 
     row.back = row:CreateTexture(nil, "BACKGROUND")
     row.back:SetAllPoints(row)
@@ -140,20 +150,47 @@ local function create()
     local saved = ns.settings.window
     frame:SetPoint(saved.point, UIParent, saved.relativePoint, saved.x, saved.y)
 
+    -- The first mob's heading: your target, or that none is.
     frame.mob = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    frame.mob:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -30)
-    frame.mob:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -14, -30)
     frame.mob:SetJustifyH("LEFT")
     frame.mob:SetWordWrap(false)
+    Window.headers[1] = frame.mob
 
+    -- Held at both ends, so a long line wraps inside the window instead of
+    -- running out past its edge.
     frame.footer = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     frame.footer:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 14, 10)
+    frame.footer:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -14, 10)
+    frame.footer:SetJustifyH("LEFT")
+    frame.footer:SetWordWrap(true)
     frame.footer:SetText("")
 
     for index = 1, MAX_ROWS do
-        Window.rows[index] = makeRow(index)
+        Window.rows[index] = makeRow()
     end
     frame:Hide()
+end
+
+--- The `index`th mob's heading, made the first time a part needs one.
+local function headerAt(index)
+    local header = Window.headers[index]
+    if not header then
+        header = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        header:SetJustifyH("LEFT")
+        header:SetWordWrap(false)
+        Window.headers[index] = header
+    end
+    return header
+end
+
+--- The `index`th row in the window, made the first time it is needed.
+local function rowAt(index)
+    local row = Window.rows[index]
+    if not row then
+        row = makeRow()
+        Window.rows[index] = row
+    end
+    return row
 end
 
 local function classColor(classFile)
@@ -190,20 +227,23 @@ local function drawRow(row, data)
     row:Show()
 end
 
-local function drawMob(list)
+local function drawMob(header, list)
     if not list.mob then
-        frame.mob:SetText("No enemy targeted")
+        header:SetText("No enemy targeted")
         return
     end
     -- A mob's name can come secret too; the game writes one where it can.
-    if not pcall(frame.mob.SetText, frame.mob, list.name) then
-        frame.mob:SetText("Your target")
+    if not pcall(header.SetText, header, list.name) then
+        header:SetText(list.mob == "target" and "Your target" or "An enemy")
     end
 end
 
 --- Whether the window should be up: turned on, and in combat unless it is
 -- told to stay up.
 function Window.Wanted()
+    if ns.Threat.InDemo() then
+        return true
+    end
     return ns.settings.shown and (not ns.settings.combatOnly or ns.Threat.InCombat())
 end
 
@@ -216,19 +256,53 @@ function Window.Refresh()
         return
     end
 
-    local list = ns.Threat.Current()
-    drawMob(list)
-    local count = math.min(#list.rows, MAX_ROWS)
-    for index = 1, MAX_ROWS do
-        local row = Window.rows[index]
-        if index <= count then
-            drawRow(row, list.rows[index])
-        else
-            row:Hide()
+    -- Each mob's part, top to bottom: its heading, then its rows. One mob
+    -- has all the rows; with more, each has a share.
+    local lists = ns.Threat.All()
+    local perMob = #lists > 1 and SPLIT_ROWS or MAX_ROWS
+    local y, used, secret = -HEADER_Y, 0, false
+    for index, list in ipairs(lists) do
+        local header = headerAt(index)
+        header:ClearAllPoints()
+        header:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, y)
+        header:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -14, y)
+        drawMob(header, list)
+        header:Show()
+        y = y - (TOP - HEADER_Y)
+
+        local count = math.min(#list.rows, perMob)
+        for position = 1, count do
+            used = used + 1
+            local row = rowAt(used)
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, y)
+            drawRow(row, list.rows[position])
+            y = y - (ROW_HEIGHT + ROW_GAP)
         end
+        if count == 0 then
+            y = y - (ROW_HEIGHT + ROW_GAP)
+        end
+        y = y - PART_GAP
+        secret = secret or list.secret
     end
-    frame.footer:SetText(list.secret and "The game hides the numbers on this one." or "")
-    frame:SetHeight(TOP + math.max(1, count) * (ROW_HEIGHT + ROW_GAP) + BOTTOM)
+    for index = #lists + 1, #Window.headers do
+        Window.headers[index]:Hide()
+    end
+    for index = used + 1, #Window.rows do
+        Window.rows[index]:Hide()
+    end
+
+    if ns.Threat.InDemo() then
+        frame.footer:SetText("Made-up numbers. /threat demo ends it.")
+    else
+        frame.footer:SetText(secret and "The game hides the numbers on this one." or "")
+    end
+    -- BOTTOM has room for one line; a line that wraps gets the rest.
+    local extra = 0
+    if frame.footer:GetText() ~= "" then
+        extra = math.max(0, (frame.footer:GetStringHeight() or 0) - FOOTER_LINE)
+    end
+    frame:SetHeight(-y + PART_GAP + BOTTOM + extra)
     frame:Show()
 end
 

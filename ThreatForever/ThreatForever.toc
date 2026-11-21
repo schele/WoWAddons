@@ -4,6 +4,7 @@
 ## IconTexture: Interface\AddOns\ThreatForever\icon
 ## Author: Skyler
 ## Version: 0.1.0
+## X-Wago-ID: bGoYvn60
 ## SavedVariables: ThreatForeverDB
 
 ThreatForever.lua

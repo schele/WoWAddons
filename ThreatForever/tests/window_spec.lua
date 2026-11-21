@@ -20,7 +20,7 @@ describe("the window", function()
 
         local f = frame(ns)
         assertEqual("SettingsFrameTemplate", f.template)
-        assertEqual("Threat", f.title:GetText())
+        assertEqual("Threat Forever", f.title:GetText())
         assertEqual("Interface\\AddOns\\ThreatForever\\logo", f.logo:GetTexture())
         assertEqual(1, f.background.color[4], "solid, never see-through")
     end)
@@ -157,6 +157,30 @@ describe("on a boss", function()
         local ns = bossFight()
 
         assertEqual("The game hides the numbers on this one.", frame(ns).footer:GetText())
+    end)
+
+    it("keeps the line at the bottom inside the window, wrapping between its edges", function()
+        local ns = bossFight()
+
+        local f = frame(ns)
+        local left, right = f.footer.points[1], f.footer.points[2]
+        assertEqual("BOTTOMLEFT", left[1])
+        assertEqual(f, left[2])
+        assertEqual("BOTTOMRIGHT", right[1], "held at both ends, so it wraps")
+        assertEqual(f, right[2])
+    end)
+
+    it("makes room when the line at the bottom wraps onto more lines", function()
+        local ns = bossFight()
+        local f = frame(ns)
+
+        f.footer.stringHeight = 12
+        ns.Window.Refresh()
+        local one = f:GetHeight()
+        f.footer.stringHeight = 36
+        ns.Window.Refresh()
+
+        assertEqual(24, f:GetHeight() - one)
     end)
 
     it("says nothing of it on a mob that shows them", function()

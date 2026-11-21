@@ -90,8 +90,24 @@ local function makeWidget(kind, parent)
     -- Status bars. A secret value is taken and drawn, as the client's bars
     -- do: that is the one place an addon may hand one over and have it shown.
     function widget:SetMinMaxValues(low, high) self.min, self.max = low, high end
-    function widget:SetValue(value) self.value = value end
     function widget:GetValue() return self.value end
+    -- A slider fires OnValueChanged when its value changes, as the client's.
+    function widget:SetValue(value)
+        if self.kind == "Slider" then
+            if self.value == value then return end
+            self.value = value
+            if self.scripts.OnValueChanged then self.scripts.OnValueChanged(self, value, false) end
+            return
+        end
+        self.value = value
+    end
+    function widget:SetValueStep(value) self.valueStep = value end
+    function widget:SetObeyStepOnDrag(value) self.obeyStep = value end
+    --- Test helper: the player dragging a slider to `value`.
+    function widget:Drag(value)
+        self.value = value
+        if self.scripts.OnValueChanged then self.scripts.OnValueChanged(self, value, true) end
+    end
     function widget:SetStatusBarTexture(value) self.barTexture = value end
     function widget:SetStatusBarColor(r, g, b, a) self.barColor = { r, g, b, a } end
 
@@ -159,6 +175,11 @@ function stub.newEnv()
         local frame = makeWidget(kind or "Frame", parent)
         frame.frameName = name
         frame.template = template
+        if template == "OptionsSliderTemplate" then
+            frame.Low = makeWidget("FontString", frame)
+            frame.High = makeWidget("FontString", frame)
+            frame.Text = makeWidget("FontString", frame)
+        end
         if template == "SettingsFrameTemplate" then
             frame.NineSlice = makeWidget("Frame", frame)
             frame.NineSlice.Text = makeWidget("FontString", frame.NineSlice)
@@ -242,6 +263,21 @@ function stub.newEnv()
         if not place then return nil end
         return place.status or 0
     end
+
+    -- Nameplates: a mob with one has a "nameplateN" token, the same unit as
+    -- any other token for it. The game says which plate is the target's.
+    env.C_NamePlate = {
+        GetNamePlateForUnit = function(token)
+            local u = unit(token)
+            if not u then return nil end
+            for index = 1, 40 do
+                local plate = "nameplate" .. index
+                if env.__units[plate] == u then
+                    return { namePlateUnitToken = plate }
+                end
+            end
+        end,
+    }
 
     function env.GetThreatStatusColor(status)
         local color = stub.THREAT_COLORS[status] or stub.THREAT_COLORS[0]

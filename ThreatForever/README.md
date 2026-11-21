@@ -17,6 +17,23 @@ warning before you pull it yourself.
   off to keep it up, for instance to drag it where you want it. Its place is
   remembered. The red X turns it off; `/threat` brings it back.
 
+## A part for each mob
+
+On by default: the window shows your target and the other mobs you or your
+group are fighting, each in a part of its own under its name, up to three
+at once. Your target comes first. The others are ordered by how close each
+is to changing hands: one where someone is over the tank comes first
+(which the game says even on a boss), then the one where someone not
+tanking has the most threat. With nothing targeted, the mobs alone.
+
+- One mob gets all ten rows; with more, each gets five.
+- **It sees the other mobs by their nameplates**, so keep enemy nameplates
+  on (V). The game gives threat on a nameplate's mob like on your target:
+  the numbers, but for a boss.
+- The warning covers every mob shown, not only your target.
+- On the settings page: the switch **A part for each mob you fight**, and
+  under it **Mobs at once**, one to five.
+
 ## The warning
 
 The raid warning sound and "You are about to pull aggro!" in red in the
@@ -61,6 +78,7 @@ the warning.
 | `/threat settings` | Open the settings page |
 | `/threat check` | Say what the game tells about threat on your target: whether it shows the numbers, and each one's |
 | `/threat test` | Show what the warning is like |
+| `/threat demo` | Show the window with made-up mobs and a party, to see how it looks out of combat or alone; again, or a fight, ends it |
 | `/threat help` | List the commands |
 
 ## Install

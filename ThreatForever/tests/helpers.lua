@@ -87,8 +87,25 @@ function M.mob(env, token, name, options)
     options = options or {}
     env.__units[token] = {
         name = name, guid = "Creature-" .. name, hostile = true, boss = options.boss, threat = {},
+        combat = not options.calm,
     }
     return env.__units[token]
+end
+
+--- Another mob the group fights, on the nameplate `plate`. `threat` maps
+-- group tokens to scaled percent (100 tanks), or to { scaled, status }.
+function M.otherMob(env, plate, name, threat, options)
+    local mob = M.mob(env, plate, name, options)
+    for who, value in pairs(threat or {}) do
+        local scaled, status = value, nil
+        if type(value) == "table" then
+            scaled, status = value[1], value[2]
+        end
+        status = status or (scaled >= 100 and 3 or 0)
+        mob.threat[who] = { scaled = scaled, status = status, tanking = status >= 2 }
+    end
+    M.fire(env, "NAME_PLATE_UNIT_ADDED", plate)
+    return mob
 end
 
 --- Target `token` (nil clears the target).

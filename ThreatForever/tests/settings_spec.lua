@@ -12,7 +12,7 @@ local function click(checkbox)
     checkbox.scripts.OnClick(checkbox)
 end
 
-local SWITCHES = { "shown", "combatOnly", "warn" }
+local SWITCHES = { "shown", "combatOnly", "split", "warn" }
 
 describe("the settings page", function()
     it("is a page in the game's options, named ThreatForever", function()
