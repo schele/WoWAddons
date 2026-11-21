@@ -14,14 +14,16 @@ M.FILES = {
     "Modules/ChatBox.lua",
     "Modules/ActionBars.lua",
     "Modules/ChatKeys.lua",
+    "Modules/Quests.lua",
     "Modules/Settings.lua",
     "Minimap.lua",
 }
 
 --- Load the addon's files into a stubbed environment, the way WoW would:
 -- in .toc order, each chunk receiving (addonName, privateTable).
-function M.loadAddon(files)
-    local env = stub.newEnv()
+-- `options` go to the stubbed client (see wow_stub's newEnv).
+function M.loadAddon(files, options)
+    local env = stub.newEnv(options)
     local ns = {}
 
     for _, path in ipairs(files or M.FILES) do

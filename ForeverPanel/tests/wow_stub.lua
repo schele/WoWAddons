@@ -234,6 +234,13 @@ local function makeWidget(kind, parent)
     end
     function widget:SetTexture(value) self.texture = value end
     function widget:GetTexture() return self.texture end
+    function widget:SetAtlas(atlas, useAtlasSize)
+        self.atlas = atlas
+        self.useAtlasSize = useAtlasSize
+    end
+    function widget:GetAtlas() return self.atlas end
+    function widget:SetBlendMode(value) self.blendMode = value end
+    function widget:SetHitRectInsets(...) self.hitRectInsets = { ... } end
     function widget:SetFont(file, size, flags)
         self.font = { file = file, size = size, flags = flags or "" }
     end
@@ -312,7 +319,151 @@ end
 
 stub.makeWidget = makeWidget
 
-function stub.newEnv()
+--- The quest log's top row, as WoW Forever's Blizzard_UIPanels_Game builds it
+-- (Gethe/wow-ui-source, branch "forever", 1.60.1), put into `env` as the
+-- client's globals: the search box, the quest count beside it and the
+-- settings gear at the top right. Camelot's QuestLogQuests_ShowQuestCount
+-- sizes the search box (200 wide, or 190 with the gamepad interface) every
+-- time the log redraws.
+function stub.buildQuestLog(env)
+    local scroll = makeWidget("ScrollFrame", env.UIParent)
+    scroll.SearchBox = makeWidget("EditBox", scroll)
+    scroll.SearchBox:SetSize(301, 20)
+    scroll.SettingsDropdown = makeWidget("DropdownButton", scroll)
+    env.QuestScrollFrame = scroll
+    env.QuestLogCount = makeWidget("Frame", scroll)
+
+    function env.QuestLogQuests_ShowQuestCount()
+        env.QuestLogCount:Show()
+        if env.__gamepad then
+            scroll.SearchBox:SetSize(190, 20)
+        else
+            scroll.SearchBox:SetSize(200, 20)
+        end
+    end
+end
+
+--- WoW Forever's quest watch list, quest log and maps. Classic Era's
+-- C_QuestLog has none of the watch list calls, so it gets none of this.
+local function addQuests(env, options)
+    -- The quest log, in order: { isHeader = true, title } or { questID, title }.
+    env.__log = {}
+    -- The tracked quests, in tracker order, and how many the tracker holds.
+    env.__watched = {}
+    env.__maxWatches = 25
+    local function watchIndex(questID)
+        for index, id in ipairs(env.__watched) do
+            if id == questID then
+                return index
+            end
+        end
+    end
+    env.C_QuestLog = {
+        GetNumQuestLogEntries = function()
+            local quests = 0
+            for _, entry in ipairs(env.__log) do
+                if not entry.isHeader then
+                    quests = quests + 1
+                end
+            end
+            return #env.__log, quests
+        end,
+        GetInfo = function(index)
+            local entry = env.__log[index]
+            if not entry then
+                return nil
+            end
+            return {
+                title = entry.title, questLogIndex = index, questID = entry.questID or 0,
+                isHeader = entry.isHeader or false, isHidden = false, isTask = false, isBounty = false,
+            }
+        end,
+        GetLogIndexForQuestID = function(questID)
+            for index, entry in ipairs(env.__log) do
+                if entry.questID == questID then
+                    return index
+                end
+            end
+        end,
+        GetNumQuestWatches = function() return #env.__watched end,
+        GetQuestIDForQuestWatchIndex = function(index) return env.__watched[index] end,
+        GetQuestWatchType = function(questID)
+            if watchIndex(questID) then
+                return 0
+            end
+        end,
+        AddQuestWatch = function(questID)
+            if watchIndex(questID) or #env.__watched >= env.__maxWatches then
+                return false
+            end
+            table.insert(env.__watched, questID)
+            return true
+        end,
+        RemoveQuestWatch = function(questID)
+            local index = watchIndex(questID)
+            if not index then
+                return false
+            end
+            table.remove(env.__watched, index)
+            return true
+        end,
+    }
+    -- A player in the new player experience may not untrack quests.
+    env.__npeRestricted = false
+    env.QuestUtil = {
+        CanRemoveQuestWatch = function() return not env.__npeRestricted end,
+    }
+
+    -- Where a quest's objectives (or, once done, its turn-in) are: a map ID,
+    -- or 0 when the client does not say.
+    env.__questMaps = {}
+    function env.GetQuestUiMapID(questID) return env.__questMaps[questID] or 0 end
+
+    -- Where the player is: the zone's name and the most detailed map.
+    env.__zone = "Hillsbrad Foothills"
+    env.__playerMap = 25
+    function env.GetRealZoneText() return env.__zone end
+    function env.GetZoneText() return env.__zone end
+    env.Enum = { UIMapType = { Cosmic = 0, World = 1, Continent = 2, Zone = 3, Dungeon = 4, Micro = 5, Orphan = 6 } }
+    local types = env.Enum.UIMapType
+    env.__maps = {
+        [12] = { name = "Kalimdor", mapType = types.Continent, parentMapID = 947 },
+        [13] = { name = "Eastern Kingdoms", mapType = types.Continent, parentMapID = 947 },
+        [14] = { name = "Arathi Highlands", mapType = types.Zone, parentMapID = 13 },
+        [22] = { name = "Alterac Mountains", mapType = types.Zone, parentMapID = 13 },
+        [25] = { name = "Hillsbrad Foothills", mapType = types.Zone, parentMapID = 13 },
+        [27] = { name = "Dun Morogh", mapType = types.Zone, parentMapID = 13 },
+        [226] = { name = "Gnomeregan", mapType = types.Dungeon, parentMapID = 27 },
+        -- A cave inside a zone: a map of its own, under the zone's.
+        [1500] = { name = "Alterac Mountains Cave", mapType = types.Micro, parentMapID = 22 },
+    }
+    env.C_Map = {
+        GetBestMapForUnit = function(unit)
+            if unit == "player" then
+                return env.__playerMap
+            end
+        end,
+        GetMapInfo = function(mapID)
+            local map = env.__maps[mapID]
+            if not map then
+                return nil
+            end
+            return { mapID = mapID, name = map.name, mapType = map.mapType, parentMapID = map.parentMapID }
+        end,
+    }
+
+    -- The game's own automatic quest tracking, on by default.
+    env.__cvars.autoQuestWatch = "1"
+
+    if options.questLog ~= false then
+        stub.buildQuestLog(env)
+    end
+end
+
+--- options.client = "classic": Classic Era, without Forever's quest API.
+-- options.questLog = false: the quest log is not built yet at login.
+function stub.newEnv(options)
+    options = options or {}
     local env = setmetatable({}, { __index = _G })
 
     env.__frames = {}
@@ -684,13 +835,53 @@ function stub.newEnv()
         end,
     }
 
+    -- hooksecurefunc(table, name, fn) on a table, or (name, fn) on a global.
     function env.hooksecurefunc(target, name, post)
+        if type(target) == "string" then
+            target, name, post = env, target, name
+        end
         local original = target[name]
+        assert(type(original) == "function", "hooksecurefunc: no function " .. tostring(name))
         target[name] = function(...)
             local result = original(...)
             post(...)
             return result
         end
+    end
+
+    -- What was printed, line by line.
+    env.__printed = {}
+    function env.print(...)
+        local pieces = {}
+        for index = 1, select("#", ...) do
+            pieces[index] = tostring((select(index, ...)))
+        end
+        table.insert(env.__printed, table.concat(pieces, " "))
+    end
+
+    -- Tooltips: the owner and every line, as { text, r, g, b, wrap }.
+    env.GameTooltip = makeWidget("GameTooltip", env.UIParent)
+    env.GameTooltip.shown = false
+    env.GameTooltip.lines = {}
+    function env.GameTooltip:SetOwner(owner, anchor)
+        self.owner, self.anchor = owner, anchor
+        self.lines = {}
+    end
+    function env.GameTooltip:GetOwner() return self.owner end
+    function env.GameTooltip:SetText(text, r, g, b)
+        self.lines = { { text = text, r = r, g = g, b = b } }
+    end
+    function env.GameTooltip:AddLine(text, r, g, b, wrap)
+        table.insert(self.lines, { text = text, r = r, g = g, b = b, wrap = wrap })
+    end
+
+    -- Sounds played: each kit handed to PlaySound.
+    env.__sounds = {}
+    env.SOUNDKIT = { IG_MAINMENU_OPTION_CHECKBOX_ON = 856, IG_MAINMENU_OPTION_CHECKBOX_OFF = 857 }
+    function env.PlaySound(kit) table.insert(env.__sounds, kit) end
+
+    if options.client ~= "classic" then
+        addQuests(env, options)
     end
 
     -- Test helper: simulate the render pass that makes text measurable.

@@ -60,30 +60,52 @@ function ns.RegisterSetting(definition)
         "unknown setting type: " .. tostring(definition.type)
     )
 
-    -- A setting with no default would read nil and write somewhere nothing
-    -- else looks at, which shows up as a control that silently does nothing.
-    assert(
-        defaults[store] ~= nil and defaults[store][key] ~= nil,
-        string.format("no default registered for %s.%s", store, key)
-    )
+    if definition.get or definition.set then
+        -- A value the game keeps (a console variable) is read and written
+        -- where it lives, through the setting's own get and set, and has no
+        -- default here. One without the other would show one value and write
+        -- another.
+        assert(
+            type(definition.get) == "function" and type(definition.set) == "function",
+            string.format("%s.%s needs both get and set", store, key)
+        )
+    else
+        -- A setting with no default would read nil and write somewhere nothing
+        -- else looks at, which shows up as a control that silently does nothing.
+        assert(
+            defaults[store] ~= nil and defaults[store][key] ~= nil,
+            string.format("no default registered for %s.%s", store, key)
+        )
+    end
 
     table.insert(settings, definition)
     return definition
 end
 
---- Current value of a setting, straight from the database.
+--- Current value of a setting, straight from the database, or from the
+-- setting's own get for a value the game keeps.
 function ns.SettingValue(setting)
+    if setting.get then
+        return setting.get()
+    end
     local store = ns.db and ns.db[setting.store]
     return store and store[setting.key]
 end
 
 function ns.SetSettingValue(setting, value)
-    local store = ns.db and ns.db[setting.store]
-    if not store or store[setting.key] == value then
-        return
+    if setting.get then
+        if setting.get() == value then
+            return
+        end
+        setting.set(value)
+    else
+        local store = ns.db and ns.db[setting.store]
+        if not store or store[setting.key] == value then
+            return
+        end
+        store[setting.key] = value
     end
 
-    store[setting.key] = value
     if setting.onChange then
         setting.onChange(value)
     end

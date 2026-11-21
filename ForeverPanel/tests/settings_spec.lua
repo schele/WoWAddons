@@ -81,6 +81,57 @@ describe("the settings registry", function()
         assertTrue(ran, "onChange fired")
         assertEqual(32, ns.db.bar.height)
     end)
+
+    -- A console variable belongs to the game, not to the database: the
+    -- setting reads and writes it where it lives, and needs no default.
+    it("reads and writes a value kept elsewhere through the setting's own get and set", function()
+        local ns = loggedIn()
+        local kept, changed = true, nil
+
+        local setting = ns.RegisterSetting({
+            store = "elsewhere",
+            key = "flag",
+            type = "checkbox",
+            name = "Kept elsewhere",
+            get = function() return kept end,
+            set = function(value) kept = value end,
+            onChange = function(value) changed = value end,
+        })
+
+        assertTrue(ns.SettingValue(setting), "read through get")
+        ns.SetSettingValue(setting, false)
+        assertFalse(kept, "written through set")
+        assertEqual(false, changed, "onChange fired")
+        assertNil(ns.db.elsewhere, "nothing written to the database")
+    end)
+
+    it("leaves a value kept elsewhere alone when it already matches", function()
+        local ns = loggedIn()
+        local writes = 0
+
+        local setting = ns.RegisterSetting({
+            store = "elsewhere",
+            key = "flag",
+            type = "checkbox",
+            name = "Kept elsewhere",
+            get = function() return true end,
+            set = function() writes = writes + 1 end,
+        })
+
+        ns.SetSettingValue(setting, true)
+        assertEqual(0, writes)
+    end)
+
+    it("rejects a get without a set", function()
+        local ns = helpers.loadAddon()
+
+        assertErrors(function()
+            ns.RegisterSetting({
+                store = "elsewhere", key = "flag", type = "checkbox", name = "Half",
+                get = function() return true end,
+            })
+        end)
+    end)
 end)
 
 describe("the right-click menu", function()
@@ -217,7 +268,9 @@ describe("the settings panel", function()
     it("draws a divider between the groups, and only between them", function()
         local ns, env = loggedIn()
 
-        assertEqual(2, #ns.Settings.dividers, "one in each column, each under its first group")
+        -- Left: the bar, then the extras. Right: the chat keys, the layout
+        -- options, then the quest options.
+        assertEqual(3, #ns.Settings.dividers, "one above each group after a column's first")
     end)
 
     it("puts the portrait, chat box and action bar options in the right column, under the chat keys", function()

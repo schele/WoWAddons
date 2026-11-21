@@ -50,6 +50,48 @@ The backpack's first slot goes in the top-left corner, each bag follows in
 order, and any gap goes at the bottom right by the money. Separate bags and
 the gamepad layout are left alone.
 
+### Quests
+
+On WoW Forever the settings panel has a group for quest tracking, under the
+layout options. Classic Era's quest log is another window, so there it has
+none of this.
+
+- **Untrack-all box in the quest log** (on). A tick box at the top of the
+  quest log, between the quest count and the settings gear, drawn like the
+  box beside each quest. It is ticked while any quest is tracked; click it
+  and every quest comes off the tracker, with the sound of clearing one
+  quest's box. The quests stay in your quest log. Hover it to see how many
+  are tracked. The search box is a little narrower to make room, and gets
+  its width back when the box is turned off.
+- **Track only the quests where you are** (off). Each time you arrive in a
+  zone or dungeon (a new zone, a loading screen, logging in), the tracker
+  swaps over to that place's quests: the ones under the quest log header
+  with the zone's name ("Hillsbrad Foothills", or "Gnomeregan" inside the
+  dungeon), and any quest whose objectives the game shows on the map you
+  are on, wherever it sits in the log. In a cave or building with a map of
+  its own, the zone around it counts; inside a dungeon only the dungeon
+  does. Everything else is untracked first, so a full tracker has room.
+  Your own ticks stand until you move on, and a quest you take here is
+  tracked even with the game's automatic tracking off.
+- **Automatic quest tracking** (the game's own, on by default). While it is
+  on, the game tracks each quest you take and each one you make progress
+  on, so untracked quests come back. WoW Forever's options have no switch
+  for it; this is the game's `autoQuestWatch` setting itself, not a copy.
+
+`/fp untrack` untracks every quest and says how many. `/fp quests` says where
+you are (the names headers are matched against, and the map), which quests
+in your log count as here and why, and the headers in your log: if a place's
+quests are not picked up, it shows whether the header's name differs from
+the zone's.
+
+Where you are is the zone's name (`GetRealZoneText`, `GetZoneText`) and the
+player's map (`C_Map.GetBestMapForUnit`), walked out to the zone while the
+map is a cave or building (`Enum.UIMapType.Micro`); a quest's own map is
+`GetQuestUiMapID`. Not the quest log's `isOnMap`, which follows whichever map
+the world map last showed. Not yet confirmed in the game: how the box lines
+up with the gear and the quest count, and whether every header's name
+matches its zone's.
+
 Modules are rearranged by dragging them along the bar. The bar reorders live
 while you hold one, so it is its own drag preview, and the layout is saved
 between sessions. Which third of the bar you drop in picks the side, so a
@@ -87,6 +129,8 @@ interface version.
 - `/fp xp` - Toggle XP between counting up and counting down
 - `/fp clock` - Toggle 12/24 hour time
 - `/fp clock blizzard` - Show or hide Blizzard's own clock
+- `/fp untrack` - Untrack every quest (WoW Forever)
+- `/fp quests` - Where you are, and which quests in your log belong here (WoW Forever)
 - `/fp status` - Show launch and note counts
 - `/fp note <text>` - Save a persistent note
 - `/fp last` - Show most recent note
@@ -144,7 +188,9 @@ ns.RegisterSetting({
 ```
 
 Registering a setting with no matching `AddDefaults` entry is an error, since it
-would render a control that silently does nothing.
+would render a control that silently does nothing. A value the game keeps, such
+as a console variable, brings its own `get` and `set` instead of a default, and
+is read and written there rather than copied into `ForeverPanelDB`.
 
 Every module also gets a `Show <name>` checkbox on the panel automatically, so
 you do not declare that one yourself.

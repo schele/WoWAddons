@@ -3,7 +3,7 @@
 ## Notes: A bar across the top of the screen with money, bag space, XP and the time, and your UI kept in place on each screen.
 ## IconTexture: Interface\AddOns\ForeverPanel\icon
 ## Author: Skyler
-## Version: 0.5.2
+## Version: 0.6.0
 ## X-Wago-ID: ANz71M64
 ## SavedVariables: ForeverPanelDB, ForeverDB
 
@@ -18,5 +18,6 @@ Modules/Portrait.lua
 Modules/ChatBox.lua
 Modules/ActionBars.lua
 Modules/ChatKeys.lua
+Modules/Quests.lua
 Modules/Settings.lua
 Minimap.lua
