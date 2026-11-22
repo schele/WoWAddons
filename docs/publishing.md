@@ -59,8 +59,7 @@ old one with the same command.
    ## X-Wago-ID: E6gzYZN1
    ```
 
-4. **Upload** with a release, below. The first one's changelog says "First
-   release on Wago."
+4. **Upload** with a release, below.
 
 ## Every release
 
@@ -74,8 +73,31 @@ Raise `## Version:` in the addon's `.toc`, then:
 `-Install` uploads only a version that is not in `wago-uploads.json` yet, so
 reinstalling while testing never reaches players. The upload ticks the game
 versions from `## Interface:` (`11509` is Classic Era 1.15.9, `16001` is WoW
-Forever 1.60.1) and builds the changelog from the commits that touched the
-addon since its last upload. Commit `wago-uploads.json` afterwards.
+Forever 1.60.1). Commit `wago-uploads.json` afterwards.
+
+The changelog holds the addon's whole history, newest version first, because
+Wago's Changelog tab shows only what came with the latest upload:
+
+```
+## 0.2.0 (22 Nov 2026)
+- A sharper icon, drawn at full size instead of scaled up
+
+## 0.1.0 (6 Nov 2026), first release on Wago
+- A settings page with Check my bars now
+- ...
+```
+
+Each version's dates and boundaries come from the git history of
+`wago-uploads.json`. Its lines are the subjects of the commits that touched
+the addon's folder, with the `Name:` in front taken off. A commit that
+mentions Wago (an "on Wago as" commit, a project ID, screenshots for the
+Wago page) is left out. The code is in
+[tools/WagoChangelog.ps1](../tools/WagoChangelog.ps1), and its tests run
+with:
+
+```powershell
+powershell -NoProfile -Command "Invoke-Pester -Script tools/WagoChangelog.Tests.ps1 -EnableExit"
+```
 
 `-NoWago` installs without uploading; `-Stability beta` or `alpha` marks a
 pre-release.

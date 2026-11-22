@@ -20,6 +20,9 @@
         WAGO_API_TOKEN                   environment variable, from
                                          addons.wago.io/account/apikeys
 
+    The changelog sent holds every version's history, newest first, built
+    from git (tools/WagoChangelog.ps1).
+
     What went up is recorded in wago-uploads.json. -NoWago skips publishing,
     -Stability beta|alpha marks the upload as a pre-release, and -WagoDryRun
     prints what would be sent instead of sending it.
@@ -43,6 +46,9 @@ Set-Location $PSScriptRoot
 
 $wagoRecordPath = Join-Path $PSScriptRoot "wago-uploads.json"
 $script:wagoPatches = $null
+
+# Get-WagoChangelog: the changelog sent with each upload.
+. (Join-Path $PSScriptRoot "tools\WagoChangelog.ps1")
 
 function Get-TocField([string[]]$tocLines, [string]$field) {
     $tocLines | Where-Object { $_ -match "^##\s*$([regex]::Escape($field)):\s*(.+)$" } |
@@ -111,14 +117,8 @@ function Publish-Wago($name, $version, $zip, [string[]]$tocLines, $folder) {
         return
     }
 
-    # The commits that touched this addon since the last upload, newest first.
-    $changelog = $null
-    if ($last -and $last.commit) {
-        $changelog = (git log --format="- %s" "$($last.commit)..HEAD" -- $folder.Name 2>$null) -join "`n"
-    }
-    if (-not $changelog) {
-        $changelog = if ($last) { "- Version $version" } else { "- First release on Wago." }
-    }
+    # Every version's history, newest first, so Wago's Changelog tab shows it all.
+    $changelog = Get-WagoChangelog $name $folder.Name $version $last
 
     $metadata = [ordered]@{ label = $version; stability = $Stability; changelog = $changelog }
     $support = Get-WagoSupport (Get-TocField $tocLines "Interface")
