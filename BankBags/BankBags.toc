@@ -3,7 +3,7 @@
 ## Notes: Your bank, and every character's, from anywhere.
 ## IconTexture: Interface\AddOns\BankBags\icon
 ## Author: Skyler
-## Version: 0.3.1
+## Version: 0.3.2
 ## X-Wago-ID: aN0a5A6j
 ## SavedVariables: BankBagsDB
 

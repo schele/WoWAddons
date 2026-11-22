@@ -3,7 +3,7 @@
 ## Notes: Hover a slot on the character sheet to see everything else you could wear there, and click one to put it on.
 ## IconTexture: Interface\AddOns\WardrobeForever\icon
 ## Author: Skyler
-## Version: 0.1.0
+## Version: 0.1.1
 ## X-Wago-ID: ZKbqZd61
 
 WardrobeForever.lua

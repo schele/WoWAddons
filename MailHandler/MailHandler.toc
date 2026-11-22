@@ -3,7 +3,7 @@
 ## Notes: Tick the mails you want, then open or forward only those. New mail starts addressed to your bank character.
 ## IconTexture: Interface\AddOns\MailHandler\icon
 ## Author: Skyler
-## Version: 0.3.0
+## Version: 0.3.1
 ## X-Wago-ID: aNerYg62
 ## SavedVariables: MailHandlerDB
 ## SavedVariablesPerCharacter: MailHandlerCharDB

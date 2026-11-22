@@ -1,38 +1,38 @@
 {
     "AutoVendor":  {
-                       "version":  "0.4.0",
-                       "commit":  "5bdfb0f5e4c764009d1ce550e221a37d9123821c"
+                       "version":  "0.4.1",
+                       "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
                    },
     "BankBags":  {
-                     "version":  "0.3.1",
-                     "commit":  "2500d7ad615ac151a36c92827bd692ab4b135a4b"
+                     "version":  "0.3.2",
+                     "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
                  },
     "ClickHeal":  {
-                      "version":  "0.2.1",
-                      "commit":  "25708d4054c57049ce8fb0831a2b327b3c66de27"
+                      "version":  "0.2.2",
+                      "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
                   },
     "ForeverPanel":  {
-                         "version":  "0.7.0",
-                         "commit":  "5bdfb0f5e4c764009d1ce550e221a37d9123821c"
+                         "version":  "0.7.1",
+                         "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
                      },
     "LFGBoard":  {
-                     "version":  "0.1.0",
-                     "commit":  "d8d2e4d60d231e8596329483164b84d91bcefa18"
+                     "version":  "0.1.1",
+                     "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
                  },
     "MailHandler":  {
-                        "version":  "0.3.0",
-                        "commit":  "5bdfb0f5e4c764009d1ce550e221a37d9123821c"
+                        "version":  "0.3.1",
+                        "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
                     },
     "RankUp":  {
-                   "version":  "0.1.0",
-                   "commit":  "91906d97322435124eab0860419eb14e577610e5"
+                   "version":  "0.1.1",
+                   "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
                },
     "ThreatForever":  {
-                          "version":  "0.1.0",
-                          "commit":  "a5168338523cb602a1440e3de4c9b67dc67a2c4f"
+                          "version":  "0.1.1",
+                          "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
                       },
     "WardrobeForever":  {
-                            "version":  "0.1.0",
-                            "commit":  "9e3b380f9463f7faa48ce88b7169c7ddef156b50"
+                            "version":  "0.1.1",
+                            "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
                         }
 }

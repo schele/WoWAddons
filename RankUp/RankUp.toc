@@ -3,7 +3,7 @@
 ## Notes: Offers to put the highest rank you know on every action button that holds an older one.
 ## IconTexture: Interface\AddOns\RankUp\icon
 ## Author: Skyler
-## Version: 0.1.0
+## Version: 0.1.1
 ## X-Wago-ID: E6gzYZN1
 
 RankUp.lua
