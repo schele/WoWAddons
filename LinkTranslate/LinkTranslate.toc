@@ -1,0 +1,13 @@
+## Interface: 11509, 16001
+## Title: LinkTranslate
+## Notes: Shows the quest, item and spell links people post in chat by the names your game uses, whatever language the sender's game is in.
+## IconTexture: Interface\AddOns\LinkTranslate\icon
+## Author: Skyler
+## Version: 0.1.0
+## SavedVariables: LinkTranslateDB
+
+LinkTranslate.lua
+Names.lua
+Chat.lua
+Hover.lua
+Settings.lua
