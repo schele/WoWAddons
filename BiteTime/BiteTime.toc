@@ -1,0 +1,14 @@
+## Interface: 11509, 16001
+## Title: BiteTime
+## Notes: Lights up your Ferocious Bite when a Bite with the combo points you have would kill your target.
+## IconTexture: Interface\AddOns\BiteTime\icon
+## Author: Skyler
+## Version: 0.1.0
+## SavedVariables: BiteTimeDB
+
+BiteTime.lua
+Bite.lua
+Kill.lua
+Gate.lua
+Glow.lua
+Settings.lua
