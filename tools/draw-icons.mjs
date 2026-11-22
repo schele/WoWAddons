@@ -417,55 +417,6 @@ const gemDetails = union(
 );
 const gemShine = triangle(15.5, 25, 22.5, 17.5, 23.5, 25);
 
-// StealthWatch: a watchful eye with a cat's slit pupil, in dusk indigo.
-const dusk = {
-  dark: [8, 8, 18], glow: [44, 40, 96], ring: [128, 120, 220],
-  light: [226, 222, 255], mid: [130, 122, 214], outline: [28, 24, 70], detail: [22, 18, 52],
-};
-const eye = intersect(circle(32, 46.2, 26.2), circle(32, 17.8, 26.2)); // 44 across, 24 tall
-const eyeDetails = union(
-  (x, y) => Math.abs(len(x - 32, y - 32) - 8.5) - 1, // the iris's rim
-  ellipse(32, 32, 2.4, 8), // the slit
-);
-const eyeShine = ellipse(22, 27.5, 4, 1.3);
-
-// BiteTime: two fangs and the small teeth between them, under a gum line, in
-// ember red with ivory teeth.
-const ember = {
-  dark: [22, 6, 4], glow: [112, 30, 14], ring: [238, 112, 64],
-  light: [255, 248, 236], mid: [226, 206, 182], outline: [74, 18, 8], detail: [150, 36, 22],
-};
-// A fang hanging from the gum at cx, hooked toward the middle (dir 1 bends
-// right, -1 left): each row is pushed sideways by the square of its depth.
-const fang = (cx, dir) => {
-  const straight = triangle(cx - 7, 20, cx + 7, 20, cx, 50);
-  return (x, y) => straight(x - dir * 0.008 * Math.max(0, y - 20) ** 2, y);
-};
-const jaw = union(
-  roundBox(32, 18.5, 23, 6.5, 5.5), // the gum
-  fang(19, 1), fang(45, -1),
-  roundBox(29.5, 26.5, 2, 3.8, 1.3), roundBox(34.5, 26.5, 2, 3.8, 1.3), // the small teeth between
-);
-const jawDetails = roundBox(32, 17, 23, 5, 4.5); // the gum, darker than the teeth
-const jawShine = ellipse(17.5, 29, 1.3, 4.5);
-
-// LinkTranslate: two speech bubbles, the one behind holding lines of text and
-// the one in front an A, the way translating is drawn; in copper.
-const copper = {
-  dark: [20, 10, 4], glow: [104, 54, 22], ring: [226, 146, 84],
-  light: [255, 238, 218], mid: [218, 166, 118], outline: [72, 34, 10], detail: [118, 60, 24],
-};
-const frontBubble = union(roundBox(38.5, 37, 13, 9.5, 4.5), triangle(40, 44, 47, 44, 45.5, 52));
-const backBubble = union(roundBox(25.5, 22.5, 13, 9.5, 4.5), triangle(16, 29, 23, 29, 14.5, 38));
-// The back one stops short of the front one, so a gap shows where they cross.
-const bubbles = union(minus(backBubble, (x, y) => frontBubble(x, y) - 2.4), frontBubble);
-const bubbleDetails = union(
-  segment(18, 18.5, 32, 18.5, 1.1), segment(18, 23.5, 24, 23.5, 1.1), // the lines of text
-  segment(33.5, 42.5, 38.5, 31, 1.2), segment(38.5, 31, 43.5, 42.5, 1.2), // the A
-  segment(35.5, 38.5, 41.5, 38.5, 1),
-);
-const bubbleShine = ellipse(20, 15.5, 4, 1.2);
-
 // ThreatForever: a gauge, its needle swung over toward the top of the scale, in
 // scarlet.
 const scarlet = {
@@ -549,18 +500,6 @@ const ICONS = {
   TrinketMenu: {
     'icon.tga': tex(amethyst, gem, gemDetails, gemShine),
     'logo.tga': tex(amethyst, gem, gemDetails, gemShine, { tile: false, zoom: 1.35 }),
-  },
-  StealthWatch: {
-    'icon.tga': tex(dusk, eye, eyeDetails, eyeShine),
-    'logo.tga': tex(dusk, eye, eyeDetails, eyeShine, { tile: false, zoom: 1.35 }),
-  },
-  BiteTime: {
-    'icon.tga': tex(ember, jaw, jawDetails, jawShine),
-    'logo.tga': tex(ember, jaw, jawDetails, jawShine, { tile: false, zoom: 1.3 }),
-  },
-  LinkTranslate: {
-    'icon.tga': tex(copper, bubbles, bubbleDetails, bubbleShine),
-    'logo.tga': tex(copper, bubbles, bubbleDetails, bubbleShine, { tile: false, zoom: 1.3 }),
   },
   ThreatForever: {
     'icon.tga': tex(scarlet, gauge, gaugeDetails, gaugeShine),
