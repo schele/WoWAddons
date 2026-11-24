@@ -11,6 +11,7 @@ ns.Bank = Bank
 
 ns.AddDefaults({
     characters = {},
+    realmNames = {}, -- realm ID -> its name, for a client that keeps the name to itself
 })
 
 -- The keyring, wherever this client numbers it: -2 on Classic, -1 on Forever.
@@ -46,11 +47,57 @@ local SAVE_DELAY = 0.3 -- seconds of changes gathered into one save
 
 local atBank = false
 
+local function named(text)
+    return type(text) == "string" and text ~= ""
+end
+
+local function playerName()
+    return UnitName and UnitName("player") or "Unknown"
+end
+
+local function realmID()
+    local id = GetRealmID and ns.Guarded(GetRealmID)
+    if type(id) == "number" and id > 0 then
+        return id
+    end
+    return nil
+end
+
+--- The one realm a character of this name is saved on, or nil when none or
+-- several are.
+local function savedRealmOf(name)
+    local found
+    for _, character in pairs(ns.db and ns.db.characters or {}) do
+        if type(character) == "table" and character.name == name and named(character.realm) then
+            if found and found ~= character.realm then
+                return nil
+            end
+            found = character.realm
+        end
+    end
+    return found
+end
+
+--- The realm played on, by name. Forever stopped telling addons in build
+-- 71037 (2026-11-20): GetRealmName() gives "". There it is the name the game
+-- gave before, remembered under the realm's ID, or the realm this character's
+-- own earlier copy is saved on; "" when neither is known.
+function Bank.Realm()
+    local name = GetRealmName and GetRealmName()
+    local id = realmID()
+    local names = ns.db and ns.db.realmNames
+    if not named(name) then
+        name = (id and names and names[id]) or savedRealmOf(playerName()) or ""
+    end
+    if id and names and named(name) then
+        names[id] = name
+    end
+    return name
+end
+
 --- The key a character's copy is kept under: "<realm>-<name>".
 function Bank.CharacterKey()
-    local name = UnitName and UnitName("player") or "Unknown"
-    local realm = GetRealmName and GetRealmName() or ""
-    return realm .. "-" .. name
+    return Bank.Realm() .. "-" .. playerName()
 end
 
 local function numSlots(container)
@@ -194,7 +241,7 @@ function Bank.Save()
     local key = Bank.CharacterKey()
     local character = ns.db.characters[key] or {}
     character.name = UnitName and UnitName("player") or character.name
-    character.realm = GetRealmName and GetRealmName() or character.realm
+    character.realm = Bank.Realm()
     if UnitClass then
         local _, class = UnitClass("player")
         character.class = class or character.class
@@ -272,7 +319,7 @@ end
 --- The other characters on this realm whose bank is saved, the ones mail can
 -- reach, by name: each { key, name }.
 function Bank.Others()
-    local realm = GetRealmName and GetRealmName() or ""
+    local realm = Bank.Realm()
     local own = Bank.CharacterKey()
     local others = {}
     for key, character in pairs(ns.db and ns.db.characters or {}) do
@@ -337,6 +384,37 @@ end)
 local function isBankContainer(container)
     return (MAIN ~= nil and container == MAIN) or (container and container >= FIRST_BAG and container <= LAST_BAG)
 end
+
+-- Forever's build 71037 hid the realm's name, and the BankBags then saved
+-- each character's next visit under "-<name>", beside their copy under
+-- "<realm>-<name>", so the dropdown listed them twice. Each such copy is
+-- folded into the character's own, the newer kept, where the realm is known:
+-- the one played on, or the one realm the name is saved on. The realm's name
+-- is learned under its ID first, for characters new to BankBags.
+ns.OnLogin(function()
+    Bank.Realm()
+    local characters = ns.db.characters
+    local nameless = {}
+    for key, character in pairs(characters) do
+        if type(character) == "table" and not named(character.realm) and key:sub(1, 1) == "-" then
+            table.insert(nameless, key)
+        end
+    end
+    for _, key in ipairs(nameless) do
+        local character = characters[key]
+        local name = character.name or key:sub(2)
+        local realm = (name == playerName()) and Bank.Realm() or savedRealmOf(name)
+        if named(realm) then
+            local target = realm .. "-" .. name
+            local kept = characters[target]
+            if not kept or (character.saved or 0) > (kept.saved or 0) then
+                character.realm = realm
+                characters[target] = character
+            end
+            characters[key] = nil
+        end
+    end
+end)
 
 -- An earlier BankBags read Forever's keyring as the main bank, and a copy it
 -- saved keeps the keys under "Bank" until that character next visits a

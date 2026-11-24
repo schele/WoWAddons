@@ -121,6 +121,101 @@ describe("saving the bank", function()
     end)
 end)
 
+-- Forever's build 71037 (2026-11-20) stopped telling addons the realm's name:
+-- GetRealmName() gives "". Aldira's next bank visit saved her a second copy,
+-- "-Aldira", beside "CAMWOW EU5 Realm 2 PvP-Aldira", and the dropdown listed
+-- her twice.
+describe("a realm whose name the game keeps to itself", function()
+    local OLD = 1780000000
+
+    -- Logged in as Carl on Forever, whose GetRealmName gives "", with the
+    -- copies saved before; `id` is what GetRealmID gives, or none.
+    local function onForever(characters, id, setup)
+        return helpers.loggedIn(function(e)
+            withBank(e)
+            function e.GetRealmName() return "" end
+            if id then
+                function e.GetRealmID() return id end
+            end
+            e.BankBagsDB = { characters = characters }
+            if setup then setup(e) end
+        end)
+    end
+
+    local function keys(ns)
+        return table.concat(ns.Bank.Characters(), ",")
+    end
+
+    it("keeps saving under the realm the game named before", function()
+        local ns, env = onForever({
+            ["Stormwind-Carl"] = { name = "Carl", realm = "Stormwind", saved = OLD, containers = {} },
+        })
+        helpers.fire(env, "BANKFRAME_OPENED")
+        assertEqual("Stormwind-Carl", keys(ns))
+        local carl = ns.db.characters["Stormwind-Carl"]
+        assertEqual("Stormwind", carl.realm)
+        assertEqual(env.__now, carl.saved)
+        assertEqual(2, #carl.containers)
+    end)
+
+    it("folds a copy saved with no realm into the character's own, the newer kept", function()
+        local ns = onForever({
+            ["Stormwind-Carl"] = { name = "Carl", realm = "Stormwind", saved = OLD, containers = {} },
+            ["-Carl"] = { name = "Carl", realm = "", saved = OLD + 60, containers = { { id = 6, name = "Tab 1", size = 4, slots = {} } } },
+            ["Stormwind-Alt"] = { name = "Alt", realm = "Stormwind", saved = OLD + 60, containers = { { id = 6, name = "Tab 1", size = 4, slots = {} } } },
+            ["-Alt"] = { name = "Alt", realm = "", saved = OLD, containers = {} },
+        })
+        assertEqual("Stormwind-Carl,Stormwind-Alt", keys(ns))
+        local carl, alt = ns.db.characters["Stormwind-Carl"], ns.db.characters["Stormwind-Alt"]
+        assertEqual("Stormwind", carl.realm)
+        assertEqual(OLD + 60, carl.saved, "the copy with no realm was newer")
+        assertEqual(1, #carl.containers)
+        assertEqual(OLD + 60, alt.saved, "the one with its realm was newer")
+        assertEqual(1, #alt.containers)
+    end)
+
+    it("still counts the other characters on the realm", function()
+        local ns = onForever({
+            ["Stormwind-Carl"] = { name = "Carl", realm = "Stormwind", saved = OLD, containers = {} },
+            ["Stormwind-Alt"] = { name = "Alt", realm = "Stormwind", saved = OLD, containers = {} },
+            ["Argent-Zed"] = { name = "Zed", realm = "Argent", saved = OLD, containers = {} },
+        })
+        local others = ns.Bank.Others()
+        assertEqual(1, #others)
+        assertEqual("Alt", others[1].name)
+    end)
+
+    it("knows the realm by its number for a character new since", function()
+        local ns = onForever({
+            ["Stormwind-Carl"] = { name = "Carl", realm = "Stormwind", saved = OLD, containers = {} },
+        }, 93)
+        local db = ns.db
+        local newbie, env = helpers.loggedIn(function(e)
+            withBank(e)
+            function e.GetRealmName() return "" end
+            function e.GetRealmID() return 93 end
+            function e.UnitName(unit) if unit == "player" then return "Newbie" end end
+            e.BankBagsDB = db
+        end)
+        helpers.fire(env, "BANKFRAME_OPENED")
+        assertEqual("Stormwind-Newbie", newbie.Bank.CharacterKey())
+        assertEqual("Stormwind", newbie.db.characters["Stormwind-Newbie"].realm)
+        local others = newbie.Bank.Others()
+        assertEqual(1, #others)
+        assertEqual("Carl", others[1].name, "Carl's bank is on the same realm")
+    end)
+
+    it("leaves a copy with no realm alone when its name is saved on two realms", function()
+        local ns = onForever({
+            ["Stormwind-Alt"] = { name = "Alt", realm = "Stormwind", saved = OLD, containers = {} },
+            ["Argent-Alt"] = { name = "Alt", realm = "Argent", saved = OLD, containers = {} },
+            ["-Alt"] = { name = "Alt", realm = "", saved = OLD, containers = {} },
+        })
+        assertTrue(ns.db.characters["-Alt"] ~= nil)
+        assertEqual(OLD, ns.db.characters["Stormwind-Alt"].saved)
+    end)
+end)
+
 -- Forever's own list of containers, as its client hands it over: its bank is
 -- all tabs, from 6, and -1 is the keyring. Classic keeps its bank at -1 and
 -- its keyring at -2.
