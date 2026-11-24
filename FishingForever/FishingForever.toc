@@ -4,6 +4,7 @@
 ## IconTexture: Interface\AddOns\FishingForever\icon
 ## Author: Skyler
 ## Version: 0.2.0
+## X-Wago-ID: jK8WJX6y
 ## SavedVariables: FishingForeverDB
 ## SavedVariablesPerCharacter: FishingForeverCharDB
 
