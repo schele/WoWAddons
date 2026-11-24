@@ -13,8 +13,9 @@ local addonName, ns = ...
 --
 -- With auto loot on, that is press, wait for the splash, press, press.
 --
--- The key is only taken while a fishing pole is in your hands (or always,
--- if you ask), and never in combat: out of it, the key is yours again.
+-- The key is only taken while a fishing pole is in your hands, and never in
+-- combat: out of it, the key is yours again. (WoW Forever has no fishing
+-- without a pole, so there is no switch to take it without one.)
 
 local Fishing = {}
 ns.Fishing = Fishing
@@ -23,9 +24,6 @@ ns.AddDefaults({
     fishing = {
         enabled = true,
         key = "F",
-        -- Take the key without a pole equipped, for a client that lets you
-        -- fish without one.
-        withoutPole = false,
         -- Turn auto loot on while fishing, and back to how it was after.
         autoLoot = true,
     },
@@ -53,7 +51,7 @@ local SOFT_TARGET_CVARS = {
 
 local guarded = ns.Guarded
 
-local owner = CreateFrame("Frame", "FishScaleBindingOwner")
+local owner = CreateFrame("Frame", "FishingForeverBindingOwner")
 local castButton
 
 local state = {
@@ -104,6 +102,7 @@ local function isFishing(spellID)
         return spellID == FISHING_SPELL_ID or spellNameOf(spellID) == Fishing.SpellName()
     end, false)
 end
+Fishing.IsFishingSpell = isFishing
 
 --- Whether a fishing pole is in the main hand.
 function Fishing.PoleEquipped()
@@ -119,7 +118,7 @@ function Fishing.PoleEquipped()
     end, false)
 end
 
---- Whether FishScale should be holding the key right now.
+--- Whether FishingForever should be holding the key right now.
 function Fishing.Active()
     local db = ns.db and ns.db.fishing
     if not (db and db.enabled) then
@@ -128,7 +127,7 @@ function Fishing.Active()
     if InCombatLockdown() then
         return false
     end
-    return db.withoutPole or Fishing.PoleEquipped()
+    return Fishing.PoleEquipped()
 end
 
 local function setCVar(name, value)
@@ -202,7 +201,7 @@ end
 
 --- Build the button the key clicks to cast. Once, at login, out of combat.
 local function createCastButton()
-    castButton = CreateFrame("Button", "FishScaleCastButton", UIParent, "SecureActionButtonTemplate")
+    castButton = CreateFrame("Button", "FishingForeverCastButton", UIParent, "SecureActionButtonTemplate")
     castButton:SetSize(1, 1)
     castButton:SetAlpha(0)
     castButton:EnableMouse(false)
@@ -265,6 +264,11 @@ local function changed()
     if ns.SettingsPanel then
         ns.SettingsPanel.Refresh()
     end
+    -- The skill bar shows where FishingForever fishes: with a pole, or without
+    -- one when told to.
+    if ns.SkillBar then
+        ns.SkillBar.Refresh()
+    end
 end
 
 --- Change the key. Anything the client accepts as a binding: F, SHIFT-F,
@@ -285,15 +289,9 @@ function Fishing.SetKey(key)
     return true
 end
 
---- Turn FishScale on, or off and give the key back.
+--- Turn FishingForever on, or off and give the key back.
 function Fishing.SetEnabled(value)
     ns.db.fishing.enabled = value and true or false
-    Fishing.Refresh()
-    changed()
-end
-
-function Fishing.SetWithoutPole(value)
-    ns.db.fishing.withoutPole = value and true or false
     Fishing.Refresh()
     changed()
 end
@@ -313,7 +311,7 @@ local function onOff(value)
     return value and "on" or "off"
 end
 
-ns.RegisterCommand("key", "Set the fishing key, e.g. /fs key F", function(rest)
+ns.RegisterCommand("key", "Set the fishing key, e.g. /ff key F", function(rest)
     if rest == "" then
         ns.Print("Fishing key: " .. ns.db.fishing.key)
     elseif Fishing.SetKey(rest) then
@@ -321,19 +319,14 @@ ns.RegisterCommand("key", "Set the fishing key, e.g. /fs key F", function(rest)
     end
 end)
 
-ns.RegisterCommand("on", "Turn FishScale on", function()
+ns.RegisterCommand("on", "Turn FishingForever on", function()
     Fishing.SetEnabled(true)
     ns.Print("On.")
 end)
 
-ns.RegisterCommand("off", "Turn FishScale off and give the key back", function()
+ns.RegisterCommand("off", "Turn FishingForever off and give the key back", function()
     Fishing.SetEnabled(false)
     ns.Print("Off.")
-end)
-
-ns.RegisterCommand("nopole", "Take the key even without a fishing pole equipped", function()
-    Fishing.SetWithoutPole(not ns.db.fishing.withoutPole)
-    ns.Print("Without a pole: " .. onOff(ns.db.fishing.withoutPole) .. ".")
 end)
 
 ns.RegisterCommand("autoloot", "Turn auto loot on while fishing", function()
@@ -345,14 +338,13 @@ ns.RegisterCommand("status", "Show what the key is doing", function()
     local db = ns.db.fishing
     local action = Fishing.KeyAction()
     ns.Print(string.format(
-        "%s. Key %s: %s. Pole equipped: %s. Without a pole: %s. Auto loot: %s.",
+        "%s. Key %s: %s. Pole equipped: %s. Auto loot: %s.",
         db.enabled and "On" or "Off",
         db.key,
         action == "cast" and "casts " .. Fishing.SpellName()
             or action == "interact" and "picks up the bobber"
             or "not taken",
         Fishing.PoleEquipped() and "yes" or "no",
-        onOff(db.withoutPole),
         onOff(db.autoLoot)
     ))
 end)

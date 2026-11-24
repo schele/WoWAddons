@@ -1,0 +1,18 @@
+## Interface: 11509, 16001
+## Title: FishingForever
+## Notes: One key to cast, loot and recast while fishing, a bar toward your next Fishing point, and stats of every catch by zone and skill.
+## IconTexture: Interface\AddOns\FishingForever\icon
+## Author: Skyler
+## Version: 0.2.0
+## SavedVariables: FishingForeverDB
+## SavedVariablesPerCharacter: FishingForeverCharDB
+
+FishingForever.lua
+Fishing.lua
+Skill.lua
+Water.lua
+Stats.lua
+SkillBar.lua
+StatsPanel.lua
+Settings.lua
+Minimap.lua

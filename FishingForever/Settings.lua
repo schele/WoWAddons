@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
--- FishScale's page in the game's options window: the switches /fs has, as
+-- FishingForever's page in the game's options window: the switches /ff has, as
 -- checkboxes, and the fishing key as a button that takes the next key pressed.
 
 local PADDING = 16
@@ -131,9 +131,11 @@ function Panel.Refresh()
     end
     local db = ns.db.fishing
     Panel.enabled:SetChecked(db.enabled)
-    Panel.withoutPole:SetChecked(db.withoutPole)
     Panel.autoLoot:SetChecked(db.autoLoot)
     Panel.minimap:SetChecked(not ns.db.minimap.hide)
+    Panel.skillBar:SetChecked(ns.db.skillBar.shown)
+    Panel.skillBarLocked:SetChecked(ns.db.skillBar.locked)
+    Panel.skillBarStats:SetChecked(ns.db.skillBar.stats)
     if not capturing then
         Panel.key:SetText(db.key)
     end
@@ -155,7 +157,7 @@ local function ensureBuilt()
 
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
-    title:SetText("FishScale")
+    title:SetText("FishingForever")
 
     local metadata = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
     local version = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
@@ -169,7 +171,8 @@ local function ensureBuilt()
     hint:SetText(
         "One key for the whole fishing loop: it casts, picks up the bobber, and "
         .. "waits while you loot. Never in combat: when a fight starts, the key "
-        .. "goes back to its usual job."
+        .. "goes back to its usual job. The skill bar counts your catches toward "
+        .. "your next Fishing point."
     )
 
     -- Rows hang off the bottom of the hint rather than a fixed height on the
@@ -187,11 +190,6 @@ local function ensureBuilt()
     Panel.key = addKeyButton(y)
     y = y - ROW_HEIGHT
 
-    Panel.withoutPole = addCheckbox("Take it without a fishing pole too", y, PADDING, function(value)
-        ns.Fishing.SetWithoutPole(value)
-    end)
-    y = y - ROW_HEIGHT
-
     Panel.autoLoot = addCheckbox("Turn auto loot on while fishing", y, PADDING, function(value)
         ns.Fishing.SetAutoLoot(value)
     end)
@@ -201,6 +199,31 @@ local function ensureBuilt()
     Panel.minimap = addCheckbox("Show the minimap button", y, PADDING, function(value)
         ns.MinimapButton.SetHidden(not value)
     end)
+    y = y - ROW_HEIGHT
+
+    Panel.skillBar = addCheckbox("Show the skill bar while a pole is equipped", y, PADDING, function(value)
+        ns.SkillBar.SetShown(value)
+    end)
+    y = y - ROW_HEIGHT
+
+    Panel.skillBarLocked = addCheckbox("Lock it in place", y, INDENT, function(value)
+        ns.SkillBar.SetLocked(value)
+    end)
+    y = y - ROW_HEIGHT
+
+    Panel.skillBarStats = addCheckbox("Open your fishing stats around it", y, INDENT, function(value)
+        ns.StatsPanel.SetShown(value)
+    end)
+    y = y - ROW_HEIGHT
+
+    local reset = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    reset:SetPoint("TOPLEFT", Panel.hint, "BOTTOMLEFT", INDENT - PADDING + 4, y)
+    reset:SetSize(140, 22)
+    reset:SetText("Reset its position")
+    reset:SetScript("OnClick", function()
+        ns.SkillBar.ResetPosition()
+    end)
+    Panel.skillBarReset = reset
 
     Panel.Refresh()
 end
@@ -212,7 +235,7 @@ local function register()
     -- shows it when the category is opened, and that is when it gets filled.
     panel = CreateFrame("Frame", nil, UIParent)
     panel:Hide()
-    panel.name = "FishScale"
+    panel.name = "FishingForever"
     Panel.panel = panel
 
     panel:SetScript("OnShow", function()
@@ -223,7 +246,7 @@ local function register()
     -- gone.
     panel:SetScript("OnHide", stopCapture)
 
-    category = Settings.RegisterCanvasLayoutCategory(panel, "FishScale")
+    category = Settings.RegisterCanvasLayoutCategory(panel, "FishingForever")
     Settings.RegisterAddOnCategory(category)
 end
 
@@ -284,7 +307,7 @@ end
 --- Open the page in the game's options window.
 function ns.OpenSettings()
     if not category then
-        ns.Print("This client has no settings panel. Use /fs for commands.")
+        ns.Print("This client has no settings panel. Use /ff for commands.")
         return
     end
 

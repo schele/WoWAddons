@@ -3,21 +3,38 @@ local stub = require("wow_stub")
 local M = {}
 
 M.FILES = {
-    "FishScale.lua",
+    "FishingForever.lua",
     "Fishing.lua",
+    "Skill.lua",
+    "Water.lua",
+    "Stats.lua",
+    "SkillBar.lua",
+    "StatsPanel.lua",
     "Settings.lua",
     "Minimap.lua",
 }
 
+local function exists(path)
+    local file = io.open(path)
+    if file then
+        file:close()
+        return true
+    end
+    return false
+end
+
 --- Load the addon's files into a stubbed environment, the way WoW would:
--- in .toc order, each chunk receiving (addonName, privateTable).
+-- in .toc order, each chunk receiving (addonName, privateTable). Files not
+-- written yet are skipped.
 function M.loadAddon(files)
     local env = stub.newEnv()
     local ns = {}
 
     for _, path in ipairs(files or M.FILES) do
-        local chunk = assert(loadfile(path, "t", env))
-        chunk("FishScale", ns)
+        if exists(path) then
+            local chunk = assert(loadfile(path, "t", env))
+            chunk("FishingForever", ns)
+        end
     end
 
     return ns, env
@@ -39,12 +56,12 @@ end
 
 --- Run the real login sequence.
 function M.login(ns, env)
-    M.fire(env, "ADDON_LOADED", "FishScale")
+    M.fire(env, "ADDON_LOADED", "FishingForever")
     M.fire(env, "PLAYER_LOGIN")
 end
 
 function M.command(env, text)
-    env.SlashCmdList.FISHSCALE(text)
+    env.SlashCmdList.FISHINGFOREVER(text)
 end
 
 function M.printed(env)

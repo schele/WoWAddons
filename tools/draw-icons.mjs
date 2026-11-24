@@ -189,7 +189,7 @@ const chestDetails = union(
 );
 const chestShine = roundBox(28, 22, 9, 1.7, 1.7);
 
-// FishScale: a fish, in orange.
+// FishingForever: a fish, in orange.
 const orange = {
   dark: [20, 11, 4], glow: [110, 62, 20], ring: [232, 148, 58],
   light: [255, 214, 146], mid: [240, 150, 64], outline: [84, 42, 10], detail: [110, 56, 16],
@@ -444,7 +444,7 @@ const ICONS = {
     'icon.tga': tex(crimson, chest, chestDetails, chestShine),
     'minimap.tga': tex(crimson, chest, chestDetails, chestShine, { tile: false, zoom: 1.4 }),
   },
-  FishScale: {
+  FishingForever: {
     'icon.tga': tex(orange, fish, fishDetails, fishShine),
     'minimap.tga': tex(orange, fish, fishDetails, fishShine, { tile: false, zoom: 1.3 }),
   },

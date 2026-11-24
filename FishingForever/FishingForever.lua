@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
-ns.PREFIX = "|cff66ccffFishScale|r"
+ns.PREFIX = "|cff66ccffFishingForever|r"
 
 -- Defaults are contributed by each file at load time, so every piece of config
 -- lives next to the code that reads it and this file never learns the others.
@@ -47,12 +47,12 @@ function ns.Guarded(fn, whenUnknown)
 end
 
 local function ensureDatabase()
-    if type(FishScaleDB) ~= "table" then
-        FishScaleDB = {}
+    if type(FishingForeverDB) ~= "table" then
+        FishingForeverDB = {}
     end
 
-    applyDefaults(FishScaleDB, defaults)
-    ns.db = FishScaleDB
+    applyDefaults(FishingForeverDB, defaults)
+    ns.db = FishingForeverDB
 end
 
 -- Slash commands. Each file registers its own, so a feature owns its commands
@@ -74,7 +74,7 @@ local function showHelp()
     table.sort(names)
 
     for _, name in ipairs(names) do
-        ns.Print(string.format("/fs %s - %s", name, commands[name].help))
+        ns.Print(string.format("/ff %s - %s", name, commands[name].help))
     end
 end
 
@@ -99,9 +99,9 @@ local function runCommand(msg)
     showHelp()
 end
 
-SLASH_FISHSCALE1 = "/fishscale"
-SLASH_FISHSCALE2 = "/fs"
-SlashCmdList.FISHSCALE = runCommand
+SLASH_FISHINGFOREVER1 = "/fishingforever"
+SLASH_FISHINGFOREVER2 = "/ff"
+SlashCmdList.FISHINGFOREVER = runCommand
 
 -- Work to do once the player is in the world and the database exists.
 local loginHandlers = {}
@@ -124,6 +124,6 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
             handler()
         end
 
-        ns.Print("Loaded. Type /fs for commands.")
+        ns.Print("Loaded. Type /ff for commands.")
     end
 end)

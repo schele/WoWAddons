@@ -44,7 +44,7 @@ describe("the fishing key", function()
     it("casts Fishing while a pole is equipped", function()
         local ns, env = loggedIn(POLE)
 
-        assertEqual("FishScaleCastButton", binding(env).button)
+        assertEqual("FishingForeverCastButton", binding(env).button)
         assertEqual("LeftButton", binding(env).mouseButton)
     end)
 
@@ -59,7 +59,7 @@ describe("the fishing key", function()
 
         env.__mainHand = POLE
         helpers.fire(env, "PLAYER_EQUIPMENT_CHANGED", 16)
-        assertEqual("FishScaleCastButton", binding(env).button, "pole on")
+        assertEqual("FishingForeverCastButton", binding(env).button, "pole on")
 
         env.__mainHand = STAFF
         helpers.fire(env, "PLAYER_EQUIPMENT_CHANGED", 16)
@@ -80,7 +80,7 @@ describe("the fishing key", function()
         castStart(env)
         castStop(env)
 
-        assertEqual("FishScaleCastButton", binding(env).button)
+        assertEqual("FishingForeverCastButton", binding(env).button)
     end)
 
     it("recognises any rank of Fishing, by name", function()
@@ -95,10 +95,10 @@ describe("the fishing key", function()
         local ns, env = loggedIn(POLE)
 
         castStart(env, 774)
-        assertEqual("FishScaleCastButton", binding(env).button, "another spell")
+        assertEqual("FishingForeverCastButton", binding(env).button, "another spell")
 
         helpers.fire(env, "UNIT_SPELLCAST_CHANNEL_START", "party1", "guid", 7620)
-        assertEqual("FishScaleCastButton", binding(env).button, "someone else fishing")
+        assertEqual("FishingForeverCastButton", binding(env).button, "someone else fishing")
     end)
 
     it("lets go while the loot window is open, so it cannot recast over the loot", function()
@@ -108,7 +108,7 @@ describe("the fishing key", function()
         assertNil(binding(env), "loot open")
 
         helpers.fire(env, "LOOT_CLOSED")
-        assertEqual("FishScaleCastButton", binding(env).button, "loot closed")
+        assertEqual("FishingForeverCastButton", binding(env).button, "loot closed")
     end)
 
     it("gives the key back as a fight starts, and takes it again after", function()
@@ -126,15 +126,16 @@ describe("the fishing key", function()
 
         env.__inCombat = false
         helpers.fire(env, "PLAYER_REGEN_ENABLED")
-        assertEqual("FishScaleCastButton", binding(env).button, "after the fight")
+        assertEqual("FishingForeverCastButton", binding(env).button, "after the fight")
     end)
 
-    it("can take the key without a pole, for a client that fishes without one", function()
+    it("never takes the key without a pole: WoW Forever cannot fish without one", function()
         local ns, env = loggedIn(nil)
 
         helpers.command(env, "nopole")
 
-        assertEqual("FishScaleCastButton", binding(env).button)
+        assertMatch("Unknown command", helpers.printed(env))
+        assertNil(binding(env))
     end)
 
     it("moves to a new key, letting go of the old one", function()
@@ -143,7 +144,7 @@ describe("the fishing key", function()
         helpers.command(env, "key shift-g")
 
         assertNil(binding(env, "F"))
-        assertEqual("FishScaleCastButton", binding(env, "SHIFT-G").button)
+        assertEqual("FishingForeverCastButton", binding(env, "SHIFT-G").button)
     end)
 
     it("gives the key back when turned off", function()
@@ -153,7 +154,7 @@ describe("the fishing key", function()
         assertNil(binding(env), "off")
 
         helpers.command(env, "on")
-        assertEqual("FishScaleCastButton", binding(env).button, "on again")
+        assertEqual("FishingForeverCastButton", binding(env).button, "on again")
     end)
 end)
 
@@ -205,11 +206,11 @@ describe("commands", function()
         assertMatch("Key F: casts Fishing", helpers.printed(env))
     end)
 
-    it("lists the commands for a bare /fs", function()
+    it("lists the commands for a bare /ff", function()
         local ns, env = loggedIn(POLE)
 
         helpers.command(env, "")
 
-        assertMatch("/fs key", helpers.printed(env))
+        assertMatch("/ff key", helpers.printed(env))
     end)
 end)

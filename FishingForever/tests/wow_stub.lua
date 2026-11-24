@@ -30,6 +30,11 @@ local function makeWidget(kind, parent, template)
     function widget:GetFrameLevel() return self.frameLevel or 1 end
     function widget:RegisterForDrag(...) self.drag = { ... } end
     function widget:SetHighlightTexture(value) self.highlightTexture = value end
+    function widget:SetNormalTexture(value) self.normalTexture = value end
+    function widget:SetPushedTexture(value) self.pushedTexture = value end
+    function widget:SetDisabledTexture(value) self.disabledTexture = value end
+    function widget:SetItemByID(id) self.itemID = id end
+    function widget:SetVertexColor(...) self.vertexColor = { ... } end
     function widget:SetTexture(value) self.texture = value end
     function widget:GetTexture() return self.texture end
     -- Showing and hiding fire their scripts, and only on a real transition,
@@ -51,7 +56,11 @@ local function makeWidget(kind, parent, template)
     function widget:GetCenter() return self.centerX or 0, self.centerY or 0 end
     function widget:GetEffectiveScale() return 1 end
     function widget:CreateTexture() return makeWidget("Texture", self) end
-    function widget:SetOwner(owner, anchor) self.owner, self.anchor = owner, anchor end
+    -- A tooltip starts over when it is given an owner.
+    function widget:SetOwner(owner, anchor)
+        self.owner, self.anchor = owner, anchor
+        self.text, self.lines = nil, nil
+    end
     function widget:GetOwner() return self.owner end
     function widget:SetText(value) self.text = value end
     -- For the settings page.
@@ -72,6 +81,15 @@ local function makeWidget(kind, parent, template)
         return fontString
     end
     function widget:SetWidth(value) self.width = value end
+    function widget:SetHeight(value) self.height = value end
+    function widget:GetHeight() return self.height or 0 end
+    function widget:GetBottom() return self.bottom end
+    function widget:GetTop() return self.top end
+    function widget:SetParent(parent) self.parent = parent end
+    function widget:SetWordWrap(value) self.wordWrap = value end
+    function widget:EnableMouseWheel(value) self.mouseWheel = value end
+    function widget:SetEnabled(value) self.enabled = value and true or false end
+    function widget:IsEnabled() return self.enabled ~= false end
     function widget:SetJustifyH(value) self.justifyH = value end
     function widget:SetAllPoints() end
     function widget:SetChecked(value) self.checked = value and true or false end
@@ -86,6 +104,21 @@ local function makeWidget(kind, parent, template)
     function widget:EnableMouse(value) self.mouseEnabled = value end
     function widget:RegisterForClicks(...) self.clicks = { ... } end
     function widget:GetName() return self.frameName end
+    -- For a status bar.
+    function widget:SetMinMaxValues(low, high) self.minValue, self.maxValue = low, high end
+    function widget:SetValue(value) self.value = value end
+    function widget:GetValue() return self.value end
+    function widget:SetStatusBarTexture(value) self.statusBarTexture = value end
+    function widget:SetStatusBarColor(r, g, b) self.barColor = { r, g, b } end
+    function widget:SetColorTexture(...) self.color = { ... } end
+    function widget:SetTextColor(...) self.textColor = { ... } end
+    function widget:ClearLines() self.lines = {} end
+    -- For a frame dragged about: StartMoving holds it to the cursor, and the
+    -- test moves it by setting a new point before StopMovingOrSizing.
+    function widget:SetMovable(value) self.movable = value end
+    function widget:SetClampedToScreen(value) self.clamped = value end
+    function widget:StartMoving() self.moving = true end
+    function widget:StopMovingOrSizing() self.moving = false end
     function widget:SetAttribute(name, value) self.attributes[name] = value end
     function widget:GetAttribute(name) return self.attributes[name] end
 
@@ -160,6 +193,10 @@ function stub.newEnv()
         local frame = makeWidget(kind or "Frame", parent, template)
         frame.frameName = name
         table.insert(env.__frames, frame)
+        if parent then
+            parent.children = parent.children or {}
+            table.insert(parent.children, frame)
+        end
         if name then env[name] = frame end
         return frame
     end
@@ -209,6 +246,90 @@ function stub.newEnv()
         GetSpellName = function(id) return env.__spellNames[id] end,
     }
 
+    -- The Fishing skill, as Forever's C_SkillInfo reads it by its ID, 356.
+    -- Nil when the character has not learned it.
+    -- `modifier` is what a lure or gear adds.
+    env.__fishing = { rank = 231, maxRank = 300 }
+    env.C_SkillInfo = {
+        GetSkillLineInfoByID = function(id)
+            local fishing = env.__fishing
+            if id ~= 356 or not fishing then return nil end
+            return {
+                skillID = 356, name = "Fishing", isHeader = false, isCollapsed = false,
+                rank = fishing.rank, maxRank = fishing.maxRank, tempPoints = 0,
+                modifier = fishing.modifier or 0,
+            }
+        end,
+    }
+
+    -- Whether the loot window open is a catch.
+    env.__fishingLoot = false
+    function env.IsFishingLoot() return env.__fishingLoot end
+    env.ERR_FISH_ESCAPED = "Your fish got away!"
+    env.SPELL_FAILED_LOW_CASTLEVEL = "Skill not high enough"
+
+    -- The client's clock, in seconds; a test moves it on by hand.
+    env.__now = 1000
+    function env.GetTime() return env.__now end
+
+    -- The zone the player stands in: its level range as the world map shows
+    -- it (nil for a map without one), the subzone, and where in it.
+    env.__map = { id = 1424, name = "Hillsbrad Foothills", levels = { 20, 30 } }
+    env.__subzone = "Southshore"
+    env.__position = { 0.5, 0.6 }
+    env.C_Map = {
+        GetBestMapForUnit = function(unit)
+            return unit == "player" and env.__map and env.__map.id or nil
+        end,
+        GetMapInfo = function(id)
+            if env.__map and env.__map.id == id then
+                return { mapID = id, name = env.__map.name }
+            end
+        end,
+        GetMapLevels = function(id)
+            local map = env.__map
+            if map and map.id == id and map.levels then
+                return map.levels[1], map.levels[2], 0, 0
+            end
+        end,
+        GetPlayerMapPosition = function(id, unit)
+            if unit == "player" and env.__position then
+                local x, y = env.__position[1], env.__position[2]
+                return { GetXY = function() return x, y end }
+            end
+        end,
+    }
+    function env.GetSubZoneText() return env.__subzone end
+
+    -- The character: Forever hands a surname after the name.
+    env.__level = 34
+    function env.UnitName(unit)
+        if unit == "player" then return "Aldira", "Moonclaw" end
+    end
+    function env.UnitLevel(unit)
+        if unit == "player" then return env.__level end
+    end
+
+    -- The clock time() reads.
+    env.__clock = 1764000000
+    function env.time() return env.__clock end
+
+    -- The loot window: { id, name, count } a slot, as the client lists it.
+    env.__loot = {}
+    function env.GetNumLootItems() return #env.__loot end
+    function env.GetLootSlotInfo(slot)
+        local item = env.__loot[slot]
+        if item then return 133888, item.name, item.count or 1, nil, 1 end
+    end
+    function env.GetLootSlotLink(slot)
+        local item = env.__loot[slot]
+        if item then
+            return string.format("|cffffffff|Hitem:%d::::::::34:::::|h[%s]|h|r", item.id, item.name)
+        end
+    end
+
+    env.UISpecialFrames = {}
+
     -- Equipment: the main hand holds whatever item ID is put here.
     env.__mainHand = nil
     env.__items = {
@@ -224,7 +345,15 @@ function stub.newEnv()
             if not item then return nil end
             return id, "Weapon", "", "INVTYPE_2HWEAPON", 0, item.classID, item.subclassID
         end,
+        GetItemIconByID = function(id) return 133888 end,
+        GetItemQualityByID = function(id) return 1 end,
     }
+    env.ITEM_QUALITY_COLORS = { [1] = { r = 1, g = 1, b = 1 } }
+    -- The quest log's colours for a level against the player's.
+    function env.GetQuestDifficultyColor(level)
+        return { r = 1, g = level > env.__level and 0.5 or 1, b = 0 }
+    end
+    env.QuestDifficultyColors = { difficult = { r = 1, g = 1, b = 0 } }
 
     return env
 end

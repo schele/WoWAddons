@@ -8,7 +8,7 @@ World of Warcraft addons, one folder each.
 | [UrlCopy](UrlCopy/) | Makes URLs spoken in chat clickable, and opens the one you click in a box you can copy from |
 | [ClickHeal](ClickHeal/) | A row of spell buttons beside every party member, so healing or dispelling someone is one click |
 | [TrinketMenu](TrinketMenu/) | Every trinket you are carrying, on a bar: left-click to equip in slot 1, right-click for slot 2 |
-| [FishScale](FishScale/) | One key to cast, pick up the bobber and recast while fishing |
+| [FishingForever](FishingForever/) | One key to cast, pick up the bobber and recast while fishing, a bar toward your next Fishing point, and stats of every catch by zone and skill |
 | [BossLoot](BossLoot/) | Every dungeon and raid, its bosses and their loot with drop chances, plus notable trash and chest drops |
 | [GatherMap](GatherMap/) | Pins on the world map and minimap for every vein you have mined and herb you have picked |
 | [RankUp](RankUp/) | When you train a new rank, offers to put it on every action button that still holds an older one |

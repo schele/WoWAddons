@@ -1,7 +1,7 @@
 local addonName, ns = ...
 
 -- A round button on the minimap's rim: click for the settings, right-click to
--- turn FishScale on or off, drag to slide it round the rim. Built by hand, as
+-- turn FishingForever on or off, drag to slide it round the rim. Built by hand, as
 -- BossLoot's is.
 
 local MinimapButton = {}
@@ -14,7 +14,7 @@ ns.AddDefaults({
 
 local SIZE = 31
 local RIM_OFFSET = 10 -- how far past the minimap's edge the button's centre sits
-local ICON = "Interface\\AddOns\\FishScale\\minimap"
+local ICON = "Interface\\AddOns\\FishingForever\\minimap"
 
 local button
 
@@ -61,7 +61,7 @@ local function showTooltip(self)
         return
     end
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetText("FishScale: " .. (ns.db.fishing.enabled and "|cff40ff40on|r" or "|cffff4040off|r"))
+    GameTooltip:SetText("FishingForever: " .. (ns.db.fishing.enabled and "|cff40ff40on|r" or "|cffff4040off|r"))
     GameTooltip:AddLine("Click to open or close the settings.", 1, 1, 1)
     GameTooltip:AddLine("Right-click to turn on or off, drag to move.", 1, 1, 1)
     GameTooltip:Show()
@@ -83,7 +83,7 @@ local function onClick(self, mouseButton)
 end
 
 local function create()
-    button = CreateFrame("Button", "FishScaleMinimapButton", Minimap)
+    button = CreateFrame("Button", "FishingForeverMinimapButton", Minimap)
     button:SetSize(SIZE, SIZE)
     button:SetFrameStrata("MEDIUM")
     button:SetFrameLevel(8)
@@ -152,7 +152,7 @@ end
 ns.RegisterCommand("minimap", "Hide or show the minimap button", function()
     MinimapButton.SetHidden(not ns.db.minimap.hide)
     if ns.db.minimap.hide then
-        ns.Print("Minimap button hidden. /fs minimap brings it back.")
+        ns.Print("Minimap button hidden. /ff minimap brings it back.")
     else
         ns.Print("Minimap button shown.")
     end
