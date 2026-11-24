@@ -82,9 +82,9 @@ type another over it if you like.
 Pick a default recipient, usually your bank character, and every new mail
 starts with that name in **To**.
 
-- **The arrow** at the right end of the To box lists your other characters
-  on this realm and side, each in its class colour, with the default
-  picked. Pick one and it becomes the default and goes in To now. A name
+- **The arrow** beside the To box, just before "Postage:", lists your other
+  characters on this realm and side, each in its class colour, with the
+  default picked. Pick one and it becomes the default and goes in To now. A name
   you have typed in To is on the list too, for a character MailHandler
   has not seen yet; **Nobody** takes the default away.
 - The name goes in To when the Send Mail tab opens, and again once a mail

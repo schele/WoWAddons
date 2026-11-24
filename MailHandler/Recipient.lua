@@ -227,13 +227,38 @@ local function showTooltip(button)
     GameTooltip:Show()
 end
 
+--- The "Postage:" label: a nameless text hanging off the left of the postage
+-- amount, top right of the Send Mail tab, so it moves as the amount grows.
+local function postageLabel()
+    local frame = SendMailCostMoneyFrame
+    if not (frame and frame.GetRegions) then
+        return nil
+    end
+    for _, region in ipairs({ frame:GetRegions() }) do
+        if region.GetObjectType and region:GetObjectType() == "FontString"
+            and region.GetText and region:GetText() == SEND_MAIL_COST then
+            return region
+        end
+    end
+    return nil
+end
+
 local function makeButton()
     if Recipient.button or not (SendMailFrame and SendMailNameEditBox) then
         return
     end
     local button = CreateFrame("Button", "MailHandlerRecipientButton", SendMailFrame)
-    button:SetSize(24, 24)
-    button:SetPoint("LEFT", SendMailNameEditBox, "RIGHT", 2, 0)
+    -- Between the To box and "Postage:", which on Forever are only about
+    -- twenty apart: hung off the label, it ends just before it, whatever the
+    -- postage, where hung off the box it ran over the label's first letters.
+    local label = postageLabel()
+    if label then
+        button:SetSize(18, 18)
+        button:SetPoint("RIGHT", label, "LEFT", -2, 0)
+    else
+        button:SetSize(24, 24)
+        button:SetPoint("LEFT", SendMailNameEditBox, "RIGHT", 2, 0)
+    end
     button:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
     button:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Down")
     button:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")

@@ -475,6 +475,13 @@ function stub.newEnv()
     env.SendMailCODButton = makeWidget(env, "CheckButton", env.SendMailFrame)
     env.SendMailSendMoneyButton.checked = true
     env.SendMailMailButton = makeWidget(env, "Button", env.SendMailFrame, "UIPanelButtonTemplate")
+    -- The postage, top right of the tab, its "Postage:" label hanging off its
+    -- left and so moving with the amount.
+    env.SEND_MAIL_COST = "Postage:"
+    env.SendMailCostMoneyFrame = makeWidget(env, "Frame", env.SendMailFrame)
+    env.__postageLabel = env.SendMailCostMoneyFrame:CreateFontString()
+    env.__postageLabel:SetText(env.SEND_MAIL_COST)
+    env.__postageLabel:SetPoint("RIGHT", env.SendMailCostMoneyFrame, "LEFT", -3, 0)
     env.SendMailNameEditBox.text = ""
     env.SendMailSubjectEditBox.text = ""
     env.MailEditBox.text = ""

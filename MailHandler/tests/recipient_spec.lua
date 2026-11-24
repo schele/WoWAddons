@@ -202,12 +202,26 @@ describe("the default", function()
 end)
 
 describe("the arrow beside To", function()
-    it("sits at the right end of the To box", function()
+    it("ends just before \"Postage:\", so it never covers it, whatever the postage", function()
         local ns, env = account()
 
-        local point, relativeTo, relativePoint = arrow(ns):GetPoint(1)
+        local point, relativeTo, relativePoint, x = arrow(ns):GetPoint(1)
+        assertEqual("RIGHT", point)
+        assertEqual(env.__postageLabel, relativeTo)
+        assertEqual("LEFT", relativePoint)
+        assertTrue(x < 0, "a gap before the label")
+        assertTrue(arrow(ns):GetWidth() <= 18, "small enough to fit between the To box and the label")
+    end)
+
+    it("sits at the right end of the To box on a client without the postage label", function()
+        local ns2, env2 = helpers.loadAddon(function(e)
+            e.SendMailCostMoneyFrame = nil
+        end)
+        helpers.login(env2)
+
+        local point, relativeTo, relativePoint = ns2.Recipient.button:GetPoint(1)
         assertEqual("LEFT", point)
-        assertEqual(env.SendMailNameEditBox, relativeTo)
+        assertEqual(env2.SendMailNameEditBox, relativeTo)
         assertEqual("RIGHT", relativePoint)
     end)
 
