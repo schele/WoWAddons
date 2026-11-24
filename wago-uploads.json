@@ -4,13 +4,17 @@
                        "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
                    },
     "BankBags":  {
-                     "version":  "0.3.2",
-                     "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
+                     "version":  "0.3.3",
+                     "commit":  "1fe26ba22aef51552792493960a75f31f5c4ef08"
                  },
     "ClickHeal":  {
                       "version":  "0.2.2",
                       "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
                   },
+    "FishingForever":  {
+                           "version":  "0.2.0",
+                           "commit":  "0674d943a975428b999328be3e54ec0b8558c838"
+                       },
     "ForeverPanel":  {
                          "version":  "0.7.1",
                          "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
