@@ -24,8 +24,8 @@
                      "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
                  },
     "MailHandler":  {
-                        "version":  "0.3.1",
-                        "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
+                        "version":  "0.3.2",
+                        "commit":  "362cedf15e5a937fff5a388cf88e1e8b8b9e2239"
                     },
     "RankUp":  {
                    "version":  "0.1.1",
