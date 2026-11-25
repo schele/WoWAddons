@@ -18,8 +18,9 @@ ns.SettingsPanel = Panel
 
 local panel, category, built
 
--- True while the key button is waiting for a key.
-local capturing = false
+-- The key button waiting for a key, or nil. One at a time: clicking another
+-- lets the first go.
+local capturing
 
 --- Let keys we are not interested in carry on to the rest of the UI. A frame
 -- with an OnKeyDown script eats every key unless it says otherwise, and one
@@ -59,36 +60,41 @@ local function stopCapture()
     if not capturing then
         return
     end
-    capturing = false
-    Panel.key:EnableKeyboard(false)
-    passKeysThrough(Panel.key, true)
-    Panel.key:SetText(ns.db.fishing.key)
+    local button = capturing
+    capturing = nil
+    button:EnableKeyboard(false)
+    passKeysThrough(button, true)
+    button:SetText(button.current())
 end
 
-local function addKeyButton(y)
+--- A row with a key button: it shows `current()`, and after a click hands
+-- the next key pressed to `set`.
+local function addKeyButton(text, y, current, set)
     local label = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     label:SetPoint("TOPLEFT", Panel.hint, "BOTTOMLEFT", INDENT - PADDING, y - 4)
-    label:SetText("Fishing key")
+    label:SetText(text)
 
     local button = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     button:SetPoint("TOPLEFT", Panel.hint, "BOTTOMLEFT", INDENT - PADDING + 90, y)
     button:SetSize(120, 22)
     button:EnableKeyboard(false)
     passKeysThrough(button, true)
+    button.current = current
 
     local hint = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     hint:SetPoint("LEFT", button, "RIGHT", 8, 0)
     hint:SetText("Click, then press the key.")
 
     button:SetScript("OnClick", function(self)
-        capturing = true
+        stopCapture()
+        capturing = self
         self:SetText("Press a key")
         self:EnableKeyboard(true)
         passKeysThrough(self, false)
     end)
 
     button:SetScript("OnKeyDown", function(self, key)
-        if not capturing then
+        if capturing ~= self then
             passKeysThrough(self, true)
             return
         end
@@ -101,7 +107,7 @@ local function addKeyButton(y)
             return -- a modifier on its own: keep waiting for the rest
         end
         stopCapture()
-        ns.Fishing.SetKey(binding)
+        set(binding)
     end)
 
     return button
@@ -136,8 +142,17 @@ function Panel.Refresh()
     Panel.skillBar:SetChecked(ns.db.skillBar.shown)
     Panel.skillBarLocked:SetChecked(ns.db.skillBar.locked)
     Panel.skillBarStats:SetChecked(ns.db.skillBar.stats)
-    if not capturing then
+    Panel.recast:SetChecked(db.recast)
+    -- A greyed-out button left listening would still take the next key.
+    if capturing == Panel.recastKey and not db.recast then
+        stopCapture()
+    end
+    Panel.recastKey:SetEnabled(db.recast)
+    if capturing ~= Panel.key then
         Panel.key:SetText(db.key)
+    end
+    if capturing ~= Panel.recastKey then
+        Panel.recastKey:SetText(db.recastKey)
     end
 end
 
@@ -187,7 +202,23 @@ local function ensureBuilt()
     end)
     y = y - ROW_HEIGHT
 
-    Panel.key = addKeyButton(y)
+    Panel.key = addKeyButton("Fishing key", y, function()
+        return ns.db.fishing.key
+    end, function(key)
+        ns.Fishing.SetKey(key)
+    end)
+    y = y - ROW_HEIGHT
+
+    Panel.recast = addCheckbox("Recast with a second key, even with the line out", y, PADDING, function(value)
+        ns.Fishing.SetRecast(value)
+    end)
+    y = y - ROW_HEIGHT
+
+    Panel.recastKey = addKeyButton("Recast key", y, function()
+        return ns.db.fishing.recastKey
+    end, function(key)
+        ns.Fishing.SetRecastKey(key)
+    end)
     y = y - ROW_HEIGHT
 
     Panel.autoLoot = addCheckbox("Turn auto loot on while fishing", y, PADDING, function(value)

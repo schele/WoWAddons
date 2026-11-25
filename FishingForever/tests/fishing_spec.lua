@@ -158,6 +158,97 @@ describe("the fishing key", function()
     end)
 end)
 
+-- A second key that always casts, for a bobber that lands outside a school
+-- of fish: one press throws a fresh line, where the fishing key would first
+-- pull the old one in.
+describe("the recast key", function()
+    it("casts Fishing on Shift-F while a pole is equipped", function()
+        local ns, env = loggedIn(POLE)
+
+        assertEqual("FishingForeverCastButton", binding(env, "SHIFT-F").button)
+        assertEqual("LeftButton", binding(env, "SHIFT-F").mouseButton)
+    end)
+
+    it("still casts while the line is out, as the fishing key picks up the bobber", function()
+        local ns, env = loggedIn(POLE)
+
+        castStart(env)
+
+        assertEqual("FishingForeverCastButton", binding(env, "SHIFT-F").button, "recast key")
+        assertEqual("INTERACTTARGET", binding(env, "F").command, "fishing key")
+    end)
+
+    it("is left alone without a pole", function()
+        local ns, env = loggedIn(STAFF)
+
+        assertNil(binding(env, "SHIFT-F"))
+    end)
+
+    it("lets go while the loot window is open, so it cannot recast over the loot", function()
+        local ns, env = loggedIn(POLE)
+
+        helpers.fire(env, "LOOT_OPENED")
+        assertNil(binding(env, "SHIFT-F"), "loot open")
+
+        helpers.fire(env, "LOOT_CLOSED")
+        assertEqual("FishingForeverCastButton", binding(env, "SHIFT-F").button, "loot closed")
+    end)
+
+    it("gives the key back as a fight starts, and takes it again after", function()
+        local ns, env = loggedIn(POLE)
+
+        helpers.fire(env, "PLAYER_REGEN_DISABLED")
+        env.__inCombat = true
+        assertNil(binding(env, "SHIFT-F"), "fighting")
+
+        env.__inCombat = false
+        helpers.fire(env, "PLAYER_REGEN_ENABLED")
+        assertEqual("FishingForeverCastButton", binding(env, "SHIFT-F").button, "after the fight")
+    end)
+
+    it("is turned off and on again by /ff recast", function()
+        local ns, env = loggedIn(POLE)
+
+        helpers.command(env, "recast")
+        assertFalse(ns.db.fishing.recast)
+        assertNil(binding(env, "SHIFT-F"), "off")
+        assertEqual("FishingForeverCastButton", binding(env, "F").button, "the fishing key kept")
+
+        helpers.command(env, "recast")
+        assertTrue(ns.db.fishing.recast)
+        assertEqual("FishingForeverCastButton", binding(env, "SHIFT-F").button, "on again")
+    end)
+
+    it("moves to a new key, letting go of the old one", function()
+        local ns, env = loggedIn(POLE)
+
+        helpers.command(env, "recast ctrl-g")
+
+        assertEqual("CTRL-G", ns.db.fishing.recastKey)
+        assertNil(binding(env, "SHIFT-F"))
+        assertEqual("FishingForeverCastButton", binding(env, "CTRL-G").button)
+    end)
+
+    it("is turned on when given a key", function()
+        local ns, env = loggedIn(POLE)
+        helpers.command(env, "recast")
+
+        helpers.command(env, "recast G")
+
+        assertTrue(ns.db.fishing.recast)
+        assertEqual("FishingForeverCastButton", binding(env, "G").button)
+    end)
+
+    it("gives way to the fishing key when both are the same key", function()
+        local ns, env = loggedIn(POLE)
+
+        helpers.command(env, "key shift-f")
+        castStart(env)
+
+        assertEqual("INTERACTTARGET", binding(env, "SHIFT-F").command)
+    end)
+end)
+
 describe("settings changed while fishing", function()
     it("turns on soft targeting and auto loot while fishing", function()
         local ns, env = loggedIn(POLE)
@@ -204,6 +295,25 @@ describe("commands", function()
         helpers.command(env, "status")
 
         assertMatch("Key F: casts Fishing", helpers.printed(env))
+        assertMatch("Recast key SHIFT%-F", helpers.printed(env))
+    end)
+
+    it("says when the recast key is off", function()
+        local ns, env = loggedIn(POLE)
+        helpers.command(env, "recast")
+
+        helpers.command(env, "status")
+
+        assertMatch("Recast key: off", helpers.printed(env))
+    end)
+
+    it("says when the recast key is the fishing key, and so does nothing", function()
+        local ns, env = loggedIn(POLE)
+        helpers.command(env, "key shift-f")
+
+        helpers.command(env, "status")
+
+        assertMatch("Recast key SHIFT%-F: the fishing key", helpers.printed(env))
     end)
 
     it("lists the commands for a bare /ff", function()

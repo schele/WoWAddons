@@ -13,6 +13,11 @@ local addonName, ns = ...
 --
 -- With auto loot on, that is press, wait for the splash, press, press.
 --
+-- A second key, the recast key, casts whether or not a line is out: when the
+-- bobber lands outside a school of fish, one press throws a fresh line,
+-- where the fishing key would first pull the old one in. Casting while
+-- fishing ends the old line, as any cast ends a channel.
+--
 -- The key is only taken while a fishing pole is in your hands, and never in
 -- combat: out of it, the key is yours again. (WoW Forever has no fishing
 -- without a pole, so there is no switch to take it without one.)
@@ -26,6 +31,9 @@ ns.AddDefaults({
         key = "F",
         -- Turn auto loot on while fishing, and back to how it was after.
         autoLoot = true,
+        -- The recast key: casts even with a line out.
+        recast = true,
+        recastKey = "SHIFT-F",
     },
 })
 
@@ -191,12 +199,26 @@ function Fishing.Refresh()
     end
     applyCVars()
 
-    local key = ns.db.fishing.key
+    local db = ns.db.fishing
+    local key = db.key
     if action == "cast" then
         SetOverrideBindingClick(owner, true, key, castButton:GetName(), "LeftButton")
     elseif action == "interact" then
         SetOverrideBinding(owner, true, key, "INTERACTTARGET")
     end
+
+    -- Let go with the fishing key over the loot window, so it cannot recast
+    -- over the loot either.
+    if action and Fishing.RecastKeyInUse() then
+        SetOverrideBindingClick(owner, true, db.recastKey, castButton:GetName(), "LeftButton")
+    end
+end
+
+--- Whether the recast key is on and a key of its own: set to the fishing key
+-- too, the fishing key wins, or the bobber could never be picked up.
+function Fishing.RecastKeyInUse()
+    local db = ns.db.fishing
+    return db.recast and db.recastKey ~= db.key
 end
 
 --- Build the button the key clicks to cast. Once, at login, out of combat.
@@ -271,11 +293,21 @@ local function changed()
     end
 end
 
+--- A key as the client writes a binding: trimmed and upper case. Nil for
+-- nothing at all.
+local function normaliseKey(key)
+    key = key and key:match("^%s*(.-)%s*$"):upper() or ""
+    if key == "" then
+        return nil
+    end
+    return key
+end
+
 --- Change the key. Anything the client accepts as a binding: F, SHIFT-F,
 -- BUTTON4, and so on.
 function Fishing.SetKey(key)
-    key = key and key:match("^%s*(.-)%s*$"):upper() or ""
-    if key == "" then
+    key = normaliseKey(key)
+    if not key then
         return false
     end
 
@@ -287,6 +319,28 @@ function Fishing.SetKey(key)
     Fishing.Refresh()
     changed()
     return true
+end
+
+--- Change the recast key, and turn it on: a key is given to be used.
+function Fishing.SetRecastKey(key)
+    key = normaliseKey(key)
+    if not key then
+        return false
+    end
+
+    -- Refresh lets go of the old key before taking the new one.
+    ns.db.fishing.recastKey = key
+    ns.db.fishing.recast = true
+    Fishing.Refresh()
+    changed()
+    return true
+end
+
+--- Turn the recast key on, or off and give it back.
+function Fishing.SetRecast(value)
+    ns.db.fishing.recast = value and true or false
+    Fishing.Refresh()
+    changed()
 end
 
 --- Turn FishingForever on, or off and give the key back.
@@ -319,6 +373,15 @@ ns.RegisterCommand("key", "Set the fishing key, e.g. /ff key F", function(rest)
     end
 end)
 
+ns.RegisterCommand("recast", "Turn the recast key on or off, or set it, e.g. /ff recast SHIFT-F", function(rest)
+    if rest == "" then
+        Fishing.SetRecast(not ns.db.fishing.recast)
+        ns.Print("Recast key: " .. onOff(ns.db.fishing.recast) .. ".")
+    elseif Fishing.SetRecastKey(rest) then
+        ns.Print("Recast key set to " .. ns.db.fishing.recastKey .. ".")
+    end
+end)
+
 ns.RegisterCommand("on", "Turn FishingForever on", function()
     Fishing.SetEnabled(true)
     ns.Print("On.")
@@ -337,13 +400,25 @@ end)
 ns.RegisterCommand("status", "Show what the key is doing", function()
     local db = ns.db.fishing
     local action = Fishing.KeyAction()
+
+    local recast
+    if not db.recast then
+        recast = "Recast key: off"
+    elseif not Fishing.RecastKeyInUse() then
+        recast = "Recast key " .. db.recastKey .. ": the fishing key, so not used"
+    else
+        recast = "Recast key " .. db.recastKey .. ": "
+            .. (action and "casts " .. Fishing.SpellName() or "not taken")
+    end
+
     ns.Print(string.format(
-        "%s. Key %s: %s. Pole equipped: %s. Auto loot: %s.",
+        "%s. Key %s: %s. %s. Pole equipped: %s. Auto loot: %s.",
         db.enabled and "On" or "Off",
         db.key,
         action == "cast" and "casts " .. Fishing.SpellName()
             or action == "interact" and "picks up the bobber"
             or "not taken",
+        recast,
         Fishing.PoleEquipped() and "yes" or "no",
         onOff(db.autoLoot)
     ))

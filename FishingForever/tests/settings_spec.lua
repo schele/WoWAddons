@@ -147,6 +147,58 @@ describe("the fishing key button", function()
     end)
 end)
 
+describe("the recast key", function()
+    it("has a box, ticked to begin with, that turns it off and on", function()
+        local ns, env, panel = opened()
+        assertTrue(panel.recast:GetChecked())
+        click(panel.recast)
+        assertFalse(ns.db.fishing.recast)
+        assertNil(env.__bindings["SHIFT-F"])
+        click(panel.recast)
+        assertEqual("FishingForeverCastButton", env.__bindings["SHIFT-F"].button)
+    end)
+
+    it("has a key button that takes the next key pressed after a click", function()
+        local ns, env, panel = opened()
+        assertEqual("SHIFT-F", panel.recastKey:GetText())
+        panel.recastKey.scripts.OnClick(panel.recastKey)
+        assertMatch("[Pp]ress a key", panel.recastKey:GetText())
+        env.__modifiers.ctrl = true
+        press(panel.recastKey, "G")
+        assertEqual("CTRL-G", ns.db.fishing.recastKey)
+        assertEqual("CTRL-G", panel.recastKey:GetText())
+        assertEqual("F", ns.db.fishing.key, "the fishing key left alone")
+        assertFalse(panel.recastKey.keyboard, "the keyboard let go")
+    end)
+
+    it("greys its key button out while it is off", function()
+        local ns, env, panel = opened()
+        assertTrue(panel.recastKey:IsEnabled())
+        click(panel.recast)
+        assertFalse(panel.recastKey:IsEnabled())
+    end)
+
+    it("lets one key button listen at a time", function()
+        local ns, env, panel = opened()
+        panel.key.scripts.OnClick(panel.key)
+        panel.recastKey.scripts.OnClick(panel.recastKey)
+        assertFalse(panel.key.keyboard, "the first let go")
+        assertEqual("F", panel.key:GetText())
+        press(panel.recastKey, "G")
+        assertEqual("F", ns.db.fishing.key)
+        assertEqual("G", ns.db.fishing.recastKey)
+    end)
+
+    it("follows a change made by command while the page is open", function()
+        local ns, env, panel = opened()
+        helpers.command(env, "recast")
+        assertFalse(panel.recast:GetChecked())
+        helpers.command(env, "recast H")
+        assertTrue(panel.recast:GetChecked())
+        assertEqual("H", panel.recastKey:GetText())
+    end)
+end)
+
 describe("closing the page", function()
     -- Opening a page by command leaves the client queued to fall back to the
     -- game menu when it closes, which is not where the player came from.
@@ -187,7 +239,8 @@ describe("the page's layout", function()
     it("keeps every row below it off the hint too, in order", function()
         local ns, env, panel = opened()
         local previous = 0
-        for _, widget in ipairs({ panel.enabled, panel.key, panel.autoLoot, panel.minimap,
+        for _, widget in ipairs({ panel.enabled, panel.key, panel.recast, panel.recastKey,
+            panel.autoLoot, panel.minimap,
             panel.skillBar, panel.skillBarLocked, panel.skillBarStats, panel.skillBarReset }) do
             local _, relativeTo, _, _, y = widget:GetPoint(1)
             assertTrue(relativeTo == panel.hint, "anchored to the hint")

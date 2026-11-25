@@ -11,6 +11,16 @@ One key for the whole fishing loop: cast, pick up the bobber, recast.
 With auto loot on, which FishingForever turns on for you while you fish, the
 loop is: press, wait for the splash, press, press.
 
+## Fishing a school
+
+The game picks where your bobber lands, and no addon can aim it. When it
+lands outside a school of fish, the quickest fix is a fresh line. The recast
+key, Shift-F unless you change it, casts Fishing even while your line is out:
+one press, where the fishing key takes two (one to pull the line in, one to
+cast). Like the fishing key, it is let go over the loot window and in combat.
+Set both to the same key and the fishing key wins, so you can still pick up
+the bobber.
+
 ## Why not recast by itself?
 
 The game only lets a spell go off from your own key press or click. An addon
@@ -138,7 +148,8 @@ or logout: send it in to help work out WoW Forever's fishing rules.
 FishingForever has a page in the game's options (Esc, Options, AddOns,
 FishingForever): turn it on or off, set the fishing key by clicking the key
 button and pressing the key you want (with Shift, Ctrl or Alt if you like;
-Escape cancels), turn auto loot on while fishing, and show, lock or reset the
+Escape cancels), turn the recast key on or off and set it the same way, turn
+auto loot on while fishing, and show, lock or reset the
 skill bar and open the stats around it.
 
 The minimap button opens and closes that page. Right-click it to turn
@@ -151,6 +162,8 @@ round the minimap.
 |---|---|
 | `/ff settings` | Open the settings page |
 | `/ff key F` | Set the fishing key. Anything the game accepts as a binding: `F`, `SHIFT-F`, `BUTTON4` |
+| `/ff recast` | Turn the recast key on or off |
+| `/ff recast SHIFT-G` | Set the recast key, and turn it on |
 | `/ff on` / `/ff off` | Turn FishingForever on, or off and give the key back |
 | `/ff autoloot` | Toggle turning auto loot on while fishing |
 | `/ff status` | Show what the key is doing right now |
@@ -160,7 +173,7 @@ round the minimap.
 | `/ff bar reset` | Put the skill bar back under the middle of the screen |
 | `/ff stats` | Open or close your fishing stats around the skill bar |
 
-The key defaults to `F`.
+The key defaults to `F`, and the recast key to `SHIFT-F`.
 
 ## Install
 
