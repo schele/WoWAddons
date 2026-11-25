@@ -207,6 +207,8 @@ function stub.newEnv(saved)
     -- scan asked for is answered when a test fires REPLICATE_ITEM_LIST_UPDATE.
     -- The game counts the auctions from 0, so index 0 is the first.
     env.__auctions = {}
+    env.__owned = {}
+    env.Enum = { AuctionStatus = { Active = 0, Sold = 1 } }
     env.__replicates = 0
     -- How many auctions were read, to tell a slice from the whole list.
     env.__replicateReads = 0
@@ -235,6 +237,11 @@ function stub.newEnv(saved)
                 auction.owner or "Someone", auction.owner or "Someone", auction.saleStatus or 0,
                 auction.itemID, described
         end,
+        -- Your own auctions, as the Auctions tab lists them: each an
+        -- OwnedAuctionInfo table (status, buyoutAmount, bidAmount,
+        -- timeLeftSeconds), from __owned.
+        GetNumOwnedAuctions = function() return #env.__owned end,
+        GetOwnedAuctionInfo = function(index) return env.__owned[index] end,
         GetReplicateItemLink = function(index)
             local auction = env.__auctions[index + 1]
             if auction and not auction.nolink and env.__items[auction.itemID] and not env.__uncached[auction.itemID] then
@@ -248,7 +255,12 @@ function stub.newEnv(saved)
     -- The tooltip, hidden to begin with: whose it is and which item it shows.
     env.GameTooltip = makeWidget("GameTooltip", env.UIParent)
     env.GameTooltip.shown = false
-    function env.GameTooltip:SetOwner(owner, anchor) self.owner, self.anchor = owner, anchor end
+    env.GameTooltip.lines = {}
+    function env.GameTooltip:SetOwner(owner, anchor)
+        self.owner, self.anchor, self.lines = owner, anchor, {}
+    end
+    function env.GameTooltip:SetText(text) self.lines = { text } end
+    function env.GameTooltip:AddLine(text) table.insert(self.lines, text) end
     function env.GameTooltip:SetItemByID(itemID) self.itemID = itemID end
 
     -- The game's options window and the game menu, both closed to begin with.
@@ -549,6 +561,14 @@ function stub.buildAuctionHouse(env)
         frame[part] = makeWidget("Frame", frame)
         frame[part].shown = false
     end
+    -- The Auctions tab's own Auctions and Bids tabs, 1 and 2.
+    local auctions = frame.AuctionsFrame
+    auctions.tab = 1
+    function auctions:SetTab(id) self.tab = id end
+    function auctions:GetTab() return self.tab end
+    function auctions:IsDisplayingBids() return self.tab == 2 end
+    -- Your gold, bottom left of the window.
+    frame.MoneyFrameBorder = makeWidget("Frame", frame)
 
     frame.Tabs = {}
     frame.tabsForDisplayMode = {}

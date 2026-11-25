@@ -360,7 +360,8 @@ local function ensureBuilt()
         .. "are sold and your gear repaired, without a click. Nothing on the "
         .. "keep list is ever sold. At the auction house, a new auction asks "
         .. "one copper under the cheapest listing, and the Vendor deals tab "
-        .. "finds auctions a merchant would pay more for than their buyout."
+        .. "finds auctions a merchant would pay more for than their buyout. "
+        .. "The Auctions tab adds up the gold your sales have coming."
     )
     Panel.hint = hint
 

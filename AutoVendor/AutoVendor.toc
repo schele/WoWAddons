@@ -3,7 +3,7 @@
 ## Notes: Sells your grey items and the items you pick, and repairs your gear whenever you open a merchant. At the auction house, undercuts the cheapest auction and finds auctions a merchant pays more for.
 ## IconTexture: Interface\AddOns\AutoVendor\icon
 ## Author: Skyler
-## Version: 0.4.1
+## Version: 0.5.0
 ## X-Wago-ID: QN5JL76B
 ## SavedVariables: AutoVendorDB
 
@@ -15,5 +15,6 @@ Vendor.lua
 Auction.lua
 Deals.lua
 DealsTab.lua
+Incoming.lua
 Picker.lua
 Settings.lua

@@ -11,6 +11,7 @@ M.FILES = {
     "Auction.lua",
     "Deals.lua",
     "DealsTab.lua",
+    "Incoming.lua",
     "Picker.lua",
     "Settings.lua",
 }
@@ -78,6 +79,13 @@ function M.auction(env, itemID, count, buyout, extra)
     end
     table.insert(env.__auctions, auction)
     return auction
+end
+
+--- An auction of your own, as the Auctions tab lists it: `fields` of the
+-- game's OwnedAuctionInfo (status 1 for sold, buyoutAmount, timeLeftSeconds).
+function M.ownAuction(env, fields)
+    table.insert(env.__owned, fields)
+    return fields
 end
 
 --- Logged in and standing at the auctioneer with the window open on the

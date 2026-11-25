@@ -8,7 +8,8 @@ AutoVendor Sold 7 items for 1g 23s 4c. Repaired for 45s.
 ```
 
 At the auction house, the asking price for a new auction lands one copper
-under the cheapest listing instead of tying with it.
+under the cheapest listing instead of tying with it, and the Auctions tab
+adds up what your sales have coming.
 
 ## What it sells
 
@@ -89,6 +90,22 @@ to try again.
 
 WoW Forever's auction house answers the full scan (seen in the game). How
 often it allows one is not yet confirmed: the 15 minutes are retail's.
+
+## What your sales come to
+
+The game's Auctions tab lists each sold auction with its own Incoming
+Amount, one row at a time. AutoVendor adds them up on one line in the strip
+under the list, beside your gold:
+
+```
+ 1g 57s 99c   Incoming: 3g 12s 45c from 25 sold       [ Cancel Auction ]
+```
+
+- **Its tooltip** says when the last sale reaches your mailbox, and what
+  the auctions still listed are worth at their buyout.
+- It follows the list as the game updates it, and makes way for the Bids
+  tab.
+- On WoW Forever's auction house; Classic Era's older window gets no line.
 
 ## Turning any of it off
 
