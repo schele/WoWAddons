@@ -1,7 +1,7 @@
 {
     "AutoVendor":  {
-                       "version":  "0.4.1",
-                       "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
+                       "version":  "0.5.0",
+                       "commit":  "d96d07ff0799c538bf768ac1a5373617ca8a6108"
                    },
     "BankBags":  {
                      "version":  "0.3.3",
