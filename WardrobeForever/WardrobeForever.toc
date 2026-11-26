@@ -1,10 +1,12 @@
 ## Interface: 16001
 ## Title: WardrobeForever
-## Notes: Hover a slot on the character sheet to see everything else you could wear there, and click one to put it on.
+## Notes: Hover a slot on the character sheet to see what else you could wear there, and give each form its own gear set.
 ## IconTexture: Interface\AddOns\WardrobeForever\icon
 ## Author: Skyler
-## Version: 0.1.1
+## Version: 0.2.0
 ## X-Wago-ID: ZKbqZd61
+## SavedVariablesPerCharacter: WardrobeForeverCharDB
 
 WardrobeForever.lua
+Forms.lua
 Settings.lua

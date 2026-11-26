@@ -20,11 +20,15 @@ local BAG_BIT_OFFSET = 8
 
 stub.SLOT = {
     HEAD = 1,
+    CHEST = 5,
     LEGS = 7,
     FEET = 8,
+    HANDS = 10,
     FINGER0 = 11,
     FINGER1 = 12,
     MAINHAND = 16,
+    OFFHAND = 17,
+    RANGED = 18,
 }
 
 -- Item locations, packed the way GetInventoryItemsForSlot packs them.
@@ -119,9 +123,47 @@ function stub.newEnv()
         return frame
     end
 
-    env.CreateFrame = function(_, name, parent)
+    env.CreateFrame = function(_, name, parent, template)
         local frame = makeFrame(name, parent)
+        frame.template = template
         if name then env[name] = frame end
+        -- The game's dropdown, as Blizzard_Menu's guide describes it (copied
+        -- from BankBags' stub): a function fills the menu with radios, and
+        -- the button reads the one selected, or the default text when none
+        -- is. `radios` is the menu as last made, each { text, isSelected,
+        -- setSelected, data }.
+        if template == "WowStyle1DropdownTemplate" then
+            frame.radios = {}
+            function frame:SetDefaultText(text) self.defaultText = text end
+            function frame:SetupMenu(generator)
+                self.menuGenerator = generator
+                if self:IsShown() then self:GenerateMenu() end
+            end
+            local function readSelection(self)
+                local selected = {}
+                for _, radio in ipairs(self.radios) do
+                    if radio.isSelected(radio.data) then table.insert(selected, radio.text) end
+                end
+                self.selectionText = #selected > 0 and table.concat(selected, ", ") or self.defaultText
+            end
+            function frame:GenerateMenu()
+                if not self.menuGenerator then return end
+                local radios, root = {}, {}
+                function root:CreateRadio(text, isSelected, setSelected, data)
+                    table.insert(radios, { text = text, isSelected = isSelected, setSelected = setSelected, data = data })
+                end
+                self.menuGenerator(self, root)
+                self.radios = radios
+                readSelection(self)
+            end
+            -- A player choosing an entry: the client sets it, then reads the
+            -- selection again from the menu it has.
+            function frame:Pick(index)
+                local radio = self.radios[index]
+                radio.setSelected(radio.data)
+                readSelection(self)
+            end
+        end
         return frame
     end
 
@@ -335,7 +377,252 @@ function stub.newEnv()
     ammo.scripts.OnLeave = env.PaperDollItemSlotButton_OnLeave
     env.CharacterAmmoSlot = ammo
 
+    stub.addGear(env)
     return env
+end
+
+-- Gear, forms, combat and equipment sets ---------------------------------
+--
+-- What the form sets touch. Items are known by GUID, as the client knows
+-- them (C_Item.GetItemGUID). The cursor rules are the game's: picking an
+-- item up and dropping it on a slot swaps the two, the old one going where
+-- the new one came from.
+function stub.addGear(env)
+    env.__worn = {}                                      -- [slot] = guid
+    env.__bags = { [0] = {}, [1] = {}, [2] = {}, [3] = {}, [4] = {} }
+    env.__bagSize = { [0] = 16, [1] = 0, [2] = 0, [3] = 0, [4] = 0 }
+    env.__itemInfo = {}                                  -- [guid] = { slots = {[slot]=true}, twoHand }
+    env.__locked = {}                                    -- [guid] = true
+    env.__cursor = nil                                   -- the location picked up from
+    env.__pickups = 0                                    -- PickupInventoryItem + PickupContainerItem calls
+    env.__refused = 0                                    -- drops the game turned down in combat (a red error)
+    env.__inCombat = false
+    env.__forms = {}                                     -- { { spellID, name } }, the stance bar
+    env.__form = 0                                       -- the stance bar index worn, 0 for none
+    env.__sets = {}                                      -- [setID] = { name, slots = { [slot] = guid | "empty" } }
+
+    env.NUM_TOTAL_EQUIPPED_BAG_SLOTS = 4
+    env.INVSLOT_MAINHAND = 16
+    env.INVSLOT_OFFHAND = 17
+    env.INVSLOTS_EQUIPABLE_IN_COMBAT = { [16] = true, [17] = true, [18] = true }
+    env.EQUIPMENT_SET_EMPTY_SLOT = 0
+    env.EQUIPMENT_SET_IGNORED_SLOT = 1
+    env.EQUIPMENT_SET_ITEM_MISSING = -1
+
+    local function newLocation(fields)
+        function fields:IsEquipmentSlot() return self.equipmentSlot ~= nil end
+        function fields:GetEquipmentSlot() return self.equipmentSlot end
+        function fields:IsBagAndSlot() return self.bag ~= nil end
+        function fields:GetBagAndSlot() return self.bag, self.slot end
+        return fields
+    end
+
+    env.ItemLocation = {
+        CreateFromEquipmentSlot = function(_, slot) return newLocation({ equipmentSlot = slot }) end,
+        CreateFromBagAndSlot = function(_, bag, slot) return newLocation({ bag = bag, slot = slot }) end,
+    }
+
+    local function itemAt(location)
+        if location.equipmentSlot then
+            return env.__worn[location.equipmentSlot]
+        end
+        return env.__bags[location.bag] and env.__bags[location.bag][location.slot]
+    end
+
+    local function put(location, guid)
+        if location.equipmentSlot then
+            env.__worn[location.equipmentSlot] = guid
+        else
+            env.__bags[location.bag][location.slot] = guid
+        end
+    end
+
+    local function find(guid)
+        for slot, worn in pairs(env.__worn) do
+            if worn == guid then return newLocation({ equipmentSlot = slot }) end
+        end
+        for bag, contents in pairs(env.__bags) do
+            for slot, held in pairs(contents) do
+                if held == guid then return newLocation({ bag = bag, slot = slot }) end
+            end
+        end
+        return nil
+    end
+
+    local function freeSlots(bag)
+        local free = {}
+        for slot = 1, env.__bagSize[bag] or 0 do
+            if not env.__bags[bag][slot] then free[#free + 1] = slot end
+        end
+        return free
+    end
+
+    local function fits(guid, slot)
+        local info = guid and env.__itemInfo[guid]
+        return info ~= nil and info.slots[slot] == true
+    end
+
+    env.C_Item = {
+        DoesItemExist = function(location) return itemAt(location) ~= nil end,
+        -- The client raises for a location with nothing in it.
+        GetItemGUID = function(location)
+            local guid = itemAt(location)
+            if not guid then error("GetItemGUID: invalid item location", 2) end
+            return guid
+        end,
+        GetItemLocation = function(guid) return find(guid) end,
+        IsLocked = function(location)
+            local guid = itemAt(location)
+            return guid ~= nil and env.__locked[guid] == true
+        end,
+    }
+
+    env.IsInventoryItemLocked = function(slot)
+        local guid = env.__worn[slot]
+        return guid ~= nil and env.__locked[guid] == true
+    end
+
+    env.ClearCursor = function() env.__cursor = nil end
+    env.CursorHasItem = function() return env.__cursor ~= nil end
+
+    -- The item on the cursor lands on `target`.
+    local function drop(target)
+        local source = env.__cursor
+        env.__cursor = nil
+        local moving, old = itemAt(source), itemAt(target)
+        if target.equipmentSlot and not fits(moving, target.equipmentSlot) then return end
+        if target.equipmentSlot == 17 and env.__worn[16] and env.__itemInfo[env.__worn[16]].twoHand then
+            env.__refused = env.__refused + 1 -- "Cannot equip that with a two-handed weapon"
+            return
+        end
+        if source.equipmentSlot and old and not fits(old, source.equipmentSlot) then return end
+
+        -- A two-hander takes the off hand's item off, into the bags.
+        local pushed
+        if target.equipmentSlot == 16 and env.__itemInfo[moving].twoHand and env.__worn[17] then
+            for bag = 0, env.NUM_TOTAL_EQUIPPED_BAG_SLOTS do
+                for _, slot in ipairs(freeSlots(bag)) do
+                    local spot = newLocation({ bag = bag, slot = slot })
+                    if not (source.bag == bag and source.slot == slot) then
+                        pushed = pushed or spot
+                    end
+                end
+            end
+            if not pushed then return end
+        end
+
+        put(target, moving)
+        put(source, old)
+        if pushed then
+            put(pushed, env.__worn[17])
+            env.__worn[17] = nil
+        end
+    end
+
+    local function pickup(location)
+        env.__pickups = env.__pickups + 1
+        if env.__cursor then
+            drop(location)
+        elseif itemAt(location) then
+            env.__cursor = location
+        end
+    end
+
+    -- In a fight Forever blocks addons from this, weapons too: "Interface
+    -- action failed because of an AddOn", and what was picked up stays on
+    -- the cursor (seen 2026-11-26). Only the player's own click works then.
+    env.__blocked = 0
+    env.PickupInventoryItem = function(slot)
+        if env.__inCombat then
+            env.__blocked = env.__blocked + 1
+            return
+        end
+        pickup(newLocation({ equipmentSlot = slot }))
+    end
+    env.InCombatLockdown = function() return env.__inCombat end
+
+    env.C_Container = {
+        PickupContainerItem = function(bag, slot) pickup(newLocation({ bag = bag, slot = slot })) end,
+        GetContainerFreeSlots = function(bag) return freeSlots(bag) end,
+        GetContainerNumFreeSlots = function(bag) return #freeSlots(bag), 0 end,
+    }
+
+    env.C_PaperDollInfo = {
+        -- Nothing goes in the off hand beside a two-hander.
+        CursorCanGoInSlot = function(slot)
+            if slot == 17 and env.__worn[16] and env.__itemInfo[env.__worn[16]].twoHand then
+                return false
+            end
+            return env.__cursor ~= nil and fits(itemAt(env.__cursor), slot)
+        end,
+    }
+
+    env.UnitAffectingCombat = function(unit) return unit == "player" and env.__inCombat end
+    env.__casting = false
+    env.__dead = false
+    env.UnitCastingInfo = function(unit)
+        if unit == "player" and env.__casting then return "Healing Touch" end
+        return nil
+    end
+    env.UnitChannelInfo = function() return nil end
+    env.UnitIsDeadOrGhost = function(unit) return unit == "player" and env.__dead end
+
+    -- The stance bar.
+    env.GetNumShapeshiftForms = function() return #env.__forms end
+    env.GetShapeshiftForm = function() return env.__form end
+    -- `__formsLoading`: at login the bar can be there before its spells.
+    env.GetShapeshiftFormInfo = function(index)
+        local form = env.__forms[index]
+        if not form then return nil end
+        if env.__formsLoading then return 132000 + index, env.__form == index, true, nil end
+        return 132000 + index, env.__form == index, true, form.spellID
+    end
+    env.C_Spell = {
+        GetSpellName = function(spellID)
+            for _, form in ipairs(env.__forms) do
+                if form.spellID == spellID then return form.name end
+            end
+            return nil
+        end,
+    }
+
+    -- The equipment manager's sets, packed the way the client packs them.
+    env.C_EquipmentSet = {
+        GetEquipmentSetIDs = function()
+            local ids = {}
+            for setID in pairs(env.__sets) do ids[#ids + 1] = setID end
+            table.sort(ids)
+            return ids
+        end,
+        GetEquipmentSetInfo = function(setID)
+            local set = env.__sets[setID]
+            if not set then return nil end
+            return set.name, 134000 + setID, setID, false, 0, 0, 0, 0, 0
+        end,
+        GetItemLocations = function(setID)
+            local set = env.__sets[setID]
+            if not set then return nil end
+            local locations = {}
+            for slot = 1, 19 do
+                local want = set.slots[slot]
+                if want == nil then
+                    locations[slot] = env.EQUIPMENT_SET_IGNORED_SLOT
+                elseif want == "empty" then
+                    locations[slot] = env.EQUIPMENT_SET_EMPTY_SLOT
+                else
+                    local at = find(want)
+                    if not at then
+                        locations[slot] = env.EQUIPMENT_SET_ITEM_MISSING
+                    elseif at.equipmentSlot then
+                        locations[slot] = stub.worn(at.equipmentSlot)
+                    else
+                        locations[slot] = stub.inBag(at.bag, at.slot)
+                    end
+                end
+            end
+            return locations
+        end,
+    }
 end
 
 return stub

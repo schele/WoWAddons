@@ -66,3 +66,97 @@ describe("the settings page", function()
         assertTrue(helpers.flyoutOpenFor(env, env.CharacterLegsSlot))
     end)
 end)
+
+describe("the Forms section", function()
+    local CAT, MOONKIN = helpers.CAT, 24858
+
+    --- A druid with sets "Cat" (1) and "Bear" (2), the page open.
+    local function druidPage(extra)
+        local ns, env = helpers.start(nil, function(env)
+            helpers.druid(env)
+            helpers.makeSet(env, 1, "Cat", {})
+            helpers.makeSet(env, 2, "Bear", {})
+            if extra then extra(env) end
+        end)
+        ns.SettingsPanel.panel:Show()
+        return ns, env, ns.SettingsPanel
+    end
+
+    local function radioTexts(dropdown)
+        local texts = {}
+        for index, radio in ipairs(dropdown.radios) do
+            texts[index] = radio.text
+        end
+        return table.concat(texts, ", ")
+    end
+
+    it("has a row for each form, named as the game names it", function()
+        local _, _, panel = druidPage()
+        assertEqual(4, #panel.forms)
+        assertEqual("Bear Form", panel.forms[1].label:GetText())
+        assertEqual("Cat Form", panel.forms[3].label:GetText())
+    end)
+
+    it("offers Leave gear alone and every set", function()
+        local _, _, panel = druidPage()
+        assertEqual("Leave gear alone, Cat, Bear", radioTexts(panel.forms[3].dropdown))
+    end)
+
+    it("shows Leave gear alone until a set is picked", function()
+        local _, _, panel = druidPage()
+        assertEqual("Leave gear alone", panel.forms[3].dropdown.selectionText)
+    end)
+
+    it("saves the set you pick for that form", function()
+        local ns, _, panel = druidPage()
+        panel.forms[3].dropdown:Pick(2)
+        assertEqual(1, ns.Forms.GetSet(CAT))
+        assertEqual("Cat", panel.forms[3].dropdown.selectionText)
+    end)
+
+    it("lets you go back to Leave gear alone", function()
+        local ns, _, panel = druidPage()
+        panel.forms[3].dropdown:Pick(2)
+        panel.forms[3].dropdown:Pick(1)
+        assertNil(ns.Forms.GetSet(CAT))
+    end)
+
+    it("hangs the first row 16px under the description", function()
+        local _, _, panel = druidPage()
+        local point = panel.forms[1].dropdown.points[1]
+        assertEqual("TOPLEFT", point[1])
+        assertEqual(panel.about, point[2])
+        assertEqual("BOTTOMLEFT", point[3])
+        assertEqual(-16, point[5])
+    end)
+
+    it("says so on a character without forms", function()
+        local ns = helpers.start(nil)
+        ns.SettingsPanel.panel:Show()
+        local panel = ns.SettingsPanel
+        assertEqual(0, #panel.forms)
+        assertEqual("This character has no forms or stances.", panel.noForms:GetText())
+        assertTrue(panel.noForms:IsShown())
+    end)
+
+    it("hides that line for a character with forms", function()
+        local _, _, panel = druidPage()
+        assertFalse(panel.noForms:IsShown())
+    end)
+
+    it("adds a form learned since the page was last open", function()
+        local _, env, panel = druidPage()
+        panel.panel:Hide()
+        table.insert(env.__forms, { spellID = MOONKIN, name = "Moonkin Form" })
+        panel.panel:Show()
+        assertEqual(5, #panel.forms)
+        assertEqual("Moonkin Form", panel.forms[5].label:GetText())
+    end)
+
+    it("says how forms and sets work", function()
+        local _, _, panel = druidPage()
+        local text = panel.about:GetText()
+        assertMatch("shifting into the form puts it on", text)
+        assertMatch("Equipment Manager", text)
+    end)
+end)
