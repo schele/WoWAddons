@@ -3,7 +3,7 @@
 ## Notes: Copy text out of chat: any chat window's lines, and the links people post, in a box ready for Ctrl+C.
 ## IconTexture: Interface\AddOns\ChatCopy\icon
 ## Author: Skyler
-## Version: 0.1.0
+## Version: 0.2.0
 ## X-Wago-ID: nKWwlMKE
 ## SavedVariables: ChatCopyDB
 
