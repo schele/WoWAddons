@@ -151,11 +151,13 @@ ns.AddDefaults({
 Threat.MOST_MOBS = 5
 local PLATES = 40
 
-local function plateOf(token)
+--- Whether two tokens are one unit: your target is also a "nameplateN", and
+-- must not be listed a second time as another mob. Asked of the game, not of
+-- the plate frame, which does not say which token it is.
+local function sameUnit(token, other)
     return ns.Guarded(function()
-        local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(token)
-        return plate and plate.namePlateUnitToken
-    end)
+        return UnitIsUnit(token, other) and true or false
+    end, false)
 end
 
 local function fighting(token)
@@ -195,19 +197,15 @@ function Threat.ReadAll(first)
     end
     local most = math.max(1, math.min(Threat.MOST_MOBS, settings.maxMobs or 3))
 
-    local lists, skip = {}, {}
+    local lists = {}
     if first.mob then
         lists[1] = first
-        local plate = plateOf(first.mob)
-        if plate then
-            skip[plate] = true
-        end
     end
 
     local others = {}
     for index = 1, PLATES do
         local token = "nameplate" .. index
-        if not skip[token] and fighting(token) then
+        if fighting(token) and not (first.mob and sameUnit(token, first.mob)) then
             local list = Threat.Read(token)
             if #list.rows > 0 then
                 list.order, list.danger = index, danger(list)

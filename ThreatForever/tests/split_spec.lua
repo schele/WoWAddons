@@ -87,6 +87,14 @@ describe("a part for each mob you fight", function()
         assertEqual(1, #ns.Threat.All())
     end)
 
+    it("still shows a second mob of the same name", function()
+        local ns, env = fight()
+
+        helpers.otherMob(env, "nameplate2", "Defias Pillager", { party1 = 100, player = 60 })
+
+        assertEqual("Defias Pillager, Defias Pillager", mobs(ns))
+    end)
+
     it("shows your target alone with the option off", function()
         local ns, env = fight(function(env)
             env.ThreatForeverDB = { settings = { split = false } }
