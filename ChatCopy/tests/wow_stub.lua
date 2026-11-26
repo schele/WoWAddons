@@ -255,11 +255,38 @@ function stub.newEnv()
         return table.unpack(args, 1, argCount)
     end
 
-    -- The client's own handler. Unknown link types fall through it silently,
-    -- which is exactly what lets an addon add one.
+    -- The linked-item tooltip, as Forever's: its SetHyperlink means to close
+    -- the tooltip when asked for the link it already shows, but the check
+    -- never matches, so it draws the same tooltip again. With
+    -- __itemRefClosesItself set it behaves as a client that gets it right.
+    -- A link type it cannot show hides it, the way an empty tooltip does.
+    local SHOWABLE = { item = true, spell = true, quest = true }
+    env.ItemRefTooltip = makeWidget("GameTooltip")
+    env.ItemRefTooltip.shown = false
+    -- GameTooltip_OnHide's ClearHandlerInfo: a hidden tooltip forgets its link.
+    env.ItemRefTooltip:SetScript("OnHide", function(self) self.hyperlink = nil end)
+    function env.ItemRefTooltip:SetHyperlink(link)
+        if env.__itemRefClosesItself and self.shown and self.hyperlink == link then
+            self:Hide()
+            return false
+        end
+        if not SHOWABLE[tostring(link):match("^(%a+):") or ""] then
+            self:Hide()
+            return false
+        end
+        self.hyperlink = link
+        self:Show()
+        return true
+    end
+
+    -- The client's own handler: a plain click shows the link in the
+    -- linked-item tooltip. Unknown link types fall through it to a tooltip
+    -- with nothing to show, which is exactly what lets an addon add one.
     env.__itemRefs = {}
     function env.SetItemRef(link, text, button)
         table.insert(env.__itemRefs, { link = link, text = text, button = button })
+        env.ItemRefTooltip:Show()
+        env.ItemRefTooltip:SetHyperlink(link)
     end
 
     -- Static popups ----------------------------------------------------

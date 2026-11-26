@@ -52,6 +52,12 @@ Written with `https://` or `www.`, they work anywhere.
 A bare `1.14.4.2` is left alone too — in this game that is a patch number far
 more often than it is a server.
 
+## Closing a linked item
+
+Click an item, spell or quest link in chat and its tooltip opens; click the
+same link again and it closes. The game means to do this itself but never
+does, so without ChatCopy the second click just draws the tooltip again.
+
 ## Install
 
 1. Copy this folder into your client's `Interface/AddOns` as `ChatCopy`, so the
@@ -94,6 +100,7 @@ In the game's Options under AddOns, or from the minimap button:
 | Shorten long links | Show just the site's name in chat for a long link; the box still gets the whole URL |
 | Links to remember | How many `/cc list` keeps, from 5 to 25 |
 | Copy button on chat windows | The button in a chat window's corner. `/cc chat` works with it off |
+| Click a link again to close it | A second click on the link a tooltip is showing closes it. Off leaves the game's own behaviour |
 | Show the minimap button | The round button on the minimap's rim |
 
 Links are remembered whether or not chat is being rewritten, so `/cc 1` keeps
@@ -119,6 +126,14 @@ each line inside a `pcall`, so a line the client will not let it read is
 skipped and counted, and never stops the rest. The buttons are parented to the
 chat frames, and a light `OnUpdate`, ten times a second, shows each one while
 the mouse is over its window.
+
+`LinkTooltip.lua` puts right a slip in Forever's own `ItemRefTooltip`. Its
+`SetHyperlink` hides the tooltip when asked for the link it already holds,
+but compares the new link against one packed with `SafePack`, whose extra `n`
+field `tCompare` counts as a difference, so it never matches. A
+`hooksecurefunc` after `SetHyperlink` remembers the link while the tooltip
+stays open and hides the tooltip on a repeat. A client that gets the check
+right has already hidden it, and the hook then does nothing.
 
 The URL travels inside the link rather than as an index into the history, so a
 link that has scrolled up still works long after the history has moved on.

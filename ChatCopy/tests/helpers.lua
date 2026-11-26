@@ -8,6 +8,7 @@ M.FILES = {
     "Popup.lua",
     "Chat.lua",
     "ChatText.lua",
+    "LinkTooltip.lua",
     "Settings.lua",
     "Minimap.lua",
 }

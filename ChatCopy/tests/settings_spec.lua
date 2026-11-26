@@ -23,6 +23,7 @@ describe("the declared settings", function()
         assertTrue(controlFor(ns, "chat", "rewrite") ~= nil, "the master switch")
         assertTrue(controlFor(ns, "chat", "shorten") ~= nil, "shortening")
         assertTrue(controlFor(ns, "history", "size") ~= nil, "the history size")
+        assertTrue(controlFor(ns, "linkTooltip", "toggle") ~= nil, "closing a tooltip on a second click")
     end)
 
     it("puts the master switch first", function()
