@@ -47,10 +47,23 @@ the form puts it on. Shifting out puts back what you had on.
 - **Shifting out puts back what you had on before.** Your gear in any form
   is your normal gear with that form's set on top, so Cat to Travel (no set)
   brings your normal gear back, and Cat to Bear goes straight to Bear's set.
-- **In a fight, it all waits for the fight to end.** The game lets no
-  addon change gear in combat, weapons included (you can still swap by
-  hand), so WardrobeForever does not try. When the fight ends, the gear
+- **In a fight, it waits for the fight to end**, except the weapons when
+  you shift from the stance bar (below). The game lets no addon change gear
+  in combat, so WardrobeForever does not try. When the fight ends, the gear
   for whichever form you are in by then goes on.
+- **The stance bar swaps the weapons with the shift, even in a fight.**
+  Once a chosen set holds a weapon (main hand, off hand, ranged or idol),
+  WardrobeForever lays a button of its own over each stance bar button. A
+  click shifts, as before, and in the same click swaps in the form's set
+  weapons, or your normal ones when you leave the form. The game allows
+  this because it is your click. With a two-hander in the set, leaving
+  the form puts back both your main hand and your off hand. It steps aside
+  in Edit Mode and Quick Keybind mode. Druids only for now: a warrior's
+  stance cannot be clicked off the way a druid's form can. Two limits: a
+  key bound to the stance bar presses Blizzard's button, not
+  WardrobeForever's, so use the mouse; and a shift the game refuses (no
+  mana, cooldown) still swaps the weapon, so click again (after the fight,
+  WardrobeForever puts the form's own weapon back).
 - **It waits while you cast or are dead**, and carries on when the cast
   ends or you are back on your feet.
 - **Your own changes win.** A slot you change by hand while shifted stays
@@ -66,6 +79,15 @@ the form puts it on. Shifting out puts back what you had on.
   working.
 
 Works for any class's forms or stances: whatever is on your stance bar.
+
+## Finding an icon for a set
+
+The icon window that New Set opens gets a search box beside its
+"Spells / Items" menu. Type "cat" and the grid shows only Cat Form's icon.
+The game gives its icons no names, so the search matches the names of what
+has each icon: your forms, your spells and the items you wear or carry.
+Click an icon in the results to pick it, as before; clear the box for the
+whole list again.
 
 It has a page in the game's options (Options, AddOns, WardrobeForever): what
 hovering does, and the set to wear in each form.
@@ -89,6 +111,14 @@ known by GUID, so two of the same ring are told apart. The remembered gear
 is saved per character (`WardrobeForeverCharDB`). Nothing is tried while
 `InCombatLockdown()`: Forever blocks addons from equipping then, weapons
 too ("Interface action failed because of an AddOn").
+
+The stance bar buttons (`Stance.lua`) are `SecureActionButtonTemplate`
+macro buttons parented over `StanceBar.actionButtons`. Each macro is
+`/cast <form>` plus `/equipslot [form:i]` (the normal weapon) and
+`/equipslot [noform:i]` (the form's set weapon) lines, by item name, for
+the weapon slots any chosen set fills. The normal weapon is the one
+`Forms.lua` remembered, or the "home" weapon worn in normal form. The text
+is rewritten only out of combat.
 
 ## Install
 

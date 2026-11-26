@@ -641,3 +641,93 @@ describe("a set deleted while worn", function()
         assertEqual("legs-caster", helpers.wearing(env, SLOT.LEGS))
     end)
 end)
+
+describe("weapons swapped by a stance button's click", function()
+    --- Normal: mace and idol. Cat's set: a staff; Bear's: another staff.
+    local function clicker(extra)
+        local ns, env = catDruid(function(env)
+            helpers.wear(env, SLOT.MAINHAND, "mace")
+            helpers.wear(env, SLOT.RANGED, "idol")
+            helpers.stow(env, "staff-cat", SLOT.MAINHAND)
+            helpers.stow(env, "staff-bear", SLOT.MAINHAND)
+            helpers.makeSet(env, 1, "Cat", { [SLOT.LEGS] = "legs-cat", [SLOT.MAINHAND] = "staff-cat" })
+            helpers.makeSet(env, 2, "Bear", { [SLOT.MAINHAND] = "staff-bear" })
+            if extra then extra(env) end
+        end)
+        ns.Forms.SetSet(BEAR, 2)
+        return ns, env
+    end
+
+    it("remembers the weapons you wear in normal form", function()
+        local _, env = clicker()
+        assertEqual("mace", env.WardrobeForeverCharDB.home[SLOT.MAINHAND])
+        assertEqual("idol", env.WardrobeForeverCharDB.home[SLOT.RANGED])
+
+        helpers.shift(env, CAT)
+        assertEqual("mace", env.WardrobeForeverCharDB.home[SLOT.MAINHAND], "not while shifted")
+    end)
+
+    it("knows your normal weapon when the click's swap lands before the shift", function()
+        local ns, env = clicker()
+        ns.Forms.ExpectClick({ [SLOT.MAINHAND] = "staff-cat" })
+        helpers.byHand(env, SLOT.MAINHAND, "staff-cat")
+        assertEqual("mace", env.WardrobeForeverCharDB.home[SLOT.MAINHAND], "the click's staff is not home")
+
+        helpers.shift(env, CAT)
+        assertEqual("mace", env.WardrobeForeverCharDB.normal[SLOT.MAINHAND])
+        helpers.shift(env, nil)
+        assertEqual("mace", helpers.wearing(env, SLOT.MAINHAND))
+    end)
+
+    it("does not take the form's own set weapon, put on by the click, for a change by hand", function()
+        local ns, env = clicker()
+        helpers.shift(env, CAT)
+        helpers.fight(env, true)
+        helpers.shift(env, BEAR)
+        helpers.byHand(env, SLOT.MAINHAND, "staff-bear") -- the click's swap, after the shift
+        helpers.fight(env, false)
+        helpers.shift(env, nil)
+        assertEqual("mace", helpers.wearing(env, SLOT.MAINHAND))
+    end)
+
+    it("does not take it for a change by hand when it lands before the shift either", function()
+        local ns, env = clicker()
+        helpers.shift(env, CAT)
+        helpers.fight(env, true)
+        ns.Forms.ExpectClick({ [SLOT.MAINHAND] = "staff-bear" })
+        helpers.byHand(env, SLOT.MAINHAND, "staff-bear")
+        helpers.shift(env, BEAR)
+        helpers.fight(env, false)
+        helpers.shift(env, nil)
+        assertEqual("mace", helpers.wearing(env, SLOT.MAINHAND))
+    end)
+
+    -- The game can refuse the shift (no mana, cooldown) while the click's
+    -- /equipslot still goes through.
+    it("still learns a new normal weapon after a shift the game refused", function()
+        local ns, env = clicker(function(env)
+            helpers.stow(env, "mace-new", SLOT.MAINHAND)
+        end)
+        ns.Forms.ExpectClick({ [SLOT.MAINHAND] = "mace" }) -- Travel Form: no set, refused
+        helpers.byHand(env, SLOT.MAINHAND, "mace-new")
+        assertEqual("mace-new", env.WardrobeForeverCharDB.home[SLOT.MAINHAND])
+    end)
+
+    it("puts the form's weapon back after a fight when a refused click swapped it", function()
+        local ns, env = clicker()
+        helpers.shift(env, CAT)
+        helpers.fight(env, true)
+        ns.Forms.ExpectClick({ [SLOT.MAINHAND] = "staff-bear" }) -- Bear refused, staff on
+        helpers.byHand(env, SLOT.MAINHAND, "staff-bear")
+        helpers.fight(env, false)
+        assertEqual("staff-cat", helpers.wearing(env, SLOT.MAINHAND), "still in Cat")
+        helpers.shift(env, nil)
+        assertEqual("mace", helpers.wearing(env, SLOT.MAINHAND))
+    end)
+
+    it("tells the stance buttons what the normal and set weapons are", function()
+        local ns = clicker()
+        assertEqual("mace", ns.Forms.Normal(SLOT.MAINHAND))
+        assertEqual("staff-cat", ns.Forms.SetItems(1)[SLOT.MAINHAND])
+    end)
+end)

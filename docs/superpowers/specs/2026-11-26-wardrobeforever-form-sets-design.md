@@ -89,3 +89,48 @@ Per CLAUDE.md, before building on them:
 - Two of the same ring or trinket, and a set that holds an empty slot.
 - Version bump (0.2.0), README and options page text, tests against the
   stub.
+
+## Addendum: weapons with the shift, from the stance bar (2026-11-26)
+
+**Why.** Carl's real aim was the weapon changing mid-fight when he shifts.
+Forever blocks addon code from equipping in combat, but a click on a secure
+button may run `/equipslot` (Carl's test: a macro with `/cast Cat Form` and
+`/equipslot 16 Defender of Dalaran`, clicked in Bear Form in a fight,
+worked). Carl shifts by clicking the stance bar.
+
+**What the player gets.** Once any chosen set holds a weapon (main hand, off
+hand, ranged/idol), WardrobeForever lays an invisible button of its own
+over each stance bar button. A click shifts, exactly as the stance button
+did, and in the same click swaps the weapons: the form's set weapons going
+in, the normal weapons going out. Mid-fight included. Everything else is
+as before (armour after the fight; all of it out of combat).
+
+**How (Carl approved "build it").**
+- `Stance.lua`: a `SecureActionButtonTemplate` button per stance button,
+  parented to `StanceBar.actionButtons[i]` and covering it, `type` "macro".
+  Its `macrotext`: `/cast <form name>`, then per weapon slot any chosen set
+  fills with an item: `/equipslot [form:i] <slot> <normal>` and
+  `/equipslot [noform:i] <slot> <this form's set item, or normal>` (one
+  unconditional line when the two are the same). Item names, as Carl
+  tested.
+- The normal weapon is the one Forms remembered, or else the "home"
+  weapon: what is worn in 16-18 in normal form once everything is back.
+- Text changes only out of combat (secure attributes are locked in a
+  fight); it follows sets, choices and the normal weapons.
+- Hidden in Edit Mode and Quick Keybind mode, so the bar can still be
+  moved and bound. Own hover glow and tooltip (`GameTooltip:SetShapeshift`).
+- Forms: a weapon the click already swapped is not taken for normal gear
+  (home is used), and the form's own set item is not taken for a change by
+  hand.
+
+**After review (2026-11-26).** Druids only (a warrior's stance cannot be
+clicked off). A set with an item in either hand brings both hands into the
+macros, so leaving a two-handed form puts the normal main and off hand
+back; the off hand beside a set's own main hand gets no line going in. A
+click tells Forms exactly what it puts on (`Forms.ExpectClick`), so a
+refused shift's weapon is neither a change by hand nor a home weapon.
+`UPDATE_SHAPESHIFT_FORMS` and `SPELLS_CHANGED` refresh the macros.
+
+**Limits, told to the player.** A key bound to the stance bar
+(SHAPESHIFTBUTTONn) presses Blizzard's button, not WardrobeForever's. A
+shift the game refuses (no mana, cooldown) still swaps the weapon.

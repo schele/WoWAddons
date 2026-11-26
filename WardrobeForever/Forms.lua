@@ -35,6 +35,10 @@ local FIRST_SLOT, LAST_SLOT = 1, 19
 -- one weapon slot remembers the other too, and neither hand moves while the
 -- other is on its way.
 local WEAPON_PARTNER = { [16] = 17, [17] = 16 }
+-- What a stance button's click swaps along with the shift (Stance.lua): the
+-- slots the game lets the player change in a fight.
+local WEAPON_SLOTS = { 16, 17, 18 }
+local IS_WEAPON = { [16] = true, [17] = true, [18] = true }
 -- Swaps sent for one slot before giving up until something asks again: the
 -- game can keep turning one down (bags full for a two-hander's off-hand).
 local MAX_TRIES = 3
@@ -45,6 +49,11 @@ local asked = true -- something asked for the form's gear, and it is not all on 
 local pending = {} -- [slot] = what was sent for (guid, or false for empty), not yet seen there
 local tries = {}   -- [slot] = swaps sent since the last ask
 local updating
+-- What the last stance button click put in each weapon slot ([slot] = GUID),
+-- until the next form change. Its swap may land before the game says the
+-- form changed, or the game may refuse the shift and keep the swap: either
+-- way it is neither the player's change by hand nor a home weapon.
+local clicked = {}
 
 local function clear(t)
     for key in pairs(t) do
@@ -284,15 +293,15 @@ function Forms.SetSet(spellID, setID)
 end
 
 --- A slot WardrobeForever is looking after that holds none of the items it
--- expects (the normal one, the one it put there, the one on its way) was
--- changed by hand. The player's change wins: the slot is theirs until the
--- next shift.
-local function noticeHandChanges()
+-- expects (the normal one, the one it put there, the one on its way, the
+-- form's own, what a stance button's click put there) was changed by hand.
+-- The player's change wins: the slot is theirs until the next shift.
+local function noticeHandChanges(set)
     for slot, normal in pairs(db.normal) do
         local now = worn(slot)
         local expecting = db.placed[slot] ~= nil or pending[slot] ~= nil
         if expecting and now ~= normal and now ~= db.placed[slot] and now ~= pending[slot]
-            and not locked(slot) then
+            and now ~= set[slot] and now ~= clicked[slot] and not locked(slot) then
             forget(slot)
             db.released[slot] = true
         end
@@ -319,11 +328,24 @@ local function wear(set)
     -- Remember the normal gear of every slot the set changes, all before
     -- any move: rings change fingers mid-way.
     for slot, item in pairs(set) do
-        if not db.released[slot] and db.normal[slot] == nil and not locked(slot) and worn(slot) ~= item then
-            db.normal[slot] = worn(slot)
-            local partner = WEAPON_PARTNER[slot]
-            if partner and db.normal[partner] == nil and not db.released[partner] then
-                db.normal[partner] = worn(partner)
+        if not db.released[slot] and db.normal[slot] == nil and not locked(slot) then
+            local base = worn(slot)
+            -- A stance button's click may have put the set's weapon on
+            -- already: the normal one is the home weapon.
+            local swappedFirst = base == item and IS_WEAPON[slot] and db.home[slot] ~= nil
+            if swappedFirst then
+                base = db.home[slot]
+            end
+            if base ~= item then
+                db.normal[slot] = base
+                local partner = WEAPON_PARTNER[slot]
+                if partner and db.normal[partner] == nil and not db.released[partner] then
+                    if swappedFirst and db.home[partner] ~= nil then
+                        db.normal[partner] = db.home[partner]
+                    else
+                        db.normal[partner] = worn(partner)
+                    end
+                end
             end
         end
     end
@@ -398,6 +420,7 @@ function Forms.Update()
     if db.form ~= (form or 0) then
         db.form = form or 0
         clear(db.released)
+        clear(clicked)
         ask()
     end
     local choice = form and db.forms[form]
@@ -406,11 +429,49 @@ function Forms.Update()
     end
 
     updating = true
-    noticeHandChanges()
+    local set = setItems(form and Forms.GetSet(form))
+    noticeHandChanges(set)
     if asked then
-        asked = wear(setItems(form and Forms.GetSet(form)))
+        asked = wear(set)
+    end
+    -- In normal form with everything back, what is in the weapon slots is
+    -- the home weapons, which a stance button's click puts back.
+    if not form and not asked and not InCombatLockdown() and next(db.normal) == nil then
+        for _, slot in ipairs(WEAPON_SLOTS) do
+            if not locked(slot) and worn(slot) ~= clicked[slot] then
+                db.home[slot] = worn(slot)
+            end
+        end
     end
     updating = false
+    if ns.Stance then
+        ns.Stance.Refresh()
+    end
+end
+
+--- A stance button was clicked: a shift is coming, and these weapons
+-- ([slot] = GUID) with it.
+function Forms.ExpectClick(targets)
+    for slot, guid in pairs(targets) do
+        clicked[slot] = guid
+    end
+end
+
+--- What a set wants worn, [slot] = item GUID or false (empty).
+function Forms.SetItems(setID)
+    return setItems(setID)
+end
+
+--- The normal item for `slot`: remembered while shifted, else the home
+-- weapon. Nil when neither is known.
+function Forms.Normal(slot)
+    if not db then
+        return nil
+    end
+    if db.normal[slot] ~= nil then
+        return db.normal[slot]
+    end
+    return db.home[slot]
 end
 
 -- Events that ask for the form's gear; every other one only lets work in
@@ -428,6 +489,8 @@ for _, event in ipairs({
     "PLAYER_ALIVE", "PLAYER_UNGHOST",
     "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_SUCCEEDED",
     "UNIT_SPELLCAST_CHANNEL_STOP",
+    -- A form learned or replaced (Dire Bear Form): the stance buttons follow.
+    "UPDATE_SHAPESHIFT_FORMS", "SPELLS_CHANGED",
 }) do
     events:RegisterEvent(event)
 end
@@ -441,7 +504,7 @@ events:SetScript("OnEvent", function(self, event, arg1)
             WardrobeForeverCharDB = {}
         end
         db = WardrobeForeverCharDB
-        for _, key in ipairs({ "forms", "normal", "placed", "released" }) do
+        for _, key in ipairs({ "forms", "normal", "placed", "released", "home" }) do
             if type(db[key]) ~= "table" then
                 db[key] = {}
             end

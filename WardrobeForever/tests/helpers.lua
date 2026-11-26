@@ -7,7 +7,7 @@ M.worn = stub.worn
 M.inBag = stub.inBag
 M.inBank = stub.inBank
 
-M.FILES = { "WardrobeForever.lua", "Forms.lua", "Settings.lua" }
+M.FILES = { "WardrobeForever.lua", "Forms.lua", "Stance.lua", "IconSearch.lua", "Settings.lua" }
 
 --- Load the addon into a stubbed client the way WoW would: in .toc order,
 -- each chunk receiving (addonName, privateTable). `prepare`, if given, sees
@@ -163,11 +163,12 @@ M.BEAR, M.AQUATIC, M.CAT, M.TRAVEL = 5487, 1066, 768, 783
 
 --- A level 38 druid's stance bar, as Forever lists it.
 function M.druid(env)
+    -- Icons as Forever gave them (Carl's /run, 2026-11-26).
     env.__forms = {
-        { spellID = M.BEAR, name = "Bear Form" },
-        { spellID = M.AQUATIC, name = "Aquatic Form" },
-        { spellID = M.CAT, name = "Cat Form" },
-        { spellID = M.TRAVEL, name = "Travel Form" },
+        { spellID = M.BEAR, name = "Bear Form", icon = 132276 },
+        { spellID = M.AQUATIC, name = "Aquatic Form", icon = 132112 },
+        { spellID = M.CAT, name = "Cat Form", icon = 132115 },
+        { spellID = M.TRAVEL, name = "Travel Form", icon = 132144 },
     }
 end
 
@@ -186,10 +187,14 @@ function M.fight(env, on)
 end
 
 --- Put on a bagged item by hand, the way a right-click in the bags does.
+-- The player's own click (or a stance button's macro), which the game
+-- allows in a fight.
 function M.byHand(env, slot, guid)
     local at = env.C_Item.GetItemLocation(guid)
+    env.__player = true
     env.C_Container.PickupContainerItem(at:GetBagAndSlot())
     env.PickupInventoryItem(slot)
+    env.__player = false
     M.fire(env, "PLAYER_EQUIPMENT_CHANGED", slot, false)
 end
 

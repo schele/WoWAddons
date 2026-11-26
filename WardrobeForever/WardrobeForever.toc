@@ -9,4 +9,6 @@
 
 WardrobeForever.lua
 Forms.lua
+Stance.lua
+IconSearch.lua
 Settings.lua

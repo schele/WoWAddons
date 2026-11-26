@@ -63,7 +63,8 @@ local function ensureBuilt()
         .. "shifting out puts back what you had on. Make sets on the character "
         .. "sheet: the arrow at its top right, then the Equipment Manager tab. "
         .. "The game lets no addon change gear in a fight, so a shift in combat "
-        .. "is worn when the fight ends."
+        .. "is worn when the fight ends; but click the stance bar to shift, and "
+        .. "the set's weapons swap in the same click, even in a fight."
     )
     Panel.about = about
 

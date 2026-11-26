@@ -81,19 +81,45 @@ function stub.newEnv()
         function frame:CreateFontString() return makeFrame(nil, self) end
         function frame:CreateTexture() return makeFrame(nil, self) end
 
+        -- A secure button may not be shown, hidden or changed in a fight.
+        local function lockedDown(self, what)
+            if self.protected and env.__inCombat then
+                error(what .. ": action blocked in combat", 3)
+            end
+        end
+
         function frame:Show()
+            lockedDown(self, "Show")
             if not self.shown then
                 self.shown = true
-                if self.scripts.OnShow then self.scripts.OnShow(self) end
+                self:Fire("OnShow")
             end
         end
 
         function frame:Hide()
+            lockedDown(self, "Hide")
             if self.shown then
                 self.shown = false
-                if self.scripts.OnHide then self.scripts.OnHide(self) end
+                self:Fire("OnHide")
             end
         end
+
+        function frame:SetShown(shown)
+            if shown then self:Show() else self:Hide() end
+        end
+
+        function frame:SetAllPoints(target) self.allPoints = target end
+        function frame:SetFrameLevel(level) self.frameLevel = level end
+        function frame:GetFrameLevel() return self.frameLevel or 1 end
+        function frame:RegisterForClicks(...) self.clicks = { ... } end
+        function frame:SetHighlightTexture(texture, blend) self.highlight = { texture, blend } end
+
+        function frame:SetAttribute(key, value)
+            lockedDown(self, "SetAttribute")
+            self.attributes = self.attributes or {}
+            self.attributes[key] = value
+        end
+        function frame:GetAttribute(key) return self.attributes and self.attributes[key] end
 
         function frame:IsShown() return self.shown end
         function frame:IsMouseOver() return env.__mouseOver[self] == true end
@@ -123,10 +149,30 @@ function stub.newEnv()
         return frame
     end
 
-    env.CreateFrame = function(_, name, parent, template)
+    env.CreateFrame = function(kind, name, parent, template)
+        if template == "SecureActionButtonTemplate" and env.__inCombat then
+            error("CreateFrame: secure button in combat", 2)
+        end
         local frame = makeFrame(name, parent)
         frame.template = template
+        frame.protected = template == "SecureActionButtonTemplate"
         if name then env[name] = frame end
+        -- An edit box tells its OnTextChanged about every change, typed or set.
+        if kind == "EditBox" then
+            function frame:SetText(text)
+                self.text = text
+                self:Fire("OnTextChanged", false)
+            end
+            function frame:Type(text)
+                self.text = text
+                self:Fire("OnTextChanged", true)
+            end
+            function frame:ClearFocus() end
+            function frame:SetAutoFocus(auto) self.autoFocus = auto end
+            if template == "SearchBoxTemplate" then
+                frame.Instructions = makeFrame(nil, frame)
+            end
+        end
         -- The game's dropdown, as Blizzard_Menu's guide describes it (copied
         -- from BankBags' stub): a function fills the menu with radios, and
         -- the button reads the one selected, or the default text when none
@@ -377,6 +423,101 @@ function stub.newEnv()
     ammo.scripts.OnLeave = env.PaperDollItemSlotButton_OnLeave
     env.CharacterAmmoSlot = ammo
 
+    -- The stance bar: ten buttons, as Blizzard_ActionBar's StanceBar makes
+    -- them, shown or not by how many forms there are.
+    local stanceBar = makeFrame("StanceBar")
+    stanceBar.actionButtons = {}
+    for index = 1, 10 do
+        local button = makeFrame(nil, stanceBar)
+        button.id = index
+        button.frameLevel = 5
+        stanceBar.actionButtons[index] = button
+    end
+    env.StanceBar = stanceBar
+
+    -- The tooltip, recording what it was asked to show.
+    local tooltip = makeFrame("GameTooltip")
+    tooltip.shown = false
+    function tooltip:SetOwner(owner, anchor) self.owner, self.anchor = owner, anchor; self.shown = true end
+    function tooltip:SetShapeshift(index) self.shapeshift = index end
+    env.GameTooltip = tooltip
+
+    -- Edit Mode and Quick Keybind mode, closed.
+    env.EditModeManagerFrame = makeFrame("EditModeManagerFrame")
+    env.EditModeManagerFrame.shown = false
+    env.QuickKeybindFrame = makeFrame("QuickKeybindFrame")
+    env.QuickKeybindFrame.shown = false
+
+    -- The equipment set icon window (GearManagerPopupFrame, from
+    -- Camelot/PaperDollFrame.lua on IconSelectorPopupFrameTemplate), cut down
+    -- to its icon list: the game's list by index, the icon grid (a
+    -- SelectorMixin), and the "selected icon" button whose texture the Okay
+    -- button saves.
+    local popup = makeFrame("GearManagerPopupFrame")
+    popup.shown = false
+    popup.baseIcons = { "INV_MISC_QUESTIONMARK", 136000, 136001, 132115, 132276, 135000 }
+    -- Its OnHide releases the icon list (self.iconDataProvider = nil), so
+    -- these raise while it is closed, as they do in the game.
+    local function provider(self)
+        if self.released then error("attempt to index field 'iconDataProvider' (a nil value)", 3) end
+    end
+    popup.scripts.OnHide = function(self) self.released = true end
+    function popup:GetNumIcons() provider(self) return #self.baseIcons end
+    function popup:GetIconByIndex(index) provider(self) return self.baseIcons[index] end
+    function popup:GetIndexOfIcon(icon)
+        provider(self)
+        for index, each in ipairs(self.baseIcons) do
+            if each == icon then return index end
+        end
+        return nil
+    end
+    popup.BorderBox = makeFrame(nil, popup)
+    popup.BorderBox.IconTypeDropdown = makeFrame(nil, popup.BorderBox)
+    popup.BorderBox.SelectedIconArea = makeFrame(nil, popup.BorderBox)
+    local selectedButton = makeFrame(nil, popup.BorderBox.SelectedIconArea)
+    function selectedButton:SetIconTexture(icon) self.icon = icon end
+    function selectedButton:GetIconTexture() return self.icon end
+    popup.BorderBox.SelectedIconArea.SelectedIconButton = selectedButton
+
+    local selector = makeFrame(nil, popup)
+    function selector:SetSelectionsDataProvider(get, count) self.getSelection, self.countSelections = get, count end
+    function selector:SetSelectionsArray(array)
+        self:SetSelectionsDataProvider(function(index) return array[index] end, function() return #array end)
+    end
+    function selector:GetNumSelections() return self.countSelections and self.countSelections() or 0 end
+    function selector:GetSelection(index) return self.getSelection(index) end
+    function selector:SetSelectedIndex(index) self.selectedIndex = index end
+    function selector:GetSelectedIndex() return self.selectedIndex end
+    function selector:SetSelectedCallback(callback) self.selectedCallback = callback end
+    -- A click on an icon in the grid.
+    function selector:OnSelection(index)
+        if self.selectedCallback then self.selectedCallback(index, self:GetSelection(index)) end
+        self:SetSelectedIndex(index)
+    end
+    popup.IconSelector = selector
+
+    -- GearManagerPopupFrameMixin:OnShow and :Update: the game's list, the
+    -- set's icon marked, and a click putting its icon on the selected button.
+    popup.scripts.OnShow = function(self)
+        self.released = false
+        selector:SetSelectionsDataProvider(
+            function(index) return self:GetIconByIndex(index) end,
+            function() return self:GetNumIcons() end)
+        selector:SetSelectedIndex(self:GetIndexOfIcon(selectedButton:GetIconTexture()))
+        selector:SetSelectedCallback(function(_, icon) selectedButton:SetIconTexture(icon) end)
+    end
+    env.GearManagerPopupFrame = popup
+
+    -- The spellbook: { name, iconID } per entry.
+    env.__spellbook = {}
+    env.Enum = { SpellBookSpellBank = { Player = 0 } }
+    env.C_SpellBook = {
+        GetSpellBookItemInfo = function(index)
+            local spell = env.__spellbook[index]
+            return spell and { name = spell.name, iconID = spell.iconID } or nil
+        end,
+    }
+
     stub.addGear(env)
     return env
 end
@@ -471,6 +612,8 @@ function stub.addGear(env)
             return guid
         end,
         GetItemLocation = function(guid) return find(guid) end,
+        -- An item's name is its GUID here, which keeps macro text readable.
+        GetItemName = function(location) return itemAt(location) end,
         IsLocked = function(location)
             local guid = itemAt(location)
             return guid ~= nil and env.__locked[guid] == true
@@ -533,7 +676,7 @@ function stub.addGear(env)
     -- the cursor (seen 2026-11-26). Only the player's own click works then.
     env.__blocked = 0
     env.PickupInventoryItem = function(slot)
-        if env.__inCombat then
+        if env.__inCombat and not env.__player then
             env.__blocked = env.__blocked + 1
             return
         end
@@ -541,11 +684,28 @@ function stub.addGear(env)
     end
     env.InCombatLockdown = function() return env.__inCombat end
 
+    -- An item's link and icon: its name is its GUID; its icon whatever the
+    -- test gave __itemInfo[guid].icon.
+    local function linkOf(guid)
+        return guid and ("|cffffffff|Hitem:1::::::::38:::::|h[" .. guid .. "]|h|r") or nil
+    end
+    local function iconOf(guid)
+        return guid and (env.__itemInfo[guid] and env.__itemInfo[guid].icon or 134400) or nil
+    end
+
     env.C_Container = {
         PickupContainerItem = function(bag, slot) pickup(newLocation({ bag = bag, slot = slot })) end,
         GetContainerFreeSlots = function(bag) return freeSlots(bag) end,
         GetContainerNumFreeSlots = function(bag) return #freeSlots(bag), 0 end,
+        GetContainerNumSlots = function(bag) return env.__bagSize[bag] or 0 end,
+        GetContainerItemInfo = function(bag, slot)
+            local guid = env.__bags[bag] and env.__bags[bag][slot]
+            if not guid then return nil end
+            return { iconFileID = iconOf(guid), hyperlink = linkOf(guid), itemID = 1 }
+        end,
     }
+    env.GetInventoryItemTexture = function(_, slot) return iconOf(env.__worn[slot]) end
+    env.GetInventoryItemLink = function(_, slot) return linkOf(env.__worn[slot]) end
 
     env.C_PaperDollInfo = {
         -- Nothing goes in the off hand beside a two-hander.
@@ -558,6 +718,8 @@ function stub.addGear(env)
     }
 
     env.UnitAffectingCombat = function(unit) return unit == "player" and env.__inCombat end
+    env.__class = "DRUID"
+    env.UnitClass = function() return "Druid", env.__class, 11 end
     env.__casting = false
     env.__dead = false
     env.UnitCastingInfo = function(unit)
@@ -574,15 +736,27 @@ function stub.addGear(env)
     env.GetShapeshiftFormInfo = function(index)
         local form = env.__forms[index]
         if not form then return nil end
-        if env.__formsLoading then return 132000 + index, env.__form == index, true, nil end
-        return 132000 + index, env.__form == index, true, form.spellID
+        local icon = form.icon or 132000 + index
+        -- The form you are in shows the "active" glow (Spell_Nature_WispSplode)
+        -- instead of its icon, as on Carl's stance bar.
+        if env.__form == index then icon = 136116 end
+        if env.__formsLoading then return icon, env.__form == index, true, nil end
+        return icon, env.__form == index, true, form.spellID
+    end
+    local function formOf(spellID)
+        for index, form in ipairs(env.__forms) do
+            if form.spellID == spellID then return form, index end
+        end
+        return nil
     end
     env.C_Spell = {
         GetSpellName = function(spellID)
-            for _, form in ipairs(env.__forms) do
-                if form.spellID == spellID then return form.name end
-            end
-            return nil
+            local form = formOf(spellID)
+            return form and form.name or nil
+        end,
+        GetSpellTexture = function(spellID)
+            local form, index = formOf(spellID)
+            return form and (form.icon or 132000 + index) or nil
         end,
     }
 
