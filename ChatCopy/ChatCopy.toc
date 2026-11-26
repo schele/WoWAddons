@@ -4,6 +4,7 @@
 ## IconTexture: Interface\AddOns\ChatCopy\icon
 ## Author: Skyler
 ## Version: 0.1.0
+## X-Wago-ID: nKWwlMKE
 ## SavedVariables: ChatCopyDB
 
 ChatCopy.lua
