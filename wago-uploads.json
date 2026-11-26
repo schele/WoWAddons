@@ -7,6 +7,10 @@
                      "version":  "0.3.3",
                      "commit":  "1fe26ba22aef51552792493960a75f31f5c4ef08"
                  },
+    "ChatCopy":  {
+                     "version":  "0.1.0",
+                     "commit":  "8a1ed672e25582b705d61200bb62ad614a37e800"
+                 },
     "ClickHeal":  {
                       "version":  "0.2.2",
                       "commit":  "5c15c828fdd0b0f8b225bf6b23cb0b8fdb0df266"
