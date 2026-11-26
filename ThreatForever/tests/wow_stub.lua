@@ -265,15 +265,17 @@ function stub.newEnv()
     end
 
     -- Nameplates: a mob with one has a "nameplateN" token, the same unit as
-    -- any other token for it. The game says which plate is the target's.
+    -- any other token for it. The plate frame the game hands back does not
+    -- say which token it is: WoW Forever's showed the target twice in the
+    -- window when the code relied on a field there. Which plate is a unit's
+    -- is for UnitIsUnit to say.
     env.C_NamePlate = {
         GetNamePlateForUnit = function(token)
             local u = unit(token)
             if not u then return nil end
             for index = 1, 40 do
-                local plate = "nameplate" .. index
-                if env.__units[plate] == u then
-                    return { namePlateUnitToken = plate }
+                if env.__units["nameplate" .. index] == u then
+                    return {}
                 end
             end
         end,
