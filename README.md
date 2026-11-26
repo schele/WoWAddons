@@ -5,7 +5,7 @@ World of Warcraft addons, one folder each.
 | Addon | What it is |
 |---|---|
 | [ForeverPanel](ForeverPanel/) | A full-width bar across the top of the screen showing XP, money, bag space and the time |
-| [UrlCopy](UrlCopy/) | Makes URLs spoken in chat clickable, and opens the one you click in a box you can copy from |
+| [ChatCopy](ChatCopy/) | Any chat window's text in a box you can mark and copy from, and the links people post made clickable |
 | [ClickHeal](ClickHeal/) | A row of spell buttons beside every party member, so healing or dispelling someone is one click |
 | [TrinketMenu](TrinketMenu/) | Every trinket you are carrying, on a bar: left-click to equip in slot 1, right-click for slot 2 |
 | [FishingForever](FishingForever/) | One key to cast, pick up the bobber and recast while fishing, a bar toward your next Fishing point, and stats of every catch by zone and skill |

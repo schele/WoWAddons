@@ -31,7 +31,7 @@ end
 
 local function setting(ns, key)
     for _, definition in ipairs(ns.settings) do
-        if definition.store == "chatCopy" and definition.key == key then
+        if definition.store == "chatText" and definition.key == key then
             return definition
         end
     end
@@ -39,7 +39,7 @@ end
 
 describe("chat text as plain text", function()
     local ns = helpers.loadAddon()
-    local plain = ns.ChatCopy.Plain
+    local plain = ns.ChatText.Plain
 
     it("drops colour codes", function()
         assertEqual("BossLoot Loaded.", plain("|cff66ccffBossLoot|r Loaded."))
@@ -70,7 +70,7 @@ describe("reading a chat window", function()
     it("gives its lines oldest first, as plain text", function()
         local ns, env = loggedIn()
         history(env.ChatFrame1, { "|cffffff00old|r", "new" })
-        local lines, skipped = ns.ChatCopy.Lines(env.ChatFrame1)
+        local lines, skipped = ns.ChatText.Lines(env.ChatFrame1)
         assertEqual("old|new", table.concat(lines, "|"))
         assertEqual(0, skipped)
     end)
@@ -78,24 +78,24 @@ describe("reading a chat window", function()
     it("leaves out a line it may not read, and counts it", function()
         local ns, env = loggedIn()
         history(env.ChatFrame1, { "one", { error = true }, "three" })
-        local lines, skipped = ns.ChatCopy.Lines(env.ChatFrame1)
+        local lines, skipped = ns.ChatText.Lines(env.ChatFrame1)
         assertEqual("one|three", table.concat(lines, "|"))
         assertEqual(1, skipped)
     end)
 
     it("gives nothing, and does not fail, for a frame without the calls", function()
         local ns, env = loggedIn()
-        local lines, skipped = ns.ChatCopy.Lines(env.CreateFrame("Frame"))
+        local lines, skipped = ns.ChatText.Lines(env.CreateFrame("Frame"))
         assertEqual(0, #lines)
         assertEqual(0, skipped)
     end)
 end)
 
 describe("the copy window", function()
-    it("opens on /url chat with the chat tab being looked at, newest at the bottom, ready to copy", function()
+    it("opens on /cc chat with the chat tab being looked at, newest at the bottom, ready to copy", function()
         local ns, env = loggedIn()
         helpers.command(env, "chat")
-        local frame = ns.ChatCopy.Frame()
+        local frame = ns.ChatText.Frame()
         assertTrue(frame:IsShown())
         assertEqual("first\nsecond", frame.box:GetText())
         assertTrue(frame.box.focused)
@@ -103,39 +103,39 @@ describe("the copy window", function()
         assertMatch("Ctrl%+C", frame.hint:GetText())
     end)
 
-    it("opens on the chat tab /url chat is typed in, whichever that is", function()
+    it("opens on the chat tab /cc chat is typed in, whichever that is", function()
         local ns, env = loggedIn()
         env.SELECTED_CHAT_FRAME = env.ChatFrame3
         helpers.command(env, "chat")
-        assertEqual("third window", ns.ChatCopy.Frame().box:GetText())
+        assertEqual("third window", ns.ChatText.Frame().box:GetText())
     end)
 
     it("says how many lines it could not read", function()
         local ns, env = loggedIn()
         history(env.ChatFrame1, { "one", { error = true }, { error = true } })
-        ns.ChatCopy.Open(env.ChatFrame1)
-        assertMatch("2 lines could not be read", ns.ChatCopy.Frame().hint:GetText())
+        ns.ChatText.Open(env.ChatFrame1)
+        assertMatch("2 lines could not be read", ns.ChatText.Frame().hint:GetText())
     end)
 
     it("says so when the window holds nothing", function()
         local ns, env = loggedIn()
         history(env.ChatFrame1, {})
-        ns.ChatCopy.Open(env.ChatFrame1)
-        assertMatch("nothing", ns.ChatCopy.Frame().hint:GetText())
+        ns.ChatText.Open(env.ChatFrame1)
+        assertMatch("nothing", ns.ChatText.Frame().hint:GetText())
     end)
 
     it("puts its text back when typed into", function()
         local ns, env = loggedIn()
-        ns.ChatCopy.Open(env.ChatFrame1)
-        local box = ns.ChatCopy.Frame().box
+        ns.ChatText.Open(env.ChatFrame1)
+        local box = ns.ChatText.Frame().box
         box:SetText("first\nsecondx")
         assertEqual("first\nsecond", box:GetText())
     end)
 
     it("closes on Escape", function()
         local ns, env = loggedIn()
-        ns.ChatCopy.Open(env.ChatFrame1)
-        local frame = ns.ChatCopy.Frame()
+        ns.ChatText.Open(env.ChatFrame1)
+        local frame = ns.ChatText.Frame()
         frame.box.scripts.OnEscapePressed(frame.box)
         assertFalse(frame:IsShown())
         assertFalse(frame.box.focused)
@@ -143,26 +143,26 @@ describe("the copy window", function()
 
     it("closes with Escape from the game too", function()
         local ns, env = loggedIn()
-        ns.ChatCopy.Open(env.ChatFrame1)
+        ns.ChatText.Open(env.ChatFrame1)
         local listed = false
         for _, name in ipairs(env.UISpecialFrames) do
-            if env[name] == ns.ChatCopy.Frame() then listed = true end
+            if env[name] == ns.ChatText.Frame() then listed = true end
         end
         assertTrue(listed)
     end)
 
     it("shows what has been said since, when opened again", function()
         local ns, env = loggedIn()
-        ns.ChatCopy.Open(env.ChatFrame1)
+        ns.ChatText.Open(env.ChatFrame1)
         history(env.ChatFrame1, { "first", "second", "third" })
-        ns.ChatCopy.Open(env.ChatFrame1)
-        assertEqual("first\nsecond\nthird", ns.ChatCopy.Frame().box:GetText())
+        ns.ChatText.Open(env.ChatFrame1)
+        assertEqual("first\nsecond\nthird", ns.ChatText.Frame().box:GetText())
     end)
 
     it("scrolls to the newest line once the text is laid out", function()
         local ns, env = loggedIn()
-        ns.ChatCopy.Open(env.ChatFrame1)
-        local scroll = ns.ChatCopy.Frame().scroll
+        ns.ChatText.Open(env.ChatFrame1)
+        local scroll = ns.ChatText.Frame().scroll
         scroll.verticalScrollRange = 240
         env.__runTimers()
         assertEqual(240, scroll.verticalScroll)
@@ -172,16 +172,16 @@ end)
 describe("the copy button", function()
     it("is put on each chat window but the combat log", function()
         local ns, env = loggedIn()
-        ns.ChatCopy.Update()
-        assertTrue(ns.ChatCopy.Button(env.ChatFrame1) ~= nil)
-        assertTrue(ns.ChatCopy.Button(env.ChatFrame3) ~= nil)
-        assertNil(ns.ChatCopy.Button(env.ChatFrame2))
+        ns.ChatText.Update()
+        assertTrue(ns.ChatText.Button(env.ChatFrame1) ~= nil)
+        assertTrue(ns.ChatText.Button(env.ChatFrame3) ~= nil)
+        assertNil(ns.ChatText.Button(env.ChatFrame2))
     end)
 
     it("sits in the top-right corner, clear of the chat's scroll bar", function()
         local ns, env = loggedIn()
-        ns.ChatCopy.Update()
-        local point, relativeTo, relativePoint, x, y = ns.ChatCopy.Button(env.ChatFrame1):GetPoint(1)
+        ns.ChatText.Update()
+        local point, relativeTo, relativePoint, x, y = ns.ChatText.Button(env.ChatFrame1):GetPoint(1)
         assertEqual("TOPRIGHT", point)
         assertEqual(env.ChatFrame1, relativeTo)
         assertEqual("TOPRIGHT", relativePoint)
@@ -191,15 +191,15 @@ describe("the copy button", function()
 
     it("shows only while the mouse is over its chat window", function()
         local ns, env = loggedIn()
-        ns.ChatCopy.Update()
-        local button = ns.ChatCopy.Button(env.ChatFrame1)
+        ns.ChatText.Update()
+        local button = ns.ChatText.Button(env.ChatFrame1)
         assertFalse(button:IsShown())
         env.ChatFrame1.mouseOver = true
-        ns.ChatCopy.Update()
+        ns.ChatText.Update()
         assertTrue(button:IsShown())
-        assertFalse(ns.ChatCopy.Button(env.ChatFrame3):IsShown(), "only the window under the mouse")
+        assertFalse(ns.ChatText.Button(env.ChatFrame3):IsShown(), "only the window under the mouse")
         env.ChatFrame1.mouseOver = false
-        ns.ChatCopy.Update()
+        ns.ChatText.Update()
         assertFalse(button:IsShown())
     end)
 
@@ -209,35 +209,35 @@ describe("the copy button", function()
         for _, frame in ipairs(env.__frames) do
             if frame.scripts.OnUpdate then frame.scripts.OnUpdate(frame, 1) end
         end
-        assertTrue(ns.ChatCopy.Button(env.ChatFrame1):IsShown())
+        assertTrue(ns.ChatText.Button(env.ChatFrame1):IsShown())
     end)
 
     it("opens its own chat window's text", function()
         local ns, env = loggedIn()
-        ns.ChatCopy.Update()
-        ns.ChatCopy.Button(env.ChatFrame3).scripts.OnClick(ns.ChatCopy.Button(env.ChatFrame3))
-        assertEqual("third window", ns.ChatCopy.Frame().box:GetText())
+        ns.ChatText.Update()
+        ns.ChatText.Button(env.ChatFrame3).scripts.OnClick(ns.ChatText.Button(env.ChatFrame3))
+        assertEqual("third window", ns.ChatText.Frame().box:GetText())
     end)
 
-    it("is gone, mouse or not, with the setting off, and /url chat still works", function()
+    it("is gone, mouse or not, with the setting off, and /cc chat still works", function()
         local ns, env = loggedIn()
         env.ChatFrame1.mouseOver = true
-        ns.ChatCopy.Update()
+        ns.ChatText.Update()
         ns.SetSettingValue(setting(ns, "button"), false)
-        assertFalse(ns.ChatCopy.Button(env.ChatFrame1):IsShown())
-        ns.ChatCopy.Update()
-        assertFalse(ns.ChatCopy.Button(env.ChatFrame1):IsShown())
+        assertFalse(ns.ChatText.Button(env.ChatFrame1):IsShown())
+        ns.ChatText.Update()
+        assertFalse(ns.ChatText.Button(env.ChatFrame1):IsShown())
         helpers.command(env, "chat")
-        assertTrue(ns.ChatCopy.Frame():IsShown())
+        assertTrue(ns.ChatText.Frame():IsShown())
     end)
 
     it("is not made at all while the setting is off", function()
         local ns, env = helpers.loadAddon()
-        env.UrlCopyDB = { chatCopy = { button = false } }
+        env.ChatCopyDB = { chatText = { button = false } }
         env.ChatFrame1.mouseOver = true
         helpers.login(ns, env)
-        ns.ChatCopy.Update()
-        assertNil(ns.ChatCopy.Button(env.ChatFrame1))
+        ns.ChatText.Update()
+        assertNil(ns.ChatText.Button(env.ChatFrame1))
     end)
 
     it("is a setting, on by default, in the settings panel", function()
@@ -245,6 +245,6 @@ describe("the copy button", function()
         local definition = setting(ns, "button")
         assertEqual("checkbox", definition.type)
         assertEqual("Copy button on chat windows", definition.name)
-        assertTrue(ns.db.chatCopy.button)
+        assertTrue(ns.db.chatText.button)
     end)
 end)

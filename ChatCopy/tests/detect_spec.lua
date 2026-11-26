@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local ns = helpers.loadAddon({ "UrlCopy.lua", "Detect.lua" })
+local ns = helpers.loadAddon({ "ChatCopy.lua", "Detect.lua" })
 local Detect = ns.Detect
 
 --- The URLs found in a message, as a plain list.

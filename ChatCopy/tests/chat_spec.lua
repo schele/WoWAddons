@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local FILES = { "UrlCopy.lua", "Detect.lua", "Popup.lua", "Chat.lua" }
+local FILES = { "ChatCopy.lua", "Detect.lua", "Popup.lua", "Chat.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)
@@ -13,7 +13,7 @@ describe("rewriting a message", function()
         local ns, env = loggedIn()
         local shown = helpers.say(env, "go to example.com now")
 
-        assertMatch("|Hurlcopy:example%.com|h", shown, "the link carries the URL")
+        assertMatch("|Hchatcopy:example%.com|h", shown, "the link carries the URL")
     end)
 
     it("colours and brackets the visible text", function()
@@ -35,8 +35,8 @@ describe("rewriting a message", function()
         local ns, env = loggedIn()
         local shown = helpers.say(env, "a.com and http://b.org/x")
 
-        assertMatch("|Hurlcopy:a%.com|h", shown)
-        assertMatch("|Hurlcopy:http://b%.org/x|h", shown)
+        assertMatch("|Hchatcopy:a%.com|h", shown)
+        assertMatch("|Hchatcopy:http://b%.org/x|h", shown)
     end)
 
     it("leaves a message with no URL untouched", function()
@@ -51,7 +51,7 @@ describe("rewriting a message", function()
         local shown = helpers.say(env, "http://evil.com|cffff0000nope|r")
 
         local link = helpers.linkIn(shown)
-        assertEqual("urlcopy:http://evil.com", link, "the escape stayed outside")
+        assertEqual("chatcopy:http://evil.com", link, "the escape stayed outside")
     end)
 
     it("works in every channel it filters", function()
@@ -59,7 +59,7 @@ describe("rewriting a message", function()
 
         for _, event in ipairs(ns.Chat.EVENTS) do
             local shown = env.__say(event, "see example.com", "Someone")
-            assertMatch("|Hurlcopy:", shown, event .. " is filtered")
+            assertMatch("|Hchatcopy:", shown, event .. " is filtered")
         end
     end)
 end)
@@ -73,7 +73,7 @@ describe("rewriting switched off", function()
         assertEqual(message, helpers.say(env, message))
     end)
 
-    it("still remembers the URL, which is what makes /url a way out", function()
+    it("still remembers the URL, which is what makes /cc a way out", function()
         local ns, env = loggedIn()
         ns.db.chat.rewrite = false
 
@@ -100,7 +100,7 @@ describe("shortening", function()
         local long = "https://example.com/a/very/long/path/that/goes/on/and/on"
         local shown = helpers.say(env, "see " .. long)
 
-        assertEqual("urlcopy:" .. long, helpers.linkIn(shown), "nothing is lost")
+        assertEqual("chatcopy:" .. long, helpers.linkIn(shown), "nothing is lost")
     end)
 
     it("leaves a short link in full", function()
@@ -147,7 +147,7 @@ describe("the filter's return shape", function()
         -- as well as each slot is what makes that regression fail loudly.
         assertEqual(6, #results, "suppress + message + 4 pass-through arguments")
         assertFalse(results[1])
-        assertMatch("|Hurlcopy:example%.com|h", results[2])
+        assertMatch("|Hchatcopy:example%.com|h", results[2])
         assertEqual("Someone", results[3], "author must survive in its slot")
         assertEqual(7, results[4], "languageID must survive in its slot")
         assertEqual("General", results[5], "channel name must survive in its slot")

@@ -125,7 +125,7 @@ local function ensureBuilt()
     -- Centred against the icon rather than pinned to the panel, so the two
     -- read as one heading whatever size the icon is given.
     title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
-    title:SetText("UrlCopy")
+    title:SetText("ChatCopy")
 
     -- From the addon's own metadata, not a constant here, which would drift
     -- from the .toc the first time either is bumped without the other.
@@ -141,8 +141,9 @@ local function ensureBuilt()
     hint:SetWidth(PANEL_WIDTH - PADDING * 2)
     hint:SetJustifyH("LEFT")
     hint:SetText(
-        "Click a link in chat, or type /url 1 for the most recent one. WoW has "
-        .. "no clipboard, so a box with the link selected is as far as any "
+        "Click a link in chat, or type /cc 1 for the most recent one. For a "
+        .. "chat window's text, click the button in its corner or type /cc chat. "
+        .. "WoW has no clipboard, so a box with the text in it is as far as any "
         .. "addon can take you: Ctrl+C from there."
     )
 
@@ -178,7 +179,7 @@ local function register()
     -- shows it when the category is opened, and that is when it gets filled.
     panel = CreateFrame("Frame", nil, UIParent)
     panel:Hide()
-    panel.name = "UrlCopy"
+    panel.name = "ChatCopy"
     Panel.panel = panel
 
     panel:SetScript("OnShow", function()
@@ -189,7 +190,7 @@ local function register()
     -- A canvas category holds widgets we own, which avoids
     -- Settings.RegisterAddOnSetting: its argument list changed in 11.0 and a
     -- wrong guess there registers nothing and fails silently.
-    category = Settings.RegisterCanvasLayoutCategory(panel, "UrlCopy")
+    category = Settings.RegisterCanvasLayoutCategory(panel, "ChatCopy")
     Settings.RegisterAddOnCategory(category)
 end
 
@@ -251,7 +252,7 @@ end
 --- Open the panel in the game's options window.
 function ns.OpenSettings()
     if not category then
-        ns.Print("This client has no settings panel. Use /url for commands.")
+        ns.Print("This client has no settings panel. Use /cc for commands.")
         return
     end
 
@@ -289,6 +290,6 @@ ns.OnLogin(function()
     if Settings and Settings.RegisterCanvasLayoutCategory then
         register()
     else
-        ns.Print("This client has no settings panel API. Use /url instead.")
+        ns.Print("This client has no settings panel API. Use /cc instead.")
     end
 end)

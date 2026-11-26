@@ -13,7 +13,7 @@ ns.AddDefaults({
 
 local SIZE = 31
 local RIM_OFFSET = 10 -- how far past the minimap's edge the button's centre sits
-local ICON = "Interface\\AddOns\\UrlCopy\\logo"
+local ICON = "Interface\\AddOns\\ChatCopy\\logo"
 
 local button
 
@@ -60,7 +60,7 @@ local function showTooltip(self)
         return
     end
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetText("UrlCopy")
+    GameTooltip:SetText("ChatCopy")
     GameTooltip:AddLine("Click to open or close the settings, drag to move.", 1, 1, 1)
     GameTooltip:Show()
 end
@@ -70,7 +70,7 @@ local function onClick()
 end
 
 local function create()
-    button = CreateFrame("Button", "UrlCopyMinimapButton", Minimap)
+    button = CreateFrame("Button", "ChatCopyMinimapButton", Minimap)
     button:SetSize(SIZE, SIZE)
     button:SetFrameStrata("MEDIUM")
     button:SetFrameLevel(8)
@@ -133,7 +133,7 @@ local hideSetting = ns.RegisterSetting({
     type = "checkbox",
     invert = true,
     name = "Show the minimap button",
-    tooltip = "Shows the round button on the minimap's rim. /url minimap does the same.",
+    tooltip = "Shows the round button on the minimap's rim. /cc minimap does the same.",
     onChange = function(hide)
         if button then
             button:SetShown(not hide)
@@ -147,7 +147,7 @@ local hideSetting = ns.RegisterSetting({
 ns.RegisterCommand("minimap", "Hide or show the minimap button", function()
     ns.SetSettingValue(hideSetting, not ns.db.minimap.hide)
     if ns.db.minimap.hide then
-        ns.Print("Minimap button hidden. /url minimap brings it back.")
+        ns.Print("Minimap button hidden. /cc minimap brings it back.")
     else
         ns.Print("Minimap button shown.")
     end

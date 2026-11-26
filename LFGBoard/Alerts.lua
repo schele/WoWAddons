@@ -117,7 +117,7 @@ end
 local installed = false
 
 --- Hooked rather than replaced, so every other link type reaches the
--- client's own handler untouched, as UrlCopy's links do.
+-- client's own handler untouched, as ChatCopy's links do.
 function Alerts.Install()
     if installed then
         return

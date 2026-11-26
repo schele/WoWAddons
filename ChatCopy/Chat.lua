@@ -86,7 +86,7 @@ function Chat.Link(url)
         display = ns.Detect.Shorten(url)
     end
 
-    return string.format("|Hurlcopy:%s|h|c%s[%s]|r|h", url, LINK_COLOR, display)
+    return string.format("|Hchatcopy:%s|h|c%s[%s]|r|h", url, LINK_COLOR, display)
 end
 
 --- Replace each span with its link.
@@ -123,7 +123,7 @@ function Chat.Filter(_, _, message, ...)
     end
 
     -- Recorded whether or not chat is rewritten. That is what makes the switch
-    -- safe to turn off: /url still has everything, so nothing is lost by it.
+    -- safe to turn off: /cc still has everything, so nothing is lost by it.
     for _, span in ipairs(spans) do
         ns.History.Add(span.text)
     end
@@ -167,7 +167,7 @@ function Chat.Install()
     installed = true
 
     if not ChatFrame_AddMessageEventFilter then
-        ns.Print("This client has no chat filters. /url still works.")
+        ns.Print("This client has no chat filters. /cc still works.")
         return
     end
 
@@ -180,7 +180,7 @@ function Chat.Install()
     -- which is what leaves room for ours.
     if hooksecurefunc and SetItemRef then
         hooksecurefunc("SetItemRef", function(link)
-            local url = type(link) == "string" and link:match("^urlcopy:(.+)$")
+            local url = type(link) == "string" and link:match("^chatcopy:(.+)$")
             if url then
                 ns.Popup.Show(url)
             end
@@ -191,13 +191,13 @@ end
 ns.OnLogin(Chat.Install)
 
 -- The one input that is not a named command. It belongs here rather than in
--- UrlCopy.lua because this is the file that knows what a link is.
-ns.RegisterHelpLine("/url <n> - Copy the nth link from /url list, newest first")
+-- ChatCopy.lua because this is the file that knows what a link is.
+ns.RegisterHelpLine("/cc <n> - Copy the nth link from /cc list, newest first")
 
 ns.NumberCommand = function(index)
     local url = History.Get(index)
     if not url then
-        ns.Print(string.format("No link %d. Try /url list.", index))
+        ns.Print(string.format("No link %d. Try /cc list.", index))
         return
     end
 
@@ -231,7 +231,7 @@ end)
 
 ns.RegisterCommand("off", "Leave chat alone", function()
     ns.db.chat.rewrite = false
-    ns.Print("Chat left alone. /url still works.")
+    ns.Print("Chat left alone. /cc still works.")
 end)
 
 -- Declared next to the code that reads them. Settings.lua renders whatever has
@@ -241,7 +241,7 @@ ns.RegisterSetting({
     key = "rewrite",
     type = "checkbox",
     name = "Make URLs in chat clickable",
-    tooltip = "Off leaves chat exactly as it arrives. /url still works, because links are remembered either way.",
+    tooltip = "Off leaves chat exactly as it arrives. /cc still works, because links are remembered either way.",
 })
 
 ns.RegisterSetting({

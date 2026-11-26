@@ -10,7 +10,7 @@ local addonName, ns = ...
 local Popup = {}
 ns.Popup = Popup
 
-local DIALOG = "URLCOPY_LINK"
+local DIALOG = "CHATCOPY_LINK"
 
 -- What the box is showing. The box resists being edited, and this is what it
 -- is put back to.

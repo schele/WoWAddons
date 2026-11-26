@@ -71,7 +71,7 @@ end
 local settings = {}
 ns.settings = settings
 
--- checkbox and slider are the shapes UrlCopy's panel already knows. spelltable
+-- checkbox and slider are the shapes ChatCopy's panel already knows. spelltable
 -- is this addon's own: one row per slot, holding a spell name.
 local SETTING_TYPES = { checkbox = true, slider = true, spelltable = true }
 

@@ -389,7 +389,7 @@ const panelBar = roundBox(32, 28.5, 26.25, 6.6, 3.25);
 const panelDetails = union(roundBox(26.3, 28.8, 0.75, 3, 0.6), roundBox(37.7, 28.8, 0.75, 3, 0.6));
 const panelShine = roundBox(32, 24.2, 22, 1.1, 1.1);
 
-// UrlCopy: two chain links, a hyperlink, in sky blue.
+// ChatCopy: two chain links, a hyperlink, in sky blue.
 const sky = {
   dark: [6, 14, 22], glow: [24, 70, 110], ring: [100, 176, 236],
   light: [206, 236, 255], mid: [100, 170, 230], outline: [14, 40, 70], detail: [30, 80, 130],
@@ -493,7 +493,7 @@ const ICONS = {
     'icon.tga': tex(gold, panelBar, panelDetails, panelShine),
     'logo.tga': tex(gold, panelBar, panelDetails, panelShine, { tile: false, zoom: 1.15 }),
   },
-  UrlCopy: {
+  ChatCopy: {
     'icon.tga': tex(sky, chain, null, chainShine),
     'logo.tga': tex(sky, chain, null, chainShine, { tile: false, zoom: 1.35 }),
   },

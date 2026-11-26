@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
-ns.PREFIX = "|cff66ccffUrlCopy|r"
+ns.PREFIX = "|cff66ccffChatCopy|r"
 
 -- Defaults are contributed by each file at load time, so every piece of config
 -- lives next to the code that reads it and this file never learns the others.
@@ -89,12 +89,12 @@ function ns.SetSettingValue(setting, value)
 end
 
 local function ensureDatabase()
-    if type(UrlCopyDB) ~= "table" then
-        UrlCopyDB = {}
+    if type(ChatCopyDB) ~= "table" then
+        ChatCopyDB = {}
     end
 
-    applyDefaults(UrlCopyDB, defaults)
-    ns.db = UrlCopyDB
+    applyDefaults(ChatCopyDB, defaults)
+    ns.db = ChatCopyDB
 end
 
 ns.ensureDatabase = ensureDatabase
@@ -130,13 +130,13 @@ local function showHelp()
     table.sort(names)
 
     for _, name in ipairs(names) do
-        ns.Print(string.format("/url %s - %s", name, commands[name].help))
+        ns.Print(string.format("/cc %s - %s", name, commands[name].help))
     end
 end
 
 ns.ShowHelp = showHelp
 
--- "/url 3" is the one input that is not a named command. Chat.lua points it at
+-- "/cc 3" is the one input that is not a named command. Chat.lua points it at
 -- the copy box; until it has, and if that file ever fails to load, a number
 -- falls through to the command list rather than to silence.
 ns.NumberCommand = nil
@@ -144,7 +144,7 @@ ns.NumberCommand = nil
 local function runCommand(msg)
     local input = msg and msg:match("^%s*(.-)%s*$") or ""
 
-    -- A bare "/url" lists the commands, the same as a bare "/fp" does. The two
+    -- A bare "/cc" lists the commands, the same as a bare "/fp" does. The two
     -- addons print their login lines one above the other, so a bare command
     -- that meant something different in each was a trap.
     if input == "" or input == "help" then
@@ -170,9 +170,10 @@ local function runCommand(msg)
     showHelp()
 end
 
-SLASH_URLCOPY1 = "/urlcopy"
-SLASH_URLCOPY2 = "/url"
-SlashCmdList.URLCOPY = runCommand
+SLASH_CHATCOPY1 = "/chatcopy"
+SLASH_CHATCOPY2 = "/cc"
+SLASH_CHATCOPY3 = "/url"
+SlashCmdList.CHATCOPY = runCommand
 
 -- Work to do once the player is in the world and the database exists. Each
 -- file adds its own, so this one never learns what the others are called.
@@ -196,6 +197,6 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
             handler()
         end
 
-        ns.Print("Loaded. Type /url for commands.")
+        ns.Print("Loaded. Type /cc for commands.")
     end
 end)

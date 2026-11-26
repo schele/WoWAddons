@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local FILES = { "UrlCopy.lua", "Detect.lua", "Popup.lua", "Chat.lua" }
+local FILES = { "ChatCopy.lua", "Detect.lua", "Popup.lua", "Chat.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)
@@ -43,7 +43,7 @@ describe("clicking a link", function()
     end)
 end)
 
-describe("a bare /url", function()
+describe("a bare /cc", function()
     it("lists the commands rather than copying anything", function()
         local ns, env = loggedIn()
         helpers.say(env, "someone posts a.com")
@@ -51,7 +51,7 @@ describe("a bare /url", function()
         helpers.command(env, "")
 
         -- ForeverPanel's bare /fp lists its commands, and the two addons print
-        -- their login lines one above the other. A bare /url that copied the
+        -- their login lines one above the other. A bare /cc that copied the
         -- last link instead was a trap, and it caught its first player inside
         -- a minute of installing.
         assertNil(helpers.box(env), "no box, even with a link to hand")
@@ -59,13 +59,13 @@ describe("a bare /url", function()
     end)
 end)
 
-describe("/url <n>", function()
+describe("/cc <n>", function()
     it("opens the box on the most recent link with 1", function()
         local ns, env = loggedIn()
         helpers.say(env, "first a.com")
         helpers.say(env, "then b.com")
 
-        -- What a bare /url used to do, two characters longer.
+        -- What a bare /cc used to do, two characters longer.
         helpers.command(env, "1")
         assertEqual("b.com", helpers.box(env):GetText())
     end)
@@ -88,7 +88,7 @@ describe("/url <n>", function()
     end)
 end)
 
-describe("/url list", function()
+describe("/cc list", function()
     it("numbers what it is remembering", function()
         local ns, env = loggedIn()
         helpers.say(env, "a.com and b.com")
@@ -106,7 +106,7 @@ describe("/url list", function()
         helpers.command(env, "list")
         -- With the switch off this is the only way left to click one, and it
         -- is a direct answer to a command rather than someone else's message.
-        assertMatch("|Hurlcopy:a%.com|h", helpers.printed(env))
+        assertMatch("|Hchatcopy:a%.com|h", helpers.printed(env))
     end)
 
     it("says so when there is nothing to list", function()
@@ -117,7 +117,7 @@ describe("/url list", function()
     end)
 end)
 
-describe("/url clear", function()
+describe("/cc clear", function()
     it("forgets everything", function()
         local ns, env = loggedIn()
         helpers.say(env, "a.com")
@@ -127,7 +127,7 @@ describe("/url clear", function()
     end)
 end)
 
-describe("/url on and /url off", function()
+describe("/cc on and /cc off", function()
     it("stops chat being touched", function()
         local ns, env = loggedIn()
         helpers.command(env, "off")
@@ -142,7 +142,7 @@ describe("/url on and /url off", function()
         helpers.command(env, "on")
 
         assertTrue(ns.db.chat.rewrite)
-        assertMatch("|Hurlcopy:", helpers.say(env, "see a.com"))
+        assertMatch("|Hchatcopy:", helpers.say(env, "see a.com"))
     end)
 end)
 
@@ -151,10 +151,10 @@ describe("help", function()
         local ns, env = loggedIn()
         helpers.command(env, "help")
 
-        assertMatch("/url <n>", helpers.printed(env))
+        assertMatch("/cc <n>", helpers.printed(env))
     end)
 
-    it("is what a bare /url and an explicit /url help both give", function()
+    it("is what a bare /cc and an explicit /cc help both give", function()
         local ns, env = loggedIn()
 
         helpers.command(env, "help")

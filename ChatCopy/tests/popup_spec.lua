@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local FILES = { "UrlCopy.lua", "Detect.lua", "Popup.lua" }
+local FILES = { "ChatCopy.lua", "Detect.lua", "Popup.lua" }
 
 local function loggedIn()
     local ns, env = helpers.loadAddon(FILES)

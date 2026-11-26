@@ -1,6 +1,6 @@
 local helpers = require("helpers")
 
-local ONLY_CORE = { "UrlCopy.lua" }
+local ONLY_CORE = { "ChatCopy.lua" }
 
 describe("the database", function()
     it("applies defaults at login", function()
@@ -12,7 +12,7 @@ describe("the database", function()
 
     it("lets a stored value win over a default", function()
         local ns, env = helpers.loadAddon(ONLY_CORE)
-        env.UrlCopyDB = { version = 99 }
+        env.ChatCopyDB = { version = 99 }
         helpers.login(ns, env)
 
         assertEqual(99, ns.db.version, "the stored value survives")
@@ -21,7 +21,7 @@ describe("the database", function()
     it("fills in a nested table added since the value was saved", function()
         local ns, env = helpers.loadAddon(ONLY_CORE)
         ns.AddDefaults({ later = { added = "yes" } })
-        env.UrlCopyDB = { version = 1 }
+        env.ChatCopyDB = { version = 1 }
         helpers.login(ns, env)
 
         assertEqual("yes", ns.db.later.added, "the new branch is filled in")
@@ -39,7 +39,7 @@ describe("commands", function()
         assertEqual("there", got, "the rest of the line reaches the handler")
     end)
 
-    it("lists every command under /url help", function()
+    it("lists every command under /cc help", function()
         local ns, env = helpers.loadAddon(ONLY_CORE)
         ns.RegisterCommand("ping", "Ping the thing", function() end)
         helpers.login(ns, env)
@@ -50,20 +50,20 @@ describe("commands", function()
 
     it("shows the help lines that are not named commands", function()
         local ns, env = helpers.loadAddon(ONLY_CORE)
-        ns.RegisterHelpLine("/url <n> - Copy the nth link")
+        ns.RegisterHelpLine("/cc <n> - Copy the nth link")
         helpers.login(ns, env)
 
         helpers.command(env, "help")
         assertMatch("Copy the nth link", helpers.printed(env))
     end)
 
-    it("shows the command list for a bare /url, the way /fp does", function()
+    it("shows the command list for a bare /cc, the way /fp does", function()
         local ns, env = helpers.loadAddon(ONLY_CORE)
         ns.RegisterCommand("ping", "Ping the thing", function() end)
         helpers.login(ns, env)
 
         -- ForeverPanel's bare /fp lists its commands, and the two addons print
-        -- their login lines one above the other. A bare /url that did anything
+        -- their login lines one above the other. A bare /cc that did anything
         -- else was a trap, and it caught its first player inside a minute.
         helpers.command(env, "")
         assertMatch("Ping the thing", helpers.printed(env))

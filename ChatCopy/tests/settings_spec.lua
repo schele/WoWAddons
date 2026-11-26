@@ -63,7 +63,7 @@ describe("the panel", function()
         assertTrue(ns.db.chat.shorten)
     end)
 
-    it("opens from /url settings", function()
+    it("opens from /cc settings", function()
         local ns, env = loggedIn()
         helpers.command(env, "settings")
 
@@ -130,7 +130,7 @@ describe("the panel's heading", function()
         -- tile on a dark panel reads as a sticker pasted onto it.
         local ns = loggedIn()
         assertEqual(
-            [[Interface\AddOns\UrlCopy\logo]],
+            [[Interface\AddOns\ChatCopy\logo]],
             ns.SettingsPanel.logo:GetTexture()
         )
     end)
@@ -139,7 +139,7 @@ describe("the panel's heading", function()
         -- The .toc already names this folder. A path spelled out here as well
         -- is the one that goes stale when it is renamed.
         local ns = loggedIn()
-        assertTrue(ns.SettingsPanel.logo:GetTexture():find("UrlCopy", 1, true) ~= nil)
+        assertTrue(ns.SettingsPanel.logo:GetTexture():find("ChatCopy", 1, true) ~= nil)
         assertTrue(ns.SettingsPanel.logo:GetWidth() > 0, "and has a size to draw at")
     end)
 end)

@@ -3,11 +3,11 @@ local stub = require("wow_stub")
 local M = {}
 
 M.FILES = {
-    "UrlCopy.lua",
+    "ChatCopy.lua",
     "Detect.lua",
     "Popup.lua",
     "Chat.lua",
-    "ChatCopy.lua",
+    "ChatText.lua",
     "Settings.lua",
     "Minimap.lua",
 }
@@ -21,7 +21,7 @@ function M.loadAddon(files)
 
     for _, path in ipairs(files or M.FILES) do
         local chunk = assert(loadfile(path, "t", env))
-        chunk("UrlCopy", ns)
+        chunk("ChatCopy", ns)
     end
 
     return ns, env
@@ -43,12 +43,12 @@ end
 
 --- Run the real login sequence.
 function M.login(ns, env)
-    M.fire(env, "ADDON_LOADED", "UrlCopy")
+    M.fire(env, "ADDON_LOADED", "ChatCopy")
     M.fire(env, "PLAYER_LOGIN")
 end
 
 function M.command(env, text)
-    env.SlashCmdList.URLCOPY(text)
+    env.SlashCmdList.CHATCOPY(text)
 end
 
 --- Say something in chat and return what the frame would show.
@@ -66,9 +66,9 @@ function M.printed(env)
     return table.concat(env.__printed, "\n")
 end
 
---- The first urlcopy link inside a rewritten message.
+--- The first chatcopy link inside a rewritten message.
 function M.linkIn(text)
-    return (tostring(text):match("|H(urlcopy:[^|]+)|h"))
+    return (tostring(text):match("|H(chatcopy:[^|]+)|h"))
 end
 
 --- The copy box currently on screen.

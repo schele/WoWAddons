@@ -6,14 +6,14 @@ local addonName, ns = ...
 -- can come.
 
 ns.AddDefaults({
-    chatCopy = {
-        -- The button in a chat window's corner. /url chat works either way.
+    chatText = {
+        -- The button in a chat window's corner. /cc chat works either way.
         button = true,
     },
 })
 
-local ChatCopy = {}
-ns.ChatCopy = ChatCopy
+local ChatText = {}
+ns.ChatText = ChatText
 
 local WIDTH, HEIGHT = 600, 420
 local BUTTON_SIZE = 18
@@ -21,7 +21,7 @@ local BUTTON_SIZE = 18
 local BUTTON_INSET = 24
 -- Seconds between looks at where the mouse is, for the buttons.
 local HOVER_POLL = 0.1
-local ICON = "Interface\\AddOns\\UrlCopy\\logo"
+local ICON = "Interface\\AddOns\\ChatCopy\\logo"
 local HINT = "Mark text with the mouse, then Ctrl+C to copy."
 
 -- An escaped pipe, kept out of the way while the markup comes off.
@@ -29,7 +29,7 @@ local PIPE = "\1"
 
 --- A chat line as it reads: colours, icons and link markup gone, a link
 -- kept as the [Name] it shows, and an escaped pipe a pipe again.
-function ChatCopy.Plain(message)
+function ChatText.Plain(message)
     local text = tostring(message):gsub("||", PIPE)
     text = text:gsub("|H.-|h(.-)|h", "%1")
     text = text:gsub("|c%x%x%x%x%x%x%x%x", "")
@@ -47,7 +47,7 @@ end
 --- A chat window's lines, oldest first, as plain text, and how many could
 -- not be read. This client can hand an addon a line it may not read (a
 -- secret value); that one is left out rather than failing the rest.
-function ChatCopy.Lines(chatFrame)
+function ChatText.Lines(chatFrame)
     local lines, skipped = {}, 0
     if not (chatFrame and chatFrame.GetNumMessages and chatFrame.GetMessageInfo) then
         return lines, skipped
@@ -57,7 +57,7 @@ function ChatCopy.Lines(chatFrame)
     for index = 1, ok and tonumber(count) or 0 do
         local read, text = pcall(function()
             local message = chatFrame:GetMessageInfo(index)
-            return message ~= nil and ChatCopy.Plain(message) or nil
+            return message ~= nil and ChatText.Plain(message) or nil
         end)
         if not read then
             skipped = skipped + 1
@@ -92,9 +92,9 @@ end
 -- title bar and red X, or on a client without it the dialog border, a title
 -- and a close button of our own. Solid either way, for reading.
 local function createWindowFrame()
-    local ok, made = pcall(CreateFrame, "Frame", "UrlCopyChatWindow", UIParent, "SettingsFrameTemplate")
+    local ok, made = pcall(CreateFrame, "Frame", "ChatCopyWindow", UIParent, "SettingsFrameTemplate")
     if not (ok and made) then
-        made = createFrame("Frame", "UrlCopyChatWindow", UIParent, "BackdropTemplate")
+        made = createFrame("Frame", "ChatCopyWindow", UIParent, "BackdropTemplate")
     end
     local native = made.NineSlice and made.NineSlice.Text and made.ClosePanelButton and made.Bg
 
@@ -204,7 +204,7 @@ local function create()
     end)
 
     -- Escape closes it from anywhere, as it does the game's own windows.
-    table.insert(UISpecialFrames, "UrlCopyChatWindow")
+    table.insert(UISpecialFrames, "ChatCopyWindow")
     frame:Hide()
 end
 
@@ -221,12 +221,12 @@ end
 
 --- Open a chat window's text in the copy window: newest at the bottom, the
 -- box focused so Ctrl+C copies what is marked.
-function ChatCopy.Open(chatFrame)
+function ChatText.Open(chatFrame)
     if not frame then
         create()
     end
 
-    local lines, skipped = ChatCopy.Lines(chatFrame)
+    local lines, skipped = ChatText.Lines(chatFrame)
     current = table.concat(lines, "\n")
     restoring = true
     frame.box:SetText(current)
@@ -244,7 +244,7 @@ function ChatCopy.Open(chatFrame)
     return frame
 end
 
-function ChatCopy.Frame()
+function ChatText.Frame()
     return frame
 end
 
@@ -297,7 +297,7 @@ local function buttonFor(chatFrame)
     button:SetPushedTexture(ICON)
     button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
     button:SetScript("OnClick", function()
-        ChatCopy.Open(chatFrame)
+        ChatText.Open(chatFrame)
     end)
     button:SetScript("OnEnter", function(self)
         if GameTooltip then
@@ -317,14 +317,14 @@ local function buttonFor(chatFrame)
     return button
 end
 
-function ChatCopy.Button(chatFrame)
+function ChatText.Button(chatFrame)
     return buttons[chatFrame]
 end
 
 --- Show each chat window's button while the mouse is over that window, as
 -- the game shows its own chat buttons; none at all with the setting off.
-function ChatCopy.Update()
-    local enabled = ns.db and ns.db.chatCopy and ns.db.chatCopy.button
+function ChatText.Update()
+    local enabled = ns.db and ns.db.chatText and ns.db.chatText.button
     if not enabled then
         for _, button in pairs(buttons) do
             button:Hide()
@@ -348,20 +348,20 @@ driver:SetScript("OnUpdate", function(_, elapsed)
         return
     end
     waited = 0
-    ChatCopy.Update()
+    ChatText.Update()
 end)
 
 ns.RegisterSetting({
-    store = "chatCopy",
+    store = "chatText",
     key = "button",
     type = "checkbox",
     name = "Copy button on chat windows",
-    tooltip = "A button in the corner of a chat window, while the mouse is over it, opens the window's text to mark and copy. /url chat does the same.",
+    tooltip = "A button in the corner of a chat window, while the mouse is over it, opens the window's text to mark and copy. /cc chat does the same.",
     onChange = function()
-        ChatCopy.Update()
+        ChatText.Update()
     end,
 })
 
 ns.RegisterCommand("chat", "Open the chat tab you are looking at, to mark and copy its text", function()
-    ChatCopy.Open(SELECTED_CHAT_FRAME or DEFAULT_CHAT_FRAME or ChatFrame1)
+    ChatText.Open(SELECTED_CHAT_FRAME or DEFAULT_CHAT_FRAME or ChatFrame1)
 end)
