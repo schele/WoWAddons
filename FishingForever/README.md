@@ -49,19 +49,31 @@ the key.
 ## The skill bar
 
 The higher your Fishing, the more catches a skill point takes. While a pole is
-in your hand, a small bar shows your skill, and fills with the catches you
-have made since your last point, against how many a point usually takes at
-your skill:
+in your hand, a small bar in two halves shows where you are. The left, in
+blue, is your next point: it fills with the catches you have made since your
+last point, against how many a point usually takes at your skill. The right,
+in green, is your skill itself against its cap:
 
-    Fishing 231/300   ▓▓▓▓▓▓░░░░
+    ▓▓▓▓▓▓ Next point ░░░░░░│▓▓▓▓▓▓▓▓ Fishing 231/300 ░░
 
 Click it for the numbers: the stats window's Summary has the chance a catch
 brings a point ("Chance of a point per catch: 1 in 7"). The game keeps no
 progress toward a point. Each catch has a chance to raise your skill, and the
-chance shrinks as you go up, so the bar is a count against an average, not a
-promise. With bad luck it stays full and the count goes on. The bar's right
-end says "too low here" where your skill is too low for the water (below),
-and "capped" at your skill's cap.
+chance shrinks as you go up, so the left half is a count against an average,
+not a promise. With bad luck it stays full and the count goes on.
+
+A half only shows while it has something to tell you:
+
+- While every catch raises your skill, which is the case up to 75, the next
+  point is always the next catch, so only your skill shows, across the whole
+  bar.
+- Where your skill is too low for the water (below), the left half says "too
+  low here" in red, whatever your skill.
+- At a trainer's cap, the left half says "capped" and both go grey: time to
+  train.
+- At 300, the highest rank, there is nothing left to fill, so the bar is only
+  `Fishing 300/300`. A click on it still opens your stats. Only a "too low
+  here" brings the halves back, in grey.
 
 The average starts as the old game's rule: every catch below 75, then a chance
 of 2500 / (skill - 50) in a hundred, about 1 in 4 at 150 and 1 in 10 near 300.
@@ -93,7 +105,7 @@ share of them landed a fish there, the same share as its rows. Where so many
 fish get away that a point takes more casts than catches, it says how many
 casts too.
 
-The bar says "too low here", and the Summary says why in red, where the game
+The bar's left half says "too low here", and the Summary says why in red, where the game
 refused your cast at your skill or above, or where every fish of five casts
 or more at your skill or above got away. It clears when your skill rises past
 those, or when a fish lands there.

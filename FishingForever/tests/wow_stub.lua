@@ -80,7 +80,15 @@ local function makeWidget(kind, parent, template)
         table.insert(self.fontStrings, fontString)
         return fontString
     end
-    function widget:SetWidth(value) self.width = value end
+    -- A change of size runs the widget's OnSizeChanged, as the client does.
+    local function resized(self)
+        local handler = self.scripts.OnSizeChanged
+        if handler then handler(self, self.width, self.height) end
+    end
+    function widget:SetWidth(value)
+        self.width = value
+        resized(self)
+    end
     function widget:SetHeight(value) self.height = value end
     function widget:GetHeight() return self.height or 0 end
     function widget:GetBottom() return self.bottom end
@@ -99,7 +107,10 @@ local function makeWidget(kind, parent, template)
     function widget:AddLine(value) self.lines = self.lines or {}; table.insert(self.lines, value) end
     function widget:RegisterEvent(event) self.registeredEvents[event] = true end
     function widget:UnregisterEvent(event) self.registeredEvents[event] = nil end
-    function widget:SetSize(w, h) self.width, self.height = w, h end
+    function widget:SetSize(w, h)
+        self.width, self.height = w, h
+        resized(self)
+    end
     function widget:SetAlpha(value) self.alpha = value end
     function widget:EnableMouse(value) self.mouseEnabled = value end
     function widget:RegisterForClicks(...) self.clicks = { ... } end

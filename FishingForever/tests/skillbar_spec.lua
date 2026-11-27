@@ -2,6 +2,13 @@ local helpers = require("helpers")
 
 local POLE, STAFF = 6256, 1161
 
+local BLUE, GREY = { 0.4, 0.8, 1 }, { 0.5, 0.5, 0.5 }
+
+--- Whether a colour the bar was given is `want`; false for none at all.
+local function colourIs(got, want)
+    return got ~= nil and got[1] == want[1] and got[2] == want[2] and got[3] == want[3]
+end
+
 --- Logged in holding whatever is given, a pole by default. `setup` runs
 -- before login, on the env.
 local function loggedIn(mainHand, setup)
@@ -21,48 +28,176 @@ local function catch(env)
     env.__fishingLoot = false
 end
 
+--- The game refusing a cast here for too little skill.
+local function refused(env)
+    helpers.fire(env, "UNIT_SPELLCAST_SENT", "player", "", "guid", 7620)
+    helpers.fire(env, "UI_ERROR_MESSAGE", 300, "Skill not high enough")
+end
+
 local function tooltipText(env)
     return table.concat({ env.GameTooltip.text or "", table.concat(env.GameTooltip.lines or {}, "\n") }, "\n")
 end
 
 describe("the skill bar", function()
-    it("shows the skill, and fills toward the next point without counting it out in words", function()
+    it("shows the next point on the left and the skill on the right", function()
         local ns, env, bar = loggedIn()
-        catch(env)
-        catch(env)
+        for _ = 1, 3 do catch(env) end
         assertTrue(bar:IsShown())
-        assertEqual("Fishing 231/300", bar.label.text)
-        assertEqual("", bar.count.text, "the fill says how close; the tooltip has the count")
+        assertEqual("Next point", bar.pointLabel.text)
+        assertEqual("Fishing 231/300", bar.skillLabel.text)
+        assertEqual(3 / ns.Skill.Expected(231), bar.pointFill.value)
+        assertNear(231 / 300, bar.skillFill.value, 1e-9)
+        assertTrue(colourIs(bar.pointFill.barColor, BLUE))
+        assertFalse(colourIs(bar.skillFill.barColor, BLUE), "the halves are told apart by colour")
     end)
 
-    it("fills by the catches over what a point takes, and no further", function()
+    it("fills the left half by the catches over what a point takes, and no further", function()
         local ns, env, bar = loggedIn()
         for _ = 1, 3 do catch(env) end
         local expected = ns.Skill.Expected(231)
-        assertEqual(0, bar.minValue)
-        assertEqual(1, bar.maxValue)
-        assertEqual(3 / expected, bar.value)
+        assertEqual(0, bar.pointFill.minValue)
+        assertEqual(1, bar.pointFill.maxValue)
+        assertEqual(3 / expected, bar.pointFill.value)
         for _ = 1, 10 do catch(env) end
-        assertEqual(1, bar.value)
+        assertEqual(1, bar.pointFill.value)
     end)
 
-    it("empties at a point", function()
+    it("empties the left half at a point, and moves the right", function()
         local ns, env, bar = loggedIn()
         catch(env)
         env.__fishing.rank = 232
         helpers.fire(env, "SKILL_LINES_CHANGED")
-        assertEqual("Fishing 232/300", bar.label.text)
-        assertEqual(0, bar.value)
+        assertEqual("Fishing 232/300", bar.skillLabel.text)
+        assertEqual(0, bar.pointFill.value)
+        assertNear(232 / 300, bar.skillFill.value, 1e-9)
     end)
 
-    it("says when the skill is at its cap, and follows a trainer raising it", function()
+    it("says capped on the left at a trainer's cap, both fills grey, and follows a trainer raising it", function()
         local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 150, maxRank = 150 } end)
-        assertEqual("Fishing 150/150", bar.label.text)
-        assertEqual("capped", bar.count.text)
+        assertEqual("capped", bar.pointLabel.text)
+        assertEqual("Fishing 150/150", bar.skillLabel.text)
+        assertEqual(1, bar.pointFill.value)
+        assertEqual(1, bar.skillFill.value)
+        assertTrue(colourIs(bar.pointFill.barColor, GREY))
+        assertTrue(colourIs(bar.skillFill.barColor, GREY))
         env.__fishing.maxRank = 225
         helpers.fire(env, "SKILL_LINES_CHANGED")
-        assertEqual("Fishing 150/225", bar.label.text)
-        assertEqual("", bar.count.text)
+        assertEqual("Next point", bar.pointLabel.text)
+        assertEqual("Fishing 150/225", bar.skillLabel.text)
+        assertNear(150 / 225, bar.skillFill.value, 1e-9)
+        assertFalse(colourIs(bar.pointFill.barColor, GREY), "no grey left over")
+        assertFalse(colourIs(bar.skillFill.barColor, GREY), "no grey left over")
+    end)
+
+    it("keeps the right fill within the bar for a cap of 0", function()
+        local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 5, maxRank = 0 } end)
+        assertEqual(1, bar.skillFill.value)
+    end)
+
+    it("is two halves of the bar's width, following it when it is widened", function()
+        local ns, env, bar = loggedIn()
+        assertEqual(110, bar.pointFill.width)
+        assertEqual(110, bar.skillFill.width)
+        bar:SetWidth(307)
+        assertEqual(153, bar.pointFill.width)
+        assertEqual(154, bar.skillFill.width)
+    end)
+
+    it("shows the skill alone, full width, while every catch raises it", function()
+        local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 50, maxRank = 75 } end)
+        assertFalse(bar.pointFill:IsShown())
+        assertFalse(bar.pointLabel:IsShown())
+        assertFalse(bar.divider:IsShown())
+        assertEqual(220, bar.skillFill.width)
+        assertEqual("Fishing 50/75", bar.skillLabel.text)
+        assertNear(50 / 75, bar.skillFill.value, 1e-9)
+    end)
+
+    it("brings the left half back once a point takes more than one catch", function()
+        local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 50, maxRank = 150 } end)
+        env.__fishing.rank = 100 -- the old rule: a point takes 2 catches here
+        helpers.fire(env, "SKILL_LINES_CHANGED")
+        assertTrue(bar.pointFill:IsShown())
+        assertTrue(bar.pointLabel:IsShown())
+        assertTrue(bar.divider:IsShown())
+        assertEqual(110, bar.pointFill.width)
+        assertEqual(110, bar.skillFill.width)
+    end)
+
+    it("goes by the measured catches per point where there are enough", function()
+        -- Five points at rank 100 that took one catch each: skill alone there.
+        local ns, env, bar = loggedIn(POLE, function(e)
+            e.__fishing = { rank = 100, maxRank = 150 }
+            e.FishingForeverDB = { skillUps = { [100] = { points = 5, catches = 5 } } }
+        end)
+        assertFalse(bar.pointFill:IsShown())
+    end)
+
+    it("brings the left half back for a warning even while every catch raises the skill", function()
+        local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 50, maxRank = 75 } end)
+        refused(env)
+        assertTrue(bar.pointFill:IsShown())
+        assertEqual("too low here", bar.pointLabel.text)
+        assertEqual(110, bar.pointFill.width)
+        assertEqual(110, bar.skillFill.width)
+    end)
+
+    it("keeps the left fill empty, not NaN, when a measured point took no catches and none have been made", function()
+        local ns, env, bar = loggedIn(POLE, function(e)
+            e.__fishing = { rank = 100, maxRank = 150 }
+            e.FishingForeverDB = { skillUps = { [100] = { points = 5, catches = 0 } } }
+        end)
+        refused(env)
+        assertTrue(bar.pointFill:IsShown())
+        assertEqual(0, bar.pointFill.value, "no catches since the last point: nothing filled")
+    end)
+
+    it("is only a label at 300, the highest rank", function()
+        local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 300, maxRank = 300 } end)
+        assertTrue(bar:IsShown())
+        assertEqual("Fishing 300/300", bar.skillLabel.text)
+        assertFalse(bar.pointFill:IsShown())
+        assertFalse(bar.skillFill:IsShown())
+        assertFalse(bar.pointLabel:IsShown())
+        assertFalse(bar.divider:IsShown())
+    end)
+
+    it("turns into the label with the last point, and not before", function()
+        local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 299, maxRank = 300 } end)
+        assertTrue(bar.skillFill:IsShown())
+        env.__fishing.rank = 300
+        helpers.fire(env, "SKILL_LINES_CHANGED")
+        assertFalse(bar.skillFill:IsShown())
+        assertEqual("Fishing 300/300", bar.skillLabel.text)
+    end)
+
+    it("brings the halves back at 300 for a warning, grey, with the words in red", function()
+        local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 300, maxRank = 300 } end)
+        refused(env)
+        assertTrue(bar.pointFill:IsShown())
+        assertTrue(bar.skillFill:IsShown())
+        assertEqual("too low here", bar.pointLabel.text)
+        assertEqual(0.3, bar.pointLabel.textColor[2])
+        assertEqual("Fishing 300/300", bar.skillLabel.text)
+        assertTrue(colourIs(bar.skillFill.barColor, GREY))
+
+        env.__map = { id = 1436, name = "Westfall" }
+        helpers.fire(env, "ZONE_CHANGED_NEW_AREA")
+        assertFalse(bar.pointFill:IsShown(), "somewhere else it is the label again")
+        assertFalse(bar.skillFill:IsShown())
+    end)
+
+    it("is not the label at a trainer's cap below 300", function()
+        local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 225, maxRank = 225 } end)
+        assertTrue(bar.skillFill:IsShown())
+        assertEqual("capped", bar.pointLabel.text)
+    end)
+
+    it("still says capped at the first trainer's cap, where every catch would otherwise raise the skill", function()
+        local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 75, maxRank = 75 } end)
+        assertTrue(bar.pointFill:IsShown())
+        assertEqual("capped", bar.pointLabel.text)
+        assertEqual("Fishing 75/75", bar.skillLabel.text)
     end)
 
     it("shows only while a pole is equipped", function()
@@ -105,24 +240,51 @@ describe("the skill bar's tooltip", function()
         assertFalse(text:find("1 in", 1, true) ~= nil)
     end)
 
-    it("says on the bar when the game refused a cast here for too little skill, until another zone", function()
+    it("says what each showing half is", function()
+        local ns, env, bar = loggedIn()
+        hover(bar)
+        assertMatch("next skill point", tooltipText(env))
+        assertMatch("against its cap", tooltipText(env))
+    end)
+
+    it("does not describe a half that is not there", function()
+        local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 50, maxRank = 75 } end)
+        hover(bar)
+        assertMatch("against its cap", tooltipText(env))
+        assertFalse(tooltipText(env):find("next skill point", 1, true) ~= nil)
+    end)
+
+    it("says nothing about halves at 300", function()
+        local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 300, maxRank = 300 } end)
+        hover(bar)
+        assertFalse(tooltipText(env):find("against its cap", 1, true) ~= nil)
+        assertFalse(tooltipText(env):find("next skill point", 1, true) ~= nil)
+        assertMatch("Click to open or close your fishing stats", tooltipText(env))
+    end)
+
+    it("says on the left, in red, when the game refused a cast here for too little skill, until another zone", function()
         local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 106, maxRank = 150 } end)
         helpers.fire(env, "UNIT_SPELLCAST_SENT", "player", "", "guid", 7620)
         helpers.fire(env, "UI_ERROR_MESSAGE", 300, "Skill not high enough")
-        assertEqual("too low here", bar.count.text)
+        assertEqual("too low here", bar.pointLabel.text)
+        assertEqual(1, bar.pointLabel.textColor[1])
+        assertEqual(0.3, bar.pointLabel.textColor[2])
+        assertEqual(0.3, bar.pointLabel.textColor[3])
 
         env.__map = { id = 1436, name = "Westfall" }
         helpers.fire(env, "ZONE_CHANGED_NEW_AREA")
-        assertEqual("", bar.count.text, "somewhere else the warning is gone")
+        assertEqual("Next point", bar.pointLabel.text, "somewhere else the warning is gone")
+        assertEqual(1, bar.pointLabel.textColor[2], "and the red with it")
+        assertEqual(1, bar.pointLabel.textColor[3], "and the red with it")
     end)
 
-    it("says on the bar when every fish of five casts here got away", function()
+    it("says on the left when every fish of five casts here got away", function()
         local ns, env, bar = loggedIn(POLE, function(e) e.__fishing = { rank = 150, maxRank = 225 } end)
         for _ = 1, 5 do
             helpers.fire(env, "UNIT_SPELLCAST_CHANNEL_START", "player", "guid", 7620)
             helpers.fire(env, "UI_ERROR_MESSAGE", 400, "Your fish got away!")
         end
-        assertEqual("too low here", bar.count.text)
+        assertEqual("too low here", bar.pointLabel.text)
     end)
 
     it("says how to move it while it can be moved", function()

@@ -1,12 +1,12 @@
 local addonName, ns = ...
 
--- A bar for the Fishing skill: the skill and its cap on the left, filled by
--- the catches since the last point against how many a point takes
--- (Skill.lua). The right end is kept for a warning: "too low here" where the
--- game refused a cast, "capped" at the cap. Shown while a pole is equipped.
--- Dragged to move it, unless locked. Its tooltip is short; the count and what
--- the numbers mean are in the stats window (StatsPanel.lua), which a click
--- opens around it.
+-- A bar for the Fishing skill, in two halves. The left is the next point: the
+-- catches since the last point against how many a point takes (Skill.lua),
+-- where "too low here" says the game refused a cast and "capped" says the
+-- skill is at its cap. The right is the skill itself against its cap. Shown
+-- while a pole is equipped. Dragged to move it, unless locked. Its tooltip is
+-- short; the count and what the numbers mean are in the stats window
+-- (StatsPanel.lua), which a click opens around it.
 
 local SkillBar = {}
 ns.SkillBar = SkillBar
@@ -30,14 +30,24 @@ local WIDTH, HEIGHT = 220, 18
 -- On its own; inside the stats window it is as wide as the window's inside.
 SkillBar.WIDTH = WIDTH
 local TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
--- FishingForever's own blue, as in its chat prefix; grey at the cap.
-local COLOUR = { 0.4, 0.8, 1 }
+-- The next point is FishingForever's own blue, as in its chat prefix; the
+-- skill is green; both are grey at the cap.
+local BLUE = { 0.4, 0.8, 1 }
+local GREEN = { 0.3, 0.75, 0.35 }
 local CAPPED = { 0.5, 0.5, 0.5 }
--- The count's words: white, or the game's error red where it refused a cast.
+-- The left half's words: white, or the game's error red where it refused a cast.
 local WHITE = { 1, 1, 1 }
 local REFUSED = { 1, 0.3, 0.3 }
+-- Room before a label's first letter.
+local LABEL_INSET = 6
+-- The highest rank of Fishing: a cap of this, reached, is the end of it. A
+-- lower cap reached is a trainer's, and a reason to go and train.
+local FINAL_CAP = 300
 
 local bar
+-- What the bar last drew, which its halves are laid out for again when the
+-- stats window widens or narrows it.
+local shownMode = "both"
 
 function SkillBar.Frame()
     return bar
@@ -94,34 +104,110 @@ local function tooLowHere()
     return zone ~= nil and ns.Water.TooLowFor(zone.id, ns.Skill.Effective()) ~= nil
 end
 
-local function countColour(colour)
-    bar.count:SetTextColor(colour[1], colour[2], colour[3])
+--- How full a fill is, from 0 to 1. A whole below 1 counts as 1, so a cap of
+-- 0, or an average of no catches, is never a division by zero.
+local function fraction(value, whole)
+    return math.min(1, value / math.max(whole, 1))
+end
+
+local function setFill(fill, value, colour)
+    fill:SetValue(value)
+    fill:SetStatusBarColor(colour[1], colour[2], colour[3])
+end
+
+--- What the bar shows: "both" halves, the "skill" alone, or only the "strip"
+-- of words. The next point has nothing to say while every catch raises the
+-- skill, as it does early on, unless a warning or a trainer's cap has
+-- something to say about it. At the last rank there is nothing left to show
+-- but the words, which are still a click away from the stats.
+local function mode()
+    local rank, maxRank = ns.Skill.Rank()
+    -- A warning is worth saying at any skill, the last rank included.
+    if tooLowHere() then
+        return "both"
+    end
+    if ns.Skill.Capped() then
+        return maxRank >= FINAL_CAP and "strip" or "both"
+    end
+    if ns.Skill.Expected(rank) <= 1 then
+        return "skill"
+    end
+    return "both"
+end
+
+--- Put the halves where `mode` has them, from the bar's width now: with both,
+-- the left half takes half the bar and the right the rest; the skill alone
+-- takes it all; the strip has no fills, only its words at the bar's edge.
+local function layout(mode)
+    shownMode = mode
+    local width = bar:GetWidth()
+    local both = mode == "both"
+    local strip = mode == "strip"
+    local half = math.floor(width / 2)
+    local left, right = bar.pointFill, bar.skillFill
+
+    left:ClearAllPoints()
+    left:SetPoint("TOPLEFT", bar, "TOPLEFT")
+    left:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT")
+    left:SetWidth(half)
+    left:SetShown(both)
+
+    right:ClearAllPoints()
+    right:SetPoint("TOPRIGHT", bar, "TOPRIGHT")
+    right:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT")
+    right:SetWidth(both and width - half or width)
+    right:SetShown(not strip)
+
+    bar.divider:ClearAllPoints()
+    bar.divider:SetPoint("TOPLEFT", right, "TOPLEFT")
+    bar.divider:SetPoint("BOTTOMLEFT", right, "BOTTOMLEFT")
+    bar.divider:SetShown(both)
+
+    bar.pointLabel:ClearAllPoints()
+    bar.pointLabel:SetPoint("LEFT", left, "LEFT", LABEL_INSET, 0)
+    bar.pointLabel:SetShown(both)
+    bar.skillLabel:ClearAllPoints()
+    bar.skillLabel:SetPoint("LEFT", strip and bar or right, "LEFT", LABEL_INSET, 0)
 end
 
 --- Draw the bar from the skill and the count.
 local function draw()
-    bar.label:SetText(title())
-    if tooLowHere() then
-        countColour(REFUSED)
-        bar.count:SetText("too low here")
-        return
-    end
-    countColour(WHITE)
-    if ns.Skill.Capped() then
-        bar:SetStatusBarColor(CAPPED[1], CAPPED[2], CAPPED[3])
-        bar:SetValue(1)
-        bar.count:SetText("capped")
-        return
-    end
+    local rank, maxRank = ns.Skill.Rank()
+    local capped = ns.Skill.Capped()
+    layout(mode())
 
-    local rank = ns.Skill.Rank()
-    local catches = ns.Skill.Catches()
-    local expected = ns.Skill.Expected(rank)
-    bar:SetStatusBarColor(COLOUR[1], COLOUR[2], COLOUR[3])
-    -- The fill alone says how close the next point is; the words were
-    -- clutter. The count is in the tooltip, and in the stats window's row.
-    bar:SetValue(math.min(1, catches / expected))
-    bar.count:SetText("")
+    -- The left half: the next point, or what stops one.
+    local words, wordsColour = "Next point", WHITE
+    if tooLowHere() then
+        words, wordsColour = "too low here", REFUSED
+    elseif capped then
+        words = "capped"
+    end
+    bar.pointLabel:SetText(words)
+    bar.pointLabel:SetTextColor(wordsColour[1], wordsColour[2], wordsColour[3])
+
+    -- The fill alone says how close the next point is. The count is in the
+    -- tooltip, and in the stats window's row. A warning leaves it as it is.
+    if capped then
+        setFill(bar.pointFill, 1, CAPPED)
+        setFill(bar.skillFill, fraction(rank, maxRank), CAPPED)
+    else
+        local expected = ns.Skill.Expected(rank)
+        setFill(bar.pointFill, fraction(ns.Skill.Catches(), expected), BLUE)
+        setFill(bar.skillFill, fraction(rank, maxRank), GREEN)
+    end
+    bar.skillLabel:SetText(title())
+end
+
+--- Keep the fills and the words in their order over the bar, whatever level
+-- the bar is at: the fills just over it, the words over the fills. The stats
+-- window raises the bar over itself, and not every client carries a parent's
+-- new level down to its children.
+local function levels()
+    local level = bar:GetFrameLevel()
+    bar.pointFill:SetFrameLevel(level + 1)
+    bar.skillFill:SetFrameLevel(level + 1)
+    bar.overlay:SetFrameLevel(level + 3)
 end
 
 --- Draw the bar, or hide it, and have the stats window follow it.
@@ -137,16 +223,29 @@ function SkillBar.Refresh()
     if ns.StatsPanel and ns.StatsPanel.Sync then
         ns.StatsPanel.Sync(show)
     end
+    -- After the window has taken the bar or given it back, which sets its level.
+    levels()
 end
 
---- Short: the skill, and where the rest is. The count, the chance of a
--- point and the water here are in the stats window, under its rows.
+-- What the halves showing are, for the tooltip: none, at the last rank.
+local HALVES = {
+    both = "Left: catches toward your next skill point. Right: your skill against its cap.",
+    skill = "Your skill against its cap.",
+}
+
+--- Short: the skill, what the halves are, and where the rest is. The count,
+-- the chance of a point and the water here are in the stats window, under its
+-- rows.
 local function showTooltip(self)
     if not (ns.Skill.Rank() and GameTooltip) then
         return
     end
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     GameTooltip:SetText(title())
+    local halves = HALVES[mode()]
+    if halves then
+        GameTooltip:AddLine(halves, 0.7, 0.7, 0.7, true)
+    end
     GameTooltip:AddLine("Click to open or close your fishing stats.", 0.7, 0.7, 0.7, true)
     if not settings().locked then
         GameTooltip:AddLine("Drag to move it.", 0.7, 0.7, 0.7, true)
@@ -154,12 +253,20 @@ local function showTooltip(self)
     GameTooltip:Show()
 end
 
+--- One half's fill, a child of the bar. It takes no mouse, so a click or a
+-- drag on it reaches the bar.
+local function createFill()
+    local fill = CreateFrame("StatusBar", nil, bar)
+    fill:SetStatusBarTexture(TEXTURE)
+    fill:SetMinMaxValues(0, 1)
+    fill:SetValue(0)
+    fill:EnableMouse(false)
+    return fill
+end
+
 local function create()
-    bar = CreateFrame("StatusBar", "FishingForeverSkillBar", UIParent)
+    bar = CreateFrame("Frame", "FishingForeverSkillBar", UIParent)
     bar:SetSize(WIDTH, HEIGHT)
-    bar:SetStatusBarTexture(TEXTURE)
-    bar:SetMinMaxValues(0, 1)
-    bar:SetValue(0)
 
     local background = bar:CreateTexture(nil, "BACKGROUND")
     background:SetAllPoints()
@@ -176,13 +283,30 @@ local function create()
         bar.border = border
     end
 
-    local label = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    label:SetPoint("LEFT", 6, 0)
-    bar.label = label
+    bar.pointFill = createFill()
+    bar.skillFill = createFill()
 
-    local count = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    count:SetPoint("RIGHT", -6, 0)
-    bar.count = count
+    -- The words and the divider sit on a frame of their own above the fills:
+    -- a child frame is drawn over its parent's own text, so words on the bar
+    -- itself would be hidden behind them.
+    local overlay = CreateFrame("Frame", nil, bar)
+    overlay:SetAllPoints()
+    bar.overlay = overlay
+    levels()
+
+    local divider = overlay:CreateTexture(nil, "OVERLAY")
+    divider:SetColorTexture(0, 0, 0, 1)
+    divider:SetWidth(1)
+    bar.divider = divider
+
+    bar.pointLabel = overlay:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    bar.skillLabel = overlay:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+
+    -- The stats window widens the bar: the halves follow it.
+    bar:SetScript("OnSizeChanged", function()
+        layout(shownMode)
+    end)
+    layout(shownMode)
 
     bar:SetMovable(true)
     bar:SetClampedToScreen(true)
