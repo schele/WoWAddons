@@ -3,7 +3,7 @@
 ## Notes: One key to cast, loot and recast while fishing, a bar toward your next Fishing point, and stats of every catch by zone and skill.
 ## IconTexture: Interface\AddOns\FishingForever\icon
 ## Author: Skyler
-## Version: 0.3.0
+## Version: 0.4.0
 ## X-Wago-ID: jK8WJX6y
 ## SavedVariables: FishingForeverDB
 ## SavedVariablesPerCharacter: FishingForeverCharDB
