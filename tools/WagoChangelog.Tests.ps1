@@ -76,6 +76,38 @@ Describe "Get-WagoReleases" {
     }
 }
 
+# 653a887 was made where wago-uploads.json had not yet seen FishingForever
+# 0.3.0, so its copy of the file put 0.2.0 back, and the merge after it put
+# 0.3.0 back again. Neither is an upload.
+$afterTheMerge = "3815b4c"
+
+Describe "Test-ChangelogAncestor" {
+    It "says whether a commit is the other's ancestor" {
+        Test-ChangelogAncestor "0674d94" "6ffed94" | Should Be $true
+        Test-ChangelogAncestor "6ffed94" "6ffed94" | Should Be $true
+        Test-ChangelogAncestor "6ffed94" "0674d94" | Should Be $false
+    }
+    It "stops when git cannot tell, rather than guess" {
+        { Test-ChangelogAncestor "0123456789abcdef0123456789abcdef01234567" "6ffed94" } | Should Throw "merge-base"
+    }
+}
+
+Describe "Get-WagoReleases, a stale record" {
+    It "does not count a record that went back to a commit the last upload holds" {
+        (Get-WagoReleases "FishingForever" -Until $afterTheMerge | ForEach-Object Version) -join "," | Should Be "0.2.0,0.3.0"
+    }
+}
+
+Describe "Get-WagoChangelog, a stale record" {
+    $text = Get-WagoChangelog "FishingForever" "FishingForever" "0.4.0" -Date ([datetime]"2026-11-27") -Until $afterTheMerge
+    It "lists each version once, newest first" {
+        (([regex]::Matches($text, '(?m)^## (\S+)') | ForEach-Object { $_.Groups[1].Value }) -join ",") | Should Be "0.4.0,0.3.0,0.2.0"
+    }
+    It "does not say a version has nothing in it when it has" {
+        $text | Should Not Match "- Version 0\.2\.0"
+    }
+}
+
 Describe "Get-WagoChangelog, failing" {
     It "stops when a recorded commit is gone, rather than send its versions empty" {
         $gone = @{ version = "0.2.0"; commit = "0123456789abcdef0123456789abcdef01234567" }

@@ -47,9 +47,26 @@ function Format-WagoChangelog([object[]]$Releases) {
 }
 
 <#
+    Whether $Commit is $Of itself or one of its ancestors. Throws when git
+    cannot tell, as for a commit that is gone: an answer guessed there would
+    send a changelog that looks whole and is not.
+#>
+function Test-ChangelogAncestor([string]$Commit, [string]$Of) {
+    & git -C $script:changelogRepo merge-base --is-ancestor $Commit $Of
+    switch ($LASTEXITCODE) {
+        0 { return $true }
+        1 { return $false }
+        default { throw "git merge-base --is-ancestor $Commit $Of failed (exit $LASTEXITCODE)." }
+    }
+}
+
+<#
     Every upload of an addon so far, oldest first, each @{ Version; Commit;
     Date }, read from the git history of wago-uploads.json: each commit that
-    changed the addon's recorded commit is an upload, dated by that commit.
+    changed the addon's recorded commit is an upload, dated by that commit,
+    unless the record only went back to a commit the last upload already
+    holds. That is a copy of the file made on a branch that had not seen the
+    upload yet, and the merge after it puts the upload back: neither is one.
     $Current is the record on disk, @{ version; commit }: an upload not
     committed yet, added dated today when git does not have it. $Until is
     the commit the history ends at (the tests pin it).
@@ -63,6 +80,9 @@ function Get-WagoReleases([string]$Name, [hashtable]$Current = $null, [string]$U
         $record = (Invoke-ChangelogGit @("show", "${sha}:wago-uploads.json")) -join "`n" | ConvertFrom-Json
         $entry = $record.$Name
         if ($entry -and $entry.commit -ne $last) {
+            if ($last -and (Test-ChangelogAncestor $entry.commit $last)) {
+                continue
+            }
             $releases += [pscustomobject]@{
                 Version = $entry.version
                 Commit  = $entry.commit
